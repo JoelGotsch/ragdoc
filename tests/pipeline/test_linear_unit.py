@@ -1,8 +1,9 @@
-"""Unit tests for pure-logic functions: Document.content_hash(), SimpleChunker ID
-generation, and TokenSplitter splitting behavior.
+"""Unit tests for pure-logic functions: SimpleChunker ID generation and
+TokenSplitter splitting behavior.
 
 These tests exercise deterministic behavior of core primitives without running
-the full DocumentPipeline.
+the full DocumentPipeline. Document.content_hash() itself is covered in
+tests/test_content_hash.py.
 """
 
 from __future__ import annotations
@@ -16,64 +17,6 @@ from ragdoc.document import Document, Heading, Paragraph
 from ragdoc.pipeline import TokenSplitter
 
 from .conftest import make_document
-
-# --- TestContentHash ---
-
-
-def test_content_hash_returns_64_char_hex():
-    doc = make_document()
-    h = doc.content_hash()
-    assert isinstance(h, str)
-    assert len(h) == 64
-    assert all(c in "0123456789abcdef" for c in h)
-
-
-def test_content_hash_same_content_same_hash():
-    doc1 = make_document(title="A", body="Hello world.")
-    doc2 = make_document(title="A", body="Hello world.")
-    assert doc1.content_hash() == doc2.content_hash()
-
-
-def test_content_hash_different_content_different_hash():
-    doc1 = make_document(title="A", body="Hello world.")
-    doc2 = make_document(title="A", body="Goodbye world.")
-    assert doc1.content_hash() != doc2.content_hash()
-
-
-def test_content_hash_different_title_different_hash():
-    doc1 = make_document(title="Alpha")
-    doc2 = make_document(title="Beta")
-    assert doc1.content_hash() != doc2.content_hash()
-
-
-def test_content_hash_empty_document_is_stable():
-    doc = Document()
-    h1 = doc.content_hash()
-    h2 = doc.content_hash()
-    assert h1 == h2
-
-
-def test_content_hash_custom_renderer_accepted():
-    from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
-
-    renderer = Renderer(format=OutputFormat.PLAIN, element_renderer=render_for_prompt)
-    doc = make_document()
-    h = doc.content_hash(renderer=renderer)
-    assert len(h) == 64
-
-
-def test_content_hash_custom_renderer_can_differ_from_default():
-    """Different renderers may produce the same or different hashes -- just
-    ensure neither raises and both return valid hex strings."""
-    from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
-
-    doc = make_document(title="Test", body="Some text here.")
-    default_hash = doc.content_hash()
-    plain_renderer = Renderer(format=OutputFormat.PLAIN, element_renderer=render_for_prompt)
-    plain_hash = doc.content_hash(renderer=plain_renderer)
-    assert len(default_hash) == 64
-    assert len(plain_hash) == 64
-
 
 # --- TestSimpleChunkerContentHash ---
 

@@ -10,10 +10,8 @@ and the chunk/embed stage::
     await vec_pipeline.run()                      # reads them back, re-chunks edited ones
 
 The store is **index-free**: :meth:`list_source_state` computes each document's
-``content_hash`` from the live file on disk, so manual edits are detected at Boundary 2 (no
-stale cached index). This trades a cheap index read for loading the documents — appropriate for
-the local-dev use case. (A server-side store such as Qdrant, where documents are only mutated
-via ``upsert``, can keep an authoritative stored hash instead.)
+``content_hash`` — cheap, pure Python — from the live file on disk, so manual edits are
+detected at Boundary 2 (no stale cached index).
 
 Notes:
     * One Document per ``source_id`` (no versioning).

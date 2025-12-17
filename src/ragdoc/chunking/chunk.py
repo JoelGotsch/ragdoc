@@ -50,7 +50,7 @@ class Chunk(BaseModel, Generic[TMetadata]):
     content_hash: str | None = Field(
         default=None,
         description=(
-            "Renderer-stable hash of the Document this chunk derived from "
+            "Canonical-content hash of the Document this chunk derived from "
             "(Document.content_hash()). Drives DocumentStore -> VectorStore change detection: "
             "a stored chunk is re-generated when its source Document's content_hash changes "
             "(e.g. a manual edit in the DocumentStore). Populated on the direct path too. "
