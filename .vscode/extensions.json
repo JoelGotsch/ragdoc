@@ -1,0 +1,9 @@
+{
+  // Recommended extensions for working on ragdoc (matches the toolchain in
+  // pyproject.toml: ruff for lint/format, basedpyright for type checking).
+  "recommendations": [
+    "ms-python.python",
+    "charliermarsh.ruff",
+    "detachhead.basedpyright"
+  ]
+}

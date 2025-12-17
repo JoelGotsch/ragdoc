@@ -223,3 +223,6 @@ scripts/output/
 plans/
 designs/
 
+
+# Auto-generated devcontainer feature lock (regenerates; pins the claude-code feature)
+.devcontainer/devcontainer-lock.json
