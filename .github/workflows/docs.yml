@@ -1,0 +1,51 @@
+name: Documentation
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "src/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+# Allow one concurrent deployment.
+concurrency:
+  group: docs
+  cancel-in-progress: true
+
+permissions:
+  contents: write # required to push to the gh-pages branch
+
+jobs:
+  build-and-deploy:
+    name: Build and deploy MkDocs site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # mike needs full history to manage versioned docs
+
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync --all-extras --group docs
+
+      - name: Build documentation (marimo notebooks + MkDocs)
+        run: uv run make html
+
+      - name: Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          cname: ""

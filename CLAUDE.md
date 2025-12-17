@@ -19,16 +19,25 @@ uv run pytest tests/ -k "test_name"  # single test by name
 uv run pytest-watcher tests/         # watch mode
 ```
 
-**Type checking / linting:**
+**Lint, format, type-check (ruff + basedpyright):**
 ```bash
-uv run mypy src/
-uv run black src/ tests/
-uv run isort src/ tests/
+uv run ruff check src tests          # lint
+uv run ruff check src tests --fix    # lint + autofix
+uv run ruff format src tests         # format (black-compatible, line-length 120)
+uv run basedpyright                  # type check (strict)
+```
+These mirror the CI jobs; tox wraps them as `tox -e lint` and `tox -e type`.
+
+**Pre-commit hooks:**
+```bash
+uv run pre-commit install            # set up the git hook
+uv run pre-commit run --all-files    # run ruff + hygiene hooks on everything
 ```
 
-**Build docs (Sphinx):**
+**Build docs (MkDocs + marimo):**
 ```bash
-make html
+make html     # export marimo notebooks to WASM, then build the MkDocs site
+make serve    # live-reload preview
 ```
 
 ## Architecture
@@ -203,7 +212,7 @@ Once an option is chosen, create `plans/PLAN-<topic>.md` with:
 - **Type hints:** Strict — no `Any`, no `**kwargs`. Use `Callable` type aliases for injectable functions (e.g., `SizeToLevelMapper`).
 - **CSS extraction functions:** Always return `None` when a property is absent (not a default value).
 - **Naming:** Processors = `*Processor`, LLM-based async resolvers = `*Resolver`, Protocols describe capability, standalone functions = `verb_noun`.
-- **Formatter:** black (line-length=100), isort (black profile).
+- **Formatter / linter:** ruff (line-length=120; lint + import-sort + format). Type checking: basedpyright (strict). Config lives in `pyproject.toml`.
 
 ### Async-only conventions
 
