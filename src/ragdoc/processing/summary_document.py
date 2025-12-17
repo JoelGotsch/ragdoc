@@ -405,7 +405,9 @@ class DocumentSummarizerProcessor(DocumentProcessor):
 
         async def call(text: str) -> str:
             """One LLM summarization call with retries."""
-            messages = build_summary_messages(text, system_prompt=settings.system_prompt or SUMMARY_SYSTEM_PROMPT)
+            # _resolve_and_validate always sets a non-None system_prompt before the processor runs.
+            assert settings.system_prompt is not None
+            messages = build_summary_messages(text, system_prompt=settings.system_prompt)
             for attempt in range(settings.max_retries + 1):
                 try:
                     response = await client.beta.chat.completions.parse(
