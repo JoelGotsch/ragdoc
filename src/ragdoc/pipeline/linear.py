@@ -266,7 +266,7 @@ class DocumentPipeline(Generic[TMetadata]):
             yield batch
 
     async def _parse(self, source: Path) -> Document:
-        """Parse *source* and stamp ``source_id`` (pure, no I/O). Shared parse prefix."""
+        """Parse *source* and stamp ``source_id`` (a pure function of the path). Shared parse prefix."""
         logger.debug(f"Parsing {source.name}")
         doc = await self._parser(source)
         logger.debug(f"Parsed {source.name}: {len(doc.elements)} elements")

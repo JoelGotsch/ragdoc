@@ -217,8 +217,9 @@ class VectorStorePipeline(Generic[TMetadata]):
                         skipped.append(sid)
                         return
                     chunks = await self._pipeline.run(path)
+                    # source_id is already stamped by chunk_document (via doc.source_id, same
+                    # source_id_fn). source_hash is a sync-only concern unknown at chunk time.
                     for chunk in chunks:
-                        chunk.source_id = sid
                         chunk.source_hash = file_hash
                     content_hash = chunks[0].content_hash if chunks else None
                     change: SourceChange[Chunk] = SourceChange(
@@ -243,7 +244,8 @@ class VectorStorePipeline(Generic[TMetadata]):
     async def _plan_from_doc_store(
         self, source_ids: Iterable[str] | None, delete_orphans: bool
     ) -> tuple[ChangeSet[Chunk], list[str], list[tuple[str, BaseException]]]:
-        assert self._document_store is not None
+        if self._document_store is None:
+            raise AssertionError("_plan_from_doc_store called without a document_store")
         doc_state = await self._document_store.list_source_state()
         vec_state = await self._vector_store.list_source_state()
         targets = list(source_ids) if source_ids is not None else list(doc_state.keys())
@@ -450,8 +452,9 @@ class VectorStorePipeline(Generic[TMetadata]):
                         result.skipped.append(sid)
                         return
                     chunks = await self._pipeline.run(path)
+                    # source_id is already stamped by chunk_document (via doc.source_id, same
+                    # source_id_fn). source_hash is a sync-only concern unknown at chunk time.
                     for chunk in chunks:
-                        chunk.source_id = sid
                         chunk.source_hash = file_hash
                     await self._sync_one(sid, chunks, is_update=existing is not None)
                     result.processed.append(sid)
@@ -468,7 +471,8 @@ class VectorStorePipeline(Generic[TMetadata]):
         return result
 
     async def _run_from_doc_store(self, source_ids: Iterable[str] | None, delete_orphans: bool) -> UpdateResult:
-        assert self._document_store is not None
+        if self._document_store is None:
+            raise AssertionError("_run_from_doc_store called without a document_store")
         doc_state = await self._document_store.list_source_state()
         vec_state = await self._vector_store.list_source_state()
         targets = list(source_ids) if source_ids is not None else list(doc_state.keys())

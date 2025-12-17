@@ -133,6 +133,38 @@ async def test_upsert_oversized_payload_raises_document_too_large(client):
 
 
 @pytest.mark.anyio
+async def test_upsert_400_larger_than_allowed_raises_document_too_large(client):
+    # Qdrant reports oversized payloads as a 400 with "larger than allowed" wording.
+    rejected = UnexpectedResponse(
+        status_code=400,
+        reason_phrase="Bad Request",
+        content=b"JSON payload (1234 bytes) is larger than allowed (limit 1024 bytes)",
+        headers=None,
+    )
+    client.upsert = AsyncMock(side_effect=rejected)
+    store = QdrantDocumentStore(client, "docs")
+    with pytest.raises(DocumentTooLargeError) as exc:
+        await store.upsert([make_document("big.pdf")])
+    assert exc.value.source_id == "big.pdf"
+
+
+@pytest.mark.anyio
+async def test_upsert_400_unrelated_payload_error_propagates(client):
+    # A 400 that merely mentions "payload" (a validation error, not a size error) must NOT be
+    # misclassified as too-large — it propagates as the raw UnexpectedResponse.
+    other = UnexpectedResponse(
+        status_code=400,
+        reason_phrase="Bad Request",
+        content=b"payload index for field 'foo' does not exist",
+        headers=None,
+    )
+    client.upsert = AsyncMock(side_effect=other)
+    store = QdrantDocumentStore(client, "docs")
+    with pytest.raises(UnexpectedResponse):
+        await store.upsert([make_document("a.pdf")])
+
+
+@pytest.mark.anyio
 async def test_upsert_unrelated_error_propagates(client):
     other = UnexpectedResponse(status_code=500, reason_phrase="Server Error", content=b"boom", headers=None)
     client.upsert = AsyncMock(side_effect=other)

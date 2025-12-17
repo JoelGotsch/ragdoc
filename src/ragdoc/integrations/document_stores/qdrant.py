@@ -98,13 +98,22 @@ def _document_to_point(document: Document) -> models.PointStruct:
     return models.PointStruct(id=_point_id(document.source_id), vector=[0.0], payload=payload)
 
 
+_SIZE_REJECTION_PHRASES = ("too large", "larger than allowed")
+
+
 def _is_too_large(exc: UnexpectedResponse) -> bool:
-    """Heuristically detect Qdrant rejecting a payload as too large."""
-    if exc.status_code in (413,):
+    """Heuristically detect Qdrant rejecting a payload as too large.
+
+    Intentionally approximate. 413 (Payload Too Large) is unambiguous; for 400 we require an
+    explicit size phrase (Qdrant emits ``"larger than allowed"``; ``"too large"`` covers proxies
+    and older versions). Matching bare ``"payload"`` is too broad — Qdrant uses it for validation
+    errors unrelated to size.
+    """
+    if exc.status_code == 413:
         return True
     raw = getattr(exc, "content", b"") or b""
     text = raw.decode("utf-8", "ignore") if isinstance(raw, (bytes, bytearray)) else str(raw)
-    return exc.status_code == 400 and ("too large" in text.lower() or "payload" in text.lower())
+    return exc.status_code == 400 and any(phrase in text.lower() for phrase in _SIZE_REJECTION_PHRASES)
 
 
 class QdrantDocumentStore:
@@ -164,9 +173,10 @@ class QdrantDocumentStore:
             await self._client.upsert(collection_name=self._collection_name, points=points)
         except UnexpectedResponse as exc:
             if _is_too_large(exc):
-                # Attribute the failure to the largest document in the batch.
-                worst = max(documents, key=lambda d: len(d.model_dump_json()))
-                raise DocumentTooLargeError(worst.source_id or "", len(worst.model_dump_json())) from exc
+                # Attribute the failure to the largest document in the batch (serialize once each).
+                sized = [(len(doc.model_dump_json()), doc) for doc in documents]
+                worst_size, worst = max(sized, key=lambda t: t[0])
+                raise DocumentTooLargeError(worst.source_id or "", worst_size) from exc
             raise
         return [doc.source_id for doc in documents if doc.source_id]
 
