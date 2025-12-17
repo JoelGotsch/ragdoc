@@ -23,7 +23,6 @@ deterministic fakes), keeping the loop itself pure and testable.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -32,7 +31,7 @@ from typing import TYPE_CHECKING, Generic, cast
 from pydantic import BaseModel, Field
 
 from ragdoc.extraction.dates import FuzzyDate
-from ragdoc.extraction.entity import Entity
+from ragdoc.extraction.entity import Entity, mint_entity_id
 from ragdoc.extraction.mention import Mention, PayloadT
 from ragdoc.llm import ChatClient, LLMRefusalError, call_structured
 
@@ -272,7 +271,7 @@ class EntityResolutionPipeline(Generic[PayloadT]):
 
     async def _canonicalize(self, cluster: _Cluster[PayloadT]) -> Entity[PayloadT]:
         member_ids = sorted(cluster.mention_ids)
-        entity_id = hashlib.sha256("\x00".join(member_ids).encode("utf-8")).hexdigest()
+        entity_id = mint_entity_id(member_ids)
 
         if self._canonicalizer is not None:
             canonical_payload = await self._canonicalizer(cluster.payloads)

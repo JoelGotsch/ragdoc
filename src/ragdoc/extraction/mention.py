@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+from collections.abc import Mapping
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
@@ -58,7 +59,13 @@ class Mention(BaseModel, Generic[PayloadT]):
     mention_id: str = Field(description="Minted primary key (see mint_mention_id); not a stable identity.")
     source_id: str = Field(description="Sync identity key of the source this mention came from.")
     source_path: str | None = Field(default=None, description="Full path to the source file, if known.")
-    source_hash: str = Field(description="SHA-256 of the original source file bytes (Boundary-1 change token).")
+    source_hash: str | None = Field(
+        default=None,
+        description=(
+            "SHA-256 of the original source file bytes (Boundary-1 change token). Honestly "
+            "optional: None when no file-byte hash exists — never faked from the content hash."
+        ),
+    )
     content_hash: str | None = Field(
         default=None,
         description="Renderer-stable hash of the source Document (Boundary-2 change token; None ⇒ always changed).",
@@ -86,13 +93,33 @@ def finalize_mention(
 
     Used by :class:`~ragdoc.extraction.pipeline.MentionStorePipeline` so a source's
     mentions share one ``content_hash`` (uniform per source, as required for change detection),
-    overriding the best-effort values the standalone processor computed. ``ordinal`` and
-    ``payload`` are unchanged, so re-minting is deterministic.
+    overriding the best-effort values the extractor computed. ``source_hash`` is stamped as
+    given — ``None`` means "no file-byte hash exists" (honestly optional, never faked from the
+    content hash). ``ordinal`` and ``payload`` are unchanged, so re-minting is deterministic.
     """
     if source_id is not None:
         mention.source_id = source_id
-    if source_hash is not None:
-        mention.source_hash = source_hash
+    mention.source_hash = source_hash
     mention.content_hash = content_hash
     mention.mention_id = mint_mention_id(mention.source_id, content_hash, mention.ordinal, mention.payload)
     return mention
+
+
+def rewrite_edge_refs(payload: BaseModel, id_map: Mapping[str, str]) -> None:
+    """Rewrite an edge-carrying payload's endpoint refs through *id_map* (old -> new mention id).
+
+    Generic over any payload carrying a ``refs`` model with ``source_mention_id`` /
+    ``target_mention_id`` string fields (the :class:`~ragdoc.extraction.schema.EdgeRef` shape),
+    checked structurally so no single schema is special-cased. Payloads without such refs are
+    left untouched; ref values absent from *id_map* are preserved (the caller decides whether a
+    dangling ref is an error — e.g. kg_resolution surfaces them as orphans).
+    """
+    refs = getattr(payload, "refs", None)
+    if refs is None:
+        return
+    src = getattr(refs, "source_mention_id", None)
+    tgt = getattr(refs, "target_mention_id", None)
+    if isinstance(src, str) and src in id_map:
+        refs.source_mention_id = id_map[src]
+    if isinstance(tgt, str) and tgt in id_map:
+        refs.target_mention_id = id_map[tgt]

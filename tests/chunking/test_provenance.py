@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import re
+import uuid
 
 import pytest
 
@@ -18,7 +18,12 @@ def test_mint_chunk_id_deterministic():
     a = mint_chunk_id("src", 1, 0, "hash")
     b = mint_chunk_id("src", 1, 0, "hash")
     assert a == b
-    assert re.fullmatch(r"[0-9a-f]{64}", a)
+
+
+def test_mint_chunk_id_is_canonical_uuid_string():
+    """Default ids must be valid vector-store point ids (Qdrant accepts only UUIDs or uints)."""
+    minted = mint_chunk_id("src", 1, 0, "hash")
+    assert minted == str(uuid.UUID(minted))  # canonical lowercase-hyphenated form
 
 
 @pytest.mark.parametrize(

@@ -240,15 +240,14 @@ Guidelines:
         return None
 
     async def process(self, document: Document) -> Document:
-        """Analyze all headings using LLM and update their levels."""
+        """Analyze all headings using LLM and update their levels.
 
-        # Idempotency guard: a resolved title means this (or another title processor)
-        # already ran. Re-running re-detects a *different* "title" and re-strips the
-        # elements before it — the non-idempotency this guard prevents. Mirrors
-        # TitleDetectionProcessor.
-        if document.title:
-            logger.debug("LLMHeadingResolver: document already has a title, skipping")
-            return document
+        Heading-*level* resolution always runs — parsers like html (``<title>``) and mineru
+        (``document_title``) set ``document.title`` on first parse, and that must not disable
+        level resolution. Only the title-assignment step respects an existing title (see
+        :meth:`_apply_levels`): the title is never overwritten and the destructive
+        title-element removal steps are skipped, which keeps re-runs non-destructive.
+        """
 
         # Collect heading information
         heading_infos = self._collect_heading_infos(document)
@@ -384,6 +383,10 @@ Guidelines:
         - NOT_DETERMINABLE → same as absent, left unchanged.
         - NOT_HEADING → element converted to Paragraph; ``llm_heading_level = "none"`` in metadata.
         - DOCUMENT_TITLE → ``document.title`` set; metadata marks the element as the title.
+          When the document *already* has a title (parser-set, or a previous run of this or
+          another title processor), the judgment is ignored: the title is never overwritten
+          and the title-element removal steps are skipped (idempotency guard — re-detecting
+          a different "title" and re-stripping elements before it would corrupt the document).
         - H1-H6 → ``element.level`` updated; ``llm_heading_level`` set in metadata.
         """
         judgment_by_id = {j.id: j for j in judgments}
@@ -407,10 +410,16 @@ Guidelines:
                 new_elem.metadata["llm_heading_level"] = "none"
                 document.elements[info.index] = new_elem
             elif judgment.level == HeadingLevel.DOCUMENT_TITLE:
-                document.title = element.text
-                element.metadata["llm_heading_level"] = "document-title"
-                element.metadata["is_document_title"] = True
-                title_element_idx = info.index
+                if document.title:
+                    logger.debug(
+                        "LLMHeadingResolver: document already has a title, keeping %r (heading left unchanged)",
+                        document.title,
+                    )
+                else:
+                    document.title = element.text
+                    element.metadata["llm_heading_level"] = "document-title"
+                    element.metadata["is_document_title"] = True
+                    title_element_idx = info.index
             else:
                 # Standard h1-h6
                 level_num = int(judgment.level.value[1])

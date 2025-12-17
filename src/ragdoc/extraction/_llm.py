@@ -21,12 +21,16 @@ from pydantic import BaseModel
 
 from ragdoc.llm import ChatClient, call_structured
 
+# Renderer/tokenizer default resolution is library-wide (chunkers and summarizers share
+# the same fallbacks), so it lives in ragdoc.rendering.defaults / ragdoc.utils.tokenizer;
+# re-exported here so extraction call sites keep one import point for LLM plumbing.
+from ragdoc.rendering.defaults import resolve_renderer as resolve_renderer
+from ragdoc.utils.tokenizer import resolve_tokenizer as resolve_tokenizer
+
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
 
     from ragdoc.extraction.structured import ExtractionSettings
-    from ragdoc.rendering import Renderer
-    from ragdoc.utils import Tokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -42,24 +46,6 @@ def resolve_model(explicit: str | None, settings: ExtractionSettings) -> str:
     from ragdoc.config import get_config
 
     return get_config().default_llm_model
-
-
-def resolve_renderer(explicit: Renderer | None) -> Renderer:
-    """Resolve the document renderer: explicit → ``Renderer(MARKDOWN, render_for_prompt)``."""
-    if explicit is not None:
-        return explicit
-    from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
-
-    return Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
-
-
-def resolve_tokenizer(explicit: Tokenizer | None) -> Tokenizer:
-    """Resolve the tokenizer for the ``min_tokens`` gate: explicit → ``GPTTokenizer()``."""
-    if explicit is not None:
-        return explicit
-    from ragdoc.utils import GPTTokenizer
-
-    return GPTTokenizer()
 
 
 def build_messages(text: str, *, system_prompt: str, user_message: str) -> list[ChatCompletionMessageParam]:

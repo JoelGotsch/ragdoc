@@ -219,7 +219,8 @@ class VectorStorePipeline(Generic[TMetadata]):
         return SourceChange(
             source_id=src.source_id,
             source_hash=doc.source_hash or "",
-            content_hash=doc.content_hash(),
+            # ChunkPipeline.run just stamped doc.content_hash() on every chunk — reuse it.
+            content_hash=chunks[0].content_hash if chunks else doc.content_hash(),
             items=chunks,
         )
 
@@ -239,7 +240,10 @@ class VectorStorePipeline(Generic[TMetadata]):
                 sources=[
                     SyncSource(source_id=sid, change_token=digest, path=path) for sid, (path, digest) in current.items()
                 ],
-                live_source_ids=frozenset(current),
+                # Sources whose hashing failed are still live (unreadable ≠ vanished):
+                # they must never become orphan-deletion candidates.
+                live_source_ids=frozenset(current) | frozenset(current.errors),
+                pre_failed=tuple(current.errors.items()),
             )
 
         doc_state = await self._document_store.list_source_state()

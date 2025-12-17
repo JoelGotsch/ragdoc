@@ -252,7 +252,9 @@ class DocumentSummarizerProcessor(DocumentProcessor):
     :meth:`process` returns unchanged without an LLM call.
 
     Args:
-        client: Async OpenAI-compatible client. ``None`` falls back to ``get_config().openai_client``.
+        client: Async OpenAI-compatible client. ``None`` falls back to ``get_config().openai_client``;
+            when neither is available, :class:`~ragdoc.llm.LLMNotConfiguredError` is raised at
+            construction (fail-loud, never at :meth:`process` time).
         model: Model name. ``None`` falls back to ``settings.model_name`` then
             ``get_config().default_llm_model``.
         settings: :class:`DocumentSummarizerSettings`. ``None`` reads env (``DOCUMENT_SUMMARIZER_*``).
@@ -279,7 +281,8 @@ class DocumentSummarizerProcessor(DocumentProcessor):
         concurrency: int | asyncio.Semaphore = 1,
     ) -> None:
         self.settings = settings or DocumentSummarizerSettings()
-        self._client = client
+        # Fail-loud at construction (library client policy): explicit → config → LLMNotConfiguredError.
+        self._client: ChatClient = resolve_openai_client(client)
         self._model = model
         self._renderer = renderer
         self._splitter = splitter
@@ -287,9 +290,6 @@ class DocumentSummarizerProcessor(DocumentProcessor):
         self.metadata_key = metadata_key
         self.overwrite = overwrite
         self._concurrency = concurrency
-
-    def _get_client(self) -> ChatClient:
-        return resolve_openai_client(self._client)
 
     def _get_model(self) -> str:
         if self._model is not None:
@@ -301,18 +301,14 @@ class DocumentSummarizerProcessor(DocumentProcessor):
         return get_config().default_llm_model
 
     def _get_renderer(self) -> Renderer:
-        if self._renderer is not None:
-            return self._renderer
-        from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
+        from ragdoc.rendering import resolve_renderer
 
-        return Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
+        return resolve_renderer(self._renderer)
 
     def _get_tokenizer(self) -> Tokenizer:
-        if self._tokenizer is not None:
-            return self._tokenizer
-        from ragdoc.utils import GPTTokenizer
+        from ragdoc.utils import resolve_tokenizer
 
-        return GPTTokenizer()
+        return resolve_tokenizer(self._tokenizer)
 
     def _get_splitter(self, renderer: Renderer, tokenizer: Tokenizer) -> Splitter:
         if self._splitter is not None:
@@ -329,12 +325,13 @@ class DocumentSummarizerProcessor(DocumentProcessor):
 
         renderer = self._get_renderer()
         tokenizer = self._get_tokenizer()
-        rendered = renderer.render(document)
+        # Rendering shells out to pandoc for non-HTML formats — blocking work off the event loop.
+        rendered = await asyncio.to_thread(renderer.render, document)
         if not rendered.strip():
             logger.debug("DocumentSummarizer: empty render, nothing to summarize")
             return document
 
-        client = self._get_client()
+        client = self._client
         model = self._get_model()
         splitter = self._get_splitter(renderer, tokenizer)
         settings = self.settings
@@ -387,7 +384,7 @@ class DocumentSummarizerProcessor(DocumentProcessor):
 
         async def summarize_doc(doc: Document, depth: int, parent_tokens: int | None) -> str:
             _check_depth(depth)
-            text = renderer.render(doc)
+            text = await asyncio.to_thread(renderer.render, doc)
             n = tokenizer.count(text)
             if n <= settings.min_tokens:
                 return text
@@ -402,7 +399,9 @@ class DocumentSummarizerProcessor(DocumentProcessor):
             # Split a copy so split_document's in-place split_sequence/split_total stamp never
             # touches the real document's metadata.
             doc_copy = doc.model_copy(update={"metadata": dict(doc.metadata)})
-            pieces = splitter(doc_copy)
+            # Splitting renders per element/group to measure token budgets — blocking work
+            # (pandoc subprocesses) off the event loop, mirroring ChunkPipeline.run.
+            pieces = await asyncio.to_thread(splitter, doc_copy)
             if len(pieces) <= 1:
                 logger.warning("DocumentSummarizer: splitter could not split oversized content; truncating")
                 return await call(tokenizer.truncate(text, settings.max_input_tokens))

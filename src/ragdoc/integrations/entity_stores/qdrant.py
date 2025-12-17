@@ -47,6 +47,22 @@ def _entity_to_payload(entity: Entity) -> dict:
     return payload
 
 
+def _bound_condition(key: str, date_range: models.DatetimeRange) -> models.Filter:
+    """One date bound as a nested *should*: in *date_range* OR *key* absent (= unbounded).
+
+    A half-bounded entity stores no payload key for its open side (see
+    :func:`_entity_to_payload`); a bare ``must`` range condition could never match it,
+    diverging from :meth:`~ragdoc.extraction.dates.FuzzyDate.overlaps` where a ``None``
+    bound is unbounded.
+    """
+    return models.Filter(
+        should=[
+            models.FieldCondition(key=key, range=date_range),
+            models.IsEmptyCondition(is_empty=models.PayloadField(key=key)),
+        ]
+    )
+
+
 class QdrantEntityStore(_QdrantCollectionStore):
     """Async :class:`~ragdoc.extraction.entity.EntityStore` backed by Qdrant.
 
@@ -138,17 +154,25 @@ class QdrantEntityStore(_QdrantCollectionStore):
     async def query(self, query: EntityQuery) -> list[Entity]:
         """Filter entities **server-side**: a date-interval overlap plus exact payload-field matches.
 
-        Date overlap uses the half-open rule ``date_start < query.end AND date_end > query.start``
-        (entities with no date are excluded by a date filter). ``where`` keys match the nested
+        Date overlap uses the half-open rule ``date_start < query.end AND date_end > query.start``,
+        with **missing-bound = unbounded**, mirroring :func:`~ragdoc.extraction.query.entity_matches`
+        over :meth:`~ragdoc.extraction.dates.FuzzyDate.overlaps`: a half-bounded entity (e.g. EDTF
+        ``"1994/.."``) stores no ``date_end`` payload key, so each bound is a nested *should* —
+        in-range OR key-absent. Entities with no date at all (``date`` null) are excluded by any
+        date filter, again matching the local semantics. ``where`` keys match the nested
         ``payload.<field>`` path. For efficiency, index the fields you filter on via
         :meth:`create`'s ``indexed_fields`` (``date_start`` / ``date_end`` are always indexed).
         """
         conditions: list[models.Condition] = []
         if query.date is not None:
+            # Parity with entity_matches: an entity without any date never satisfies a date filter.
+            conditions.append(
+                models.Filter(must_not=[models.IsEmptyCondition(is_empty=models.PayloadField(key="date"))])
+            )
             if query.date.end is not None:
-                conditions.append(models.FieldCondition(key=_DATE_START, range=models.DatetimeRange(lt=query.date.end)))
+                conditions.append(_bound_condition(_DATE_START, models.DatetimeRange(lt=query.date.end)))
             if query.date.start is not None:
-                conditions.append(models.FieldCondition(key=_DATE_END, range=models.DatetimeRange(gt=query.date.start)))
+                conditions.append(_bound_condition(_DATE_END, models.DatetimeRange(gt=query.date.start)))
         for key, value in query.where.items():
             conditions.append(models.FieldCondition(key=f"payload.{key}", match=models.MatchValue(value=value)))
 

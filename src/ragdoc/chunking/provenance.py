@@ -16,6 +16,7 @@ idempotent vector-store upserts without collisions between identical-content spl
 from __future__ import annotations
 
 import hashlib
+import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -72,9 +73,11 @@ def resolve_chunk_provenance(document: Document) -> ChunkProvenance:
 def mint_chunk_id(source_id: str, split_sequence: int, chunk_ordinal: int, content_hash: str) -> str:
     """Deterministic chunk id over the 4-tuple identity of a chunk.
 
-    SHA-256 hex digest of the four parts joined with ``"\\x1f"`` (the unit separator —
-    unambiguous versus any raw string concatenation, so ``("a1", 1, ...)`` and
-    ``("a", 11, ...)`` never collide).
+    A UUID derived from the SHA-256 of the four parts joined with ``"\\x1f"`` (the unit
+    separator — unambiguous versus any raw string concatenation, so ``("a1", 1, ...)`` and
+    ``("a", 11, ...)`` never collide): the first 16 digest bytes become the UUID. The id is
+    UUID-shaped (rather than the raw hex digest) so default ids are valid vector-store point
+    ids out of the box — Qdrant, for one, accepts only UUIDs or unsigned integers.
 
     Args:
         source_id: Sync identity key of the source document.
@@ -83,7 +86,8 @@ def mint_chunk_id(source_id: str, split_sequence: int, chunk_ordinal: int, conte
         content_hash: Canonical content hash of the source document.
 
     Returns:
-        64-character lowercase hex string.
+        36-character canonical UUID string, deterministic in the four inputs.
     """
     joined = "\x1f".join((source_id, str(split_sequence), str(chunk_ordinal), content_hash))
-    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(joined.encode("utf-8")).digest()
+    return str(uuid.UUID(bytes=digest[:16]))

@@ -249,7 +249,13 @@ def _classify(exc: Exception) -> tuple[bool, float | None]:
         ``(retryable, retry_after_seconds)`` — ``retry_after_seconds`` is only ever non-``None``
         for a rate limit carrying a parseable ``Retry-After`` header.
     """
-    errors = _openai_errors()
+    try:
+        errors = _openai_errors()
+    except ImportError:
+        # Base install with a custom structural ChatClient/EmbeddingsClient: there are no
+        # openai exception types to classify against. Treat everything as non-retryable so
+        # the ORIGINAL exception propagates instead of being masked by an ImportError.
+        return False, None
     if isinstance(exc, errors.rate_limit):  # 429 — check first: subclass of APIStatusError
         return True, _retry_after_seconds(exc)
     if isinstance(exc, errors.connection):  # network error; includes APITimeoutError

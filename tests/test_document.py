@@ -12,8 +12,8 @@ from ragdoc.document import (
     Paragraph,
     RawText,
     Table,
+    concat_documents,
     join_documents,
-    merge_documents,
 )
 
 # ---------------------------------------------------------------------------
@@ -569,23 +569,23 @@ def test_document_empty_property():
 
 
 # ---------------------------------------------------------------------------
-# merge_documents / join_documents (field-policy suite)
+# concat_documents / join_documents (field-policy suite)
 # ---------------------------------------------------------------------------
 
 
-def test_merge_elements_concatenated_fresh_list():
+def test_concat_elements_concatenated_fresh_list():
     d1 = Document(elements=[Heading(html="<h1>A</h1>")])
     d2 = Document(elements=[Paragraph(html="<p>B</p>")])
-    merged = merge_documents(d1, d2)
+    merged = concat_documents(d1, d2)
     assert len(merged.elements) == 2
     assert merged.elements is not d1.elements and merged.elements is not d2.elements
     assert len(d1.elements) == 1  # inputs untouched
 
 
-def test_merge_titles_bridge_heading_escaped():
+def test_concat_titles_bridge_heading_escaped():
     d1 = Document(title="First", elements=[])
     d2 = Document(title="Second <script>", elements=[])
-    merged = merge_documents(d1, d2)
+    merged = concat_documents(d1, d2)
     assert merged.title == "First"
     bridge = [e for e in merged.elements if isinstance(e, Heading)]
     assert len(bridge) == 1
@@ -593,44 +593,44 @@ def test_merge_titles_bridge_heading_escaped():
     assert bridge[0].text == "Second <script>"
 
 
-def test_merge_one_title_no_bridge():
-    merged = merge_documents(Document(elements=[]), Document(title="Only", elements=[]))
+def test_concat_one_title_no_bridge():
+    merged = concat_documents(Document(elements=[]), Document(title="Only", elements=[]))
     assert merged.title == "Only"
     assert merged.elements == []
 
 
-def test_merge_metadata_policy_first_matches_old_or():
+def test_concat_metadata_policy_first_matches_old_or():
     d1 = Document(metadata={"a": 1, "shared": "first"})
     d2 = Document(metadata={"b": 2, "shared": "second"})
-    merged = merge_documents(d1, d2)  # default policy="first"
+    merged = concat_documents(d1, d2)  # default policy="first"
     assert merged.metadata == {"a": 1, "b": 2, "shared": "first"}
 
 
-def test_merge_metadata_policy_second():
+def test_concat_metadata_policy_second():
     d1 = Document(metadata={"a": 1, "shared": "first"})
     d2 = Document(metadata={"b": 2, "shared": "second"})
-    merged = merge_documents(d1, d2, metadata_policy="second")
+    merged = concat_documents(d1, d2, metadata_policy="second")
     assert merged.metadata == {"a": 1, "b": 2, "shared": "second"}
 
 
-def test_merge_metadata_policy_strict_raises_on_conflict():
+def test_concat_metadata_policy_strict_raises_on_conflict():
     d1 = Document(metadata={"shared": "first", "same": 1})
     d2 = Document(metadata={"shared": "second", "same": 1})
     with pytest.raises(ValueError, match="shared"):
-        merge_documents(d1, d2, metadata_policy="strict")
+        concat_documents(d1, d2, metadata_policy="strict")
     # equal values are not conflicts
-    ok = merge_documents(Document(metadata={"same": 1}), Document(metadata={"same": 1}), metadata_policy="strict")
+    ok = concat_documents(Document(metadata={"same": 1}), Document(metadata={"same": 1}), metadata_policy="strict")
     assert ok.metadata == {"same": 1}
 
 
-def test_merge_drops_provenance_and_external_refs():
+def test_concat_drops_provenance_and_external_refs():
     from ragdoc.document import ExternalRef
 
     d1 = Document(source_path="/a.html", external_refs=[ExternalRef(target_id="x", rel_type="external-parent")])
     d1.source_id = "sid"
     d1.source_hash = "shash"
     d2 = Document()
-    merged = merge_documents(d1, d2)
+    merged = concat_documents(d1, d2)
     assert merged.source_path == "/a.html"  # first or second
     assert merged.source_id is None
     assert merged.source_hash is None
@@ -638,17 +638,17 @@ def test_merge_drops_provenance_and_external_refs():
     assert merged.id not in (d1.id, d2.id)  # new identity
 
 
-def test_merge_parser_kept_iff_equal():
-    same = merge_documents(Document(parser="html"), Document(parser="html"))
+def test_concat_parser_kept_iff_equal():
+    same = concat_documents(Document(parser="html"), Document(parser="html"))
     assert same.parser == "html"
-    differs = merge_documents(Document(parser="html"), Document(parser="xlsx"))
+    differs = concat_documents(Document(parser="html"), Document(parser="xlsx"))
     assert differs.parser is None
 
 
-def test_merge_result_metadata_is_fresh_dict():
+def test_concat_result_metadata_is_fresh_dict():
     d1 = Document(metadata={"a": 1})
     d2 = Document(metadata={"b": 2})
-    merged = merge_documents(d1, d2)
+    merged = concat_documents(d1, d2)
     merged.metadata["c"] = 3
     assert "c" not in d1.metadata and "c" not in d2.metadata
 

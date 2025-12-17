@@ -93,6 +93,28 @@ def test_malformed_edtf_raises():
         FuzzyDate(original_text="whatever", edtf="not-a-date", precision="YEAR")
 
 
+def test_ascending_hyphen_year_range_normalised_to_interval():
+    """US-style '1990-1995' is rewritten to EDTF '1990/1995' and parses as an interval."""
+    fd = FuzzyDate(original_text="1990-1995", edtf="1990-1995", precision="YEAR")
+    assert fd.edtf == "1990/1995"
+    assert fd.start == D(1990, 1, 1)
+    assert fd.end == D(1996, 1, 1)  # exclusive end = first year after the interval
+    assert fd.sort_key == D(1990, 1, 1)
+
+
+def test_malformed_hyphen_pair_is_not_rewritten_and_raises():
+    """'2024-0312' (a mangled day, not a year range) must NOT become '2024/0312' (year 312,
+    reversed interval) — it stays untouched so parse_edtf fails loud (→ LLM retry)."""
+    with pytest.raises(ValidationError):
+        FuzzyDate(original_text="12 March 2024", edtf="2024-0312", precision="DAY")
+
+
+def test_non_ascending_hyphen_pair_is_not_rewritten_and_raises():
+    """A descending pair like '1995-1990' is not a plausible range; fail loud, don't reorder."""
+    with pytest.raises(ValidationError):
+        FuzzyDate(original_text="1995-1990", edtf="1995-1990", precision="YEAR")
+
+
 def test_overlaps_half_open():
     fd = FuzzyDate(original_text="1994", edtf="1994", precision="YEAR")  # [1994-01-01, 1995-01-01)
     # query [1990-01-01, 1996-01-01) overlaps

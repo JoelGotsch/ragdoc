@@ -17,32 +17,16 @@ bookkeeping.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 from urllib.parse import quote, unquote
 
-import aiofiles
 from pydantic import BaseModel
 
+from ragdoc.extraction._io import read_text as _read_text, write_text as _write_text
 from ragdoc.extraction.entity import Entity
 from ragdoc.extraction.schema import GraphSchema, build_edge_union, build_node_union
 
-if TYPE_CHECKING:
-    pass
-
-
 _ENTITY_SUFFIX = ".entity.json"
-
-
-async def _read_text(path: Path) -> str:
-    """Read *path* via aiofiles (UTF-8) without blocking the event loop."""
-    async with aiofiles.open(path, encoding="utf-8") as f:
-        return await f.read()
-
-
-async def _write_text(path: Path, content: str) -> None:
-    """Write *content* to *path* via aiofiles (UTF-8) without blocking the event loop."""
-    async with aiofiles.open(path, "w", encoding="utf-8") as f:
-        await f.write(content)
 
 
 @runtime_checkable

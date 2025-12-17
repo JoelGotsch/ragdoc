@@ -13,17 +13,32 @@ given the same membership).
 
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Generic, Protocol, runtime_checkable
 from urllib.parse import quote, unquote
 
 from pydantic import BaseModel, Field
 
+from ragdoc.extraction._io import read_text, write_text
 from ragdoc.extraction.dates import FuzzyDate
 from ragdoc.extraction.mention import PayloadT
 from ragdoc.extraction.query import EntityQuery, filter_entities
 
 _ENTITY_SUFFIX = ".entity.json"
+
+
+def mint_entity_id(member_mention_ids: Iterable[str]) -> str:
+    """Return the ``entity_id`` for an entity with *member_mention_ids* — the one minting scheme.
+
+    A SHA-256 content hash over the **sorted** member mention ids (order-invariant), so an entity's
+    id is stable given the same membership and re-running resolution over an unchanged mention set
+    re-mints the same id. Used by both resolution paths (``EntityResolutionPipeline`` and the
+    KG edge promotion) — do not inline this expression elsewhere.
+    """
+    sorted_ids = sorted(member_mention_ids)
+    return hashlib.sha256("\x00".join(sorted_ids).encode("utf-8")).hexdigest()
 
 
 class Entity(BaseModel, Generic[PayloadT]):
@@ -92,7 +107,7 @@ class LocalEntityStore:
 
     async def upsert(self, entities: list[Entity]) -> list[str]:
         for e in entities:
-            self._path(e.entity_id).write_text(e.model_dump_json(indent=2), encoding="utf-8")
+            await write_text(self._path(e.entity_id), e.model_dump_json(indent=2))
         return [e.entity_id for e in entities]
 
     async def delete(self, entity_ids: list[str]) -> None:
@@ -102,7 +117,7 @@ class LocalEntityStore:
     async def delete_by_source(self, source_id: str) -> None:
         etype = self._entity_type()
         for path in list(self._iter_files()):
-            entity = etype.model_validate_json(path.read_text(encoding="utf-8"))
+            entity = etype.model_validate_json(await read_text(path))
             if entity.source_ids == [source_id]:
                 path.unlink(missing_ok=True)
 
@@ -110,12 +125,12 @@ class LocalEntityStore:
         etype = self._entity_type()
         ids: set[str] = set()
         for path in self._iter_files():
-            ids.update(etype.model_validate_json(path.read_text(encoding="utf-8")).source_ids)
+            ids.update(etype.model_validate_json(await read_text(path)).source_ids)
         return ids
 
     async def list_entities(self) -> list[Entity]:
         etype = self._entity_type()
-        return [etype.model_validate_json(p.read_text(encoding="utf-8")) for p in self._iter_files()]
+        return [etype.model_validate_json(await read_text(p)) for p in self._iter_files()]
 
     async def query(self, query: EntityQuery) -> list[Entity]:
         """Filter all stored entities in memory (loads the store, then applies *query*)."""

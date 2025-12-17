@@ -89,6 +89,11 @@ What each pipeline contributes is just:
    (`DocumentStorePipeline`), or split+extract (`MentionStorePipeline`). Returning an empty
    item list means "this source now yields nothing" (its stale entries are deleted);
    returning `None` means "unavailable" (warned + counted as skipped).
+   `DocumentStorePipeline` returns `None` when processing filters a document out, so a
+   transient filter (or a misclassifying LLM processor) never deletes the previously
+   stored copy. Resolution failures (an unreadable or vanished file during hashing) are
+   captured per path instead of aborting the run: they surface in `UpdateResult.errors`
+   and the affected source is never treated as an orphan.
 
 ## How the three pipelines compose it
 

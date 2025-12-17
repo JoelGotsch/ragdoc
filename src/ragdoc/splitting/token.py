@@ -606,6 +606,11 @@ def split_by_elements(
     result: list[Document] = []
     current: list[BaseElement] = []
     current_tokens: int = 0
+    # True while `current` holds only the heading context re-seeded after an oversized-group
+    # delegation. Those headings already lead every delegated sub-split, so flushing them as
+    # a *final* split would emit a content-free heading-only chunk. Any subsequent append
+    # (a new heading or a group's elements) clears the flag — new material must survive.
+    reseeded_ctx_only = False
 
     def flush() -> None:
         nonlocal current, current_tokens
@@ -626,6 +631,7 @@ def split_by_elements(
         if isinstance(item, Heading):
             current.append(item)
             current_tokens += el_tokens.get(item.id, 0)
+            reseeded_ctx_only = False
             if item.level not in ctx_level_order:
                 ctx_level_order.append(item.level)
             heading_ctx[item.level] = item
@@ -658,6 +664,7 @@ def split_by_elements(
             result.extend(sub_splits)
             current = list(ctx)
             current_tokens = ctx_tokens
+            reseeded_ctx_only = True
 
         elif has_content and current_tokens + tokens > max_tokens:
             flush()
@@ -665,12 +672,15 @@ def split_by_elements(
             ctx_tokens = get_ctx_tokens()
             current = list(ctx) + item.all_elements
             current_tokens = ctx_tokens + tokens
+            reseeded_ctx_only = False
 
         else:
             current.extend(item.all_elements)
             current_tokens += tokens
+            reseeded_ctx_only = False
 
-    flush()
+    if not reseeded_ctx_only:
+        flush()
     final = result if result else [document]
     logger.debug(f"split_by_elements: {doc_label} produced {len(final)} sub-documents")
     return final

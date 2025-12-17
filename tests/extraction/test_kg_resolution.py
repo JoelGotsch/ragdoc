@@ -432,3 +432,16 @@ def test_resolution_result_default_fields():
     assert r.orphan_edges == []
     assert r.pending == []
     assert r.iterations == 0
+
+
+# ---------------------------------------------------------------------------
+# 9. mint_entity_id — one shared minting function (F12)
+# ---------------------------------------------------------------------------
+
+
+def test_mint_entity_id_is_order_invariant():
+    """Both resolution paths mint entity ids through one function; it sorts its members."""
+    from ragdoc.extraction.entity import mint_entity_id
+
+    assert mint_entity_id(["b", "a"]) == mint_entity_id(["a", "b"])
+    assert mint_entity_id(["a"]) != mint_entity_id(["a", "b"])

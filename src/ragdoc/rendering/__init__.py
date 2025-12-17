@@ -32,6 +32,7 @@ from ragdoc.rendering.base import (
     RenderContext,
     Renderer,
 )
+from ragdoc.rendering.defaults import resolve_renderer
 from ragdoc.rendering.elements import (
     format_metadata_value,
     render_for_prompt,
@@ -66,4 +67,5 @@ __all__ = [
     "format_metadata_value",
     "render_for_prompt",
     "render_raw",
+    "resolve_renderer",
 ]

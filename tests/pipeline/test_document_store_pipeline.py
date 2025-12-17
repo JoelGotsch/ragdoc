@@ -6,7 +6,8 @@ Covers:
 - apply(): documents stored and retrievable via get_document; list_source_state reflects them.
 - run() == apply(plan()); re-run skips unchanged.
 - delete_orphans True removes documents absent from the run set.
-- a document filtered to None by processing is not stored.
+- a document filtered to None by processing is not stored; a previously stored copy
+  is preserved (skip-with-warning, never delete-on-filter).
 """
 
 from __future__ import annotations
@@ -188,16 +189,21 @@ class DropAll(DocumentProcessor):
 
 @pytest.mark.anyio
 async def test_filtered_document_not_stored(make_files, doc_store):
-    """A filtered source yields an empty change: counted processed, nothing stored."""
+    """A filtered source is skipped with a warning: nothing stored, nothing deleted."""
     paths = make_files({"doc.html": "content"})
     result = await make_doc_pipeline(doc_store, processors=[DropAll()]).run(paths)
-    assert result.processed == ["doc.html"]  # the source was evaluated; it just yields nothing
+    assert result.skipped == ["doc.html"]  # filtered ⇒ unavailable-style skip, not processed
+    assert result.processed == []
     assert doc_store.stored == {}
 
 
 @pytest.mark.anyio
-async def test_filtered_document_clears_stale_stored_entry(tmp_path, doc_store):
-    """A previously-stored source whose new version is filtered has its stale Document deleted."""
+async def test_filtered_document_preserves_stored_copy(tmp_path, doc_store, caplog):
+    """A previously-stored source whose new version is filtered keeps its stored Document.
+
+    A transient LLM/filter misclassification must not destroy durable state (nor cascade
+    into chunk deletion via a later Boundary-2 delete_orphans run).
+    """
 
     class DropV2(DocumentProcessor):
         async def process(self, document):
@@ -210,8 +216,24 @@ async def test_filtered_document_clears_stale_stored_entry(tmp_path, doc_store):
     pipeline = make_doc_pipeline(doc_store, processors=[DropV2()])
     await pipeline.run([p])
     assert "doc.html" in doc_store.stored
+    stored_v1 = doc_store.stored["doc.html"]
 
     p.write_text("v2 now filtered", encoding="utf-8")
-    result = await pipeline.run([p])
-    assert result.processed == ["doc.html"]
-    assert doc_store.stored == {}  # stale entry deleted, not left behind
+    with caplog.at_level("WARNING"):
+        result = await pipeline.run([p])
+    assert result.skipped == ["doc.html"] and result.processed == []
+    assert doc_store.stored["doc.html"] is stored_v1  # stored copy preserved
+    assert any("filtered by processing" in rec.message for rec in caplog.records)
+
+
+@pytest.mark.anyio
+async def test_filtered_document_source_still_orphan_deletable_when_vanished(make_files, doc_store):
+    """Preserving on filter must not weaken genuine deletion: a source absent from the
+    input set is still removed under delete_orphans=True."""
+    paths = make_files({"a.html": "A", "b.html": "B"})
+    pipeline = make_doc_pipeline(doc_store)
+    await pipeline.run(paths)
+
+    result = await pipeline.run([paths[0]], delete_orphans=True)
+    assert result.deleted == ["b.html"]
+    assert await doc_store.list_source_ids() == {"a.html"}

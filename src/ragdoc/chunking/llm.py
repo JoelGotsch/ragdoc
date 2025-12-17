@@ -191,18 +191,14 @@ class LLMChunker(Chunker):
         self._tokenizer = tokenizer
 
     def _get_prompt_renderer(self) -> Renderer:
-        if self._prompt_renderer is not None:
-            return self._prompt_renderer
-        from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
+        from ragdoc.rendering import resolve_renderer
 
-        return Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
+        return resolve_renderer(self._prompt_renderer)
 
     def _get_tokenizer(self) -> Tokenizer:
-        if self._tokenizer is not None:
-            return self._tokenizer
-        from ragdoc.utils import GPTTokenizer
+        from ragdoc.utils import resolve_tokenizer
 
-        return GPTTokenizer()
+        return resolve_tokenizer(self._tokenizer)
 
     def _budget_llm_input(self, rendered: str, doc_label: str) -> str:
         """Truncate the LLM input to ``max_prompt_tokens`` (chunks keep the full text)."""

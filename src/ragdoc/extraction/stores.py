@@ -133,7 +133,11 @@ class LocalMentionStore:
             mentions = await self._load(path)
             if mentions:
                 first = mentions[0]
-                state[first.source_id] = SourceState(source_hash=first.source_hash, content_hash=first.content_hash)
+                # source_hash is honestly optional on Mention; SourceState's token degrades to
+                # '' (⇒ unknown ⇒ "always changed" under the direct-path token selector).
+                state[first.source_id] = SourceState(
+                    source_hash=first.source_hash or "", content_hash=first.content_hash
+                )
         return state
 
     async def list_mentions(self, payload_type: type[BaseModel] | None = None) -> list[Mention]:

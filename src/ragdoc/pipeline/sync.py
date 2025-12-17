@@ -99,15 +99,21 @@ class SyncPlanInput:
         sources: The sources to evaluate this run.
         live_source_ids: The set of ids considered alive upstream. Direct mode: the ids of
             *sources*. Boundary-2 mode: **every** id in the DocumentStore, so a subset run
-            never deletes stored items whose documents still exist upstream.
+            never deletes stored items whose documents still exist upstream. Sources that
+            failed resolution (``pre_failed``) belong here too — unreadable is not orphaned.
         pre_skipped: source_ids resolved as unavailable before production (e.g. a requested
             Boundary-2 target absent from the DocumentStore). :meth:`SyncEngine.run` counts
             them in ``skipped``; :meth:`SyncEngine.plan` drops them (as it drops all skips).
+        pre_failed: ``(source_id, exception)`` pairs that failed during resolution (e.g. an
+            unreadable file whose ``hash_fn`` raised). :meth:`SyncEngine.run` surfaces them
+            in ``UpdateResult.errors``; :meth:`SyncEngine.plan` logs a summary warning and
+            omits them (the same treatment as production errors).
     """
 
     sources: Sequence[SyncSource]
     live_source_ids: frozenset[str]
     pre_skipped: tuple[str, ...] = ()
+    pre_failed: tuple[tuple[str, Exception], ...] = ()
 
 
 Producer = Callable[[SyncSource], Awaitable["SourceChange[T] | None"]]
@@ -115,8 +121,13 @@ Producer = Callable[[SyncSource], Awaitable["SourceChange[T] | None"]]
 
 Returns a :class:`~ragdoc.pipeline.changeset.SourceChange` with the source's new content
 (``items`` may be empty ⇒ "the source now yields nothing" — its stale stored entry is
-deleted), or ``None`` when the source is unavailable (e.g. it vanished from the upstream
-store between listing and loading) — the engine logs a warning and counts it skipped.
+deleted), or ``None`` when the source cannot yield a payload this run — the engine logs a
+warning and counts it skipped, leaving any stored state untouched. ``None`` covers both
+"unavailable" (e.g. it vanished from the upstream store between listing and loading) and
+"filtered" (a processor dropped the document): a filtered source **preserves** its stored
+copy — filtering is potentially transient (an LLM misclassification must not destroy
+durable state), so deletion stays reserved for ``delete_orphans`` and for sources that
+genuinely vanish from the input set.
 """
 
 TokenSelector = Callable[[SourceState], "str | None"]
@@ -176,9 +187,10 @@ class UpdateResult:
             unavailable at production time. Populated by ``run``; empty for a bare
             ``apply`` (apply does not know what was skipped during planning).
         deleted: source_ids removed as orphans (only when ``delete_orphans=True``).
-        errors: ``(source_id, exception)`` pairs collected during production or writing.
-            Only ``Exception`` subclasses are collected; ``asyncio.CancelledError`` and
-            other ``BaseException`` subclasses always propagate.
+        errors: ``(source_id, exception)`` pairs collected during resolution (hashing —
+            see ``SyncPlanInput.pre_failed``), production, or writing. Only ``Exception``
+            subclasses are collected; ``asyncio.CancelledError`` and other
+            ``BaseException`` subclasses always propagate.
     """
 
     processed: list[str] = field(default_factory=list)
@@ -187,17 +199,37 @@ class UpdateResult:
     errors: list[tuple[str, Exception]] = field(default_factory=list)
 
 
+class CurrentMap(dict[str, tuple[Path, str]]):
+    """``source_id -> (path, file_hash)`` plus the per-source hashing failures.
+
+    A plain ``dict`` (so every existing consumer keeps working) carrying an extra
+    :attr:`errors` channel: sources whose ``hash_fn`` raised are **excluded** from the
+    mapping and recorded here instead, so one unreadable file never aborts a whole sync.
+    """
+
+    def __init__(self, entries: dict[str, tuple[Path, str]], errors: dict[str, Exception]) -> None:
+        super().__init__(entries)
+        self.errors: dict[str, Exception] = errors
+        """``source_id -> exception`` for every source whose hashing failed."""
+
+
 async def build_current_map(
     sources: Iterable[Path],
     source_id_fn: Callable[[Path], str],
     hash_fn: Callable[[Path], str],
     concurrency: int | asyncio.Semaphore,
-) -> dict[str, tuple[Path, str]]:
+) -> CurrentMap:
     """Map ``source_id -> (path, file_hash)`` for *sources*, raising on id collisions.
 
     Collision detection runs **before** any hashing, so a duplicate ``source_id`` costs no
     I/O. Hashing then fans out with ``asyncio.to_thread`` under the semaphore (*hash_fn*
     stays synchronous; see :func:`file_hash`).
+
+    Per-source error isolation: a *hash_fn* failure (unreadable file, permission error)
+    excludes that source from the mapping and records it in :attr:`CurrentMap.errors`
+    instead of aborting — callers thread those errors into ``SyncPlanInput.pre_failed``
+    (and keep the failed ids in ``live_source_ids`` so they are never orphan-deleted).
+    Only ``Exception`` subclasses are captured; cancellation always propagates.
 
     Args:
         sources: The source files to identify and hash.
@@ -206,7 +238,8 @@ async def build_current_map(
         concurrency: Max concurrent hash threads (``int`` or a shared semaphore).
 
     Returns:
-        ``source_id -> (path, file_hash)`` for every source.
+        A :class:`CurrentMap`: ``source_id -> (path, file_hash)`` for every hashable
+        source, with per-source failures in ``.errors``.
 
     Raises:
         ValueError: If two paths map to the same ``source_id``.
@@ -230,12 +263,22 @@ async def build_current_map(
 
     sem = resolve_semaphore(concurrency)
 
-    async def _hash_one(sid: str, path: Path) -> tuple[str, Path, str]:
+    async def _hash_one(path: Path) -> str:
         async with sem:
-            return sid, path, await asyncio.to_thread(hash_fn, path)
+            return await asyncio.to_thread(hash_fn, path)
 
-    hashed = await asyncio.gather(*(_hash_one(sid, path) for sid, path in paths.items()))
-    return {sid: (path, digest) for sid, path, digest in hashed}
+    results = await asyncio.gather(*(_hash_one(path) for path in paths.values()), return_exceptions=True)
+    entries: dict[str, tuple[Path, str]] = {}
+    errors: dict[str, Exception] = {}
+    for (sid, path), result in zip(paths.items(), results, strict=True):
+        if isinstance(result, BaseException):
+            if not isinstance(result, Exception):
+                raise result  # cancellation and other fatal BaseExceptions always propagate
+            logger.error(f"hashing failed for {path} (source_id={sid!r}): {result!r}")
+            errors[sid] = result
+        else:
+            entries[sid] = (path, result)
+    return CurrentMap(entries, errors)
 
 
 class SyncEngine(Generic[T]):
@@ -331,11 +374,11 @@ class SyncEngine(Generic[T]):
         """Buffer the event stream into a reviewable ChangeSet (no store writes).
 
         ``changed`` outcomes land in ``to_add``/``to_update``; ``orphan`` outcomes in
-        ``to_delete``; skips are dropped; production errors are logged (one summary
-        warning) and their sources omitted.
+        ``to_delete``; skips are dropped; resolution (``pre_failed``) and production
+        errors are logged (one summary warning) and their sources omitted.
         """
         changeset: ChangeSet[T] = ChangeSet()
-        failed: list[str] = []
+        failed: list[str] = [sid for sid, _ in request.pre_failed]
         async for outcome in self._stream(request, delete_orphans):
             if outcome.kind == "changed":
                 if outcome.change is None:  # pragma: no cover - _evaluate always sets it
@@ -360,6 +403,7 @@ class SyncEngine(Generic[T]):
         """
         result = UpdateResult()
         result.skipped.extend(request.pre_skipped)
+        result.errors.extend(request.pre_failed)
         try:
             async for outcome in self._stream(request, delete_orphans):
                 if outcome.kind == "skipped":

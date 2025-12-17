@@ -22,6 +22,7 @@ Customising the prompt (environment)::
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from functools import cache
 from pathlib import Path
@@ -223,11 +224,15 @@ class StructuredExtractor(Generic[PayloadT]):
     Args:
         payload_model: The Pydantic model to extract (its docstring + ``Field`` descriptions are
             the schema), e.g. ``Event``.
-        client: Async OpenAI-compatible client. ``None`` falls back to ``get_config().openai_client``.
+        client: Async OpenAI-compatible client. ``None`` falls back to ``get_config().openai_client``,
+            resolved fail-loud at construction.
         model: Model name. ``None`` falls back to ``settings.model_name`` then config default.
         settings: :class:`ExtractionSettings`. ``None`` reads env (``EXTRACTION_*``).
         renderer: Renderer for document → text. ``None`` uses ``Renderer(MARKDOWN, render_for_prompt)``.
         tokenizer: Tokenizer for the ``min_tokens`` decision. ``None`` uses ``GPTTokenizer``.
+
+    Raises:
+        LLMNotConfiguredError: when no client is given and the active config has none.
     """
 
     def __init__(
@@ -241,7 +246,7 @@ class StructuredExtractor(Generic[PayloadT]):
     ) -> None:
         self._payload_model = payload_model
         self.settings = settings or ExtractionSettings()
-        self._client = client
+        self._client: ChatClient = resolve_openai_client(client)
         self._model = model
         self._renderer = renderer
         self._tokenizer = tokenizer
@@ -254,7 +259,8 @@ class StructuredExtractor(Generic[PayloadT]):
     async def extract(self, document: Document) -> list[Mention[PayloadT]]:
         """Extract every mention of the payload type from *document* (no metadata side effects)."""
         renderer = resolve_renderer(self._renderer)
-        rendered = renderer.render(document)
+        # Rendering is sync CPU/pandoc work — hop off the event loop (chunker precedent).
+        rendered = await asyncio.to_thread(renderer.render, document)
         if not rendered.strip():
             return []
         min_tokens = self.settings.min_tokens
@@ -262,7 +268,7 @@ class StructuredExtractor(Generic[PayloadT]):
             logger.debug("StructuredExtractor: below min_tokens, skipping extraction")
             return []
 
-        client = resolve_openai_client(self._client)
+        client = self._client
         model = resolve_model(self._model, self.settings)
         batch_cls = _batch_model(self._payload_model)
         messages = build_extraction_messages(
@@ -281,7 +287,8 @@ class StructuredExtractor(Generic[PayloadT]):
 
         content_hash = document.content_hash()
         source_id = document.source_id or document.source_path or document.id
-        source_hash = document.source_hash or content_hash
+        # Honestly optional: the file-byte hash, or None — never faked from the content hash.
+        source_hash = document.source_hash
         metadata_copy = dict(document.metadata)
 
         mentions: list[Mention[PayloadT]] = []

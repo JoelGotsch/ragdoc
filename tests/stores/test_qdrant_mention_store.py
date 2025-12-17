@@ -72,6 +72,25 @@ async def test_upsert_one_point_per_mention_with_identity_vector(store, client):
 
 
 @pytest.mark.anyio
+async def test_source_hash_none_roundtrips_and_state_token(store, client):
+    """source_hash is honestly optional (F7): None is stored as a null payload key, rehydrates
+    as None, and the SourceState token degrades to '' (unknown ⇒ always changed)."""
+    m = Mention[Event](mention_id="m0", source_id="s1", content_hash="c", payload=Event(title="E-m0"))
+    await store.upsert([m])
+    point_payload = client.upsert.call_args.kwargs["points"][0].payload
+    assert point_payload["source_hash"] is None
+
+    point = MagicMock()
+    point.payload = point_payload
+    client.scroll = AsyncMock(return_value=([point], None))
+
+    (reloaded,) = await store.list_mentions()
+    assert reloaded.source_hash is None
+    state = await store.list_source_state()
+    assert state["s1"].source_hash == "" and state["s1"].content_hash == "c"
+
+
+@pytest.mark.anyio
 async def test_delete_by_source_uses_filter(store, client):
     await store.delete_by_source("s1")
     selector = client.delete.call_args.kwargs["points_selector"]

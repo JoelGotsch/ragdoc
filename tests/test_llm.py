@@ -323,6 +323,30 @@ def test_resolve_client_raises_llm_not_configured():
     assert "openai_client" in message
 
 
+@pytest.mark.anyio
+async def test_custom_client_error_surfaces_when_openai_unavailable(
+    monkeypatch: pytest.MonkeyPatch, sleeps: list[float]
+):
+    """Without openai installed, a custom structural client's exception must surface unchanged.
+
+    Regression: ``_classify`` used to call ``_openai_errors()`` unconditionally, replacing the
+    real transport error from a custom ``ChatClient`` with an ImportError on base installs.
+    """
+
+    class _GatewayDown(ConnectionError):
+        pass
+
+    def _no_openai() -> ragdoc.llm._OpenAIErrorTypes:
+        raise ImportError("LLM features require the 'llm' extra: pip install 'ragdoc[llm]'")
+
+    monkeypatch.setattr(ragdoc.llm, "_openai_errors", _no_openai)
+    client = _client(side_effect=[_GatewayDown("gateway down")])
+    with pytest.raises(_GatewayDown, match="gateway down"):
+        await call_structured(client, model="m", messages=[], response_format=_Out, max_retries=3)
+    assert client.chat.completions.parse.call_count == 1  # non-retryable without openai's types
+    assert sleeps == []
+
+
 # ---------------------------------------------------------------------------
 # retry_llm: generic engine (shared with embeddings)
 # ---------------------------------------------------------------------------

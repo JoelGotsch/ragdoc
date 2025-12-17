@@ -101,6 +101,24 @@ def test_heading_level_zero_raises():
         h.level = 0
 
 
+@pytest.mark.parametrize("bad_level", [-1, 0, 7, 42])
+def test_heading_level_out_of_range_raises_and_preserves_html(bad_level):
+    """Levels outside 1-6 must raise — <h7> is unparseable by the normalizer and used to
+    silently destroy inline content (e.g. <ref/> tags) by escaping the text into <h1>."""
+    h = Heading(html='<h6>x <ref id="a" rel="footnote"/></h6>')
+    with pytest.raises(ValueError, match="1-6"):
+        h.level = bad_level
+    assert h.level == 6  # unchanged
+    assert 'rel="footnote"' in h.html  # inline ref survived
+
+
+@pytest.mark.parametrize("good_level", [1, 6])
+def test_heading_level_bounds_accepted(good_level):
+    h = Heading(html="<h3>t</h3>")
+    h.level = good_level
+    assert h.level == good_level
+
+
 def test_heading_innerhtml_property():
     h = Heading(html="<h3><em>fancy</em> title</h3>")
     assert h.innerhtml == "<em>fancy</em> title"
@@ -243,6 +261,34 @@ def test_image_html_setter_updates_fields():
     assert img.image == "BBBB"
     assert img.image_type == "jpeg"
     assert img.width == 5
+
+
+def test_image_html_setter_resets_absent_attrs():
+    """Assignment re-derives ALL derivable fields — attrs absent in the new tag reset to None."""
+    img = Image(html='<img src="data:image/png;base64,AAAA" alt="old alt" width="10" height="20"/>')
+    img.html = '<img src="data:image/jpeg;base64,BBBB"/>'
+    assert img.image == "BBBB"
+    assert img.image_type == "jpeg"
+    assert img.alt is None
+    assert img.width is None
+    assert img.height is None
+
+
+def test_image_html_setter_non_data_src_raises():
+    """Image stores base64 content; a non-data: src cannot be represented — fail loud, not no-op."""
+    img = Image(image="AAAA", image_type="png", alt="kept")
+    with pytest.raises(ValueError, match="data:"):
+        img.html = '<img src="https://example.com/x.png" alt="new"/>'
+    # Assignment failed atomically: nothing changed.
+    assert img.image == "AAAA"
+    assert img.alt == "kept"
+
+
+def test_image_html_setter_no_img_tag_raises():
+    img = Image(image="AAAA")
+    with pytest.raises(ValueError, match="<img>"):
+        img.html = "<p>not an image</p>"
+    assert img.image == "AAAA"
 
 
 # ---------------------------------------------------------------------------

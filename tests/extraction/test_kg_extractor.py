@@ -109,6 +109,29 @@ def _split_by_kind(
 # ---------------------------------------------------------------------------
 
 
+def test_construction_without_client_fails_loud():
+    """Client resolution happens in __init__ (fail-loud at construction), never at extract time."""
+    from ragdoc.config import RagdocConfig, configure
+    from ragdoc.llm import LLMNotConfiguredError
+
+    with configure(RagdocConfig()), pytest.raises(LLMNotConfiguredError):
+        KnowledgeGraphExtractor(SCHEMA)
+
+
+@pytest.mark.anyio
+async def test_source_hash_none_when_document_has_none():
+    """source_hash is honestly optional — never faked from the content hash."""
+    client = make_kg_client(
+        SCHEMA,
+        [([{"local_id": "n0", "node": {"kind": "Person", "full_name": "Alice"}}], [])],
+    )
+    extractor = KnowledgeGraphExtractor(SCHEMA, client=client, model="m")
+    doc = make_doc()  # no source_hash set
+    merged = await extractor.extract(doc)
+    assert merged and all(m.source_hash is None for m in merged)
+    assert all(m.content_hash == doc.content_hash() for m in merged)
+
+
 def test_payload_model_is_merged_union():
     """`payload_model` stays on the concrete class (store queries / ChangeSet parametrization)."""
     extractor = KnowledgeGraphExtractor(SCHEMA, client=MagicMock(), model="m")
@@ -371,6 +394,63 @@ async def test_gleaning_runs_second_call_and_merges():
     acme_mention_id = nodes[1].mention_id
     assert edges[1].payload.refs.source_mention_id == bob_mention_id  # type: ignore[attr-defined]
     assert edges[1].payload.refs.target_mention_id == acme_mention_id  # type: ignore[attr-defined]
+
+
+@pytest.mark.anyio
+async def test_gleaning_merge_with_noncontiguous_primary_ids():
+    """Primary local_ids need not be contiguous n0..n{k-1}; renumbered gleaning ids must be
+    minted collision-free against the actual primary id set (F3)."""
+    client = make_kg_client(
+        SCHEMA,
+        [
+            # Primary: ids n0 and n2 (the LLM skipped n1) — offset-based renumbering would
+            # naively hand the gleaned node "n2" and collide.
+            (
+                [
+                    {"local_id": "n0", "node": {"kind": "Person", "full_name": "Alice"}},
+                    {"local_id": "n2", "node": {"kind": "Company", "name": "Acme"}},
+                ],
+                [{"kind": "Employment", "refs": {"source_mention_id": "n0", "target_mention_id": "n2"}}],
+            ),
+            # Gleaning: one new node + an edge from it to the PRIMARY company (ref "n2" is not a
+            # secondary id, so it must survive the renumbering untouched).
+            (
+                [{"local_id": "n0", "node": {"kind": "Person", "full_name": "Bob"}}],
+                [{"kind": "Employment", "refs": {"source_mention_id": "n0", "target_mention_id": "n2"}}],
+            ),
+        ],
+    )
+    extractor = KnowledgeGraphExtractor(SCHEMA, client=client, model="m", gleaning=True)
+    merged = await extractor.extract(make_doc())
+
+    nodes, edges = _split_by_kind(merged, SCHEMA)
+    assert len(nodes) == 3
+    assert len(edges) == 2
+    by_name = {getattr(n.payload, "full_name", None) or getattr(n.payload, "name", None): n.mention_id for n in nodes}
+    assert edges[1].payload.refs.source_mention_id == by_name["Bob"]  # type: ignore[attr-defined]
+    assert edges[1].payload.refs.target_mention_id == by_name["Acme"]  # type: ignore[attr-defined]
+
+
+@pytest.mark.anyio
+async def test_gleaning_duplicate_secondary_local_ids_raise():
+    """Duplicate local_ids WITHIN the gleaning batch fail loud (F4) — silent last-wins remapping
+    would attach edges referencing the duplicated id to the wrong node."""
+    client = make_kg_client(
+        SCHEMA,
+        [
+            ([{"local_id": "n0", "node": {"kind": "Person", "full_name": "Alice"}}], []),
+            (
+                [
+                    {"local_id": "g0", "node": {"kind": "Person", "full_name": "Bob"}},
+                    {"local_id": "g0", "node": {"kind": "Company", "name": "Beta"}},
+                ],
+                [],
+            ),
+        ],
+    )
+    extractor = KnowledgeGraphExtractor(SCHEMA, client=client, model="m", gleaning=True)
+    with pytest.raises(ValueError, match=r"[Dd]uplicate node local_id"):
+        await extractor.extract(make_doc())
 
 
 @pytest.mark.anyio

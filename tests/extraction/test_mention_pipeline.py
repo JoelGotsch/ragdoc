@@ -202,6 +202,197 @@ async def test_roundtrip_never_touches_document_metadata(make_files, mstore, mon
         assert "kg_mentions" not in doc.metadata
 
 
+# ---------------------------------------------------------------------------
+# Multi-split provenance: running ordinals (F2), edge-ref rewrite (F1), honest source_hash (F7)
+# ---------------------------------------------------------------------------
+
+
+def two_way_splitter(document: Document) -> list[Document]:
+    """A deterministic splitter producing two distinct splits with content markers."""
+    from ragdoc.document import Paragraph
+
+    def _split(seq: int, marker: str) -> Document:
+        return Document(
+            title=f"{document.title}-{seq}",
+            elements=[Paragraph(html=f"<p>{marker} body of split {seq}</p>")],
+            metadata={**document.metadata, "split_sequence": seq, "split_total": 2},
+        )
+
+    return [_split(1, "SPLIT-ONE"), _split(2, "SPLIT-TWO")]
+
+
+@pytest.mark.anyio
+async def test_multisplit_edge_refs_resolve_to_finalized_node_ids(make_files, mstore):
+    """F1 regression: the pipeline re-mints node mention_ids with the PARENT content_hash;
+    every KG edge payload's refs must be rewritten through the old->new map, or every edge of a
+    multi-split source dangles and kg_resolution orphans it."""
+    from types import SimpleNamespace
+    from typing import Literal
+    from unittest.mock import AsyncMock, MagicMock
+
+    from pydantic import BaseModel
+
+    from ragdoc.extraction.kg import KnowledgeGraphExtractor, build_graph_batch_model
+    from ragdoc.extraction.schema import EdgeRef, GraphSchema
+
+    class Person(BaseModel):
+        kind: Literal["Person"] = "Person"
+        full_name: str
+
+    class Company(BaseModel):
+        kind: Literal["Company"] = "Company"
+        name: str
+
+    class Employment(BaseModel):
+        kind: Literal["Employment"] = "Employment"
+        refs: EdgeRef
+
+    schema = GraphSchema(
+        node_types=(Person, Company),
+        edge_types=(Employment,),
+        patterns=((Person, Employment, Company),),
+    )
+    batches_by_marker = {
+        "SPLIT-ONE": (
+            [
+                {"local_id": "n0", "node": {"kind": "Person", "full_name": "Alice"}},
+                {"local_id": "n1", "node": {"kind": "Company", "name": "Acme"}},
+            ],
+            [{"kind": "Employment", "refs": {"source_mention_id": "n0", "target_mention_id": "n1"}}],
+        ),
+        "SPLIT-TWO": (
+            [
+                {"local_id": "n0", "node": {"kind": "Person", "full_name": "Bob"}},
+                {"local_id": "n1", "node": {"kind": "Company", "name": "Beta"}},
+            ],
+            [{"kind": "Employment", "refs": {"source_mention_id": "n0", "target_mention_id": "n1"}}],
+        ),
+    }
+    graph_batch_cls, _ = build_graph_batch_model(schema)
+
+    # Keyed on the rendered split content (not call order) — splits are extracted concurrently.
+    async def _parse(**kwargs):  # type: ignore[no-untyped-def]
+        text = kwargs["messages"][1]["content"]
+        for marker, (nodes, edges) in batches_by_marker.items():
+            if marker in text:
+                batch = graph_batch_cls.model_validate({"node_mentions": nodes, "edge_mentions": edges})
+                return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(parsed=batch))])
+        raise AssertionError(f"no batch registered for split text: {text!r}")
+
+    client = MagicMock()
+    client.chat.completions.parse = AsyncMock(side_effect=_parse)
+
+    pipeline = MentionStorePipeline(
+        ingest=IngestPipeline(parser=make_parser()),
+        extractor=KnowledgeGraphExtractor(schema, client=client, model="m"),
+        mention_store=mstore,
+        splitter=two_way_splitter,
+    )
+    result = await pipeline.run(make_files({"a.txt": "irrelevant raw body"}))
+    assert result.processed == ["a.txt"]
+
+    stored = await mstore.list_mentions()
+    node_ids = {m.mention_id for m in stored if m.payload.kind in {"Person", "Company"}}  # type: ignore[attr-defined]
+    edges = [m for m in stored if m.payload.kind == "Employment"]  # type: ignore[attr-defined]
+    assert len(node_ids) == 4
+    assert len(edges) == 2
+
+    # Every edge ref resolves to a finalized node mention_id — nothing dangles.
+    for e in edges:
+        assert e.payload.refs.source_mention_id in node_ids  # type: ignore[attr-defined]
+        assert e.payload.refs.target_mention_id in node_ids  # type: ignore[attr-defined]
+
+    # And the wiring is per-split correct: Alice→Acme, Bob→Beta.
+    by_name = {
+        (getattr(m.payload, "full_name", None) or getattr(m.payload, "name", None)): m.mention_id
+        for m in stored
+        if m.payload.kind in {"Person", "Company"}  # type: ignore[attr-defined]
+    }
+    pairs = {(e.payload.refs.source_mention_id, e.payload.refs.target_mention_id) for e in edges}  # type: ignore[attr-defined]
+    assert pairs == {(by_name["Alice"], by_name["Acme"]), (by_name["Bob"], by_name["Beta"])}
+
+
+@pytest.mark.anyio
+async def test_identical_payloads_across_splits_get_distinct_mention_ids(make_files, tmp_path):
+    """F2 regression: ordinals run across the whole source, not per split — identical payloads
+    at split-local ordinal 0 must finalize to distinct mention_ids and both survive the store."""
+    from ragdoc.extraction.mention import mint_mention_id
+    from ragdoc.extraction.stores import LocalMentionStore
+
+    class OnePerSplitExtractor:
+        payload_model = Event
+
+        async def extract(self, document: Document) -> list[Mention[Event]]:
+            payload = Event(title="Same")
+            return [
+                Mention[Event](
+                    mention_id=mint_mention_id(document.source_id or "", document.content_hash(), 0, payload),
+                    source_id=document.source_id or "",
+                    payload=payload,
+                )
+            ]
+
+    store = LocalMentionStore(tmp_path / "mentions", Event)
+    pipeline = MentionStorePipeline(
+        ingest=IngestPipeline(parser=make_parser()),
+        extractor=OnePerSplitExtractor(),
+        mention_store=store,
+        splitter=two_way_splitter,
+    )
+    result = await pipeline.run(make_files({"a.txt": "body"}))
+    assert result.processed == ["a.txt"]
+
+    stored = await store.list_mentions()
+    assert len(stored) == 2  # no silent overwrite in the mention_id-keyed store
+    assert len({m.mention_id for m in stored}) == 2
+    assert sorted(m.ordinal for m in stored) == [0, 1]
+
+
+@pytest.mark.anyio
+async def test_unreadable_file_surfaces_in_errors_and_is_not_orphaned(make_files, mstore):
+    """A hash_fn failure is per-source isolated: it lands in result.errors, the other source
+    still syncs, and the failed source's existing mentions are never orphan-deleted."""
+    import hashlib
+
+    paths = make_files({"good.txt": "g", "bad.txt": "b"})
+
+    def flaky_hash(p: Path) -> str:
+        if p.name == "bad.txt":
+            raise OSError("unreadable")
+        return hashlib.sha256(p.read_bytes()).hexdigest()
+
+    # Seed the store with a mention for bad.txt so orphan deletion has something to (not) remove.
+    await mstore.upsert(
+        [Mention[Event](mention_id="pre", source_id="bad.txt", source_hash="old", payload=Event(title="Old"))]
+    )
+
+    pipeline = MentionStorePipeline(
+        ingest=IngestPipeline(parser=make_parser()),
+        extractor=make_extractor([Event(title="Ev")]),
+        mention_store=mstore,
+        hash_fn=flaky_hash,
+    )
+    result = await pipeline.run(paths, delete_orphans=True)
+
+    assert result.processed == ["good.txt"]
+    assert [sid for sid, _ in result.errors] == ["bad.txt"]
+    assert result.deleted == []  # unreadable is not orphaned
+    assert "bad.txt" in await mstore.list_source_ids()
+
+
+@pytest.mark.anyio
+async def test_direct_mode_stamps_real_file_hash(make_files, mstore):
+    """F7: direct mode stamps the actual file-byte hash onto every mention."""
+    import hashlib
+
+    paths = make_files({"a.txt": "alpha"})
+    await make_pipeline(make_extractor([Event(title="Ev")]), mstore).run(paths)
+
+    expected = hashlib.sha256(paths[0].read_bytes()).hexdigest()
+    mentions = await mstore.list_mentions()
+    assert mentions and all(m.source_hash == expected for m in mentions)
+
+
 @pytest.mark.anyio
 async def test_mentions_arrive_typed_without_revalidation(make_files, mstore):
     """The store receives the same Mention objects the extractor returned — no
@@ -215,7 +406,7 @@ async def test_mentions_arrive_typed_without_revalidation(make_files, mstore):
             mention = Mention[Event](
                 mention_id="pending",
                 source_id=document.source_id or "",
-                source_hash=document.source_hash or "",
+                source_hash=document.source_hash,
                 payload=Event(title="Tracked"),
             )
             returned.append(mention)

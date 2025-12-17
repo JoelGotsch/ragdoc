@@ -149,15 +149,14 @@ async def test_kg_extractor_composes_with_mention_store_pipeline():
     assert len(companies) == 1 and companies[0].payload.name == "Acme"
     assert len(employments) == 1
 
-    # The edge's endpoint refs were rewritten through the local_id → mention_id map. Note that
-    # MentionStorePipeline.finalize_mention re-mints mention_ids using the authoritative
-    # source_id/content_hash from the parent Document — so the rewritten refs MAY no longer
-    # match the re-minted node mention_ids exactly. The resolution layer handles this by
-    # re-mapping mention_id → entity_id at edge-rewrite time; what we verify here is the
-    # primary contract: chunk-local strings ("n0"/"n1") are gone from the persisted edge.
+    # The edge's endpoint refs were rewritten twice: local_id → mention_id inside the extractor,
+    # then old → re-minted mention_id by the pipeline's finalization pass (finalize_mention
+    # re-mints node ids with the parent Document's authoritative source_id/content_hash, and
+    # rewrite_edge_refs re-points the edge refs through the same map). The persisted refs must
+    # therefore resolve exactly to the persisted node mention_ids — nothing dangles.
     edge_mention = employments[0]
-    assert edge_mention.payload.refs.source_mention_id != "n0"
-    assert edge_mention.payload.refs.target_mention_id != "n1"
+    assert edge_mention.payload.refs.source_mention_id == persons[0].mention_id
+    assert edge_mention.payload.refs.target_mention_id == companies[0].mention_id
 
 
 @pytest.mark.anyio
