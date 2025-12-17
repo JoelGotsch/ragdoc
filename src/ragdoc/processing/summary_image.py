@@ -38,6 +38,7 @@ from ragdoc.processing.summary_base import ImageSummary
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
+
     from ragdoc.document import Document
 
 logger = logging.getLogger(__name__)
@@ -105,6 +106,7 @@ def apply_image_transformations(
 # Prompt building
 # ---------------------------------------------------------------------------
 
+
 def build_image_messages(
     base64_image: str,
     image_type: str,
@@ -130,13 +132,15 @@ def build_image_messages(
     user_content: list = [{"type": "text", "text": user_message}]
     if context:
         user_content.append({"type": "text", "text": f"**Context:**\n\n{context}"})
-    user_content.append({
-        "type": "image_url",
-        "image_url": {
-            "url": f"data:image/{image_type};base64,{base64_image}",
-            "detail": image_detail,
-        },
-    })
+    user_content.append(
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/{image_type};base64,{base64_image}",
+                "detail": image_detail,
+            },
+        }
+    )
     return [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
@@ -149,6 +153,7 @@ ImageMessagesFn: TypeAlias = Callable[[str, str, "str | None"], "list[ChatComple
 # ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
+
 
 def openai_image_summarizer(
     client: Any,
@@ -203,6 +208,7 @@ def openai_image_summarizer(
 # Processor
 # ---------------------------------------------------------------------------
 
+
 class ImageSummaryProcessor(DocumentProcessor):
     """Summarizes all :class:`~ragdoc.document.Image` elements in a document.
 
@@ -237,7 +243,7 @@ class ImageSummaryProcessor(DocumentProcessor):
     def __init__(
         self,
         summarize: ImageSummarizeFn | None = None,
-        context_fn: Callable[[Image, "Document"], str | None] | None = None,
+        context_fn: Callable[[Image, Document], str | None] | None = None,
         concurrency: int | asyncio.Semaphore = 1,
     ):
         self._summarize = summarize
@@ -248,9 +254,10 @@ class ImageSummaryProcessor(DocumentProcessor):
         if self._summarize is not None:
             return self._summarize
         from ragdoc.config import get_config
+
         return openai_image_summarizer(get_config().openai_client)
 
-    async def process(self, document: "Document") -> "Document":
+    async def process(self, document: Document) -> Document:
         summarize = self._get_summarize()
         all_images = [img for img in document.images if img.image is not None]
         images = [img for img in all_images if not img.text_representation]
@@ -268,7 +275,7 @@ class ImageSummaryProcessor(DocumentProcessor):
         self,
         summarize: ImageSummarizeFn,
         image: Image,
-        document: "Document",
+        document: Document,
     ) -> None:
         from PIL import UnidentifiedImageError
 
@@ -280,6 +287,4 @@ class ImageSummaryProcessor(DocumentProcessor):
             else:
                 image.text_representation = result.text_representation or result.summary
         except (UnidentifiedImageError, OSError):
-            logger.exception(
-                f"Failed to summarize image {image.id}: image type {image.image_type!r} not supported"
-            )
+            logger.exception(f"Failed to summarize image {image.id}: image type {image.image_type!r} not supported")

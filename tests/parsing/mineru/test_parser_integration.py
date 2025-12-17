@@ -5,6 +5,7 @@ These tests build minimal MinerUMiddleDocument fixtures in-memory and verify
 end-to-end pipeline behaviour: block dispatch order, caption placement,
 metadata propagation, and image loading.
 """
+
 import pytest
 
 pytest.importorskip("pylatexenc", reason="pdf_mineru extra not installed")
@@ -23,8 +24,6 @@ from ragdoc.parsing.mineru.base import (
     ImageCaptionBlock,
     ImageSpan,
     Line,
-    ListBlock,
-    ListItemBlock,
     MinerUMiddleDocument,
     PageInfo,
     TableBlock,
@@ -38,11 +37,9 @@ from ragdoc.parsing.mineru.base import (
 )
 from ragdoc.parsing.mineru.handlers import (
     ExtractionConfig,
-    handle_discarded_as_metadata,
     handle_discarded_as_raw_text,
 )
 from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUExtractor
-
 
 # ---------------------------------------------------------------------------
 # Fixture factories (shared with test_handlers.py but duplicated to keep files independent)
@@ -96,21 +93,15 @@ _RICH_DOC = _single_page_doc(
         blocks=[
             TableCaptionBlock(bbox=[0.0, 18.0, 200.0, 30.0], index=0, lines=[_line("Table 1: Summary")]),
             _table_body_block,
-            TableFootnoteBlock(
-                bbox=[0.0, 80.0, 200.0, 90.0], index=2, lines=[_line("* statistically significant")]
-            ),
+            TableFootnoteBlock(bbox=[0.0, 80.0, 200.0, 90.0], index=2, lines=[_line("* statistically significant")]),
         ],
     ),
     CodeBlock(
         bbox=[0.0, 100.0, 200.0, 150.0],
         index=2,
         blocks=[
-            CodeCaptionBlock(
-                bbox=[0.0, 100.0, 200.0, 112.0], index=0, lines=[_line("Algorithm 1: Pseudocode")]
-            ),
-            CodeBodyBlock(
-                bbox=[0.0, 112.0, 200.0, 150.0], index=1, lines=[_line("for i in range(n): pass")]
-            ),
+            CodeCaptionBlock(bbox=[0.0, 100.0, 200.0, 112.0], index=0, lines=[_line("Algorithm 1: Pseudocode")]),
+            CodeBodyBlock(bbox=[0.0, 112.0, 200.0, 150.0], index=1, lines=[_line("for i in range(n): pass")]),
         ],
     ),
 )
@@ -135,9 +126,7 @@ def test_table_caption_precedes_table():
         if isinstance(el, Table):
             assert i > 0, "Table has no preceding element"
             preceding = elements[i - 1]
-            assert isinstance(preceding, Paragraph), (
-                f"Expected Paragraph before Table, got {type(preceding).__name__}"
-            )
+            assert isinstance(preceding, Paragraph), f"Expected Paragraph before Table, got {type(preceding).__name__}"
             assert "Table 1" in preceding.html
 
 
@@ -148,9 +137,7 @@ def test_table_footnote_follows_table():
         if isinstance(el, Table):
             assert i < len(elements) - 1, "Table has no following element"
             following = elements[i + 1]
-            assert isinstance(following, RawText), (
-                f"Expected RawText after Table, got {type(following).__name__}"
-            )
+            assert isinstance(following, RawText), f"Expected RawText after Table, got {type(following).__name__}"
             assert "statistically significant" in following.innerhtml
 
 
@@ -248,9 +235,7 @@ async def test_image_loaded_through_pipeline(tmp_path):
             index=0,
             blocks=[
                 ImageBodyBlock(bbox=[0.0, 0.0, 200.0, 100.0], index=0, lines=[span_line]),
-                ImageCaptionBlock(
-                    bbox=[0.0, 100.0, 200.0, 115.0], index=1, lines=[_line("Fig 1")]
-                ),
+                ImageCaptionBlock(bbox=[0.0, 100.0, 200.0, 115.0], index=1, lines=[_line("Fig 1")]),
             ],
         )
     )
@@ -278,9 +263,7 @@ async def test_image_loaded_through_pipeline(tmp_path):
 
 @pytest.mark.anyio
 async def test_parser_field_set_to_mineru(tmp_path):
-    doc = await MinerUExtractor().parse(
-        MinerUMiddleDocument(pdf_info=[]), source_path=tmp_path / "report_middle.json"
-    )
+    doc = await MinerUExtractor().parse(MinerUMiddleDocument(pdf_info=[]), source_path=tmp_path / "report_middle.json")
     assert doc.parser == "mineru"
 
 

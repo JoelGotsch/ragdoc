@@ -3,9 +3,8 @@
 These tests call generate_document directly with test HTML files rather than
 going through load_file, making them lower-level unit tests.
 """
-from ragdoc.document import Document
-from ragdoc.parsing.html.load import unwrap_idiotic_tables, unwrap_structural, HTML, generate_document
 
+from ragdoc.parsing.html.load import HTML, generate_document, unwrap_structural
 
 wrapped_paragraphs = """
 <div class="content">

@@ -1,23 +1,25 @@
 from __future__ import annotations
 
-import pymupdf
 import base64
 import logging
-
-from bs4 import BeautifulSoup
 from functools import partial
 from itertools import islice
 from pathlib import Path
+
+import pymupdf
+from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from pypandoc import convert_text
 
 from ragdoc.document import Document
-from ragdoc.parsing.html.load import generate_document as html_generate_documents, HTML, unwrap_idiotic_tables
+from ragdoc.parsing.html.load import HTML, generate_document as html_generate_documents, unwrap_idiotic_tables
 
 logger = logging.getLogger(__name__)
+
+
 class FigureExtractor:
     def __init__(self, file_path: str):
-        self.file_path: str  = file_path
+        self.file_path: str = file_path
         self.doc = pymupdf.open(file_path)
 
     def _rectangular_hull(self, polygon: list[tuple[float, float]], dpi: int = 72) -> tuple[float, float, float, float]:
@@ -34,15 +36,16 @@ class FigureExtractor:
 
 
 def _get_figure_information(figure: dict) -> tuple[int, list[tuple[float, float]]]:
-    if not "boundingRegions" in figure or not isinstance(figure["boundingRegions"], list) or len(figure["boundingRegions"]) == 0:
+    if (
+        "boundingRegions" not in figure
+        or not isinstance(figure["boundingRegions"], list)
+        or len(figure["boundingRegions"]) == 0
+    ):
         return None, []
 
     bounding_region = figure["boundingRegions"][0]
     page = bounding_region.get("pageNumber")
-    polygon = list(zip(
-        islice(bounding_region["polygon"], 0, None, 2),
-        islice(bounding_region["polygon"], 1, None, 2)
-    ))
+    polygon = list(zip(islice(bounding_region["polygon"], 0, None, 2), islice(bounding_region["polygon"], 1, None, 2)))
     return page, polygon
 
 
@@ -51,16 +54,18 @@ def replace_figure_tags(soup: BeautifulSoup, azure_bundle) -> BeautifulSoup:
     figures = result.get("figures", [])
     html_figures = soup.find_all("figure")
 
-    if not figures or not azure_bundle.source_path  or not azure_bundle.source_path.exists():
+    if not figures or not azure_bundle.source_path or not azure_bundle.source_path.exists():
         return soup
 
     if len(figures) != len(html_figures):
-        logger.warning(f"Number of figures in AzureDI result ({len(figures)}) does not match number of figure tags in HTML ({len(html_figures)})")
+        logger.warning(
+            f"Number of figures in AzureDI result ({len(figures)}) does not match number of figure tags in HTML ({len(html_figures)})"
+        )
         return soup
 
     try:
         extractor = FigureExtractor(azure_bundle.source_path)
-    except Exception as e:
+    except Exception:
         return soup
 
     for azure_figure, html_figure in zip(figures, html_figures):
@@ -70,10 +75,12 @@ def replace_figure_tags(soup: BeautifulSoup, azure_bundle) -> BeautifulSoup:
 
         try:
             (width, height), b64_image = extractor.extract_document_image(page, polygon)
-        except Exception as e:
+        except Exception:
             continue
 
-        img_tag = soup.new_tag("img", src=f"data:image/png;base64,{b64_image.decode()}", width=width, height=height, alt=html_figure.text)
+        img_tag = soup.new_tag(
+            "img", src=f"data:image/png;base64,{b64_image.decode()}", width=width, height=height, alt=html_figure.text
+        )
         html_figure.replace_with(img_tag)
     return soup
 

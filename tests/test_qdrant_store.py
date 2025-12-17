@@ -2,9 +2,10 @@
 
 All tests stub AsyncQdrantClient with MagicMock/AsyncMock — no live Qdrant instance required.
 """
+
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, call
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -12,7 +13,6 @@ pytest.importorskip("qdrant_client", reason="qdrant extra not installed")
 
 from ragdoc.chunking import Chunk
 from ragdoc.integrations.vector_stores.qdrant import QdrantVectorStore, ServerSideVector, _chunk_to_point
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -264,7 +264,6 @@ def test_chunk_to_point_sparse_only_with_server_side_passes() -> None:
 
 
 def test_server_side_vector_custom_text_fn() -> None:
-    from qdrant_client import models as qdrant_models
 
     chunk = make_chunk(embedding_content="embedding summary", prompt_content="full text")
     bm25 = ServerSideVector(model="Qdrant/bm25", text_fn=lambda c: c.embedding_content)
@@ -275,9 +274,7 @@ def test_server_side_vector_custom_text_fn() -> None:
 @pytest.mark.anyio
 async def test_create_with_sparse_vectors_passes_sparse_config(client: MagicMock) -> None:
     bm25 = ServerSideVector(model="Qdrant/bm25")
-    store = await QdrantVectorStore.create(
-        client, "hybrid_col", vector_size=128, sparse_vectors={"sparse": bm25}
-    )
+    store = await QdrantVectorStore.create(client, "hybrid_col", vector_size=128, sparse_vectors={"sparse": bm25})
     assert isinstance(store, QdrantVectorStore)
     _, kwargs = client.create_collection.call_args
     assert "sparse_vectors_config" in kwargs

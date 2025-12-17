@@ -4,6 +4,7 @@ generation, and TokenSplitter splitting behavior.
 These tests exercise deterministic behavior of core primitives without running
 the full DocumentPipeline.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -13,7 +14,6 @@ from ragdoc.document import Document, Heading, Paragraph
 from ragdoc.pipeline import TokenSplitter
 
 from .conftest import make_document
-
 
 # --- TestContentHash ---
 

@@ -1,10 +1,9 @@
 """Cross-module pytest fixtures and test session setup."""
+
 import logging
-
-import pytest
-
 from pathlib import Path
 
+import pytest
 
 logger = logging.getLogger("ragdoc")
 logger.setLevel(logging.DEBUG)

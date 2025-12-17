@@ -14,6 +14,7 @@ Covers:
 - UpdateResult fields are populated correctly
 - chunk.metadata is NOT modified by the pipeline (provenance is in source_id/source_hash)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -23,10 +24,9 @@ import pytest
 
 from ragdoc.document import Document
 from ragdoc.pipeline import DocumentPipeline, VectorStorePipeline
-from ragdoc.pipeline.vectorstore import UpdateResult, _file_hash
+from ragdoc.pipeline.vectorstore import _file_hash
 
 from .conftest import MemoryVectorStore, make_document
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

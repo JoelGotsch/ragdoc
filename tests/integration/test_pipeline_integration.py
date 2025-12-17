@@ -7,6 +7,7 @@ Exercises the complete real-world flow:
 
 Verifies against the ground-truth structure in tests/data/test_cases.json.
 """
+
 from __future__ import annotations
 
 import json
@@ -22,6 +23,7 @@ pytest.importorskip("pydantic_settings", reason="pydantic_settings not installed
 from ragdoc.chunking.chunk import Chunk
 from ragdoc.chunking.llm import DocumentTopicSummaries, LLMChunker
 from ragdoc.document import Document, Heading
+from ragdoc.parsing.mineru.base import _latex_to_text
 from ragdoc.parsing.multi_source import MultiSourceParser
 from ragdoc.parsing.registry import get_parser
 from ragdoc.pipeline import DocumentPipeline, VectorStorePipeline
@@ -35,9 +37,7 @@ from ragdoc.processing.heading_llm import (
 )
 from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
 from ragdoc.utils.helpers import _normalize_text
-from ragdoc.parsing.mineru.base import _latex_to_text
 from ragdoc.utils.tokenizer import GPTTokenizer
-
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -216,10 +216,7 @@ def _make_chunker_mock(summaries_per_call: int = 3) -> MagicMock:
         nonlocal call_count
         call_count += 1
         topics = DocumentTopicSummaries(
-            summaries=[
-                f"Topic summary {j + 1} for split {call_count}"
-                for j in range(summaries_per_call)
-            ]
+            summaries=[f"Topic summary {j + 1} for split {call_count}" for j in range(summaries_per_call)]
         )
         resp = MagicMock()
         resp.choices = [MagicMock()]
@@ -359,21 +356,16 @@ async def test_document_pipeline_with_nested_multi_source_parser():
 
     # At least half the expected headings should be found
     assert len(found_headings) >= len(expected_headings) // 2, (
-        f"Too few headings found: {len(found_headings)}/{len(expected_headings)}. "
-        f"Missing: {missing_headings}"
+        f"Too few headings found: {len(found_headings)}/{len(expected_headings)}. Missing: {missing_headings}"
     )
 
     # Check levels match
     level_mismatches: list[str] = []
     for heading_text, (expected, actual) in found_headings.items():
         if expected != actual:
-            level_mismatches.append(
-                f"  '{heading_text}': expected level {expected}, got {actual}"
-            )
+            level_mismatches.append(f"  '{heading_text}': expected level {expected}, got {actual}")
 
-    assert not level_mismatches, (
-        "Heading level mismatches:\n" + "\n".join(level_mismatches)
-    )
+    assert not level_mismatches, "Heading level mismatches:\n" + "\n".join(level_mismatches)
 
     # === Heading ordering ===
     headings_list = list(expected_headings.items())
@@ -388,8 +380,7 @@ async def test_document_pipeline_with_nested_multi_source_parser():
                 continue
             if match_a.level > match_b.level:
                 violations.append(
-                    f"  '{text_a}' (exp {exp_a}, got {match_a.level}) "
-                    f"> '{text_b}' (exp {exp_b}, got {match_b.level})"
+                    f"  '{text_a}' (exp {exp_a}, got {match_a.level}) > '{text_b}' (exp {exp_b}, got {match_b.level})"
                 )
 
     assert not violations, "Heading ordering violations:\n" + "\n".join(violations)
@@ -422,22 +413,16 @@ async def test_document_pipeline_with_nested_multi_source_parser():
 
     for pattern in test_case.get("present_in_output_regex", []):
         if not re.search(pattern, rendered):
-            pytest.xfail(
-                f"Pattern not found in merged output — content may differ across parsers: {pattern!r}"
-            )
+            pytest.xfail(f"Pattern not found in merged output — content may differ across parsers: {pattern!r}")
 
     for pattern in test_case.get("not_present_in_output_regex", []):
-        assert not re.search(pattern, rendered), (
-            f"Pattern should NOT be in output: {pattern!r}"
-        )
+        assert not re.search(pattern, rendered), f"Pattern should NOT be in output: {pattern!r}"
 
     # === Also verify pipeline.run() produces chunks ===
     mock_heading_client_2 = _make_heading_mock_client(
         _build_synthetic_heading_response(
             LLMHeadingResolver(client=MagicMock())._collect_heading_infos(
-                await HeadingLevelProcessor(trust_parser_levels=False).process(
-                    await outer_msp(INPUT_PATH)
-                )
+                await HeadingLevelProcessor(trust_parser_levels=False).process(await outer_msp(INPUT_PATH))
             ),
             expected_headings=test_case["headings"],
             expected_title=test_case["title"],
@@ -519,9 +504,7 @@ async def test_vector_store_pipeline_with_llm_chunker(tmp_path: Path):
     tokenizer = GPTTokenizer()
     for chunk in all_chunks:
         token_count = tokenizer.count(chunk.prompt_content)
-        assert token_count <= 7000, (
-            f"Chunk {chunk.id} has {token_count} tokens, exceeds 7000 limit"
-        )
+        assert token_count <= 7000, f"Chunk {chunk.id} has {token_count} tokens, exceeds 7000 limit"
 
     # --- Non-empty embedding content ---
     for chunk in all_chunks:

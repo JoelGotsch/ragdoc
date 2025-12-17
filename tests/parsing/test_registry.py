@@ -1,8 +1,10 @@
 """Tests for the parser registry (resolve, priority, longest-match, config override)."""
 
-import pytest
 from pathlib import Path
 
+import pytest
+
+from ragdoc.config import RagdocConfig, configure
 from ragdoc.document import Document
 from ragdoc.parsing.parser import Parser
 from ragdoc.parsing.registry import (
@@ -13,8 +15,6 @@ from ragdoc.parsing.registry import (
     register_parser,
     unregister_parser,
 )
-from ragdoc.config import RagdocConfig, configure
-
 
 # ---------------------------------------------------------------------------
 # Helpers

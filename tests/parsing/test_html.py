@@ -1,10 +1,11 @@
 """Tests for HTML loading and parsing functionality."""
-import pytest
 
 from pathlib import Path
 
-from ragdoc.parsing import load_file, HTMLFile
+import pytest
+
 from ragdoc.document import Document
+from ragdoc.parsing import HTMLFile, load_file
 
 
 @pytest.fixture
@@ -24,7 +25,7 @@ def test_document_headings(html_document: Document):
         "Second second layer",
         "Third second layer",
         "Numbered items",
-        "We can also do images!"
+        "We can also do images!",
     ]
 
 
@@ -48,11 +49,11 @@ def test_paragraphs_content(html_document: Document):
     """Test paragraphs are correctly parsed from HTML."""
     # Document should have multiple paragraphs
     assert len(html_document.paragraphs) >= 3
-    
+
     # Check specific paragraph content exists
     paragraph_texts = [p.text for p in html_document.paragraphs]
     combined_text = " ".join(paragraph_texts)
-    
+
     assert "I am just text under the first paragraph" in combined_text
     assert "What it should however provide " in combined_text
     assert "And checking how it looks if certain text" in combined_text
@@ -164,7 +165,7 @@ def test_stunted(html_data_path):
     """Test parsing HTML where paragraph appears before first heading."""
     html_file = HTMLFile(file_path=str(html_data_path / "test_stunted.html"))
     document = load_file(html_file)
-    
+
     # Test there is content before the first heading
     # Check that paragraphs and headings both exist
     assert len(document.paragraphs) >= 1
@@ -175,12 +176,12 @@ def test_description_list_parsing(description_list_file_path):
     """Test that HTML description lists (<dl>, <dt>, <dd>) are properly parsed."""
     html_file = HTMLFile(file_path=str(description_list_file_path))
     document = load_file(html_file)
-    
+
     assert document.title == "Description List Test"
-    
+
     # Document should have description lists
     assert len(document.lists) >= 3
-    
+
     # Check all headings are parsed (use .text property)
     heading_texts = [h.text for h in document.headings]
     assert "Description List Examples" in heading_texts
@@ -193,21 +194,21 @@ def test_description_list_simple_content(description_list_file_path):
     """Test parsing of simple description list content."""
     html_file = HTMLFile(file_path=str(description_list_file_path))
     document = load_file(html_file)
-    
+
     # Find the simple description list by content
     simple_dl = None
     for lst in document.lists:
         if "<dt>Coffee</dt>" in lst.html:
             simple_dl = lst
             break
-    
+
     assert simple_dl is not None
     # Check content is present (outer dl tags may or may not be included)
     assert "<dt>Coffee</dt>" in simple_dl.html
     assert "black hot drink" in simple_dl.html
     assert "<dt>Milk</dt>" in simple_dl.html
     assert "white cold drink" in simple_dl.html
-    
+
     assert "Coffee" in simple_dl.text
     assert "black hot drink" in simple_dl.text
 
@@ -216,14 +217,14 @@ def test_description_list_nested_content(description_list_file_path):
     """Test parsing of nested description list content."""
     html_file = HTMLFile(file_path=str(description_list_file_path))
     document = load_file(html_file)
-    
+
     # Find the nested description list by content
     nested_dl = None
     for lst in document.lists:
         if "<dt>Beverages</dt>" in lst.html:
             nested_dl = lst
             break
-    
+
     assert nested_dl is not None
     # Outer dl may not be included, but nested one should be
     assert nested_dl.html.count("<dl>") >= 1
@@ -235,14 +236,14 @@ def test_description_list_multiple_definitions(description_list_file_path):
     """Test parsing of description list with multiple dd elements per dt."""
     html_file = HTMLFile(file_path=str(description_list_file_path))
     document = load_file(html_file)
-    
+
     # Find the multi-DD description list by content
     multi_dd_dl = None
     for lst in document.lists:
         if "<dt>Term 1</dt>" in lst.html:
             multi_dd_dl = lst
             break
-    
+
     assert multi_dd_dl is not None
     assert "<dd>Definition 1a</dd>" in multi_dd_dl.html
     assert "<dd>Definition 1b</dd>" in multi_dd_dl.html
@@ -263,6 +264,9 @@ def preface_document(html_preface_file_path) -> Document:
 
 
 def test_preface(preface_document: Document):
-    assert any(p.text == "I am text in a super preface with nested paragaphs even though this is hilariously dumb" for p in preface_document.paragraphs)
+    assert any(
+        p.text == "I am text in a super preface with nested paragaphs even though this is hilariously dumb"
+        for p in preface_document.paragraphs
+    )
     assert any(t.html == expected_preface_table for t in preface_document.tables)
     assert any(l.text == "Oh look a list!" for l in preface_document.lists)

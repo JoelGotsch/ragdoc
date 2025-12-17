@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ragdoc.document import Document
+
 from .base import (
     AsyncCallNext,
     BaseMiddleware,
@@ -11,16 +13,15 @@ from .base import (
     InterlineEquationBlock,
     ListBlock,
     MinerUMiddleDocument,
-    ParserMiddleware,
     ParseContext,
     ParsedElement,
+    ParserMiddleware,
     RefTextBlock,
     TableBlock,
     TextBlock,
     TitleBlock,
 )
 from .handlers import ExtractionConfig
-from ragdoc.document import Document
 
 
 class CoreExtractionMiddleware(BaseMiddleware):
@@ -124,7 +125,7 @@ class MinerUExtractor:
             for mw in middlewares:
                 self.use(mw)
 
-    def use(self, middleware: ParserMiddleware) -> "MinerUExtractor":
+    def use(self, middleware: ParserMiddleware) -> MinerUExtractor:
         """Append a middleware to the pipeline."""
         self.middlewares.append(middleware)
         return self
@@ -133,7 +134,7 @@ class MinerUExtractor:
         self,
         middleware: ParserMiddleware,
         before: type[ParserMiddleware],
-    ) -> "MinerUExtractor":
+    ) -> MinerUExtractor:
         """Insert a middleware immediately before the first instance of *before*."""
         for i, mw in enumerate(self.middlewares):
             if isinstance(mw, before):
@@ -146,7 +147,7 @@ class MinerUExtractor:
         self,
         middleware: ParserMiddleware,
         after: type[ParserMiddleware],
-    ) -> "MinerUExtractor":
+    ) -> MinerUExtractor:
         """Insert a middleware immediately after the first instance of *after*."""
         for i, mw in enumerate(self.middlewares):
             if isinstance(mw, after):

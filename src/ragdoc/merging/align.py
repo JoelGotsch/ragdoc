@@ -4,6 +4,7 @@ Uses ``difflib.SequenceMatcher`` on normalized text keys to align primary
 elements from two Documents.  Secondary elements (Image, Footnote) trail their
 preceding primary anchor and travel with it through all operations.
 """
+
 from __future__ import annotations
 
 import difflib
@@ -11,9 +12,6 @@ from typing import Literal
 
 from ragdoc.document import (
     Document,
-    DocumentList,
-    DocumentPrimaryElement,
-    DocumentSecondaryElement,
     ElementType,
     ElementTypeEnum,
     Footnote,
@@ -35,13 +33,15 @@ from ragdoc.merging.patch import PatchOperation, PatchOperationType
 from ragdoc.utils.helpers import _normalize_text
 
 # Primary element types that drive alignment (text-bearing elements)
-_PRIMARY_TYPES = frozenset({
-    ElementTypeEnum.HEADING,
-    ElementTypeEnum.PARAGRAPH,
-    ElementTypeEnum.TABLE,
-    ElementTypeEnum.DOCUMENT_LIST,
-    ElementTypeEnum.RAW_TEXT,
-})
+_PRIMARY_TYPES = frozenset(
+    {
+        ElementTypeEnum.HEADING,
+        ElementTypeEnum.PARAGRAPH,
+        ElementTypeEnum.TABLE,
+        ElementTypeEnum.DOCUMENT_LIST,
+        ElementTypeEnum.RAW_TEXT,
+    }
+)
 
 
 def alignment_key(element: ElementType) -> str:
@@ -266,8 +266,8 @@ def align_elements(
                 etype = ElementTypeEnum(anchor_a.element_type)
                 pref = _effective_prefer(etype, prefer_source)
 
-                elems_a = [anchor_a] + trailing_a
-                elems_b = [anchor_b] + trailing_b
+                elems_a = [anchor_a, *trailing_a]
+                elems_b = [anchor_b, *trailing_b]
 
                 if pref == "b":
                     op_type = PatchOperationType.KEEP_B
@@ -280,9 +280,7 @@ def align_elements(
                 else:
                     # Same text but HTML may differ — apply heuristics to pick
                     # the richer/more accurate version
-                    resolved, reason = _apply_heuristics(
-                        elems_a, elems_b, parser_a, parser_b, prefer_source
-                    )
+                    resolved, reason = _apply_heuristics(elems_a, elems_b, parser_a, parser_b, prefer_source)
                     if resolved == elems_a:
                         op_type = PatchOperationType.KEEP_A
                     elif resolved == elems_b:
@@ -290,21 +288,21 @@ def align_elements(
                     else:
                         op_type = PatchOperationType.MERGE
 
-                operations.append(PatchOperation(
-                    op=op_type,
-                    elements_a=elems_a,
-                    elements_b=elems_b,
-                    resolved_elements=resolved,
-                    reason=reason,
-                ))
+                operations.append(
+                    PatchOperation(
+                        op=op_type,
+                        elements_a=elems_a,
+                        elements_b=elems_b,
+                        resolved_elements=resolved,
+                        reason=reason,
+                    )
+                )
 
         elif opcode == "replace":
             # Check if the groups are similar enough to MERGE rather than split
             group_keys_a = keys_a[i1:i2]
             group_keys_b = keys_b[j1:j2]
-            ratio = difflib.SequenceMatcher(
-                None, " ".join(group_keys_a), " ".join(group_keys_b)
-            ).ratio()
+            ratio = difflib.SequenceMatcher(None, " ".join(group_keys_a), " ".join(group_keys_b)).ratio()
 
             elems_a = [e for idx in range(i1, i2) for e in [groups_a[idx][0]] + groups_a[idx][1]]
             elems_b = [e for idx in range(j1, j2) for e in [groups_b[idx][0]] + groups_b[idx][1]]
@@ -318,24 +316,24 @@ def align_elements(
                     for idx_a, idx_b in zip(range(i1, i2), range(j1, j2)):
                         anchor_a, trailing_a = groups_a[idx_a]
                         anchor_b, trailing_b = groups_b[idx_b]
-                        ea = [anchor_a] + trailing_a
-                        eb = [anchor_b] + trailing_b
-                        resolved_pair, reason_pair = _apply_heuristics(
-                            ea, eb, parser_a, parser_b, prefer_source
-                        )
+                        ea = [anchor_a, *trailing_a]
+                        eb = [anchor_b, *trailing_b]
+                        resolved_pair, reason_pair = _apply_heuristics(ea, eb, parser_a, parser_b, prefer_source)
                         if resolved_pair == ea:
                             op_type = PatchOperationType.KEEP_A if ratio > 0.95 else PatchOperationType.MERGE
                         elif resolved_pair == eb:
                             op_type = PatchOperationType.KEEP_B if ratio > 0.95 else PatchOperationType.MERGE
                         else:
                             op_type = PatchOperationType.MERGE
-                        operations.append(PatchOperation(
-                            op=op_type,
-                            elements_a=ea,
-                            elements_b=eb,
-                            resolved_elements=resolved_pair,
-                            reason=reason_pair,
-                        ))
+                        operations.append(
+                            PatchOperation(
+                                op=op_type,
+                                elements_a=ea,
+                                elements_b=eb,
+                                resolved_elements=resolved_pair,
+                                reason=reason_pair,
+                            )
+                        )
                 elif len_a > len_b:
                     # More doc_a elements than doc_b: pairwise match each a-element
                     # to its closest b-element. Unmatched a-elements are preserved
@@ -348,9 +346,7 @@ def align_elements(
                         for idx_b in range(j1, j2):
                             if idx_b in matched_b:
                                 continue
-                            r = difflib.SequenceMatcher(
-                                None, keys_a[idx_a], keys_b[idx_b]
-                            ).ratio()
+                            r = difflib.SequenceMatcher(None, keys_a[idx_a], keys_b[idx_b]).ratio()
                             if r > best_ratio:
                                 best_ratio = r
                                 best_b_idx = idx_b
@@ -360,90 +356,98 @@ def align_elements(
 
                     for idx_a in range(i1, i2):
                         anchor_a, trailing_a = groups_a[idx_a]
-                        ea = [anchor_a] + trailing_a
+                        ea = [anchor_a, *trailing_a]
                         if idx_a in a_to_b:
                             idx_b = a_to_b[idx_a]
                             anchor_b, trailing_b = groups_b[idx_b]
-                            eb = [anchor_b] + trailing_b
-                            resolved_pair, reason_pair = _apply_heuristics(
-                                ea, eb, parser_a, parser_b, prefer_source
-                            )
+                            eb = [anchor_b, *trailing_b]
+                            resolved_pair, reason_pair = _apply_heuristics(ea, eb, parser_a, parser_b, prefer_source)
                             # When doc_b wins a 1:1 primary pair, carry inline markup
                             # from doc_a's element into the winner so formatting from
                             # doc_a (e.g. <strong>) is not silently discarded.
                             if resolved_pair == eb and len(ea) == 1 and len(eb) == 1:
                                 enhanced = _with_injected_markup(eb[0], ea[0])
                                 if enhanced is not eb[0]:
-                                    resolved_pair = [enhanced] + eb[1:]
+                                    resolved_pair = [enhanced, *eb[1:]]
                             if resolved_pair == ea:
                                 op_type = PatchOperationType.KEEP_A
                             elif resolved_pair == eb:
                                 op_type = PatchOperationType.KEEP_B
                             else:
                                 op_type = PatchOperationType.MERGE
-                            operations.append(PatchOperation(
-                                op=op_type,
-                                elements_a=ea,
-                                elements_b=eb,
-                                resolved_elements=resolved_pair,
-                                reason=reason_pair,
-                            ))
+                            operations.append(
+                                PatchOperation(
+                                    op=op_type,
+                                    elements_a=ea,
+                                    elements_b=eb,
+                                    resolved_elements=resolved_pair,
+                                    reason=reason_pair,
+                                )
+                            )
                         else:
                             # No matching b-element: preserve this unique doc_a element
-                            operations.append(PatchOperation(
-                                op=PatchOperationType.DELETE_A,
-                                elements_a=ea,
-                                resolved_elements=ea,
-                                reason="doc_a element in replace group with no close doc_b counterpart; preserving",
-                            ))
+                            operations.append(
+                                PatchOperation(
+                                    op=PatchOperationType.DELETE_A,
+                                    elements_a=ea,
+                                    resolved_elements=ea,
+                                    reason="doc_a element in replace group with no close doc_b counterpart; preserving",
+                                )
+                            )
                     # Insert unmatched b-elements if allowed
                     for idx_b in range(j1, j2):
                         if idx_b not in matched_b:
                             anchor_b, trailing_b = groups_b[idx_b]
-                            elems_b_single = [anchor_b] + trailing_b
+                            elems_b_single = [anchor_b, *trailing_b]
                             if _is_insertion_allowed(anchor_b, allow_insertions_from_b):
-                                operations.append(PatchOperation(
-                                    op=PatchOperationType.INSERT_B,
-                                    elements_b=elems_b_single,
-                                    resolved_elements=elems_b_single,
-                                    reason="doc_b element in replace group with no doc_a counterpart; inserting",
-                                ))
+                                operations.append(
+                                    PatchOperation(
+                                        op=PatchOperationType.INSERT_B,
+                                        elements_b=elems_b_single,
+                                        resolved_elements=elems_b_single,
+                                        reason="doc_b element in replace group with no doc_a counterpart; inserting",
+                                    )
+                                )
                 else:
                     # More doc_b elements than doc_a: whole-block M:N merge
-                    resolved, reason = _apply_heuristics(
-                        elems_a, elems_b, parser_a, parser_b, prefer_source
-                    )
+                    resolved, reason = _apply_heuristics(elems_a, elems_b, parser_a, parser_b, prefer_source)
                     if resolved == elems_a:
                         op_type = PatchOperationType.KEEP_A if ratio > 0.95 else PatchOperationType.MERGE
                     elif resolved == elems_b:
                         op_type = PatchOperationType.KEEP_B if ratio > 0.95 else PatchOperationType.MERGE
                     else:
                         op_type = PatchOperationType.MERGE
-                    operations.append(PatchOperation(
-                        op=op_type,
-                        elements_a=elems_a,
-                        elements_b=elems_b,
-                        resolved_elements=resolved,
-                        reason=reason,
-                    ))
+                    operations.append(
+                        PatchOperation(
+                            op=op_type,
+                            elements_a=elems_a,
+                            elements_b=elems_b,
+                            resolved_elements=resolved,
+                            reason=reason,
+                        )
+                    )
             else:
                 # Too different → DELETE_A + INSERT_B
-                operations.append(PatchOperation(
-                    op=PatchOperationType.DELETE_A,
-                    elements_a=elems_a,
-                    resolved_elements=[],
-                    reason=f"low similarity ratio={ratio:.2f}; dropping doc_a group",
-                ))
+                operations.append(
+                    PatchOperation(
+                        op=PatchOperationType.DELETE_A,
+                        elements_a=elems_a,
+                        resolved_elements=[],
+                        reason=f"low similarity ratio={ratio:.2f}; dropping doc_a group",
+                    )
+                )
                 for idx in range(j1, j2):
                     anchor_b, trailing_b = groups_b[idx]
-                    elems_b_single = [anchor_b] + trailing_b
+                    elems_b_single = [anchor_b, *trailing_b]
                     if all(_is_insertion_allowed(e, allow_insertions_from_b) for e in elems_b_single):
-                        operations.append(PatchOperation(
-                            op=PatchOperationType.INSERT_B,
-                            elements_b=elems_b_single,
-                            resolved_elements=elems_b_single,
-                            reason="low similarity; inserting doc_b group",
-                        ))
+                        operations.append(
+                            PatchOperation(
+                                op=PatchOperationType.INSERT_B,
+                                elements_b=elems_b_single,
+                                resolved_elements=elems_b_single,
+                                reason="low similarity; inserting doc_b group",
+                            )
+                        )
 
         elif opcode == "insert":
             # Elements only in doc_b
@@ -451,34 +455,40 @@ def align_elements(
                 anchor_b, trailing_b = groups_b[idx]
                 if _is_insertion_allowed(anchor_b, allow_insertions_from_b):
                     # Anchor is allowed → insert anchor + all trailing elements
-                    elems_b = [anchor_b] + trailing_b
-                    operations.append(PatchOperation(
-                        op=PatchOperationType.INSERT_B,
-                        elements_b=elems_b,
-                        resolved_elements=elems_b,
-                        reason="element only in doc_b",
-                    ))
+                    elems_b = [anchor_b, *trailing_b]
+                    operations.append(
+                        PatchOperation(
+                            op=PatchOperationType.INSERT_B,
+                            elements_b=elems_b,
+                            resolved_elements=elems_b,
+                            reason="element only in doc_b",
+                        )
+                    )
                 else:
                     # Anchor blocked → check each trailing element individually
                     for trailing_elem in trailing_b:
                         if _is_insertion_allowed(trailing_elem, allow_insertions_from_b):
-                            operations.append(PatchOperation(
-                                op=PatchOperationType.INSERT_B,
-                                elements_b=[trailing_elem],
-                                resolved_elements=[trailing_elem],
-                                reason="trailing secondary element only in doc_b (anchor blocked)",
-                            ))
+                            operations.append(
+                                PatchOperation(
+                                    op=PatchOperationType.INSERT_B,
+                                    elements_b=[trailing_elem],
+                                    resolved_elements=[trailing_elem],
+                                    reason="trailing secondary element only in doc_b (anchor blocked)",
+                                )
+                            )
 
         elif opcode == "delete":
             # Elements only in doc_a
             for idx in range(i1, i2):
                 anchor_a, trailing_a = groups_a[idx]
-                elems_a = [anchor_a] + trailing_a
-                operations.append(PatchOperation(
-                    op=PatchOperationType.DELETE_A,
-                    elements_a=elems_a,
-                    resolved_elements=[],
-                    reason="element only in doc_a; no counterpart in doc_b",
-                ))
+                elems_a = [anchor_a, *trailing_a]
+                operations.append(
+                    PatchOperation(
+                        op=PatchOperationType.DELETE_A,
+                        elements_a=elems_a,
+                        resolved_elements=[],
+                        reason="element only in doc_a; no counterpart in doc_b",
+                    )
+                )
 
     return operations

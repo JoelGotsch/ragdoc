@@ -38,12 +38,13 @@ level is prepended to the new chunk as context, so every chunk is self-contained
 
 Reading order is preserved throughout.
 """
+
 from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from bs4 import BeautifulSoup
 
@@ -62,6 +63,7 @@ DEFAULT_MAX_TOKENS = 7_000
 # TODO: evaluate if split-helpers could operate on a Document
 # so its possible for them to be used standalone.
 
+
 def _overhead_tokens(doc: Document, renderer: Renderer, tokenizer: Tokenizer) -> int:
     """Token count of the rendered overhead (heading context + metadata/title).
 
@@ -72,6 +74,7 @@ def _overhead_tokens(doc: Document, renderer: Renderer, tokenizer: Tokenizer) ->
     """
     rendered = renderer.render(doc)
     return tokenizer.count(rendered) if rendered.strip() else 0
+
 
 SentenceSplitter = Callable[[str], list[str]]
 """Callable that splits a plain-text string into sentence strings."""
@@ -122,12 +125,18 @@ def split_at_sentences(
     Returns:
         List of Documents or ``None`` if no split was possible.
     """
-    full_doc = Document(
-        elements=heading_ctx + elements, title=doc_title, metadata=doc_metadata
-    )
+    full_doc = Document(elements=heading_ctx + elements, title=doc_title, metadata=doc_metadata)
     rendered = renderer.render(full_doc)
     if tokenizer.count(rendered) <= max_tokens:
-        return [Document(elements=heading_ctx + elements, title=doc_title, source_path=doc_source_path, metadata=doc_metadata, external_refs=[parent_ref])]
+        return [
+            Document(
+                elements=heading_ctx + elements,
+                title=doc_title,
+                source_path=doc_source_path,
+                metadata=doc_metadata,
+                external_refs=[parent_ref],
+            )
+        ]
 
     overhead_tokens = _overhead_tokens(
         Document(elements=heading_ctx, title=doc_title, metadata=doc_metadata), renderer, tokenizer
@@ -140,7 +149,7 @@ def split_at_sentences(
 
     def make_chunk(text: str) -> Document:
         return Document(
-            elements=heading_ctx + [RawText(innerhtml=text)],
+            elements=[*heading_ctx, RawText(innerhtml=text)],
             title=doc_title,
             source_path=doc_source_path,
             metadata=doc_metadata,
@@ -222,7 +231,7 @@ def split_at_html_tags(
     def _make_doc(child_htmls: list[str], extra_els: list[BaseElement]) -> Document:
         raw = RawText(innerhtml=_wrap(child_htmls))
         return Document(
-            elements=heading_ctx + [raw] + extra_els,
+            elements=[*heading_ctx, raw, *extra_els],
             title=doc_title,
             source_path=doc_source_path,
             metadata=doc_metadata,
@@ -250,7 +259,7 @@ def split_at_html_tags(
 
         # Sub-chunk still too big: try tier 2 (sentence split on rendered)
         sub = split_at_sentences(
-            elements=[RawText(innerhtml=_wrap(children_html))] + extra,
+            elements=[RawText(innerhtml=_wrap(children_html)), *extra],
             heading_ctx=heading_ctx,
             renderer=renderer,
             tokenizer=tokenizer,
@@ -337,7 +346,7 @@ def _token_slice(
 
     def make_chunk(text: str) -> Document:
         return Document(
-            elements=heading_ctx + [RawText(innerhtml=text)],
+            elements=[*heading_ctx, RawText(innerhtml=text)],
             title=doc_title,
             source_path=doc_source_path,
             metadata=doc_metadata,
@@ -420,7 +429,8 @@ def split_oversized_element(
 
     overhead_tokens = _overhead_tokens(
         Document(elements=heading_ctx, title=document.title, metadata=document.metadata),
-        renderer, tokenizer,
+        renderer,
+        tokenizer,
     )
     content_budget = max_tokens - overhead_tokens
 
@@ -543,9 +553,7 @@ def split_by_elements(
     group_tokens: dict[int, int] = {}  # keyed by index into groups list
     for i, item in enumerate(groups):
         if isinstance(item, ElementGroup):
-            group_tokens[i] = tokenizer.count(
-                renderer.render(Document(elements=item.all_elements))
-            )
+            group_tokens[i] = tokenizer.count(renderer.render(Document(elements=item.all_elements)))
 
     parent_ref = ExternalRef(target_id=document.id, rel_type="external-parent")
 
@@ -565,13 +573,15 @@ def split_by_elements(
     def flush() -> None:
         nonlocal current, current_tokens
         if current:
-            result.append(Document(
-                elements=list(current),
-                title=document.title,
-                source_path=document.source_path,
-                metadata=document.metadata,
-                external_refs=[parent_ref],
-            ))
+            result.append(
+                Document(
+                    elements=list(current),
+                    title=document.title,
+                    source_path=document.source_path,
+                    metadata=document.metadata,
+                    external_refs=[parent_ref],
+                )
+            )
         current = []
         current_tokens = 0
 
@@ -601,7 +611,11 @@ def split_by_elements(
                 metadata=document.metadata,
             )
             sub_splits = split_oversized_element(
-                oversized_doc, renderer, tokenizer, max_tokens, overlap_tokens,
+                oversized_doc,
+                renderer,
+                tokenizer,
+                max_tokens,
+                overlap_tokens,
                 parent_id=document.id,
             )
             result.extend(sub_splits)
@@ -673,10 +687,8 @@ def split_document(
     if len(splits) == 1:
         logger.debug(f"split_document: {doc_label} falling back to element-level split")
         result = split_by_elements(document, renderer, tokenizer, max_tokens, overlap_tokens)
-    else: 
-        logger.debug(
-            f"split_document: {doc_label} hierarchical split produced {len(splits)} parts, recursing"
-        )
+    else:
+        logger.debug(f"split_document: {doc_label} hierarchical split produced {len(splits)} parts, recursing")
         result: list[Document] = []
         for split in splits:
             result.extend(split_document(split, renderer, tokenizer, max_tokens, overlap_tokens))

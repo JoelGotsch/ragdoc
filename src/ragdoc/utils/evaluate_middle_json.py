@@ -84,17 +84,19 @@ def print_summary(results: list[MiddleJsonFileResult]) -> None:
             rows.append([r.path.name, "ERROR", "", "", "", "", "", "", r.error[:60]])
         else:
             title_preview = (r.title[:40] + "…") if r.title and len(r.title) > 40 else (r.title or "")
-            rows.append([
-                r.path.name,
-                r.page_count,
-                r.heading_count,
-                r.paragraph_count,
-                r.table_count,
-                r.image_count,
-                r.list_count,
-                r.footnote_count,
-                title_preview,
-            ])
+            rows.append(
+                [
+                    r.path.name,
+                    r.page_count,
+                    r.heading_count,
+                    r.paragraph_count,
+                    r.table_count,
+                    r.image_count,
+                    r.list_count,
+                    r.footnote_count,
+                    title_preview,
+                ]
+            )
 
     print()
     print(tabulate(rows, headers=headers, tablefmt="github"))
@@ -132,5 +134,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     import asyncio
+
     results = asyncio.run(evaluate_middle_jsons(folder_arg))
     print_summary(results)

@@ -27,14 +27,16 @@ Typical usage::
     r2 = await vs.run([Path("a.docx"), Path("b.html")])
     assert len(r2.skipped) == 2 and len(r2.processed) == 0
 """
+
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import logging
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Generic, Iterable, cast
+from typing import TYPE_CHECKING, Generic, cast
 
 from ragdoc.metadata import BaseMetadata, TMetadata
 from ragdoc.processing._concurrency import _resolve_semaphore
@@ -144,10 +146,10 @@ class VectorStorePipeline(Generic[TMetadata]):
 
     def __init__(
         self,
-        pipeline: "DocumentPipeline[TMetadata]",
-        vector_store: "VectorStore",
+        pipeline: DocumentPipeline[TMetadata],
+        vector_store: VectorStore,
         source_id_fn: Callable[[Path], str] = lambda p: p.name,
-        embedders: "dict[str, EmbedderConfig] | None" = None,
+        embedders: dict[str, EmbedderConfig] | None = None,
         concurrency: int | asyncio.Semaphore = 10,
     ) -> None:
         self._pipeline = pipeline
@@ -197,10 +199,7 @@ class VectorStorePipeline(Generic[TMetadata]):
                 current[sid] = (path, _file_hash(path))
 
         if collisions:
-            lines = [
-                f"  {sid!r}: {[str(p) for p in paths]}"
-                for sid, paths in collisions.items()
-            ]
+            lines = [f"  {sid!r}: {[str(p) for p in paths]}" for sid, paths in collisions.items()]
             raise ValueError(
                 "source_id_fn produced duplicate source_ids for different paths.\n"
                 + "\n".join(lines)
@@ -255,13 +254,10 @@ class VectorStorePipeline(Generic[TMetadata]):
                     result.errors.append((path, exc))
 
         try:
-            await asyncio.gather(
-                *[_process_one(sid, path, fhash) for sid, (path, fhash) in current.items()]
-            )
+            await asyncio.gather(*[_process_one(sid, path, fhash) for sid, (path, fhash) in current.items()])
         except BaseException:
             logger.error(
-                f"Run failed: {len(result.processed)} processed, "
-                f"{len(result.skipped)} skipped before failure",
+                f"Run failed: {len(result.processed)} processed, {len(result.skipped)} skipped before failure",
                 exc_info=True,
             )
             raise
@@ -272,7 +268,7 @@ class VectorStorePipeline(Generic[TMetadata]):
         )
         return result
 
-    async def _embed_chunks(self, chunks: "list[Chunk]") -> None:
+    async def _embed_chunks(self, chunks: list[Chunk]) -> None:
         """Populate ``chunk.named_embeddings`` for all configured embedders (in-place).
 
         All embedders run concurrently via :func:`asyncio.gather`.  Each embedder
@@ -285,14 +281,12 @@ class VectorStorePipeline(Generic[TMetadata]):
         if not self._embedders or not chunks:
             return
 
-        async def _run_one(name: str, config: "EmbedderConfig") -> tuple[str, list[list[float]]]:
+        async def _run_one(name: str, config: EmbedderConfig) -> tuple[str, list[list[float]]]:
             texts = [config.text_fn(chunk) for chunk in chunks]
             vectors = await config.embedder.embed(texts)
             return name, vectors
 
-        results = await asyncio.gather(
-            *(_run_one(name, cfg) for name, cfg in self._embedders.items())
-        )
+        results = await asyncio.gather(*(_run_one(name, cfg) for name, cfg in self._embedders.items()))
         for name, vectors in results:
             for chunk, vec in zip(chunks, vectors):
                 chunk.named_embeddings[name] = vec

@@ -5,6 +5,7 @@
 ``metadata["filename"]`` written by parsers).  Both must survive processing,
 splitting, and chunking stages.
 """
+
 import pytest
 
 from ragdoc.chunking import SimpleChunker
@@ -14,7 +15,6 @@ from ragdoc.processing import ProcessingPipeline
 from ragdoc.processing.heading import HeadingLevelProcessor
 from ragdoc.splitting.base import split_by_headings
 from ragdoc.splitting.hierarchical import split_hierarchical
-
 
 SOURCE_PATH = "/data/report.pdf"
 CUSTOM_METADATA = {"custom_key": "custom_value", "filename": "report.pdf"}
@@ -58,9 +58,7 @@ class TestFieldsSurviveProcessing:
     @pytest.mark.anyio
     async def test_multiple_processors_preserve_fields(self):
         doc = _make_doc()
-        pipeline = ProcessingPipeline(
-            processors=[HeadingLevelProcessor(), HeadingLevelProcessor()]
-        )
+        pipeline = ProcessingPipeline(processors=[HeadingLevelProcessor(), HeadingLevelProcessor()])
         result = await pipeline.process(doc)
         _assert_doc_provenance(result)
 

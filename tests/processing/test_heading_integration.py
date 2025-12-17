@@ -89,9 +89,7 @@ _title_params = [
 @pytest.mark.anyio
 @pytest.mark.skipif(not _heading_params, reason="No headings defined in test cases")
 @pytest.mark.parametrize("test_case_name,heading_text,expected_level", _heading_params)
-async def test_heading_level_in_valid_range(
-    test_case_name: str, heading_text: str, expected_level: int
-) -> None:
+async def test_heading_level_in_valid_range(test_case_name: str, heading_text: str, expected_level: int) -> None:
     """After HeadingLevelProcessor every heading level must be in 1–6."""
     doc = await _parse_fresh(test_case_name)
     doc = await HeadingLevelProcessor(trust_parser_levels=False).process(doc)
@@ -99,9 +97,7 @@ async def test_heading_level_in_valid_range(
     headings = [el for el in doc.elements if isinstance(el, Heading)]
     assert headings, f"[{test_case_name}] No headings remain after HeadingLevelProcessor"
     for h in headings:
-        assert 1 <= h.level <= 6, (
-            f"[{test_case_name}] '{h.text[:50]}' has out-of-range level {h.level}"
-        )
+        assert 1 <= h.level <= 6, f"[{test_case_name}] '{h.text[:50]}' has out-of-range level {h.level}"
 
 
 @pytest.mark.anyio
@@ -126,16 +122,18 @@ async def test_heading_present_after_level_processor(
 @pytest.mark.xfail(reason="HeadingLevelProcessor may not assign the exact expected level", strict=False)
 @pytest.mark.skipif(not _heading_params, reason="No headings defined in test cases")
 @pytest.mark.parametrize("test_case_name,heading_text,expected_level", _heading_params)
-async def test_heading_exact_level(
-    test_case_name: str, heading_text: str, expected_level: int
-) -> None:
+async def test_heading_exact_level(test_case_name: str, heading_text: str, expected_level: int) -> None:
     """HeadingLevelProcessor must assign each heading exactly the expected level."""
     doc = await _parse_fresh(test_case_name)
     doc = await HeadingLevelProcessor(trust_parser_levels=False).process(doc)
 
     needle = _norm(heading_text)
     target = next(
-        (el for el in doc.elements if isinstance(el, Heading) and (needle in _norm(el.text) or _norm(el.text) in needle)),
+        (
+            el
+            for el in doc.elements
+            if isinstance(el, Heading) and (needle in _norm(el.text) or _norm(el.text) in needle)
+        ),
         None,
     )
     if target is None:
@@ -149,9 +147,7 @@ async def test_heading_exact_level(
 @pytest.mark.anyio
 @pytest.mark.skipif(not _heading_params, reason="No headings defined in test cases")
 @pytest.mark.parametrize("test_case_name,heading_text,expected_level", _heading_params)
-async def test_heading_relative_ordering_preserved(
-    test_case_name: str, heading_text: str, expected_level: int
-) -> None:
+async def test_heading_relative_ordering_preserved(test_case_name: str, heading_text: str, expected_level: int) -> None:
     """
     For headings with expected_level > 1, their assigned level must be >=
     the assigned level of any expected_level-1 heading in the same document.
@@ -165,23 +161,22 @@ async def test_heading_relative_ordering_preserved(
 
     needle = _norm(heading_text)
     target = next(
-        (el for el in doc.elements if isinstance(el, Heading) and (needle in _norm(el.text) or _norm(el.text) in needle)),
+        (
+            el
+            for el in doc.elements
+            if isinstance(el, Heading) and (needle in _norm(el.text) or _norm(el.text) in needle)
+        ),
         None,
     )
     if target is None:
         pytest.skip(f"Heading '{heading_text}' not found — covered by presence test")
 
     # Collect assigned levels for all expected level-1 headings
-    top_level_norms = {
-        _norm(ht)
-        for ht, lvl in _TEST_CASES[test_case_name].get("headings", {}).items()
-        if lvl == 1
-    }
+    top_level_norms = {_norm(ht) for ht, lvl in _TEST_CASES[test_case_name].get("headings", {}).items() if lvl == 1}
     top_assigned = [
         el.level
         for el in doc.elements
-        if isinstance(el, Heading)
-        and any(_norm(el.text) in n or n in _norm(el.text) for n in top_level_norms)
+        if isinstance(el, Heading) and any(_norm(el.text) in n or n in _norm(el.text) for n in top_level_norms)
     ]
     if not top_assigned:
         pytest.skip("No level-1 reference headings resolved — cannot check ordering")
@@ -210,13 +205,9 @@ async def test_title_detected(test_case_name: str, expected_title: str) -> None:
     doc = await HeadingLevelProcessor(trust_parser_levels=False).process(doc)
     doc = await TitleDetectionProcessor(remove_title_from_elements=False).process(doc)
 
-    assert doc.title is not None, (
-        f"[{test_case_name}] TitleDetectionProcessor did not set document.title"
-    )
+    assert doc.title is not None, f"[{test_case_name}] TitleDetectionProcessor did not set document.title"
     assert _norm(doc.title) == _norm(expected_title), (
-        f"[{test_case_name}] Wrong title.\n"
-        f"  Expected: '{expected_title}'\n"
-        f"  Got:      '{doc.title}'"
+        f"[{test_case_name}] Wrong title.\n  Expected: '{expected_title}'\n  Got:      '{doc.title}'"
     )
 
 

@@ -1,4 +1,5 @@
 import pytest
+
 pytest.importorskip("pylatexenc", reason="pdf_mineru extra not installed")
 
 import json
@@ -6,28 +7,31 @@ import re
 from pathlib import Path
 
 import pytest
-from ragdoc.utils.helpers import _normalize_text
-from ragdoc.parsing.mineru.base import MinerUMiddleDocument, ParseContext, _latex_to_text
+
+from ragdoc.document import Document, Heading, Table
+from ragdoc.parsing.mineru.base import MinerUMiddleDocument, _latex_to_text
 from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUExtractor
-from ragdoc.parsing.mineru import MinerUParser
-from ragdoc.document import Footnote, Heading, Table, Document
+from ragdoc.utils.helpers import _normalize_text
 
 # Path to test cases JSON
 TEST_CASES_FILE = Path(__file__).parent.parent.parent / "data" / "test_cases.json"
 FILES_DIR = Path(__file__).parent.parent / "data" / "mineru"
+
 
 def _normalize_text_and_spaces(text: str) -> str:
     """Normalize text and also remove whitespaces."""
     normalized = _normalize_text(_latex_to_text(text))
     return re.sub(r"\s+", "", normalized).strip()
 
+
 def load_test_case_json() -> dict:
     """Load test cases from JSON file."""
     if not TEST_CASES_FILE.exists():
         return {}
-    with open(TEST_CASES_FILE, "r", encoding="utf-8") as f:
+    with open(TEST_CASES_FILE, encoding="utf-8") as f:
         return json.load(f)
-    
+
+
 def load_test_cases() -> dict:
     """Load test cases from JSON file and their parsed _middle.json file., keyed by test case name."""
     data = load_test_case_json()
@@ -42,6 +46,7 @@ def load_test_cases() -> dict:
             # Run only CoreExtractionMiddleware (no heading refiner, no footnote resolution)
             # Module-level asyncio.run() — acceptable: feeds @pytest.mark.parametrize at import time.
             import asyncio
+
             extractor = MinerUExtractor(use_default_middlewares=False)
             extractor.use(CoreExtractionMiddleware())
             document = asyncio.run(extractor.parse(mineru_doc))
@@ -85,9 +90,7 @@ def test_footnote_parsed_by_core_middleware(test_case_name: str, fn_index: int, 
     document: Document = TEST_CASES[test_case_name].get("parsed_doc")
     parsed_footnotes = [_normalize_text_and_spaces(fn.text) for fn in document.footnotes]
 
-    assert len(parsed_footnotes) > 0, (
-        f"[{test_case_name}] No footnotes extracted by CoreExtractionMiddleware"
-    )
+    assert len(parsed_footnotes) > 0, f"[{test_case_name}] No footnotes extracted by CoreExtractionMiddleware"
 
     needle = _normalize_text_and_spaces(fn_text)
     found = any(needle in parsed or parsed in needle for parsed in parsed_footnotes)
@@ -107,15 +110,9 @@ def test_footnote_parsed_by_core_middleware(test_case_name: str, fn_index: int, 
 def test_heading_detected(test_case_name: str, heading_name: str) -> None:
     """Test that each expected heading is present in the parsed document."""
     document = TEST_CASES[test_case_name].get("parsed_doc")
-    parsed_heading_texts = [
-        _normalize_text_and_spaces(el.text)
-        for el in document.elements
-        if isinstance(el, Heading)
-    ]
+    parsed_heading_texts = [_normalize_text_and_spaces(el.text) for el in document.elements if isinstance(el, Heading)]
 
-    assert len(parsed_heading_texts) > 0, (
-        f"[{test_case_name}] No headings extracted"
-    )
+    assert len(parsed_heading_texts) > 0, f"[{test_case_name}] No headings extracted"
 
     needle = _normalize_text_and_spaces(heading_name)
     found = any(needle in h or h in needle for h in parsed_heading_texts)
@@ -137,9 +134,7 @@ def test_table_parsed_by_core_middleware(test_case_name: str, table_index: int, 
     document: Document = TEST_CASES[test_case_name].get("parsed_doc")
     tables = [el for el in document.elements if isinstance(el, Table)]
 
-    assert len(tables) > 0, (
-        f"[{test_case_name}] No tables extracted by CoreExtractionMiddleware"
-    )
+    assert len(tables) > 0, f"[{test_case_name}] No tables extracted by CoreExtractionMiddleware"
 
     found = any(expected_text in table.html_content for table in tables)
     assert found, (
@@ -172,15 +167,13 @@ def test_heading_html_contains_css():
         if not headings:
             continue
         # At least some headings should have CSS on the outer tag
-        css_headings = [h for h in headings if 'style=' in h.html]
+        css_headings = [h for h in headings if "style=" in h.html]
         assert len(css_headings) > 0, (
-            f"[{name}] No headings have CSS style on outer tag. "
-            f"Sample html: {headings[0].html[:100]}"
+            f"[{name}] No headings have CSS style on outer tag. Sample html: {headings[0].html[:100]}"
         )
         # Verify font-size is present in at least one heading
-        font_size_headings = [h for h in css_headings if 'font-size' in h.html]
+        font_size_headings = [h for h in css_headings if "font-size" in h.html]
         assert len(font_size_headings) > 0, (
-            f"[{name}] No headings have font-size CSS. "
-            f"Sample html: {css_headings[0].html[:100]}"
+            f"[{name}] No headings have font-size CSS. Sample html: {css_headings[0].html[:100]}"
         )
         return  # Passed for at least one fixture, that's enough

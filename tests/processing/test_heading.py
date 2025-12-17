@@ -1,4 +1,5 @@
 """Tests for heading processors and related helpers."""
+
 import pytest
 
 from ragdoc.document import Document, Heading, Paragraph
@@ -15,7 +16,6 @@ from ragdoc.processing.heading import (
     normalize_heading_levels,
 )
 
-
 # --- TestHeadingVisualInfo ---
 
 
@@ -30,9 +30,7 @@ from ragdoc.processing.heading import (
         pytest.param(None, True, True, True, 0.0, id="none_font"),
     ],
 )
-def test_heading_visual_info_effective_size(
-    font_size, is_all_caps_val, is_centered_val, is_bold_val, expected
-):
+def test_heading_visual_info_effective_size(font_size, is_all_caps_val, is_centered_val, is_bold_val, expected):
     info = HeadingVisualInfo(
         index=0,
         font_size=font_size,
@@ -53,11 +51,9 @@ def test_heading_visual_info_effective_size(
         pytest.param('<span style="font-size: 20px;">Text</span>', 15.0, id="px"),
         pytest.param('<span style="font-size: 2em;">Text</span>', 24.0, id="em"),
         pytest.param('<span style="font-size: 1.5rem;">Text</span>', 18.0, id="rem"),
-        pytest.param('<span>Text</span>', None, id="no_font_size"),
-        pytest.param('Plain text', None, id="plain_text"),
-        pytest.param(
-            '<div><span style="font-size: 18pt;">Nested</span></div>', 18.0, id="nested"
-        ),
+        pytest.param("<span>Text</span>", None, id="no_font_size"),
+        pytest.param("Plain text", None, id="plain_text"),
+        pytest.param('<div><span style="font-size: 18pt;">Nested</span></div>', 18.0, id="nested"),
     ],
 )
 def test_extract_font_size(html, expected):
@@ -84,7 +80,7 @@ def test_is_centered_without_space():
 def test_is_centered_not_centered():
     """Returns False for non-centered text."""
     assert not is_centered('<span style="text-align: left;">Text</span>')
-    assert not is_centered('<span>Text</span>')
+    assert not is_centered("<span>Text</span>")
 
 
 def test_is_centered_in_div():
@@ -97,12 +93,12 @@ def test_is_centered_in_div():
 
 def test_is_bold_tag():
     """Detects <b> tag."""
-    assert is_bold('<b>Bold</b>')
+    assert is_bold("<b>Bold</b>")
 
 
 def test_is_bold_strong_tag():
     """Detects <strong> tag."""
-    assert is_bold('<strong>Strong</strong>')
+    assert is_bold("<strong>Strong</strong>")
 
 
 def test_is_bold_css_keyword():
@@ -120,7 +116,7 @@ def test_is_bold_css_numeric():
 
 def test_is_bold_not_bold():
     """Returns False for non-bold text."""
-    assert not is_bold('<span>Normal</span>')
+    assert not is_bold("<span>Normal</span>")
 
 
 # --- TestIsAllCaps ---
@@ -225,7 +221,7 @@ async def test_heading_level_processor_skips_html_parser():
         elements=[
             Heading(innerhtml="Title", level=1),
             Heading(innerhtml="Section", level=2),
-        ]
+        ],
     )
 
     processor = HeadingLevelProcessor()
@@ -242,7 +238,7 @@ async def test_heading_level_processor_skips_pandoc_parser():
         parser="pandoc",
         elements=[
             Heading(innerhtml="Title", level=1),
-        ]
+        ],
     )
 
     processor = HeadingLevelProcessor()
@@ -257,15 +253,9 @@ async def test_heading_level_processor_processes_mineru_parser():
     doc = Document(
         parser="mineru",
         elements=[
-            Heading(
-                innerhtml='<span style="font-size: 24pt;">Big Title</span>',
-                level=1
-            ),
-            Heading(
-                innerhtml='<span style="font-size: 14pt;">Small Section</span>',
-                level=1
-            ),
-        ]
+            Heading(innerhtml='<span style="font-size: 24pt;">Big Title</span>', level=1),
+            Heading(innerhtml='<span style="font-size: 14pt;">Small Section</span>', level=1),
+        ],
     )
 
     processor = HeadingLevelProcessor()
@@ -281,15 +271,9 @@ async def test_heading_level_processor_custom_size_to_level_mapper():
     doc = Document(
         parser="mineru",
         elements=[
-            Heading(
-                innerhtml='<span style="font-size: 24pt;">Big Title</span>',
-                level=1
-            ),
-            Heading(
-                innerhtml='<span style="font-size: 14pt;">Small Section</span>',
-                level=1
-            ),
-        ]
+            Heading(innerhtml='<span style="font-size: 24pt;">Big Title</span>', level=1),
+            Heading(innerhtml='<span style="font-size: 14pt;">Small Section</span>', level=1),
+        ],
     )
 
     def custom_mapper(sizes: list[float], max_levels: int) -> dict[float, int]:
@@ -308,11 +292,8 @@ async def test_heading_level_processor_custom_mapper_called_with_effective_sizes
     doc = Document(
         parser="mineru",
         elements=[
-            Heading(
-                innerhtml='<span style="font-size: 10pt; text-align: center;">CENTERED CAPS</span>',
-                level=1
-            ),
-        ]
+            Heading(innerhtml='<span style="font-size: 10pt; text-align: center;">CENTERED CAPS</span>', level=1),
+        ],
     )
 
     received_sizes = []
@@ -340,7 +321,7 @@ async def test_title_detection_skips_if_title_exists():
         title="Existing Title",
         elements=[
             Heading(innerhtml="Another Title", level=1),
-        ]
+        ],
     )
 
     processor = TitleDetectionProcessor()

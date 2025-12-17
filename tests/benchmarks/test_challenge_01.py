@@ -31,9 +31,7 @@ def doc() -> Document:
 
 def _table_text(doc: Document) -> str:
     """All table cells joined into one string for substring checks."""
-    return "\n".join(
-        BeautifulSoup(t.html, "html.parser").get_text() for t in doc.tables
-    )
+    return "\n".join(BeautifulSoup(t.html, "html.parser").get_text() for t in doc.tables)
 
 
 def _heading_names(doc: Document) -> set[str]:
@@ -115,10 +113,7 @@ def test_fake_heading_bold_is_paragraph(doc: Document) -> None:
 
 
 def test_fake_heading_allcaps_is_paragraph(doc: Document) -> None:
-    assert any(
-        "THIS ENTIRELY UPPERCASE PARAGRAPH COULD FOOL A NAIVE CLASSIFIER" in t
-        for t in _para_texts(doc)
-    )
+    assert any("THIS ENTIRELY UPPERCASE PARAGRAPH COULD FOOL A NAIVE CLASSIFIER" in t for t in _para_texts(doc))
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -333,8 +328,7 @@ def test_code_block_is_one_element(doc: Document) -> None:
 
 @pytest.mark.xfail(
     strict=True,
-    reason="indented_paragraph_to_code normalisation not implemented; "
-    "fake code block stays as Paragraph, not RawText",
+    reason="indented_paragraph_to_code normalisation not implemented; fake code block stays as Paragraph, not RawText",
 )
 def test_code_block_is_raw_text(doc: Document) -> None:
     assert any("def analyse_report" in r.text for r in doc.raw_texts)
@@ -359,14 +353,11 @@ def test_caption_paragraph_present(doc: Document) -> None:
 
 @pytest.mark.xfail(
     strict=True,
-    reason="orphan_caption_to_linked normalisation not implemented; "
-    "caption paragraph stays unlinked",
+    reason="orphan_caption_to_linked normalisation not implemented; caption paragraph stays unlinked",
 )
 def test_caption_linked_to_image(doc: Document) -> None:
     """Ideal: caption text should become Image.text_representation after normalisation."""
-    assert any(
-        img.text_representation and "Figure 1" in img.text_representation for img in doc.images
-    )
+    assert any(img.text_representation and "Figure 1" in img.text_representation for img in doc.images)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -424,8 +415,7 @@ def test_footer_text_currently_in_paragraphs(doc: Document) -> None:
 
 @pytest.mark.xfail(
     strict=False,  # ambiguous: over-normalisation risk is real
-    reason="Footer-pattern body text detection not implemented; "
-    "paragraph is currently included, not dropped",
+    reason="Footer-pattern body text detection not implemented; paragraph is currently included, not dropped",
 )
 def test_footer_text_dropped_by_smart_parser(doc: Document) -> None:
     """Ideal (aspirational): parser detects and drops footer-patterned body text."""

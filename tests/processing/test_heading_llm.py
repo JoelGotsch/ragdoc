@@ -1,8 +1,11 @@
 """Tests for LLMHeadingResolver."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+
 pytest.importorskip("pydantic_settings", reason="pydantic_settings not installed")
+from ragdoc.document import Document, Heading
 from ragdoc.processing.heading_llm import (
     HeadingJudgment,
     HeadingLevel,
@@ -10,8 +13,6 @@ from ragdoc.processing.heading_llm import (
     LLMHeadingResolver,
     LLMHeadingResolverSettings,
 )
-
-from ragdoc.document import Document, Heading
 
 
 def _make_mock_client(response: HeadingResponse | None = None, *, side_effect: Exception | None = None) -> MagicMock:
@@ -47,6 +48,7 @@ async def test_heading_resolver_process_empty_document():
 async def test_heading_resolver_process_no_headings():
     """Processor handles document with no headings."""
     from ragdoc.document import Paragraph
+
     doc = Document(elements=[Paragraph(html="<p>Content</p>")])
     client = _make_mock_client()
     resolver = LLMHeadingResolver(client)
@@ -65,10 +67,12 @@ async def test_heading_resolver_process_with_headings():
         ]
     )
 
-    response = HeadingResponse(judgments=[
-        HeadingJudgment(id=1, level=HeadingLevel.DOCUMENT_TITLE),
-        HeadingJudgment(id=2, level=HeadingLevel.H1),
-    ])
+    response = HeadingResponse(
+        judgments=[
+            HeadingJudgment(id=1, level=HeadingLevel.DOCUMENT_TITLE),
+            HeadingJudgment(id=2, level=HeadingLevel.H1),
+        ]
+    )
     client = _make_mock_client(response)
     # Keep title in elements so we can inspect its metadata
     resolver = LLMHeadingResolver(client, remove_title_from_elements=False)
@@ -87,6 +91,7 @@ async def test_heading_resolver_process_with_headings():
 async def test_heading_resolver_handles_none_response():
     """Processor handles LLM marking headings as 'none' — converts them to Paragraphs."""
     from ragdoc.document import Paragraph
+
     doc = Document(
         elements=[
             Heading(innerhtml="12-March-2024", level=1),  # Metadata
@@ -94,10 +99,12 @@ async def test_heading_resolver_handles_none_response():
         ]
     )
 
-    response = HeadingResponse(judgments=[
-        HeadingJudgment(id=1, level=HeadingLevel.NOT_HEADING),
-        HeadingJudgment(id=2, level=HeadingLevel.H1),
-    ])
+    response = HeadingResponse(
+        judgments=[
+            HeadingJudgment(id=1, level=HeadingLevel.NOT_HEADING),
+            HeadingJudgment(id=2, level=HeadingLevel.H1),
+        ]
+    )
     client = _make_mock_client(response)
     resolver = LLMHeadingResolver(client)
     result = await resolver.process(doc)
@@ -119,9 +126,11 @@ async def test_heading_resolver_handles_uncertain_response():
     )
 
     # Heading 1 omitted from judgments → uncertain; heading 2 present → assign h1
-    response = HeadingResponse(judgments=[
-        HeadingJudgment(id=2, level=HeadingLevel.H1),
-    ])
+    response = HeadingResponse(
+        judgments=[
+            HeadingJudgment(id=2, level=HeadingLevel.H1),
+        ]
+    )
     client = _make_mock_client(response)
     resolver = LLMHeadingResolver(client)
     result = await resolver.process(doc)

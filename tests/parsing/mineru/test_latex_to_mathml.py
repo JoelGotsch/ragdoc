@@ -12,8 +12,8 @@ from ragdoc.parsing.mineru.base import (
     Line,
     TextSpan,
     extract_text_from_lines,
-    normalize_math_spaces,
     latex_to_mathml,
+    normalize_math_spaces,
 )
 
 # ---------------------------------------------------------------------------
@@ -57,8 +57,8 @@ def test_normalize_math_spaces(latex: str, expected: str) -> None:
 @pytest.mark.parametrize(
     "latex, expected_number",
     [
-        (r"2 0 0 4 ^ { 1 2 }", "12"),   # footnote number in exponent
-        (r"\mathrm { I 1 1 }", "11"),   # footnote number after letter
+        (r"2 0 0 4 ^ { 1 2 }", "12"),  # footnote number in exponent
+        (r"\mathrm { I 1 1 }", "11"),  # footnote number after letter
     ],
     ids=["year_footnote_exponent", "heu_footnote_exponent"],
 )
@@ -116,9 +116,7 @@ def test_latex_to_mathml_empty_returns_empty_string() -> None:
     ],
     ids=["inline", "block"],
 )
-def test_latex_to_mathml_display_attribute(
-    latex: str, display: bool, expected_display_attr: str
-) -> None:
+def test_latex_to_mathml_display_attribute(latex: str, display: bool, expected_display_attr: str) -> None:
     """<math> must carry the correct display= attribute."""
     result = latex_to_mathml(latex, display=display)
     soup = BeautifulSoup(result, "html.parser")
@@ -166,9 +164,7 @@ def test_extract_text_inline_equation_produces_math_tag() -> None:
 
 def test_extract_text_interline_equation_produces_block_math_tag() -> None:
     """InterlineEquationSpan must become a <math display="block"> element."""
-    line = _make_line(
-        InterlineEquationSpan(bbox=_DUMMY_BBOX, content=r"\int_0^\infty f(x)\,dx")
-    )
+    line = _make_line(InterlineEquationSpan(bbox=_DUMMY_BBOX, content=r"\int_0^\infty f(x)\,dx"))
     result = extract_text_from_lines([line])
     soup = BeautifulSoup(result, "html.parser")
     math = soup.find("math")

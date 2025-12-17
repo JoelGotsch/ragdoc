@@ -1,14 +1,13 @@
 """Tests for the Renderer class (rendering/__init__.py)."""
-import pytest
+
 from pydantic import BaseModel
 
 from ragdoc.document import Document, Heading, Image, Paragraph
-from ragdoc.rendering import DocumentMetadata, OutputFormat, Renderer
+from ragdoc.rendering import OutputFormat, Renderer
 from ragdoc.rendering.elements import (
     render_for_prompt,
     render_raw,
 )
-
 
 # --- TestRenderer ---
 

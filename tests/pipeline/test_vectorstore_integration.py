@@ -1,4 +1,5 @@
 """Integration tests for VectorStorePipeline: stateless incremental updates via vector store."""
+
 from __future__ import annotations
 
 from pathlib import Path

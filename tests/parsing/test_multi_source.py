@@ -1,12 +1,12 @@
 """Tests for MultiSourceParser."""
 
-import pytest
 from pathlib import Path
 
-from ragdoc.document import Document, Heading
-from ragdoc.parsing.parser import Parser
-from ragdoc.parsing.multi_source import MultiSourceParser
+import pytest
 
+from ragdoc.document import Document, Heading
+from ragdoc.parsing.multi_source import MultiSourceParser
+from ragdoc.parsing.parser import Parser
 
 # ---------------------------------------------------------------------------
 # Helpers

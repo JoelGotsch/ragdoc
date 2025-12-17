@@ -1,7 +1,8 @@
 """Integration tests for the unified load() entry point."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 
 from ragdoc.parsing import load
 

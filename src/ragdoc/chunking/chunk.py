@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import uuid
 import datetime
+import uuid
 from typing import Generic
 
 from pydantic import BaseModel, Field, SkipValidation, model_validator

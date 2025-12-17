@@ -1,13 +1,13 @@
 """Tests for ImageSummaryProcessor and related functions (summary_image.py)."""
+
 from __future__ import annotations
 
 import base64
 import io
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from PIL import Image as PILImage
-from PIL import UnidentifiedImageError
-from unittest.mock import AsyncMock, MagicMock
+from PIL import Image as PILImage, UnidentifiedImageError
 
 from ragdoc.document import Document, Image
 from ragdoc.processing.summary_base import ImageSummary
@@ -95,6 +95,7 @@ async def test_image_processor_sets_text_representation_from_structured():
 @pytest.mark.anyio
 async def test_image_processor_sets_text_representation_from_summary_fallback():
     """When text_representation is None, summary becomes text_representation."""
+
     async def mock_summarize(image: Image, context: str | None) -> ImageSummary:
         return ImageSummary(summary="A photo of a building.")
 
@@ -112,9 +113,11 @@ async def test_image_processor_skips_already_processed():
         calls.append(image)
         return ImageSummary(summary="x")
 
-    doc = Document(elements=[
-        Image(image=_tiny_png_base64(), image_type="png", text_representation="already"),
-    ])
+    doc = Document(
+        elements=[
+            Image(image=_tiny_png_base64(), image_type="png", text_representation="already"),
+        ]
+    )
     await ImageSummaryProcessor(summarize=mock_summarize).process(doc)
     assert calls == []
 
@@ -128,10 +131,12 @@ async def test_image_processor_processes_multiple_images():
         summaries.append(s)
         return ImageSummary(summary=s)
 
-    doc = Document(elements=[
-        Image(image=_tiny_png_base64(), image_type="png"),
-        Image(image=_tiny_png_base64(), image_type="png"),
-    ])
+    doc = Document(
+        elements=[
+            Image(image=_tiny_png_base64(), image_type="png"),
+            Image(image=_tiny_png_base64(), image_type="png"),
+        ]
+    )
     await ImageSummaryProcessor(summarize=mock_summarize).process(doc)
     assert len(summaries) == 2
     assert all(img.text_representation is not None for img in doc.images)
@@ -157,6 +162,7 @@ async def test_image_processor_context_fn_passed_to_summarize():
 @pytest.mark.anyio
 async def test_image_processor_decorative_image_skipped():
     """Decorative images get text_representation=None."""
+
     async def mock_summarize(image: Image, context: str | None) -> ImageSummary:
         return ImageSummary(summary="A logo.", decorative=True)
 
@@ -203,9 +209,7 @@ async def test_openai_summarizer_custom_create_messages_called():
 
     async def fake_parse(*args, **kwargs):
         captured.append(kwargs.get("messages", []))
-        return MagicMock(
-            choices=[MagicMock(message=MagicMock(parsed=ImageSummary(summary="x")))]
-        )
+        return MagicMock(choices=[MagicMock(message=MagicMock(parsed=ImageSummary(summary="x")))])
 
     client.beta.chat.completions.parse = fake_parse
 
@@ -224,9 +228,7 @@ async def test_openai_summarizer_no_transformations_skips_pil():
     """Passing transformations=[] skips the PIL round-trip."""
     client = _make_openai_client()
     client.beta.chat.completions.parse = AsyncMock(
-        return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(parsed=ImageSummary(summary="x")))]
-        )
+        return_value=MagicMock(choices=[MagicMock(message=MagicMock(parsed=ImageSummary(summary="x")))])
     )
     summarize = openai_image_summarizer(client, transformations=[])
     img = Image(image=_tiny_png_base64(), image_type="png")

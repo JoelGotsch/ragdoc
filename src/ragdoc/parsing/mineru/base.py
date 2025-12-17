@@ -4,23 +4,20 @@ Pydantic models for parsing MinerU _middle.json output files.
 These models represent the intermediate processing results from MinerU PDF extraction.
 """
 
+import json
+import re as _re
+from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable, Iterator
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Annotated, Literal, TypeVar, Union, Any
 from functools import cached_property
+from pathlib import Path
+from typing import Annotated, Any, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, Field
-from pathlib import Path
-import json
-
-from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Iterator, Callable
-from typing import Protocol
-from dataclasses import dataclass, field
-from ragdoc.document import ElementType
-
-import re as _re
-
 from pylatexenc.latex2text import LatexNodes2Text
+
+from ragdoc.document import ElementType
 
 _LATEX2TEXT = LatexNodes2Text(math_mode="text")
 
@@ -93,6 +90,7 @@ def latex_to_mathml(latex: str, display: bool = False) -> str:
 
     display_mode = "block" if display else "inline"
     return convert(normalize_math_spaces(latex), display=display_mode)
+
 
 E = TypeVar("E", bound=ElementType)
 # =============================================================================
@@ -249,7 +247,7 @@ class ChartSpan(BaseModel):
 
 
 Span = Annotated[
-    Union[TextSpan, InlineEquationSpan, InterlineEquationSpan, ImageSpan, TableSpan, ChartSpan],
+    TextSpan | InlineEquationSpan | InterlineEquationSpan | ImageSpan | TableSpan | ChartSpan,
     Field(discriminator="type"),
 ]
 
@@ -329,9 +327,7 @@ class ListBlock(BaseBlock):
 
     type: Literal["list"] = "list"
     blocks: list[ListItemBlock] = Field(description="List items as text blocks")
-    sub_type: ListSubType = Field(
-        default=ListSubType.TEXT, description="List category type"
-    )
+    sub_type: ListSubType = Field(default=ListSubType.TEXT, description="List category type")
 
 
 # =============================================================================
@@ -359,9 +355,7 @@ class CodeCaptionBlock(BaseModel):
     type: Literal["code_caption"] = "code_caption"
 
 
-CodeInnerBlock = Annotated[
-    Union[CodeBodyBlock, CodeCaptionBlock], Field(discriminator="type")
-]
+CodeInnerBlock = Annotated[CodeBodyBlock | CodeCaptionBlock, Field(discriminator="type")]
 
 
 class CodeBlock(BaseBlock):
@@ -374,12 +368,8 @@ class CodeBlock(BaseBlock):
     """
 
     type: Literal["code"] = "code"
-    blocks: list[CodeInnerBlock] = Field(
-        description="Code body and optional caption blocks"
-    )
-    sub_type: CodeSubType = Field(
-        default=CodeSubType.CODE, description="Code block category"
-    )
+    blocks: list[CodeInnerBlock] = Field(description="Code body and optional caption blocks")
+    sub_type: CodeSubType = Field(default=CodeSubType.CODE, description="Code block category")
 
     @property
     def code_body(self) -> CodeBodyBlock | None:
@@ -434,7 +424,7 @@ class ImageFootnoteBlock(BaseModel):
 
 
 ImageInnerBlock = Annotated[
-    Union[ImageBodyBlock, ImageCaptionBlock, ImageFootnoteBlock],
+    ImageBodyBlock | ImageCaptionBlock | ImageFootnoteBlock,
     Field(discriminator="type"),
 ]
 
@@ -448,9 +438,7 @@ class ImageBlock(BaseModel):
 
     type: Literal["image"] = "image"
     bbox: BBox
-    blocks: list[ImageInnerBlock] = Field(
-        description="Image body and optional caption/footnote blocks"
-    )
+    blocks: list[ImageInnerBlock] = Field(description="Image body and optional caption/footnote blocks")
     index: int = Field(description="Block index within the page")
 
     @property
@@ -506,7 +494,7 @@ class TableFootnoteBlock(BaseModel):
 
 
 TableInnerBlock = Annotated[
-    Union[TableBodyBlock, TableCaptionBlock, TableFootnoteBlock],
+    TableBodyBlock | TableCaptionBlock | TableFootnoteBlock,
     Field(discriminator="type"),
 ]
 
@@ -520,9 +508,7 @@ class TableBlock(BaseModel):
 
     type: Literal["table"] = "table"
     bbox: BBox
-    blocks: list[TableInnerBlock] = Field(
-        description="Table body and optional caption/footnote blocks"
-    )
+    blocks: list[TableInnerBlock] = Field(description="Table body and optional caption/footnote blocks")
     index: int = Field(description="Block index within the page")
 
     @property
@@ -610,7 +596,7 @@ class ChartFootnoteBlock(BaseModel):
 
 
 ChartInnerBlock = Annotated[
-    Union[ChartBodyBlock, ChartCaptionBlock, ChartFootnoteBlock],
+    ChartBodyBlock | ChartCaptionBlock | ChartFootnoteBlock,
     Field(discriminator="type"),
 ]
 
@@ -620,9 +606,7 @@ class ChartBlock(BaseModel):
 
     type: Literal["chart"] = "chart"
     bbox: BBox
-    blocks: list[ChartInnerBlock] = Field(
-        description="Chart body and optional caption/footnote blocks"
-    )
+    blocks: list[ChartInnerBlock] = Field(description="Chart body and optional caption/footnote blocks")
     index: int = Field(description="Block index within the page")
 
     @property
@@ -666,17 +650,15 @@ class DiscardedBlock(BaseBlock):
 # =============================================================================
 
 ParaBlock = Annotated[
-    Union[
-        TextBlock,
-        TitleBlock,
-        ListBlock,
-        CodeBlock,
-        ImageBlock,
-        TableBlock,
-        ChartBlock,
-        RefTextBlock,
-        InterlineEquationBlock,
-    ],
+    TextBlock
+    | TitleBlock
+    | ListBlock
+    | CodeBlock
+    | ImageBlock
+    | TableBlock
+    | ChartBlock
+    | RefTextBlock
+    | InterlineEquationBlock,
     Field(discriminator="type"),
 ]
 
@@ -689,9 +671,7 @@ ParaBlock = Annotated[
 class PageInfo(BaseModel):
     """Information about a single page in the PDF."""
 
-    para_blocks: list[ParaBlock] = Field(
-        default_factory=list, description="Paragraph blocks on this page"
-    )
+    para_blocks: list[ParaBlock] = Field(default_factory=list, description="Paragraph blocks on this page")
     discarded_blocks: list[DiscardedBlock] = Field(
         default_factory=list, description="Blocks discarded during processing"
     )
@@ -703,23 +683,23 @@ class PageInfo(BaseModel):
     def bounding_box(self) -> tuple[float, float, float, float]:
         """
         Calculate the bounding box of the page based on all blocks.
-        
+
         Returns:
             A tuple (x1, y1, x2, y2) representing the bounding box that
             encompasses all para_blocks and discarded_blocks on the page.
             Returns (0, 0, 612, 792) as default if no blocks exist (US Letter size in points).
         """
         all_blocks = list(self.para_blocks) + list(self.discarded_blocks)
-        
+
         if not all_blocks:
             # Default to US Letter size in points
             return (0.0, 0.0, 612.0, 792.0)
-        
+
         min_x = min(block.bbox[0] for block in all_blocks)
         min_y = min(block.bbox[1] for block in all_blocks)
         max_x = max(block.bbox[2] for block in all_blocks)
         max_y = max(block.bbox[3] for block in all_blocks)
-        
+
         return (min_x, min_y, max_x, max_y)
 
     @property
@@ -749,15 +729,15 @@ class MinerUMiddleDocument(BaseModel):
     pdf_info: list[PageInfo] = Field(description="List of pages in the document")
 
     @classmethod
-    def from_json_path(cls, path: Path|str) -> "MinerUMiddleDocument":
+    def from_json_path(cls, path: Path | str) -> "MinerUMiddleDocument":
         """Load a MinerUMiddleDocument from a _middle.json file."""
         path = Path(path)
         if not path.is_file() or not path.name.endswith("_middle.json"):
             raise ValueError(f"Path {path} is not a valid _middle.json file")
-        
+
         with open(path, encoding="utf-8") as f:
             json_data = json.load(f)
-        
+
         return cls.model_validate(json_data)
 
     def get_page(self, page_idx: int) -> PageInfo | None:
@@ -871,7 +851,8 @@ def parse_middle_json(json_data: dict) -> MinerUMiddleDocument:
     """
     return MinerUMiddleDocument.model_validate(json_data)
 
-def parse_middle_json_file(path: Path|str) -> MinerUMiddleDocument:
+
+def parse_middle_json_file(path: Path | str) -> MinerUMiddleDocument:
     """
     Parse a MinerU _middle.json file from disk.
 
@@ -890,7 +871,9 @@ def parse_middle_json_file(path: Path|str) -> MinerUMiddleDocument:
         if not json_files:
             raise FileNotFoundError(f"No *_middle.json file found in {path}")
         if len(json_files) > 1:
-            raise ValueError(f"Multiple *_middle.json files found in {path}, please specify one: {[f.name for f in json_files]}")
+            raise ValueError(
+                f"Multiple *_middle.json files found in {path}, please specify one: {[f.name for f in json_files]}"
+            )
         json_path = json_files[0]
 
     with open(json_path, encoding="utf-8") as f:
@@ -898,7 +881,8 @@ def parse_middle_json_file(path: Path|str) -> MinerUMiddleDocument:
 
     return parse_middle_json(json_data)
 
-def parse_directory_middle_jsons(dir_path: Path|str) -> list[MinerUMiddleDocument]:
+
+def parse_directory_middle_jsons(dir_path: Path | str) -> list[MinerUMiddleDocument]:
     """
     Parse all *_middle.json files in a directory.
 
@@ -913,6 +897,7 @@ def parse_directory_middle_jsons(dir_path: Path|str) -> list[MinerUMiddleDocumen
 
     return [parse_middle_json_file(json_file) for json_file in dir_path.rglob("*_middle.json")]
 
+
 SourceBlock = ParaBlock | DiscardedBlock
 
 
@@ -925,26 +910,26 @@ SourceBlock = ParaBlock | DiscardedBlock
 class ParsedElement:
     """
     Wrapper linking a parsed document element to its source block and page.
-    
+
     This is the core data structure that enables the middleware pipeline to:
     - Access the original MinerU block data for any element
     - Modify elements in place while preserving source linkage
     - Filter elements by type for specialized processing
-    
+
     Design Rationale:
     -----------------
-    Instead of maintaining separate lists for each element type (headings, 
+    Instead of maintaining separate lists for each element type (headings,
     paragraphs, etc.), we use a single list of ParsedElement wrappers. This:
-    
+
     1. Preserves document order naturally (all elements in reading order)
     2. Provides uniform access to source data for any element type
     3. Simplifies middleware implementation (filter by type, access source)
     4. Makes it easy to add new element types without changing the context
-    
+
     The source_block and source_page fields enable middlewares to make decisions
     based on visual properties (font size, position, centering) that aren't
     captured in the parsed element itself.
-    
+
     Attributes:
         element: The parsed document element (Heading, Paragraph, etc.)
         source_block: The original MinerU block this element was extracted from
@@ -952,7 +937,7 @@ class ParsedElement:
         metadata: Optional metadata dictionary for middlewares to store additional info (usually for other middlewares).
           e.g. if heading is centered, its average height, etc.
     """
-    
+
     element: ElementType
     source_block: SourceBlock
     source_page: PageInfo
@@ -968,14 +953,14 @@ class ParsedElement:
 class ParseContext:
     """
     Context object passed through the parsing pipeline.
-    
+
     The context maintains a unified list of ParsedElement wrappers, preserving
     document order and source linkage. Middlewares can:
     - Filter elements by type using helper methods
     - Modify elements in place
     - Access source blocks for visual property analysis
     - Add metadata and warnings
-    
+
     Design Rationale:
     -----------------
     The single `elements` list (vs. separate typed lists) ensures:
@@ -983,7 +968,7 @@ class ParseContext:
     - Source linkage is always available
     - Middlewares can be written generically or for specific types
     - Adding new element types doesn't require context changes
-    
+
     Attributes:
         source: The original MinerU document being parsed
         elements: All parsed elements with source linkage (in document order)
@@ -991,34 +976,32 @@ class ParseContext:
         warnings: Errors/warnings collected during parsing
         document_title: The detected document title (set by TitleDetectionMiddleware)
     """
-    
+
     # Source document
     source: MinerUMiddleDocument
-    
+
     # All parsed elements with source linkage (in document order)
     elements: list[ParsedElement] = field(default_factory=list)
-    
+
     # Metadata accumulated during parsing
     metadata: dict[str, Any] = field(default_factory=dict)
-    
+
     # Errors/warnings collected during parsing
     warnings: list[str] = field(default_factory=list)
-    
+
     # Document title detected during parsing (set by TitleDetectionMiddleware)
     document_title: str | None = None
-    
+
     # -------------------------------------------------------------------------
     # Element Filtering Methods
     # -------------------------------------------------------------------------
-    
-    def get_elements_by_type(
-        self, element_type: type[E]
-    ) -> list[tuple[int, ParsedElement]]:
+
+    def get_elements_by_type(self, element_type: type[E]) -> list[tuple[int, ParsedElement]]:
         """
         Get all elements of a specific type with their indices.
-        
+
         Returns tuples of (index, parsed_element) to allow in-place updates.
-        
+
         Example:
             for idx, parsed in context.get_elements_by_type(Heading):
                 # Access the heading
@@ -1032,19 +1015,14 @@ class ParseContext:
                     source_page=parsed.source_page,
                 )
         """
-        return [
-            (i, elem) for i, elem in enumerate(self.elements)
-            if isinstance(elem.element, element_type)
-        ]
-    
-    def iter_elements_by_type(
-        self, element_type: type[E]
-    ) -> Iterator[tuple[ParsedElement, E]]:
+        return [(i, elem) for i, elem in enumerate(self.elements) if isinstance(elem.element, element_type)]
+
+    def iter_elements_by_type(self, element_type: type[E]) -> Iterator[tuple[ParsedElement, E]]:
         """
         Iterate over elements of a specific type with index and typed element.
-        
+
         Yields (parsed_element, typed_element) tuples for convenient access.
-        
+
         Example:
             for parsed, heading in context.iter_elements_by_type(Heading):
                 # heading is already typed as Heading
@@ -1054,55 +1032,61 @@ class ParseContext:
         for elem in self.elements:
             if isinstance(elem.element, element_type):
                 yield (elem, elem.element)
-    
+
     # -------------------------------------------------------------------------
     # Convenience Properties (for quick access without filtering)
     # -------------------------------------------------------------------------
-    
+
     @property
     def headings(self) -> list[ParsedElement]:
         """Get all heading elements (without indices)."""
         from ragdoc.document import Heading
+
         return [e for e in self.elements if isinstance(e.element, Heading)]
-    
+
     @property
     def paragraphs(self) -> list[ParsedElement]:
         """Get all paragraph elements (without indices)."""
         from ragdoc.document import Paragraph
+
         return [e for e in self.elements if isinstance(e.element, Paragraph)]
-    
+
     @property
     def tables(self) -> list[ParsedElement]:
         """Get all table elements (without indices)."""
         from ragdoc.document import Table
+
         return [e for e in self.elements if isinstance(e.element, Table)]
-    
+
     @property
     def lists(self) -> list[ParsedElement]:
         """Get all list elements (without indices)."""
         from ragdoc.document import DocumentList
+
         return [e for e in self.elements if isinstance(e.element, DocumentList)]
-    
+
     @property
     def images(self) -> list[ParsedElement]:
         """Get all image elements (without indices)."""
         from ragdoc.document import Image
+
         return [e for e in self.elements if isinstance(e.element, Image)]
-    
+
     @property
     def raw_texts(self) -> list[ParsedElement]:
         """Get all raw text elements (without indices)."""
         from ragdoc.document import RawText
+
         return [e for e in self.elements if isinstance(e.element, RawText)]
-    
+
     # -------------------------------------------------------------------------
     # Utility Methods
     # -------------------------------------------------------------------------
-    
+
     def add_warning(self, message: str) -> None:
         """Add a warning message to the context."""
         self.warnings.append(message)
-    
+
 
 # =============================================================================
 # Middleware Protocol
@@ -1116,11 +1100,11 @@ AsyncCallNext = Callable[[ParseContext], Awaitable[ParseContext]]
 class ParserMiddleware(Protocol):
     """
     Protocol for parser middlewares (async-first).
-    
+
     Middlewares can modify the ParseContext during parsing.
     They receive the context and an async `call_next` function to continue the chain.
     """
-    
+
     async def __call__(
         self,
         context: ParseContext,
@@ -1128,11 +1112,11 @@ class ParserMiddleware(Protocol):
     ) -> ParseContext:
         """
         Process the context and optionally call the next middleware.
-        
+
         Args:
             context: The parsing context with accumulated state
             call_next: Async function to call the next middleware in the chain
-            
+
         Returns:
             The (possibly modified) ParseContext
         """
@@ -1146,12 +1130,12 @@ class ParserMiddleware(Protocol):
 
 class BaseMiddleware(ABC):
     """Abstract base class for middlewares with common functionality (async-first)."""
-    
+
     @abstractmethod
     async def process(self, context: ParseContext) -> ParseContext:
         """Process the context. Override in subclasses."""
         ...
-    
+
     async def __call__(
         self,
         context: ParseContext,
@@ -1164,10 +1148,11 @@ class BaseMiddleware(ABC):
 
 class PreProcessingMiddleware(BaseMiddleware):
     """Middleware that runs before the main extraction."""
+
     pass
 
 
 class PostProcessingMiddleware(BaseMiddleware):
     """Middleware that runs after the main extraction."""
-    pass
 
+    pass

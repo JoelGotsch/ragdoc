@@ -4,16 +4,15 @@ These tests cover cross-cutting concerns after removing the first-class
 ``filename`` field from :class:`~ragdoc.document.Document` and
 :class:`~ragdoc.chunking.chunk.Chunk`.
 """
+
 from __future__ import annotations
 
-import pytest
 from pathlib import Path
 
 from ragdoc.chunking.chunk import Chunk
 from ragdoc.document import Document, Heading, Paragraph
 from ragdoc.processing.dump import default_file_namer
 from ragdoc.splitting.base import split_by_headings
-
 
 # ---------------------------------------------------------------------------
 # Phase 0a — model fields

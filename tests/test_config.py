@@ -6,7 +6,6 @@ import pytest
 
 from ragdoc.config import RagdocConfig, configure, get_config
 
-
 # =============================================================================
 # get_config() defaults
 # =============================================================================

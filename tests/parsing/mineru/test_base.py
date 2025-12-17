@@ -6,21 +6,25 @@ by iterating through all *_middle.json files in data/03_mineru_output.
 """
 
 import pytest
+
 pytest.importorskip("pylatexenc", reason="pdf_mineru extra not installed")
 
 import json
 import re
 from pathlib import Path
+
 import pytest
-from ragdoc.utils.helpers import _normalize_text
 
 from ragdoc.parsing.mineru.base import (
     BlockType,
     DiscardedBlockType,
     MinerUMiddleDocument,
-    parse_directory_middle_jsons,
     _latex_to_text,
+    parse_directory_middle_jsons,
 )
+from ragdoc.utils.helpers import _normalize_text
+
+
 def _normalize_text_and_spaces(text: str) -> str:
     """Normalize text and also remove whitespaces."""
     normalized = _normalize_text(_latex_to_text(text))
@@ -36,7 +40,7 @@ def load_test_cases() -> dict:
     """Load test cases from JSON file."""
     if not TEST_CASES_FILE.exists():
         return {}
-    with open(TEST_CASES_FILE, "r", encoding="utf-8") as f:
+    with open(TEST_CASES_FILE, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -126,6 +130,7 @@ def test_parse_middle_json(json_file: Path) -> None:
         assert isinstance(page.para_blocks, list)
         assert isinstance(page.discarded_blocks, list)
 
+
 def test_parse_directory_middle_jsons() -> None:
     """
     Test that parse_directory_middle_jsons can parse all *_middle.json files in the directory.
@@ -159,9 +164,7 @@ def test_middle_document_contains_headings(test_case_name: str) -> None:
     title_blocks = doc.get_all_blocks_by_type(BlockType.TITLE)
     title_texts = [_normalize_text_and_spaces(_extract_block_text(b)) for b in title_blocks]
 
-    assert len(title_texts) > 0, (
-        f"[{test_case_name}] No title blocks found in MinerUMiddleDocument"
-    )
+    assert len(title_texts) > 0, f"[{test_case_name}] No title blocks found in MinerUMiddleDocument"
 
     for heading_name in expected_headings:
         needle = _normalize_text_and_spaces(heading_name)

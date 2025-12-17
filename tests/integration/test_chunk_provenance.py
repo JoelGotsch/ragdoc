@@ -6,6 +6,7 @@ VectorStorePipeline → source_id / source_hash on every chunk.
 Bug regression: parsers must set document.source_path and metadata["filename"]
 so they propagate into chunks.
 """
+
 from __future__ import annotations
 
 from pathlib import Path

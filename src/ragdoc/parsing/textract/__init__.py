@@ -1,25 +1,28 @@
 import json  # type: ignore
-
-from ragdoc.parsing.base import load_file
-from ragdoc.document import Document, join_documents
-
-from pydantic import BaseModel, Field
 from pathlib import Path
 
+from pydantic import BaseModel, Field
+
+from ragdoc.document import Document, join_documents
+from ragdoc.parsing.base import load_file
 from ragdoc.parsing.parser import Parser
 
 try:
     from textract_preprocessing.textract_caller import TextractCaller
+
     textract_available = True
 except ImportError:
     textract_available = False
+
 
 class PDFFile(BaseModel):
     file_path: str | Path = Field(
         description="The path to the file. Can be local path or S3 path to file. If this is a s3 path, then s3 path must be left empty."
     )
     textract_output_path: str | None = Field(default=None, description="The path to save the textract output to")
-    s3_path: str | None = Field(default=None, description="The path to the S3 bucket. Only used if file_path is a local path.")
+    s3_path: str | None = Field(
+        default=None, description="The path to the S3 bucket. Only used if file_path is a local path."
+    )
 
     @property
     def s3_file_path(self) -> str | None:
@@ -53,7 +56,9 @@ def load_pdf(file_obj: PDFFile) -> Document:
 
     textract = Textract.from_list(l=response, file_path=str(file_path), pdf_path=str(file_path))
     documents, orphans = generate_textract_documents(textract)
-    doc = join_documents([Document(elements=orphans, source_path=str(file_path), metadata={"filename": file_path.name})] + documents)
+    doc = join_documents(
+        [Document(elements=orphans, source_path=str(file_path), metadata={"filename": file_path.name}), *documents]
+    )
     doc.parser = "textract"
     return doc
 
@@ -64,7 +69,9 @@ def load_textract_json(file_obj: TextractJSONFile) -> Document:
     file_path = Path(file_obj.file_path)
     textract = Textract.from_json(file_path=file_obj.file_path, pdf_path=file_obj.pdf_path)
     documents, orphans = generate_textract_documents(textract)
-    doc = join_documents([Document(elements=orphans, source_path=str(file_path), metadata={"filename": file_path.name})] + documents)
+    doc = join_documents(
+        [Document(elements=orphans, source_path=str(file_path), metadata={"filename": file_path.name}), *documents]
+    )
     doc.parser = "textract"
     return doc
 
@@ -72,6 +79,7 @@ def load_textract_json(file_obj: TextractJSONFile) -> Document:
 # ---------------------------------------------------------------------------
 # Registry integration
 # ---------------------------------------------------------------------------
+
 
 def parse_textract_json_file(path: Path) -> Document:
     """Parse a Textract JSON file (standalone function for reuse/testing)."""

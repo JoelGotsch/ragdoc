@@ -1,10 +1,10 @@
 """Integration tests for Approach A: element-alignment merge."""
+
 import pytest
 
 from ragdoc.document import Document, ElementTypeEnum, Footnote, Heading, Image, Paragraph, RawText
 from ragdoc.merging.merge import compute_patch, merge_documents
 from ragdoc.merging.patch import PatchOperationType, validate_inline_refs
-
 
 # --- TestMergeHeadingLevel ---
 
@@ -28,9 +28,7 @@ def test_heading_level_html_parser_wins_over_mineru():
 def test_heading_level_prefer_source_b_forces_heading_from_b():
     doc_a = Document(elements=[Heading(html_content="<h1>Title</h1>")])
     doc_b = Document(elements=[Heading(html_content="<h2>Title</h2>")])
-    result = merge_documents(
-        doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "b"}
-    )
+    result = merge_documents(doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "b"})
     assert result.headings[0].level == 2
 
 
@@ -39,21 +37,15 @@ def test_heading_level_prefer_source_b_forces_heading_from_b():
 
 def test_inline_markup_em_paragraph_from_b_preserved():
     doc_a = Document(elements=[Paragraph(html_content="<p>plain body text</p>")])
-    doc_b = Document(
-        elements=[Paragraph(html_content="<p><em>italic</em> body text</p>")]
-    )
+    doc_b = Document(elements=[Paragraph(html_content="<p><em>italic</em> body text</p>")])
     result = merge_documents(doc_a, doc_b)
     assert len(result.paragraphs) == 1
     assert "<em>" in result.paragraphs[0].html
 
 
 def test_inline_markup_math_formula_from_b_preferred():
-    doc_a = Document(
-        elements=[Paragraph(html_content="<p>E equals mc squared</p>")]
-    )
-    doc_b = Document(
-        elements=[Paragraph(html_content="<p>E = <math>mc<sup>2</sup></math></p>")]
-    )
+    doc_a = Document(elements=[Paragraph(html_content="<p>E equals mc squared</p>")])
+    doc_b = Document(elements=[Paragraph(html_content="<p>E = <math>mc<sup>2</sup></math></p>")])
     result = merge_documents(doc_a, doc_b)
     para_html = result.paragraphs[0].html
     assert "<math>" in para_html or "<sup>" in para_html
@@ -65,9 +57,7 @@ def test_inline_markup_math_formula_from_b_preferred():
 def test_footnote_element_in_output_when_referenced():
     """If doc_b has a footnote referenced in a paragraph, it ends up in output."""
     fn = Footnote(number=1, innerhtml="Detailed footnote text.")
-    para = Paragraph(
-        html_content=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>'
-    )
+    para = Paragraph(html_content=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>')
     doc_a = Document(elements=[Paragraph(html_content="<p>Body text.</p>")])
     doc_b = Document(elements=[para, fn], parser="html")
 
@@ -81,9 +71,7 @@ def test_footnote_element_in_output_when_referenced():
 def test_image_inline_ref_intact():
     """Image element and its inline ref survive the merge."""
     img = Image(image=None, image_type="png", alt="Chart")
-    para = Paragraph(
-        html_content=f'<p>See <ref id="{img.id}" rel="image"/> for details.</p>'
-    )
+    para = Paragraph(html_content=f'<p>See <ref id="{img.id}" rel="image"/> for details.</p>')
     doc_a = Document(elements=[Paragraph(html_content="<p>See diagram for details.</p>")])
     doc_b = Document(elements=[para, img], parser="html")
 
@@ -122,9 +110,7 @@ def test_per_type_prefer_source_a_for_all_headings():
             Paragraph(html_content="<p><em>Content</em></p>"),
         ]
     )
-    result = merge_documents(
-        doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "a"}
-    )
+    result = merge_documents(doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "a"})
     # Heading from doc_a (h1)
     assert result.headings[0].level == 1
     # Paragraph still gets richer markup from doc_b
@@ -203,8 +189,8 @@ _INSERT_PARAMS = pytest.mark.parametrize(
     [
         (True, True),
         (False, False),
-        (frozenset({ElementTypeEnum.PARAGRAPH}), True),    # Paragraph allowed -> included
-        (frozenset({ElementTypeEnum.TABLE}), False),       # Paragraph not in set -> blocked
+        (frozenset({ElementTypeEnum.PARAGRAPH}), True),  # Paragraph allowed -> included
+        (frozenset({ElementTypeEnum.TABLE}), False),  # Paragraph not in set -> blocked
     ],
     ids=["allow_all", "allow_none", "allow_paragraph", "allow_table_only"],
 )
@@ -214,7 +200,7 @@ _INSERT_PARAMS = pytest.mark.parametrize(
 def test_real_world_structured_doc_wins_and_inline_refs_intact(
     real_world_docs, allow_insertions_from_b, extra_para_present
 ):
-    doc_a, doc_b, fn, img, para1, para2, para_extra = real_world_docs
+    doc_a, doc_b, fn, img, _para1, para2, _para_extra = real_world_docs
     result = merge_documents(doc_a, doc_b, allow_insertions_from_b=allow_insertions_from_b)
 
     # Inline refs must be clean
@@ -255,9 +241,7 @@ def test_real_world_image_and_footnote_from_b_survive_merge():
     """Even when doc_a has no counterparts, Image and Footnote from doc_b are inserted."""
     fn = Footnote(number=1, innerhtml="This is the footnote text")
     img = Image(image=None, image_type="png", alt="Figure 1")
-    para1 = Paragraph(
-        html_content=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>'
-    )
+    para1 = Paragraph(html_content=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>')
     doc_a = Document(
         elements=[RawText(innerhtml="Body text1.")],
         parser="mineru",
@@ -288,9 +272,7 @@ def test_parity_empty_docs_return_empty_document():
 
 def test_parity_richer_paragraph_from_a_wins():
     """Richness selection is symmetric: A can win over B."""
-    doc_a = Document(
-        elements=[Paragraph(html_content="<p><b>bold</b> text here</p>")]
-    )
+    doc_a = Document(elements=[Paragraph(html_content="<p><b>bold</b> text here</p>")])
     doc_b = Document(elements=[Paragraph(html_content="<p>plain text here</p>")])
     result = merge_documents(doc_a, doc_b)
     assert "<b>" in result.paragraphs[0].html

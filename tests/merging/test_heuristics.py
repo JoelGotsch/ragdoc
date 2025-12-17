@@ -1,7 +1,8 @@
 """Tests for merging/heuristics.py -- HTML selection heuristics."""
+
 import pytest
 
-from ragdoc.document import DocumentList, Footnote, Heading, Paragraph, Table
+from ragdoc.document import Footnote, Heading, Paragraph, Table
 from ragdoc.merging.heuristics import (
     markup_richness_score,
     select_footnote,
@@ -9,7 +10,6 @@ from ragdoc.merging.heuristics import (
     select_paragraph,
     select_table,
 )
-
 
 # ---------------------------------------------------------------------------
 # --- TestMarkupRichnessScore ---
@@ -92,8 +92,10 @@ def test_select_heading_trust_parsers_customizable():
     h_b = Heading(html_content="<h3>Title</h3>")
     # Only "azure_di" is trusted
     result = select_heading(
-        h_a, h_b,
-        parser_a="azure_di", parser_b="mineru",
+        h_a,
+        h_b,
+        parser_a="azure_di",
+        parser_b="mineru",
         trust_parsers=frozenset({"azure_di"}),
     )
     assert result.level == 1  # from azure_di (trusted)
@@ -104,8 +106,10 @@ def test_select_heading_both_trusted_uses_lower_level_number():
     h_a = Heading(html_content="<h1>Title</h1>")
     h_b = Heading(html_content="<h2>Title</h2>")
     result = select_heading(
-        h_a, h_b,
-        parser_a="html", parser_b="pandoc",
+        h_a,
+        h_b,
+        parser_a="html",
+        parser_b="pandoc",
         trust_parsers=frozenset({"html", "pandoc"}),
     )
     assert result.level == 1
@@ -166,9 +170,7 @@ def test_select_table_more_th_elements_wins():
 
 def test_select_table_equal_headers_tiebreak_by_row_count():
     t_a = Table(html_content="<table><tr><td>A</td></tr></table>")
-    t_b = Table(
-        html_content="<table><tr><td>A</td></tr><tr><td>B</td></tr><tr><td>C</td></tr></table>"
-    )
+    t_b = Table(html_content="<table><tr><td>A</td></tr><tr><td>B</td></tr><tr><td>C</td></tr></table>")
     result = select_table(t_a, t_b)
     assert result.id == t_b.id
 

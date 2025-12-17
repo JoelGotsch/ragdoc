@@ -1,10 +1,10 @@
 import re
+from pathlib import Path
 
 import pytest
 
-from pathlib import Path
-from ragdoc.parsing import load_file, PandocFile
-from ragdoc.document import Document, Paragraph, DocumentList, Table
+from ragdoc.document import Document
+from ragdoc.parsing import PandocFile, load_file
 from ragdoc.splitting import split_by_headings
 
 
@@ -26,8 +26,9 @@ def test_document_headings(pandoc_document: Document):
         "Second second layer",
         "Third second layer",
         "Numbered items",
-        "We can also do images!"
+        "We can also do images!",
     ]
+
 
 def test_h1_content(pandoc_document: Document):
     assert pandoc_document.name == "New super amazing Document"
@@ -52,6 +53,7 @@ EUR.
 | 2022 | 2012412,6 | Just | Some |
 | 2021 | 12031212,3 |  | Cells |
 """.strip()
+
 
 def test_table_content(pandoc_document: Document):
     assert len(pandoc_document.tables) == 1
@@ -81,6 +83,7 @@ expected_numbered_list_markdown = """
       1. Even rather deep nesting
 2. Especially given there is no content
 """.strip()
+
 
 def test_list_content(pandoc_document: Document):
     assert len(pandoc_document.lists) == 2
@@ -145,7 +148,10 @@ def test_nested_images(nested_image_document):
 
     assert nested_image_document.images[0].alt == "A cartoon of a seal Description automatically generated"
 
-    assert nested_image_document.images[1].alt == "Cartoon a cartoon of a room with a table and a coffee cup Description automatically generated"
+    assert (
+        nested_image_document.images[1].alt
+        == "Cartoon a cartoon of a room with a table and a coffee cup Description automatically generated"
+    )
     table_image_key = nested_image_document.images[1].id
     assert nested_image_document.tables[0].image_ids == [table_image_key]
     assert nested_image_document.tables[0].html == expected_nested_image_table.format(key=table_image_key)

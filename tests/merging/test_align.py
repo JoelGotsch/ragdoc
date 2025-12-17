@@ -1,5 +1,4 @@
 """Tests for merging/align.py — element alignment logic (Approach A)."""
-import pytest
 
 from ragdoc.document import (
     Document,
@@ -8,11 +7,9 @@ from ragdoc.document import (
     Heading,
     Image,
     Paragraph,
-    Table,
 )
 from ragdoc.merging.align import align_elements, alignment_key
 from ragdoc.merging.patch import PatchOperationType
-
 
 # ---------------------------------------------------------------------------
 # --- TestAlignmentKey ---
@@ -56,10 +53,7 @@ def test_align_basic_identical_docs_all_keep_a():
     doc_b = Document(elements=[Paragraph(html_content="<p>Same content</p>")])
 
     ops = align_elements(doc_a, doc_b)
-    assert all(
-        op.op in (PatchOperationType.KEEP_A, PatchOperationType.KEEP_B)
-        for op in ops
-    )
+    assert all(op.op in (PatchOperationType.KEEP_A, PatchOperationType.KEEP_B) for op in ops)
 
 
 def test_align_basic_extra_paragraph_in_b_becomes_insert_b():
@@ -103,9 +97,7 @@ def test_align_basic_paragraph_only_in_a_becomes_delete_a():
 
 def test_align_basic_different_content_becomes_merge():
     doc_a = Document(elements=[Paragraph(html_content="<p>Plain text here</p>")])
-    doc_b = Document(
-        elements=[Paragraph(html_content="<p><em>Italic text here</em></p>")]
-    )
+    doc_b = Document(elements=[Paragraph(html_content="<p><em>Italic text here</em></p>")])
     ops = align_elements(doc_a, doc_b)
     assert any(op.op == PatchOperationType.MERGE for op in ops)
 
@@ -126,9 +118,7 @@ def test_prefer_source_b_for_headings_equal_text():
     doc_a = Document(elements=[h_a])
     doc_b = Document(elements=[h_b])
 
-    ops = align_elements(
-        doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "b"}
-    )
+    ops = align_elements(doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "b"})
     assert len(ops) == 1
     assert ops[0].op == PatchOperationType.KEEP_B
 
@@ -139,9 +129,7 @@ def test_prefer_source_a_for_headings_produces_keep_a():
     doc_a = Document(elements=[h_a])
     doc_b = Document(elements=[h_b])
 
-    ops = align_elements(
-        doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "a"}
-    )
+    ops = align_elements(doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "a"})
     assert ops[0].op == PatchOperationType.KEEP_A
 
 
@@ -152,9 +140,7 @@ def test_prefer_source_a_for_headings_produces_keep_a():
 
 def test_allow_only_footnote_insertions():
     """INSERT_B only allowed for Footnote, not Paragraph."""
-    doc_a = Document(
-        elements=[Paragraph(html_content="<p>Shared paragraph</p>")]
-    )
+    doc_a = Document(elements=[Paragraph(html_content="<p>Shared paragraph</p>")])
     fn = Footnote(number=1, innerhtml="New footnote in B.")
     doc_b = Document(
         elements=[
@@ -193,10 +179,10 @@ def test_mn_boundary_one_paragraph_vs_three_produces_merge():
         ]
     )
     ops = align_elements(doc_a, doc_b)
-    merge_ops = [op for op in ops if op.op == PatchOperationType.MERGE]
+    [op for op in ops if op.op == PatchOperationType.MERGE]
     # At least some MERGE should be present (not all KEEP_A)
     # The important thing is all elements are accounted for
-    all_b_ids = {e.id for e in doc_b.elements}
+    {e.id for e in doc_b.elements}
     accounted_b_ids: set[str] = set()
     for op in ops:
         for e in op.elements_b:
@@ -238,6 +224,4 @@ def test_resolved_populated_all_ops_have_resolved_elements_or_are_delete():
     ops = align_elements(doc_a, doc_b)
     for op in ops:
         if op.op != PatchOperationType.DELETE_A:
-            assert len(op.resolved_elements) > 0, (
-                f"Operation {op.op} has empty resolved_elements"
-            )
+            assert len(op.resolved_elements) > 0, f"Operation {op.op} has empty resolved_elements"

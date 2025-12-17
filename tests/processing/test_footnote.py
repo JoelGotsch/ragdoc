@@ -1,12 +1,13 @@
 """Tests for the footnote processing module."""
-import pytest
+
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from ragdoc.document import Document, DocumentList, Footnote, Heading, Paragraph
 from ragdoc.processing.footnote import (
     FootnoteCandidate,
     FootnoteProcessor,
-    FootnoteResolver,
     LLMFootnoteResolver,
     SimpleFootnoteResolver,
     SyncFootnoteProcessor,
@@ -15,7 +16,6 @@ from ragdoc.processing.footnote import (
     find_footnote_candidates,
     score_footnote_candidates,
 )
-
 
 # =============================================================================
 # Test Fixtures
@@ -118,14 +118,10 @@ def test_find_footnote_candidates_same_page_only_filter(sample_document):
     footnote = sample_document.footnotes[0]  # Footnote 1 on page 1
 
     # With same_page_only=True (default)
-    candidates_same_page = find_footnote_candidates(
-        sample_document, footnote, same_page_only=True
-    )
+    candidates_same_page = find_footnote_candidates(sample_document, footnote, same_page_only=True)
 
     # With same_page_only=False
-    candidates_all_pages = find_footnote_candidates(
-        sample_document, footnote, same_page_only=False
-    )
+    candidates_all_pages = find_footnote_candidates(sample_document, footnote, same_page_only=False)
 
     # All candidates from same_page should be on page 1
     assert all(c.page == 1 for c in candidates_same_page)
@@ -139,9 +135,7 @@ def test_find_footnote_candidates_same_page_only_filter(sample_document):
 def test_find_footnote_candidates_context_extraction(sample_document):
     """find_footnote_candidates extracts context around matches."""
     footnote = sample_document.footnotes[0]
-    candidates = find_footnote_candidates(
-        sample_document, footnote, context_chars=20
-    )
+    candidates = find_footnote_candidates(sample_document, footnote, context_chars=20)
 
     for candidate in candidates:
         assert len(candidate.context_before) <= 20
@@ -318,7 +312,9 @@ def test_find_footnote_candidates_finds_ocr_split_multi_digit_number():
                 html_content="<p>Sensor reading DEV1 1 was flagged in the audit log.</p>",
                 page=1,
             ),
-            Footnote(id="fn-11", number=11, innerhtml="DEV denotes deviation from the nominal calibration baseline.", page=1),
+            Footnote(
+                id="fn-11", number=11, innerhtml="DEV denotes deviation from the nominal calibration baseline.", page=1
+            ),
         ]
     )
     footnote = doc.footnotes[0]
@@ -890,9 +886,7 @@ def test_find_footnote_candidates_returns_all_occurrences_in_same_text_node():
 def test_find_footnote_candidates_does_not_match_inside_existing_ref_tag():
     """After a first pass, the '[1]' inside a <ref> tag is not re-matched."""
     # Simulate HTML after FootnoteProcessor has already run once
-    already_processed_html = (
-        '<p>See reference <sup><ref id="fn-1">[1]</ref></sup> for details.</p>'
-    )
+    already_processed_html = '<p>See reference <sup><ref id="fn-1">[1]</ref></sup> for details.</p>'
     doc = Document(
         elements=[
             Paragraph(id="para-1", html_content=already_processed_html, page=1),
@@ -1001,9 +995,7 @@ async def test_year_glued_resolver_picks_year_glued_over_paragraph_number():
         footnote_text="In January 2004, the equipment was inspected by the auditor and the residual process material was recovered therefrom.",
     )
     assert result is not None
-    assert result.element_id == "para-17", (
-        f"Expected para-17 but resolver picked {result.element_id!r}"
-    )
+    assert result.element_id == "para-17", f"Expected para-17 but resolver picked {result.element_id!r}"
 
 
 # --- TestOnlyOrphanedParameter ---
@@ -1017,20 +1009,22 @@ def _make_only_orphaned_doc() -> Document:
     only_orphaned=False (default) would insert a second ref there.
     Para-2 contains "2", the reference for the still-orphaned fn-2.
     """
-    return Document(elements=[
-        Paragraph(
-            id="para-1",
-            html_content='<p>See note.<ref id="fn-1" rel="footnote"/> Also item 1 here.</p>',
-            page=1,
-        ),
-        Paragraph(
-            id="para-2",
-            html_content="<p>Another paragraph with 2 references.</p>",
-            page=1,
-        ),
-        Footnote(id="fn-1", number=1, innerhtml="Already resolved footnote.", page=1),
-        Footnote(id="fn-2", number=2, innerhtml="Not yet resolved footnote.", page=1),
-    ])
+    return Document(
+        elements=[
+            Paragraph(
+                id="para-1",
+                html_content='<p>See note.<ref id="fn-1" rel="footnote"/> Also item 1 here.</p>',
+                page=1,
+            ),
+            Paragraph(
+                id="para-2",
+                html_content="<p>Another paragraph with 2 references.</p>",
+                page=1,
+            ),
+            Footnote(id="fn-1", number=1, innerhtml="Already resolved footnote.", page=1),
+            Footnote(id="fn-2", number=2, innerhtml="Not yet resolved footnote.", page=1),
+        ]
+    )
 
 
 @pytest.mark.anyio
@@ -1040,9 +1034,7 @@ async def test_only_orphaned_skips_referenced_footnote():
     doc = await FootnoteProcessor(only_orphaned=True).process(doc)
 
     para1 = next(e for e in doc.elements if e.id == "para-1")
-    assert para1.html.count('id="fn-1"') == 1, (
-        "fn-1 already had one ref; only_orphaned=True must not add another"
-    )
+    assert para1.html.count('id="fn-1"') == 1, "fn-1 already had one ref; only_orphaned=True must not add another"
     # fn-2 (the actual orphan) should now be resolved
     assert doc.orphaned_footnotes == []
 
@@ -1062,14 +1054,16 @@ async def test_only_orphaned_false_processes_dangling_number():
 @pytest.mark.anyio
 async def test_only_orphaned_true_processes_all_when_none_prereferred():
     """only_orphaned=True with no pre-existing refs processes every footnote."""
-    doc = Document(elements=[
-        Paragraph(
-            id="para-1",
-            html_content="<p>Reference to study1 in detail.</p>",
-            page=1,
-        ),
-        Footnote(id="fn-1", number=1, innerhtml="A study.", page=1),
-    ])
+    doc = Document(
+        elements=[
+            Paragraph(
+                id="para-1",
+                html_content="<p>Reference to study1 in detail.</p>",
+                page=1,
+            ),
+            Footnote(id="fn-1", number=1, innerhtml="A study.", page=1),
+        ]
+    )
     doc = await FootnoteProcessor(only_orphaned=True).process(doc)
     assert doc.orphaned_footnotes == []
 

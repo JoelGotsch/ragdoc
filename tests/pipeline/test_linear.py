@@ -8,6 +8,7 @@ Covers:
 
 See test_linear_integration.py for full parse → process → chunk coverage.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,7 +19,6 @@ from ragdoc.document import Document
 from ragdoc.pipeline import DocumentPipeline, PipelineResult
 
 from .conftest import make_document
-
 
 # --- run() ---
 

@@ -1,4 +1,5 @@
 """Tests for the evaluate_footnotes utility."""
+
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -6,8 +7,7 @@ import pytest
 
 from ragdoc.document import Document, Footnote, Paragraph
 from ragdoc.processing import DocumentProcessor
-from ragdoc.utils.evaluate_footnotes import FootnoteFileResult, evaluate_footnotes
-
+from ragdoc.utils.evaluate_footnotes import evaluate_footnotes
 
 # =============================================================================
 # Helpers
@@ -15,19 +15,23 @@ from ragdoc.utils.evaluate_footnotes import FootnoteFileResult, evaluate_footnot
 
 
 def _doc_all_resolved() -> Document:
-    return Document(elements=[
-        Paragraph(html_content='<p>See <ref id="fn-1" rel="footnote"/>.</p>'),
-        Footnote(id="fn-1", number=1, innerhtml="Referenced footnote."),
-    ])
+    return Document(
+        elements=[
+            Paragraph(html_content='<p>See <ref id="fn-1" rel="footnote"/>.</p>'),
+            Footnote(id="fn-1", number=1, innerhtml="Referenced footnote."),
+        ]
+    )
 
 
 def _doc_with_orphans() -> Document:
-    return Document(elements=[
-        Paragraph(html_content='<p>See <ref id="fn-1" rel="footnote"/>.</p>'),
-        Footnote(id="fn-1", number=1, innerhtml="Referenced footnote."),
-        Footnote(id="fn-2", number=2, innerhtml="Orphaned footnote."),
-        Footnote(id="fn-3", number=3, innerhtml="Also orphaned."),
-    ])
+    return Document(
+        elements=[
+            Paragraph(html_content='<p>See <ref id="fn-1" rel="footnote"/>.</p>'),
+            Footnote(id="fn-1", number=1, innerhtml="Referenced footnote."),
+            Footnote(id="fn-2", number=2, innerhtml="Orphaned footnote."),
+            Footnote(id="fn-3", number=3, innerhtml="Also orphaned."),
+        ]
+    )
 
 
 # --- TestEvaluateFootnotes ---

@@ -3,6 +3,7 @@
 Covers §3.2 from PLAN_TYPED_METADATA_EXTENSIONS.md.
 All tests stub AsyncQdrantClient — no live Qdrant instance required.
 """
+
 from __future__ import annotations
 
 from typing import Annotated
@@ -78,9 +79,7 @@ def _conflict_client() -> MagicMock:
     """Client whose create_payload_index always raises 409."""
     c = make_client()
     c.create_payload_index = AsyncMock(
-        side_effect=UnexpectedResponse(
-            status_code=409, reason_phrase="Conflict", content=b"", headers={}
-        )
+        side_effect=UnexpectedResponse(status_code=409, reason_phrase="Conflict", content=b"", headers={})
     )
     return c
 
@@ -112,8 +111,7 @@ def test_qdrantindex_is_frozen():
 
 
 def test_qdrantindex_and_register_exported_from_vector_stores():
-    from ragdoc.integrations.vector_stores import QdrantIndex as QI
-    from ragdoc.integrations.vector_stores import register_indexes_from_type as r
+    from ragdoc.integrations.vector_stores import QdrantIndex as QI, register_indexes_from_type as r
 
     assert QI is QdrantIndex
     assert r is register_indexes_from_type

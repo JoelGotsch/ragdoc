@@ -3,6 +3,7 @@
 Uses HeadingNormalizationProcessor (a real library processor) and asserts on
 actual rendered chunk content, not just counts or structure.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,9 +30,7 @@ async def _parse_structured_report(path: Path) -> Document:
             Heading(innerhtml="By Region", level=5),  # gap: 3 → 5
             Paragraph(html_content="<p>EMEA contributed 42%, APAC 38%, Americas 20%.</p>"),
             Heading(innerhtml="Operating Costs", level=3),
-            Paragraph(
-                html_content="<p>Operating margin held at 23% despite inflationary pressure.</p>"
-            ),
+            Paragraph(html_content="<p>Operating margin held at 23% despite inflationary pressure.</p>"),
         ],
     )
 

@@ -1,4 +1,5 @@
 """Tests for split_hierarchical."""
+
 import pytest
 
 from ragdoc.document import Document, Footnote, Heading, Paragraph
@@ -20,6 +21,7 @@ def heading_levels(doc: Document) -> list[int]:
 # ---------------------------------------------------------------------------
 # No-split cases
 # ---------------------------------------------------------------------------
+
 
 def test_no_headings_returns_original():
     doc = Document(elements=[p()])
@@ -49,6 +51,7 @@ def test_empty_document_returns_original():
 # ---------------------------------------------------------------------------
 # Basic splitting (no context propagation needed)
 # ---------------------------------------------------------------------------
+
 
 def test_two_headings_same_level_splits_into_two():
     h2a, h2b = h(2, "A"), h(2, "B")
@@ -91,6 +94,7 @@ def test_split_includes_child_headings():
 # Context propagation — docstring examples
 # ---------------------------------------------------------------------------
 
+
 def test_docstring_example_2_context_from_preamble():
     """[2, 1, 3, 3, 3] → split_level=3 → [[2,1,3], [2,1,3], [2,1,3]]"""
     h2, h1, h3a, h3b, h3c = h(2), h(1), h(3, "A"), h(3, "B"), h(3, "C")
@@ -128,9 +132,7 @@ def test_docstring_example_5_context_from_within_chunk():
 
 def test_corrected_example_1_context_with_h1_inside_chunk():
     """[2, 1, 3, 2, 3, 4, 4, 3] → split_level=2 → [[2,1,3],[1,2,3,4,4,3]]"""
-    h2a, h1, h3a, h2b, h3b, h4a, h4b, h3c = (
-        h(2, "A"), h(1), h(3, "a"), h(2, "B"), h(3, "b"), h(4), h(4), h(3, "c")
-    )
+    h2a, h1, h3a, h2b, h3b, h4a, h4b, h3c = (h(2, "A"), h(1), h(3, "a"), h(2, "B"), h(3, "b"), h(4), h(4), h(3, "c"))
     doc = Document(elements=[h2a, h1, h3a, h2b, h3b, h4a, h4b, h3c])
     result = split_hierarchical(doc)
     assert len(result) == 2
@@ -141,6 +143,7 @@ def test_corrected_example_1_context_with_h1_inside_chunk():
 # ---------------------------------------------------------------------------
 # Context ordering
 # ---------------------------------------------------------------------------
+
 
 def test_context_prepended_in_document_order():
     """Context headings are prepended in document order (h2 before h1 if h2 came first)."""
@@ -178,6 +181,7 @@ def test_context_updated_from_within_chunk():
 # Non-heading elements in preamble
 # ---------------------------------------------------------------------------
 
+
 def test_preamble_non_heading_elements_included_in_first_chunk():
     """Paragraphs before first split_level heading go into the first chunk."""
     intro, h2a, h2b = p("intro"), h(2, "A"), h(2, "B")
@@ -191,6 +195,7 @@ def test_preamble_non_heading_elements_included_in_first_chunk():
 # ---------------------------------------------------------------------------
 # ExternalRef relationships
 # ---------------------------------------------------------------------------
+
 
 def test_split_docs_have_original_as_parent():
     doc = Document(elements=[h(1, "A"), h(1, "B")])
@@ -212,6 +217,7 @@ def test_no_split_no_external_refs_added():
 # Metadata and title propagation
 # ---------------------------------------------------------------------------
 
+
 def test_split_preserves_title():
     doc = Document(elements=[h(1, "A"), h(1, "B")], title="My Doc")
     result = split_hierarchical(doc)
@@ -227,6 +233,7 @@ def test_split_preserves_metadata():
 # ---------------------------------------------------------------------------
 # Ref-awareness: footnotes across split boundaries (known bug)
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.xfail(strict=False, reason="split_hierarchical lacks ref-awareness (known bug)")
 def test_footnote_stranded_across_heading_split_boundary():

@@ -1,4 +1,5 @@
 """Tests for merging/patch.py — DocumentPatch, PatchOperation, validate_inline_refs."""
+
 import pytest
 
 from ragdoc.document import Document, Footnote, Heading, Image, Paragraph
@@ -92,12 +93,8 @@ def test_patch_apply_merge_empty_resolved_raises():
 def test_patch_apply_multiple_ops_concatenates_in_order():
     h = Heading(html_content="<h1>Title</h1>")
     p = Paragraph(html_content="<p>Body</p>")
-    op1 = PatchOperation(
-        op=PatchOperationType.KEEP_A, elements_a=[h], resolved_elements=[h]
-    )
-    op2 = PatchOperation(
-        op=PatchOperationType.KEEP_B, elements_b=[p], resolved_elements=[p]
-    )
+    op1 = PatchOperation(op=PatchOperationType.KEEP_A, elements_a=[h], resolved_elements=[h])
+    op2 = PatchOperation(op=PatchOperationType.KEEP_B, elements_b=[p], resolved_elements=[p])
     doc = _make_patch(op1, op2).apply()
     assert len(doc.elements) == 2
     assert doc.elements[0].id == h.id
@@ -124,12 +121,8 @@ def test_patch_apply_manual_override_honored():
 def test_patch_apply_deduplicates_by_id():
     """Same element ID appearing in two KEEP_A ops -> appears once in output."""
     para = Paragraph(html_content="<p>Shared</p>")
-    op1 = PatchOperation(
-        op=PatchOperationType.KEEP_A, elements_a=[para], resolved_elements=[para]
-    )
-    op2 = PatchOperation(
-        op=PatchOperationType.KEEP_A, elements_a=[para], resolved_elements=[para]
-    )
+    op1 = PatchOperation(op=PatchOperationType.KEEP_A, elements_a=[para], resolved_elements=[para])
+    op2 = PatchOperation(op=PatchOperationType.KEEP_A, elements_a=[para], resolved_elements=[para])
     doc = _make_patch(op1, op2).apply()
     assert len(doc.elements) == 1
 
@@ -175,9 +168,7 @@ def test_validate_inline_refs_no_refs_returns_empty():
 
 
 def test_validate_inline_refs_multiple_broken_refs_all_returned():
-    para = Paragraph(
-        html_content='<p><ref id="bad-1" rel="image"/> and <ref id="bad-2" rel="footnote"/></p>'
-    )
+    para = Paragraph(html_content='<p><ref id="bad-1" rel="image"/> and <ref id="bad-2" rel="footnote"/></p>')
     doc = Document(elements=[para])
     broken = validate_inline_refs(doc)
     assert "bad-1" in broken

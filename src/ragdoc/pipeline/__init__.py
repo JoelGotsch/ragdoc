@@ -28,6 +28,7 @@ Quick start::
     # many files, 4 at a time
     result = await pipeline.run_many(paths, concurrency=4)
 """
+
 from ragdoc.pipeline.embedders import Embedder, EmbedderConfig, embedding_content_text, prompt_content_text
 from ragdoc.pipeline.linear import DocumentPipeline, PipelineResult
 from ragdoc.pipeline.parser import AutoParser, Parser
@@ -36,16 +37,16 @@ from ragdoc.pipeline.stores import VectorStore
 from ragdoc.pipeline.vectorstore import UpdateResult, VectorStorePipeline
 
 __all__ = [
+    "AutoParser",
     "DocumentPipeline",
     "Embedder",
     "EmbedderConfig",
-    "embedding_content_text",
-    "prompt_content_text",
-    "PipelineResult",
-    "AutoParser",
     "Parser",
+    "PipelineResult",
     "TokenSplitter",
-    "VectorStorePipeline",
     "UpdateResult",
     "VectorStore",
+    "VectorStorePipeline",
+    "embedding_content_text",
+    "prompt_content_text",
 ]

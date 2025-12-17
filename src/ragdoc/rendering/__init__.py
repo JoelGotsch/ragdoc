@@ -26,10 +26,10 @@ Example:
 
 from ragdoc.rendering.base import (
     DocumentMetadata,
+    ExternalRefProvider,
     MetadataValue,
     OutputFormat,
     RenderContext,
-    ExternalRefProvider,
     Renderer,
 )
 from ragdoc.rendering.elements import (
@@ -58,10 +58,10 @@ from ragdoc.rendering.elements import (
 
 __all__ = [
     "DocumentMetadata",
+    "ExternalRefProvider",
     "MetadataValue",
     "OutputFormat",
     "RenderContext",
-    "ExternalRefProvider",
     "Renderer",
     "render_for_prompt",
     "render_raw",

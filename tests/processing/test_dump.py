@@ -1,10 +1,11 @@
 """Tests for DocumentDumpProcessor and default_file_namer."""
-import pytest
+
 from pathlib import Path
+
+import pytest
 
 from ragdoc.document import Document, Heading, Paragraph
 from ragdoc.processing.dump import DocumentDumpProcessor, default_file_namer
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -58,9 +59,7 @@ async def test_dump_processor_creates_output_dir(tmp_path: Path, sample_document
 
 
 @pytest.mark.anyio
-async def test_dump_processor_returns_document_unchanged(
-    tmp_path: Path, sample_document: Document
-):
+async def test_dump_processor_returns_document_unchanged(tmp_path: Path, sample_document: Document):
     proc = DocumentDumpProcessor(output_dir=tmp_path)
     result = await proc.process(sample_document)
     assert result is sample_document
@@ -94,9 +93,7 @@ async def test_dump_processor_custom_namer(tmp_path: Path, sample_document: Docu
 
 @pytest.mark.anyio
 async def test_dump_processor_multiple_documents(tmp_path: Path):
-    docs = [
-        Document(elements=[], source_path=f"/data/doc{i}.txt", parser="test") for i in range(3)
-    ]
+    docs = [Document(elements=[], source_path=f"/data/doc{i}.txt", parser="test") for i in range(3)]
     proc = DocumentDumpProcessor(output_dir=tmp_path)
     for doc in docs:
         await proc.process(doc)

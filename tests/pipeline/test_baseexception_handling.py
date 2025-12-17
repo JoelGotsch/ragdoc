@@ -7,6 +7,7 @@ Verifies:
   result.errors (no regression).
 - "Run failed" is logged before a fatal exception escapes.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -19,7 +20,6 @@ from ragdoc.document import Document
 from ragdoc.pipeline import DocumentPipeline, VectorStorePipeline
 
 from .conftest import MemoryVectorStore, make_document
-
 
 # ---------------------------------------------------------------------------
 # Parser factories
@@ -96,9 +96,7 @@ async def test_vs_runtime_error_collected(tmp_path: Path):
     b.write_text("bbb", encoding="utf-8")
 
     vs = VectorStorePipeline(
-        pipeline=DocumentPipeline(
-            parser=_parser_raises_for("a.txt", lambda: RuntimeError("boom"))
-        ),
+        pipeline=DocumentPipeline(parser=_parser_raises_for("a.txt", lambda: RuntimeError("boom"))),
         vector_store=MemoryVectorStore(),
     )
     result = await vs.run([a, b])

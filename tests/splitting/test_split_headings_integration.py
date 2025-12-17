@@ -1,10 +1,10 @@
 """Tests for split_document_naive function."""
-import pytest
-from pathlib import Path
 
-from ragdoc.parsing import load_file, HTMLFile
-from ragdoc.splitting import split_by_headings
+import pytest
+
 from ragdoc.document import Document
+from ragdoc.parsing import HTMLFile, load_file
+from ragdoc.splitting import split_by_headings
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ def test_split_document_naive_titles(html_documents):
         "Second second layer",
         "Third second layer",
         "Numbered items",
-        "We can also do images!"
+        "We can also do images!",
     ]
 
 
@@ -41,7 +41,7 @@ def test_split_document_naive_headings(html_documents):
         "Second second layer",
         "Third second layer",
         "Numbered items",
-        "We can also do images!"
+        "We can also do images!",
     ]
 
 
@@ -91,13 +91,13 @@ def test_split_description_list_sections(description_list_documents):
     """Test that description list document splits into correct sections."""
     # Should have 4 sections: title + 3 h2 sections
     assert len(description_list_documents) == 4
-    
+
     section_names = [d.name for d in description_list_documents]
     assert section_names == [
         "Description List Examples",
         "Simple Description List",
         "Nested Description List",
-        "Description List with Multiple DDs"
+        "Description List with Multiple DDs",
     ]
 
 
@@ -106,7 +106,7 @@ def test_split_preserves_document_title(description_list_file_path):
     html_file = HTMLFile(file_path=str(description_list_file_path))
     document = load_file(html_file)
     documents = split_by_headings(document)
-    
+
     assert document.title == "Description List Test"
     assert all(d.title == document.title for d in documents)
 
@@ -116,14 +116,14 @@ def test_split_simple_description_list(description_list_documents):
     simple_dl_doc = description_list_documents[1]
     assert simple_dl_doc.name == "Simple Description List"
     assert len(simple_dl_doc.lists) == 1
-    
+
     dl_html = simple_dl_doc.lists[0].html
     # Outer dl tags may not be included in html_content
     assert "<dt>Coffee</dt>" in dl_html
     assert "black hot drink" in dl_html
     assert "<dt>Milk</dt>" in dl_html
     assert "white cold drink" in dl_html
-    
+
     dl_text = simple_dl_doc.lists[0].text
     assert "Coffee" in dl_text
     assert "black hot drink" in dl_text
@@ -136,7 +136,7 @@ def test_split_nested_description_list(description_list_documents):
     nested_dl_doc = description_list_documents[2]
     assert nested_dl_doc.name == "Nested Description List"
     assert len(nested_dl_doc.lists) == 1
-    
+
     dl_html = nested_dl_doc.lists[0].html
     # Outer dl may not be included, but nested one should be
     assert dl_html.count("<dl>") >= 1
@@ -150,7 +150,7 @@ def test_split_description_list_multiple_definitions(description_list_documents)
     multi_dd_doc = description_list_documents[3]
     assert multi_dd_doc.name == "Description List with Multiple DDs"
     assert len(multi_dd_doc.lists) == 1
-    
+
     dl_html = multi_dd_doc.lists[0].html
     assert "<dt>Term 1</dt>" in dl_html
     assert "<dd>Definition 1a</dd>" in dl_html

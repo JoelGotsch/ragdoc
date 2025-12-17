@@ -1,9 +1,9 @@
 """Tests for InlineRef and ExternalRef relationship models."""
+
 import pytest
 from pydantic import ValidationError
 
 from ragdoc.document import Document, ExternalRef, Heading, InlineRef, Paragraph
-
 
 # --- TestInlineRef ---
 

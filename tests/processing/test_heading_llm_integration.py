@@ -8,6 +8,7 @@ and checks results against tests/data/test_cases.json.
 The LLM responses are replayed from tests/processing/fixtures/heading_llm/.
 Generate new fixtures by running: uv run python scripts/generate_heading_llm_fixtures.py
 """
+
 import json
 import re
 from pathlib import Path
@@ -130,9 +131,7 @@ _scenario_params = [
 ]
 
 _title_params = [
-    pytest.param(name, tc["title"], id=name)
-    for name, tc in _TEST_CASES.items()
-    if name in _available and "title" in tc
+    pytest.param(name, tc["title"], id=name) for name, tc in _TEST_CASES.items() if name in _available and "title" in tc
 ]
 
 
@@ -144,9 +143,7 @@ _title_params = [
 @pytest.mark.skipif(not _heading_params, reason="No LLM heading fixtures available")
 @pytest.mark.parametrize("test_case_name,heading_text,expected_level", _heading_params)
 @pytest.mark.anyio
-async def test_heading_exact_level(
-    test_case_name: str, heading_text: str, expected_level: int
-) -> None:
+async def test_heading_exact_level(test_case_name: str, heading_text: str, expected_level: int) -> None:
     """LLMHeadingResolver must assign each heading exactly the expected level."""
     doc = await _parse_and_process(test_case_name)
     resolver = _make_resolver(_FIXTURES[test_case_name]["response_content"])
@@ -155,9 +152,9 @@ async def test_heading_exact_level(
     needle = _norm(heading_text)
     target = next(
         (
-            el for el in doc.elements
-            if isinstance(el, Heading)
-            and (needle in _norm(el.text) or _norm(el.text) in needle)
+            el
+            for el in doc.elements
+            if isinstance(el, Heading) and (needle in _norm(el.text) or _norm(el.text) in needle)
         ),
         None,
     )
@@ -165,9 +162,7 @@ async def test_heading_exact_level(
         pytest.skip(f"Heading '{heading_text}' not found after LLM processing")
 
     if target.level != expected_level:
-        pytest.xfail(
-            f"[{test_case_name}] '{heading_text}': expected level {expected_level}, got {target.level}"
-        )
+        pytest.xfail(f"[{test_case_name}] '{heading_text}': expected level {expected_level}, got {target.level}")
 
 
 @pytest.mark.skipif(not _scenario_params, reason="No LLM heading fixtures available")
@@ -217,8 +212,7 @@ async def test_heading_ordering(test_case_name: str) -> None:
 
     assert not violations, (
         f"[{test_case_name}] Ordering violations "
-        f"(higher-level heading got a larger level number than a lower-level one):\n"
-        + "\n".join(violations)
+        f"(higher-level heading got a larger level number than a lower-level one):\n" + "\n".join(violations)
     )
 
 
@@ -231,11 +225,7 @@ async def test_title_detected(test_case_name: str, expected_title: str) -> None:
     resolver = _make_resolver(_FIXTURES[test_case_name]["response_content"])
     doc = await resolver.process(doc)
 
-    assert doc.title is not None, (
-        f"[{test_case_name}] LLMHeadingResolver did not set document.title"
-    )
+    assert doc.title is not None, f"[{test_case_name}] LLMHeadingResolver did not set document.title"
     assert _norm(doc.title) == _norm(expected_title), (
-        f"[{test_case_name}] Wrong title.\n"
-        f"  Expected: '{expected_title}'\n"
-        f"  Got:      '{doc.title}'"
+        f"[{test_case_name}] Wrong title.\n  Expected: '{expected_title}'\n  Got:      '{doc.title}'"
     )

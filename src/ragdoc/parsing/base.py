@@ -1,5 +1,4 @@
 from functools import singledispatch
-from typing import Iterator
 
 from ragdoc.document import Document
 

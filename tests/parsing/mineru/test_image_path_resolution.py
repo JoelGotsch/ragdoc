@@ -7,25 +7,23 @@ subdirectory alongside the JSON.  These tests verify that ``handle_image_block``
 resolves correctly via ``<source_dir>/images/<image_path>`` and that the
 ``check_mineru_images`` pre-flight helper surfaces missing images.
 """
+
 import json
-import shutil
 from pathlib import Path
 
 import pytest
 
 pytest.importorskip("pylatexenc", reason="pdf_mineru extra not installed")
 
-from ragdoc.document import Image, Paragraph
+from ragdoc.document import Image
 from ragdoc.parsing.mineru.base import (
     ImageBlock,
     ImageBodyBlock,
-    ImageCaptionBlock,
     ImageSpan,
     Line,
     MinerUMiddleDocument,
     PageInfo,
     ParseContext,
-    TextSpan,
 )
 from ragdoc.parsing.mineru.handlers import handle_image_block
 
@@ -55,7 +53,7 @@ def _image_block(image_path: str) -> ImageBlock:
 
 def _make_png(path: Path) -> None:
     """Write a minimal 1×1 PNG using Pillow."""
-    pil = pytest.importorskip("PIL", reason="Pillow not installed")
+    pytest.importorskip("PIL", reason="Pillow not installed")
     from PIL import Image as PILImage
 
     PILImage.new("RGB", (4, 6), color=(0, 128, 255)).save(str(path))
@@ -109,7 +107,9 @@ def test_handle_image_block_image_file_absent_from_images_subdir(tmp_path):
 # Integration test — real test-data fixture
 # ---------------------------------------------------------------------------
 
-_REAL_JSON = Path(__file__).parent.parent / "data" / "mineru" / "nist-sp-800-63b" / "hybrid_auto" / "nist-sp-800-63b_middle.json"
+_REAL_JSON = (
+    Path(__file__).parent.parent / "data" / "mineru" / "nist-sp-800-63b" / "hybrid_auto" / "nist-sp-800-63b_middle.json"
+)
 
 
 @pytest.mark.skipif(not _REAL_JSON.exists(), reason="real test data not present")

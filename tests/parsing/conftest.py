@@ -1,7 +1,8 @@
 """Pytest fixtures scoped to the parsing test suite."""
-import pytest
 
 from pathlib import Path
+
+import pytest
 
 from ragdoc.document import Document, Footnote, Paragraph
 

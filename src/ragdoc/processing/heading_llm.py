@@ -13,12 +13,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from openai import AsyncOpenAI
 from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from openai import AsyncOpenAI
 
-from ragdoc.document import Heading, Paragraph
 from ragdoc.config import get_config
+from ragdoc.document import Heading, Paragraph
 from ragdoc.processing._concurrency import _fan_out
 from ragdoc.processing.base import DocumentProcessor
 
@@ -223,7 +223,7 @@ Guidelines:
             )
         return None
 
-    async def process(self, document: "Document") -> "Document":
+    async def process(self, document: Document) -> Document:
         """Analyze all headings using LLM and update their levels."""
 
         # Collect heading information
@@ -232,10 +232,7 @@ Guidelines:
         if not heading_infos:
             return document
 
-        logger.info(
-            f"LLMHeadingResolver: resolving {len(heading_infos)} headings "
-            f"(model={self.settings.model_name})"
-        )
+        logger.info(f"LLMHeadingResolver: resolving {len(heading_infos)} headings (model={self.settings.model_name})")
 
         # Process headings (possibly in batches)
         if self.settings.batch_size and len(heading_infos) > self.settings.batch_size:
@@ -248,9 +245,10 @@ Guidelines:
 
         return document
 
-    def _collect_heading_infos(self, document: "Document") -> list[HeadingInfo]:
+    def _collect_heading_infos(self, document: Document) -> list[HeadingInfo]:
         """Collect information about all headings for LLM analysis."""
         import re
+
         from bs4 import BeautifulSoup
 
         heading_infos: list[HeadingInfo] = []
@@ -294,17 +292,12 @@ Guidelines:
             font_str = f"{info.font_size:.1f}pt" if info.font_size else "unknown"
             centered_str = "Yes" if info.is_centered else "No"
             lines.append(
-                f"{i}. Page {info.page_number} | "
-                f"Font: {font_str} | "
-                f"Centered: {centered_str} | "
-                f'Text: "{info.text}"'
+                f'{i}. Page {info.page_number} | Font: {font_str} | Centered: {centered_str} | Text: "{info.text}"'
             )
 
         return "\n".join(lines)
 
-    async def _get_heading_levels(
-        self, heading_infos: list[HeadingInfo]
-    ) -> list[HeadingJudgment]:
+    async def _get_heading_levels(self, heading_infos: list[HeadingInfo]) -> list[HeadingJudgment]:
         """Query the LLM to determine heading levels using structured output."""
         prompt = self._build_prompt(heading_infos)
 
@@ -333,16 +326,11 @@ Guidelines:
                     return []
         return []
 
-    async def _process_in_batches(
-        self, heading_infos: list[HeadingInfo]
-    ) -> list[HeadingJudgment]:
+    async def _process_in_batches(self, heading_infos: list[HeadingInfo]) -> list[HeadingJudgment]:
         """Process headings in batches, with bounded concurrency across batches."""
         batch_size = self.settings.batch_size
         # Pre-compute (id_offset, batch) so offsets are stable even under parallel execution.
-        batches = [
-            (i, heading_infos[i : i + batch_size])
-            for i in range(0, len(heading_infos), batch_size)
-        ]
+        batches = [(i, heading_infos[i : i + batch_size]) for i in range(0, len(heading_infos), batch_size)]
 
         # Pre-allocate results list: preserves order regardless of completion order.
         results: list[list[HeadingJudgment]] = [[] for _ in batches]
@@ -357,10 +345,9 @@ Guidelines:
 
         return [j for r in results for j in r]
 
-
     def _apply_levels(
         self,
-        document: "Document",
+        document: Document,
         heading_infos: list[HeadingInfo],
         judgments: list[HeadingJudgment],
     ) -> None:

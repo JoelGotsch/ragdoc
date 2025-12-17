@@ -6,13 +6,14 @@
 # of ragdoc works without the extra dependency installed.
 
 try:
-    import llama_index  # noqa: F401
+    import llama_index
+
     _llama_index_available = True
 except ImportError:
     _llama_index_available = False
 
+from collections.abc import Callable
 from copy import deepcopy
-from typing import Callable
 
 from ragdoc.chunking import Chunk
 
@@ -70,8 +71,12 @@ def document_fragment_to_node_dict(fragment: Chunk, content_replacement_key: str
     if content_replacement_key not in metadata:
         metadata[content_replacement_key] = fragment.prompt_content
 
-    excluded_embed_metadata_keys = [k for k in fragment.metadata.keys() if k not in fragment.embedding_metadata_keys] + [content_replacement_key]
-    excluded_llm_metadata_keys = [k for k in fragment.metadata.keys() if k not in fragment.prompt_metadata_keys] + [content_replacement_key]
+    excluded_embed_metadata_keys = [
+        k for k in fragment.metadata.keys() if k not in fragment.embedding_metadata_keys
+    ] + [content_replacement_key]
+    excluded_llm_metadata_keys = [k for k in fragment.metadata.keys() if k not in fragment.prompt_metadata_keys] + [
+        content_replacement_key
+    ]
     return dict(
         id_=fragment.id,
         text=text,

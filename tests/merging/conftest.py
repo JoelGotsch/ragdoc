@@ -1,4 +1,5 @@
 """Shared fixtures for merging tests."""
+
 import pytest
 
 from ragdoc.document import Document, Footnote, Image, Paragraph, RawText
@@ -21,9 +22,7 @@ def real_world_docs():
     """
     fn = Footnote(number=1, innerhtml="This is the footnote text")
     img = Image(image=None, image_type="png", alt="Figure 1: example diagram")
-    para1 = Paragraph(
-        html_content=f'<p>This is just some text with a footnote<ref id="{fn.id}" rel="footnote"/>.</p>'
-    )
+    para1 = Paragraph(html_content=f'<p>This is just some text with a footnote<ref id="{fn.id}" rel="footnote"/>.</p>')
     para2 = Paragraph(html_content="<p>Some text in the middle</p>")
     para_extra = Paragraph(html_content="<p>This paragraph appears only in doc_b.</p>")
 

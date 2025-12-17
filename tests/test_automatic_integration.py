@@ -2,6 +2,7 @@
 
 Replaces the old test_automatic_integration.py that tested automatic_load_file().
 """
+
 import json
 from pathlib import Path
 from unittest.mock import patch

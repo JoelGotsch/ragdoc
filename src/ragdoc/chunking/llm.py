@@ -24,6 +24,7 @@ Customising the prompt::
     my_messages = partial(build_topic_summary_messages, system_prompt="Be terse.")
     chunker = LLMChunker(client=client, create_messages=my_messages)
 """
+
 from __future__ import annotations
 
 import logging
@@ -38,6 +39,7 @@ from ragdoc.chunking.chunk import Chunk
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
+
     from ragdoc.document import Document
     from ragdoc.rendering import Renderer
 
@@ -80,9 +82,7 @@ themes** present and write one short summary (1-100 words) per topic.  Each summ
 If the document covers only one clear topic, return a single summary.
 """.strip()
 
-LLM_CHUNKER_USER_MESSAGE = (
-    "Please analyse the following document and produce topic summaries as described."
-)
+LLM_CHUNKER_USER_MESSAGE = "Please analyse the following document and produce topic summaries as described."
 
 # ---------------------------------------------------------------------------
 # Prompt building
@@ -94,7 +94,7 @@ def build_topic_summary_messages(
     *,
     system_prompt: str = LLM_CHUNKER_SYSTEM_PROMPT,
     user_message: str = LLM_CHUNKER_USER_MESSAGE,
-) -> "list[ChatCompletionMessageParam]":
+) -> list[ChatCompletionMessageParam]:
     """Build the ``messages`` list for a topic-summary LLM call.
 
     Args:
@@ -151,10 +151,10 @@ class LLMChunker(Chunker):
         self,
         client: Any | None = None,
         model: str | None = None,
-        prompt_renderer: "Renderer | None" = None,
-        create_messages: Callable[[str], "list[ChatCompletionMessageParam]"] = build_topic_summary_messages,
-        metadata_fn: Callable[["Document"], dict] | None = None,
-        id_fn: Callable[["Document", int], str] | None = None,
+        prompt_renderer: Renderer | None = None,
+        create_messages: Callable[[str], list[ChatCompletionMessageParam]] = build_topic_summary_messages,
+        metadata_fn: Callable[[Document], dict] | None = None,
+        id_fn: Callable[[Document, int], str] | None = None,
     ) -> None:
         from ragdoc.config import get_config
 
@@ -163,17 +163,19 @@ class LLMChunker(Chunker):
         self._model = model if model is not None else config.default_llm_model
         self._prompt_renderer = prompt_renderer
         self._create_messages = create_messages
-        self._metadata_fn: Callable[["Document"], dict] = metadata_fn or (lambda doc: doc.metadata)
-        self._id_fn: Callable[["Document", int], str] = id_fn or (lambda _doc, _i: str(uuid.uuid4()))
+        self._metadata_fn: Callable[[Document], dict] = metadata_fn or (lambda doc: doc.metadata)
+        self._id_fn: Callable[[Document, int], str] = id_fn or (lambda _doc, _i: str(uuid.uuid4()))
 
-    def _get_prompt_renderer(self) -> "Renderer":
+    def _get_prompt_renderer(self) -> Renderer:
         if self._prompt_renderer is not None:
             return self._prompt_renderer
-        from ragdoc.rendering import Renderer, OutputFormat, render_for_prompt
+        from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
+
         return Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
 
-    async def chunk(self, document: "Document") -> list[Chunk]:
+    async def chunk(self, document: Document) -> list[Chunk]:
         from pathlib import Path
+
         doc_label = f"{Path(document.source_path).name} ({document.id})" if document.source_path else document.id
         rendered = self._get_prompt_renderer().render(document)
         logger.debug(f"LLMChunker: rendered document: {len(rendered)} chars")
@@ -202,11 +204,6 @@ class LLMChunker(Chunker):
             )
             for i, summary in enumerate(topic_summaries.summaries)
         ]
-        logger.info(
-            f"LLMChunker: {doc_label} -> {len(topic_summaries.summaries)} embedding contents"
-        )
-        logger.debug(
-            f"LLMChunker: {doc_label} topics: "
-            f"{[s[:80] for s in topic_summaries.summaries]}"
-        )
+        logger.info(f"LLMChunker: {doc_label} -> {len(topic_summaries.summaries)} embedding contents")
+        logger.debug(f"LLMChunker: {doc_label} topics: {[s[:80] for s in topic_summaries.summaries]}")
         return chunks

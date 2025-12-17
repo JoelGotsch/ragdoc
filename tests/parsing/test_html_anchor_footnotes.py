@@ -86,6 +86,7 @@ and avoids the need for a separate numbering registry.
 Proof that pandoc handles this correctly — see
 ``test_pandoc_html_footnote_convention`` at the bottom of this file.
 """
+
 from __future__ import annotations
 
 import re
@@ -97,10 +98,11 @@ from ragdoc.document import Document, Footnote
 
 def replace_whitespace(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
+
+
 from ragdoc.parsing.html.load import HTML, generate_document
 from ragdoc.rendering.base import OutputFormat, Renderer
 from ragdoc.rendering.elements import render_for_prompt, render_raw
-
 
 # =============================================================================
 # Part 1 — Parsing
@@ -254,14 +256,15 @@ def test_raw_renderer_uses_pandoc_footnote_syntax(anchor_footnote_document: Docu
 
 
 def test_unreferenced_footnote_standalone_rendering_per_renderer() -> None:
-    """Unreferenced footnotes should be rendered by all renderers.
-    """
+    """Unreferenced footnotes should be rendered by all renderers."""
     fn = Footnote(number=1, innerhtml="Standalone footnote block.")
     doc = Document()
     doc.elements = [fn]
 
     # render_for_prompt: orphaned footnote
-    prompt_out = replace_whitespace(Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt).render(doc))
+    prompt_out = replace_whitespace(
+        Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt).render(doc)
+    )
     assert "Standalone footnote block" in prompt_out
 
     # render_raw: orphaned footnote appears as a plain paragraph.

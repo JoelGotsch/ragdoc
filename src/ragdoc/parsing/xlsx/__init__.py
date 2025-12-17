@@ -1,12 +1,12 @@
-import pandas as pd
 from pathlib import Path
-from ragdoc.parsing.xlsx.load import generate_document as generate_xlsx_documents, ExcelConfig
 
+import pandas as pd
 from pydantic import BaseModel, Field
 
-from ragdoc.parsing.base import load_file
 from ragdoc.document import Document
+from ragdoc.parsing.base import load_file
 from ragdoc.parsing.parser import Parser
+from ragdoc.parsing.xlsx.load import ExcelConfig, generate_document as generate_xlsx_documents
 
 
 class ExcelSource(BaseModel):
@@ -32,6 +32,7 @@ ExcelPackage = ExcelSource
 # ---------------------------------------------------------------------------
 # Registry integration
 # ---------------------------------------------------------------------------
+
 
 class XlsxParser(Parser):
     name: str = "xlsx"

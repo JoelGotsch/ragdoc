@@ -8,10 +8,9 @@ The second section contains general integration tests (no extra deps).
 import copy
 import json
 import re
+from pathlib import Path
 
 import pytest
-
-from pathlib import Path
 
 from ragdoc.document import Document, Footnote
 from ragdoc.processing.footnote import (
@@ -72,6 +71,7 @@ _TEST_CASES, _MIDDLE_DOCS = _load_raw()
 # Each test deep-copies from here so processor mutations don't bleed across tests.
 # Module-level asyncio.run() — acceptable: feeds @pytest.mark.parametrize at import time.
 import asyncio as _asyncio
+
 _PARSED_DOCS: dict[str, Document] = {}
 if _HAS_MINERU:
     for _name, _middle in _MIDDLE_DOCS.items():
@@ -136,8 +136,7 @@ async def test_footnote_inline_ref_added(
     )
     if footnote is None:
         pytest.skip(
-            f"[{test_case_name}] fn{fn_index} not found in parsed document — "
-            "covered by test_mineru_base_parser.py"
+            f"[{test_case_name}] fn{fn_index} not found in parsed document — covered by test_mineru_base_parser.py"
         )
 
     print(f"\n  fn{fn_index}  text: {fn_text[:80]}")
@@ -173,7 +172,9 @@ async def test_footnote_inline_ref_added(
             pat = build_footnote_pattern(footnote.number)
             same_page = [el for el in doc.elements if el.page == footnote.page and not isinstance(el, Footnote)]
             matching = [el for el in same_page if pat.search(el.text)]
-            print(f"         [INFO] pattern {pat.pattern!r} matched {len(matching)}/{len(same_page)} same-page elements")
+            print(
+                f"         [INFO] pattern {pat.pattern!r} matched {len(matching)}/{len(same_page)} same-page elements"
+            )
             for el in matching[:3]:
                 print(f"                idx={doc.elements.index(el)}  type={type(el).__name__}  text: {el.text[:100]}")
 
@@ -182,10 +183,7 @@ async def test_footnote_inline_ref_added(
     resolved_elements = [
         el
         for el in doc.elements
-        if any(
-            ref.rel_type == "footnote" and ref.target_id == footnote.id
-            for ref in el.inline_refs
-        )
+        if any(ref.rel_type == "footnote" and ref.target_id == footnote.id for ref in el.inline_refs)
     ]
 
     if not resolved_elements:
@@ -195,22 +193,30 @@ async def test_footnote_inline_ref_added(
         else:
             # Show scored candidates (without min_element_idx, so scores are optimistic)
             scored = score_footnote_candidates(candidates)
-            print(f"         [FAIL] {len(candidates)} candidate(s) — resolver did not resolve (or apply_ref_patches failed)")
-            print(f"         Note: scores shown WITHOUT sequential-ordering penalty (processor applies -10 for out-of-order)")
+            print(
+                f"         [FAIL] {len(candidates)} candidate(s) — resolver did not resolve (or apply_ref_patches failed)"
+            )
+            print(
+                "         Note: scores shown WITHOUT sequential-ordering penalty (processor applies -10 for out-of-order)"
+            )
             print(f"         {'idx':>3}  {'score':>5}  {'page':>4}  {'has_ref_in_html':<17}  context")
             ref_marker = f'id="{footnote.id}"'
             for i, (c, score) in enumerate(scored):
                 el = el_by_id.get(c.element_id)
                 has_ref = ref_marker in (el.html if el else "")
                 snippet = c.full_context.replace("\n", " ")[:60]
-                print(f"         [{i:>2}]  {score:>5}  p{c.page:<3}  {str(has_ref):<17}  ...{snippet}...")
+                print(f"         [{i:>2}]  {score:>5}  p{c.page:<3}  {has_ref!s:<17}  ...{snippet}...")
             # Check if ref appears in ANY element
             any_el_with_ref = next((el for el in doc.elements if ref_marker in el.html), None)
             if any_el_with_ref:
-                print(f"         [INFO] ref IS present in element idx={doc.elements.index(any_el_with_ref)} HTML — inline_refs parse may have failed")
+                print(
+                    f"         [INFO] ref IS present in element idx={doc.elements.index(any_el_with_ref)} HTML — inline_refs parse may have failed"
+                )
                 print(f"         [INFO] element.html snippet: {any_el_with_ref.html[:200]}")
             else:
-                print(f"         [INFO] ref NOT present in any element HTML — apply_ref_patches failed or resolver returned wrong pick")
+                print(
+                    "         [INFO] ref NOT present in any element HTML — apply_ref_patches failed or resolver returned wrong pick"
+                )
 
     assert resolved_elements, (
         f"[{test_case_name}] fn{fn_index} ('{fn_text[:60]}') was not resolved — "
@@ -247,8 +253,7 @@ async def test_footnote_resolved_near_insertion_point(
     )
     if footnote is None:
         pytest.skip(
-            f"[{test_case_name}] fn{fn_index} not found in parsed document — "
-            "covered by test_mineru_base_parser.py"
+            f"[{test_case_name}] fn{fn_index} not found in parsed document — covered by test_mineru_base_parser.py"
         )
 
     # Identify the expected element before processing mutates any HTML.
@@ -278,26 +283,20 @@ async def test_footnote_resolved_near_insertion_point(
     # After processing, the expected element must have an InlineRef to this footnote.
     resolved_el = next((el for el in doc.elements if el.id == expected_el_id), None)
     assert resolved_el is not None, (
-        f"[{test_case_name}] fn{fn_index}: expected element {expected_el_id} "
-        "disappeared after processing"
+        f"[{test_case_name}] fn{fn_index}: expected element {expected_el_id} disappeared after processing"
     )
 
-    has_ref = any(
-        ref.rel_type == "footnote" and ref.target_id == footnote.id
-        for ref in resolved_el.inline_refs
-    )
+    has_ref = any(ref.rel_type == "footnote" and ref.target_id == footnote.id for ref in resolved_el.inline_refs)
 
     if has_ref:
-        print(f"         [OK] Footnote resolved into expected element")
+        print("         [OK] Footnote resolved into expected element")
         return
 
     # On failure, show which element (if any) got the ref instead
     actual_elements = [
-        el for el in doc.elements
-        if any(
-            r.rel_type == "footnote" and r.target_id == footnote.id
-            for r in el.inline_refs
-        )
+        el
+        for el in doc.elements
+        if any(r.rel_type == "footnote" and r.target_id == footnote.id for r in el.inline_refs)
     ]
     if actual_elements:
         for el in actual_elements:
@@ -307,7 +306,7 @@ async def test_footnote_resolved_near_insertion_point(
                 f"text: {el.text[:100]}"
             )
     else:
-        print(f"         [FAIL] footnote was not resolved into any element")
+        print("         [FAIL] footnote was not resolved into any element")
 
     print(f"         expected element text: {resolved_el.text[:150]}")
 
@@ -324,7 +323,6 @@ async def test_footnote_resolved_near_insertion_point(
 from unittest.mock import AsyncMock, MagicMock
 
 from ragdoc.document import Paragraph
-
 
 # --- TestFootnoteProcessingIntegration ---
 
@@ -576,6 +574,6 @@ async def test_isolation_multiple_footnotes_each_patched_in_correct_element():
 
     # Each element has only its own ref tag
     assert '<ref id="fn-1" rel="footnote"/>' in para1_html
-    assert 'fn-2' not in para1_html
+    assert "fn-2" not in para1_html
     assert '<ref id="fn-2" rel="footnote"/>' in para2_html
-    assert 'fn-1' not in para2_html
+    assert "fn-1" not in para2_html

@@ -1,4 +1,5 @@
 """Tests for split_sequence/split_total metadata assignment by split_document."""
+
 import random
 
 import pytest
@@ -8,7 +9,6 @@ from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
 from ragdoc.splitting.base import split_by_headings
 from ragdoc.splitting.hierarchical import split_hierarchical
 from ragdoc.splitting.token import split_by_elements, split_document
-
 
 # ---------------------------------------------------------------------------
 # Helpers (same shape as test_token.py)
@@ -88,9 +88,12 @@ def test_single_level_split_assigns_contiguous_sequence():
 def test_split_total_equals_len_splits():
     """Every split carries split_total equal to the total number of splits."""
     doc = make_doc(
-        h(1, "A"), p("paragraph a " * 5),
-        h(1, "B"), p("paragraph b " * 5),
-        h(1, "C"), p("paragraph c " * 5),
+        h(1, "A"),
+        p("paragraph a " * 5),
+        h(1, "B"),
+        p("paragraph b " * 5),
+        h(1, "C"),
+        p("paragraph c " * 5),
     )
     splits = split_document(doc, renderer=rdr(), tokenizer=tok(), max_tokens=150, overlap_tokens=_OVERLAP)
     assert len(splits) > 1
@@ -100,9 +103,12 @@ def test_split_total_equals_len_splits():
 def test_sequence_equals_list_position():
     """split_sequence is 1-based and equals the list index + 1."""
     doc = make_doc(
-        h(1, "A"), p("paragraph a " * 5),
-        h(1, "B"), p("paragraph b " * 5),
-        h(1, "C"), p("paragraph c " * 5),
+        h(1, "A"),
+        p("paragraph a " * 5),
+        h(1, "B"),
+        p("paragraph b " * 5),
+        h(1, "C"),
+        p("paragraph c " * 5),
     )
     splits = split_document(doc, renderer=rdr(), tokenizer=tok(), max_tokens=150, overlap_tokens=_OVERLAP)
     for i, d in enumerate(splits):
@@ -112,9 +118,12 @@ def test_sequence_equals_list_position():
 def test_sorting_by_split_sequence_matches_list_order():
     """Shuffling then sorting by split_sequence restores original order."""
     doc = make_doc(
-        h(1, "A"), p("paragraph a " * 5),
-        h(1, "B"), p("paragraph b " * 5),
-        h(1, "C"), p("paragraph c " * 5),
+        h(1, "A"),
+        p("paragraph a " * 5),
+        h(1, "B"),
+        p("paragraph b " * 5),
+        h(1, "C"),
+        p("paragraph c " * 5),
     )
     splits = split_document(doc, renderer=rdr(), tokenizer=tok(), max_tokens=150, overlap_tokens=_OVERLAP)
     assert len(splits) >= 2
@@ -130,9 +139,12 @@ def test_recursive_split_sequences_are_globally_ordered():
     # A: small, B: large (forces element-level split), C: small
     long_content = "x " * 200
     doc = make_doc(
-        h(1, "A"), p("short a"),
-        h(1, "B"), p(long_content),
-        h(1, "C"), p("short c"),
+        h(1, "A"),
+        p("short a"),
+        h(1, "B"),
+        p(long_content),
+        h(1, "C"),
+        p("short c"),
     )
     splits = split_document(doc, renderer=rdr(), tokenizer=tok(), max_tokens=150, overlap_tokens=_OVERLAP)
     assert len(splits) >= 3
@@ -141,18 +153,24 @@ def test_recursive_split_sequences_are_globally_ordered():
     assert all(d.metadata["split_total"] == len(splits) for d in splits)
 
 
-@pytest.mark.parametrize("splitter,kwargs", [
-    (split_by_headings, {}),
-    (split_hierarchical, {}),
-    (split_by_elements, {"renderer": rdr(), "tokenizer": tok(), "max_tokens": 150, "overlap_tokens": _OVERLAP}),
-])
+@pytest.mark.parametrize(
+    "splitter,kwargs",
+    [
+        (split_by_headings, {}),
+        (split_hierarchical, {}),
+        (split_by_elements, {"renderer": rdr(), "tokenizer": tok(), "max_tokens": 150, "overlap_tokens": _OVERLAP}),
+    ],
+)
 def test_primitive_splitters_do_not_set_split_metadata(splitter, kwargs):
     """Primitive splitters never write split_sequence or split_total."""
     long_content = "word " * 50
     doc = make_doc(
-        h(1, "A"), p(long_content),
-        h(1, "B"), p(long_content),
-        h(1, "C"), p(long_content),
+        h(1, "A"),
+        p(long_content),
+        h(1, "B"),
+        p(long_content),
+        h(1, "C"),
+        p(long_content),
     )
     result = splitter(doc, **kwargs)
     assert len(result) > 1
@@ -177,9 +195,12 @@ async def test_split_sequence_propagates_through_processing_pipeline():
 
     long_content = "word " * 50
     doc = make_doc(
-        h(1, "A"), p(long_content),
-        h(1, "B"), p(long_content),
-        h(1, "C"), p(long_content),
+        h(1, "A"),
+        p(long_content),
+        h(1, "B"),
+        p(long_content),
+        h(1, "C"),
+        p(long_content),
     )
     splits = split_document(doc, renderer=rdr(), tokenizer=tok(), max_tokens=150, overlap_tokens=_OVERLAP)
     n = len(splits)

@@ -1,9 +1,7 @@
 """Tests for rendering base classes (rendering/base.py)."""
-import pytest
 
 from ragdoc.document import Document, ExternalRef
-from ragdoc.rendering.base import ExternalRefProvider, RenderContext
-
+from ragdoc.rendering.base import RenderContext
 
 # --- TestRenderContext ---
 
@@ -32,7 +30,7 @@ def test_render_context_get_siblings_from_parent():
         external_refs=[
             ExternalRef(target_id=sibling1.id, rel_type="external-child"),
             ExternalRef(target_id=sibling2.id, rel_type="external-child"),
-        ]
+        ],
     )
 
     current = Document(

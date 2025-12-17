@@ -1,12 +1,12 @@
 """Tests for src/ragdoc/cli.py Click commands."""
+
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from click.testing import CliRunner
 
-from ragdoc.document import Document
 from ragdoc.cli import document_processing
+from ragdoc.document import Document
 
 
 def _empty_doc() -> Document:

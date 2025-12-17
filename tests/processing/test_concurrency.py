@@ -8,22 +8,21 @@ Covers:
 - FootnoteProcessor: concurrency=1 uses ordering constraint; concurrency=2 parallel
 - Shared asyncio.Semaphore crosses processor boundaries
 """
+
 from __future__ import annotations
 
 import asyncio
 import base64
 import io
-from pathlib import Path
 
 import pytest
 from PIL import Image as PILImage
 
-from ragdoc.document import Document, Footnote, Heading, Image, Paragraph
+from ragdoc.document import Document, Footnote, Image, Paragraph
 from ragdoc.processing._concurrency import _fan_out, _resolve_semaphore
-from ragdoc.processing.footnote import FootnoteProcessor, SimpleFootnoteResolver
+from ragdoc.processing.footnote import FootnoteProcessor
 from ragdoc.processing.summary_base import ImageSummary
 from ragdoc.processing.summary_image import ImageSummaryProcessor
-
 
 # ---------------------------------------------------------------------------
 # Helpers

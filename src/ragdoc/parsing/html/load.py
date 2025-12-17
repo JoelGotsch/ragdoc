@@ -1,26 +1,29 @@
 from __future__ import annotations
-import base64
-import re
-import requests
-from pathlib import Path
-import logging
 
+import base64
+import logging
+import re
+from collections.abc import Callable
+from pathlib import Path
+
+import requests
 from bs4 import BeautifulSoup, NavigableString, Tag
+
 # from funcy import rcompose
 from pydantic import BaseModel
-from typing import Callable
 
 from ragdoc.config import get_config
-from ragdoc.document import Footnote, Paragraph, Document, Table, DocumentList, Image, Heading
+from ragdoc.document import Document, DocumentList, Footnote, Heading, Image, Paragraph, Table
 
 logger = logging.getLogger(__name__)
+
 
 class HTML(BaseModel):
     content: str
 
     @classmethod
-    def from_file(cls, path: str|Path) -> HTML:
-        with open(path, "r", encoding="utf-8") as fh:
+    def from_file(cls, path: str | Path) -> HTML:
+        with open(path, encoding="utf-8") as fh:
             content = fh.read()
         return cls(content=content)
 
@@ -37,7 +40,7 @@ def is_structural(tag: Tag) -> bool:
 TSoupTransformer = Callable[[BeautifulSoup], BeautifulSoup]
 
 
-def unwrap_structural(soup: BeautifulSoup, tags: list[str]|None = None) -> BeautifulSoup:
+def unwrap_structural(soup: BeautifulSoup, tags: list[str] | None = None) -> BeautifulSoup:
     """This function unwraps (as default) div and span tags, that have no text in them."""
     if tags is None:
         tags = ["div", "span"]
@@ -49,7 +52,7 @@ def unwrap_structural(soup: BeautifulSoup, tags: list[str]|None = None) -> Beaut
 
 def unwrap_idiotic_tables(soup: BeautifulSoup) -> BeautifulSoup:
     """This function looks for tables in the soup tree which fulfill the following criteria:
-    
+
     - contains a THEAD
     - contains a TBODY which is empty
     - THEAD contains exactly one TR
@@ -58,7 +61,7 @@ def unwrap_idiotic_tables(soup: BeautifulSoup) -> BeautifulSoup:
     Those tables are procuded by some tormented soul deciding its a super cool idea
     to use tables for drawing a broder around a bunch of paragraphs in words.
     Because formatting and styling would be very boring and we do not do this here.
-    
+
     Therefor those tables now go away and are replaced by the content of the TH cell.
     """
     tables = soup.find_all("table")
@@ -77,6 +80,7 @@ def unwrap_idiotic_tables(soup: BeautifulSoup) -> BeautifulSoup:
                     th_element.unwrap()
 
     return soup
+
 
 _FOOTNOTE_ID_RE = re.compile(r"^(?:footnote|fn|note)[-_]?(\d+)$", re.I)
 
@@ -103,9 +107,7 @@ def detect_html_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
         # Strip leading [N] prefix from the first text node, if present
         for child in p.children:
             if isinstance(child, NavigableString):
-                child.replace_with(
-                    re.sub(r'^\s*\[' + str(number) + r'\]\s*', '', str(child), count=1)
-                )
+                child.replace_with(re.sub(r"^\s*\[" + str(number) + r"\]\s*", "", str(child), count=1))
                 break
         p.name = "aside"
         p.attrs.clear()
@@ -127,7 +129,7 @@ def generate_image(image: Tag) -> Image | None:
     download_images = get_config().download_images
     if not image.has_attr("src"):
         return None
-    
+
     image_src = image["src"]
     if not isinstance(image_src, str):
         logger.warning(f"Image src is not a string: {image['src']}")
@@ -153,6 +155,7 @@ def generate_image(image: Tag) -> Image | None:
             logger.error(f"Failed to download image: {image_src}")
             pass
 
+
 def _handle_images(element: Tag) -> list[Image]:
     """Replace <img> tags with <ref id="..." rel="image"/> placeholders and return Image elements."""
     images = []
@@ -160,14 +163,15 @@ def _handle_images(element: Tag) -> list[Image]:
         document_image = generate_image(image)
         if document_image is not None:
             images.append(document_image)
-            ref_tag = BeautifulSoup(document_image.placeholder_html, 'html.parser')
+            ref_tag = BeautifulSoup(document_image.placeholder_html, "html.parser")
             image.replace_with(ref_tag)
     return images
 
+
 def handle_tag(element: Tag, document: Document) -> None:
     """
-    This function handles the tags that are directly nested under the heading tags. 
-    It does not handle nested tags, which are handled in the else case where we loop over 
+    This function handles the tags that are directly nested under the heading tags.
+    It does not handle nested tags, which are handled in the else case where we loop over
     all nested tags and call this function recursively.
     """
     match element.name:
@@ -231,7 +235,9 @@ def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | No
 
     soup = BeautifulSoup(html.content, "html.parser")
 
-    transformers = soup_transformers if soup_transformers is not None else [unwrap_idiotic_tables, detect_html_footnotes]
+    transformers = (
+        soup_transformers if soup_transformers is not None else [unwrap_idiotic_tables, detect_html_footnotes]
+    )
     for transformer in transformers:
         soup = transformer(soup)
 
@@ -254,10 +260,12 @@ def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | No
     # Handle preface elements
     root = soup.find("body") or soup
 
-    # TODO: this is probably too simplistic. It might be better to to first find headings again and then for each heading 
+    # TODO: this is probably too simplistic. It might be better to to first find headings again and then for each heading
     # iterate through siblings until another heading is found - and then continue with that heading.
-    for element in root.find_all(element_names|heading_tags, recursive=False):
-        if element.name in heading_tags or (element.name == "p" and "class" in element.attrs and "heading" in element.attrs["class"]):
+    for element in root.find_all(element_names | heading_tags, recursive=False):
+        if element.name in heading_tags or (
+            element.name == "p" and "class" in element.attrs and "heading" in element.attrs["class"]
+        ):
             heading_innerhtml = element.decode_contents(formatter="html")
             heading_level = int("6" if element.name == "p" else element.name.replace("h", ""))
             document.elements.append(Heading(innerhtml=heading_innerhtml, level=heading_level))
@@ -269,7 +277,7 @@ def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | No
 
     n = 1
     first_heading = None
-    for element in root.find_all(element_names|heading_tags, recursive=False):
+    for element in root.find_all(element_names | heading_tags, recursive=False):
         if first_heading is not None and element == first_heading:
             break
         n, preface = handle_tag(element, preface, 0, n)

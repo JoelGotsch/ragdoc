@@ -4,11 +4,11 @@ Unit tests for MinerU handler functions.
 Each handler converts a single MinerU block into zero or more ParsedElement
 objects.  Tests use minimal in-memory fixtures — no I/O, no real JSON files.
 """
+
 import pytest
 
 pytest.importorskip("pylatexenc", reason="pdf_mineru extra not installed")
 
-from pathlib import Path
 
 from ragdoc.document import DocumentList, Footnote, Heading, Image, Paragraph, RawText, Table
 from ragdoc.parsing.mineru.base import (
@@ -55,7 +55,6 @@ from ragdoc.parsing.mineru.handlers import (
     handle_title_block,
 )
 
-
 # ---------------------------------------------------------------------------
 # Minimal fixture factories
 # ---------------------------------------------------------------------------
@@ -85,9 +84,7 @@ def _context(**metadata) -> ParseContext:
     return ctx
 
 
-def _discarded(
-    text: str, block_type: DiscardedBlockType = DiscardedBlockType.PAGE_FOOTNOTE
-) -> DiscardedBlock:
+def _discarded(text: str, block_type: DiscardedBlockType = DiscardedBlockType.PAGE_FOOTNOTE) -> DiscardedBlock:
     return DiscardedBlock(bbox=[0.0, 0.0, 100.0, 20.0], index=0, type=block_type, lines=[_line(text)])
 
 
@@ -241,9 +238,7 @@ def test_handle_list_block_css_font_size_from_item_line_height():
 
 def test_handle_list_block_css_text_align_center_when_centred():
     page = _page(page_bbox=[0.0, 0.0, 200.0, 300.0])
-    item_blocks = [
-        ListItemBlock(bbox=[40.0, 0.0, 160.0, 15.0], index=0, lines=[_line("centred item")])
-    ]
+    item_blocks = [ListItemBlock(bbox=[40.0, 0.0, 160.0, 15.0], index=0, lines=[_line("centred item")])]
     block = ListBlock(bbox=[40.0, 0.0, 160.0, 15.0], index=0, blocks=item_blocks)
     html = handle_list_block(block, page, _context())[0].element.html
     assert "text-align: center" in html
@@ -257,13 +252,9 @@ def test_handle_list_block_css_text_align_center_when_centred():
 def _code_block(caption: str | None = None, body: str | None = None) -> CodeBlock:
     blocks = []
     if caption is not None:
-        blocks.append(
-            CodeCaptionBlock(bbox=[0.0, 0.0, 100.0, 15.0], index=0, lines=[_line(caption)])
-        )
+        blocks.append(CodeCaptionBlock(bbox=[0.0, 0.0, 100.0, 15.0], index=0, lines=[_line(caption)]))
     if body is not None:
-        blocks.append(
-            CodeBodyBlock(bbox=[0.0, 15.0, 100.0, 50.0], index=1, lines=[_line(body)])
-        )
+        blocks.append(CodeBodyBlock(bbox=[0.0, 15.0, 100.0, 50.0], index=1, lines=[_line(body)]))
     return CodeBlock(bbox=[0.0, 0.0, 100.0, 50.0], index=0, blocks=blocks)
 
 
@@ -315,17 +306,13 @@ def _table_block(
 ) -> TableBlock:
     blocks = []
     if caption is not None:
-        blocks.append(
-            TableCaptionBlock(bbox=[0.0, 0.0, 100.0, 15.0], index=0, lines=[_line(caption)])
-        )
+        blocks.append(TableCaptionBlock(bbox=[0.0, 0.0, 100.0, 15.0], index=0, lines=[_line(caption)]))
     if body_html is not None:
         span = TableSpan(bbox=[0.0, 15.0, 100.0, 50.0], html=body_html)
         span_line = Line(bbox=[0.0, 15.0, 100.0, 50.0], spans=[span])
         blocks.append(TableBodyBlock(bbox=[0.0, 15.0, 100.0, 50.0], index=1, lines=[span_line]))
     if footnote is not None:
-        blocks.append(
-            TableFootnoteBlock(bbox=[0.0, 50.0, 100.0, 60.0], index=2, lines=[_line(footnote)])
-        )
+        blocks.append(TableFootnoteBlock(bbox=[0.0, 50.0, 100.0, 60.0], index=2, lines=[_line(footnote)]))
     return TableBlock(bbox=[0.0, 0.0, 100.0, 60.0], index=0, blocks=blocks)
 
 
@@ -335,16 +322,12 @@ def test_handle_table_block_caption_produces_paragraph():
 
 
 def test_handle_table_block_body_produces_table():
-    result = handle_table_block(
-        _table_block(body_html="<table><tr><td>A</td></tr></table>"), _page(), _context()
-    )
+    result = handle_table_block(_table_block(body_html="<table><tr><td>A</td></tr></table>"), _page(), _context())
     assert any(isinstance(r.element, Table) for r in result)
 
 
 def test_handle_table_block_footnote_produces_raw_text():
-    result = handle_table_block(
-        _table_block(body_html="<table/>", footnote="* p < 0.05"), _page(), _context()
-    )
+    result = handle_table_block(_table_block(body_html="<table/>", footnote="* p < 0.05"), _page(), _context())
     assert any(isinstance(r.element, RawText) and "p < 0.05" in r.element.innerhtml for r in result)
 
 
@@ -386,17 +369,13 @@ def _chart_block(
 ) -> ChartBlock:
     blocks = []
     if caption is not None:
-        blocks.append(
-            ChartCaptionBlock(bbox=[0.0, 0.0, 100.0, 15.0], index=0, lines=[_line(caption)])
-        )
+        blocks.append(ChartCaptionBlock(bbox=[0.0, 0.0, 100.0, 15.0], index=0, lines=[_line(caption)]))
     if body_markdown is not None:
         span = ChartSpan(bbox=[0.0, 15.0, 100.0, 50.0], content=body_markdown)
         span_line = Line(bbox=[0.0, 15.0, 100.0, 50.0], spans=[span])
         blocks.append(ChartBodyBlock(bbox=[0.0, 15.0, 100.0, 50.0], index=1, lines=[span_line]))
     if footnote is not None:
-        blocks.append(
-            ChartFootnoteBlock(bbox=[0.0, 50.0, 100.0, 60.0], index=2, lines=[_line(footnote)])
-        )
+        blocks.append(ChartFootnoteBlock(bbox=[0.0, 50.0, 100.0, 60.0], index=2, lines=[_line(footnote)]))
     return ChartBlock(bbox=[0.0, 0.0, 100.0, 60.0], index=0, blocks=blocks)
 
 
@@ -466,9 +445,7 @@ def _image_block(image_path: str | None = None, caption: str | None = None) -> I
         span_line = Line(bbox=[0.0, 0.0, 100.0, 80.0], spans=[img_span])
         blocks.append(ImageBodyBlock(bbox=[0.0, 0.0, 100.0, 80.0], index=0, lines=[span_line]))
     if caption is not None:
-        blocks.append(
-            ImageCaptionBlock(bbox=[0.0, 80.0, 100.0, 95.0], index=1, lines=[_line(caption)])
-        )
+        blocks.append(ImageCaptionBlock(bbox=[0.0, 80.0, 100.0, 95.0], index=1, lines=[_line(caption)]))
     return ImageBlock(bbox=[0.0, 0.0, 100.0, 95.0], index=0, blocks=blocks)
 
 
@@ -500,9 +477,7 @@ def test_handle_image_block_loads_image_with_pillow(tmp_path):
 
     img_dir = tmp_path / "images"
     img_dir.mkdir()
-    (img_dir / "fig1.png").write_bytes(
-        PILImage.new("RGB", (10, 10)).tobytes()
-    )
+    (img_dir / "fig1.png").write_bytes(PILImage.new("RGB", (10, 10)).tobytes())
     # Save properly
     PILImage.new("RGB", (10, 10), color=(255, 0, 0)).save(str(img_dir / "fig1.png"))
 
@@ -542,9 +517,7 @@ def test_handle_discarded_as_footnote_numbered_produces_footnote():
 
 
 def test_handle_discarded_as_footnote_large_number():
-    result = handle_discarded_as_footnote(
-        _discarded("12 Long footnote with number twelve"), _page(), _context()
-    )
+    result = handle_discarded_as_footnote(_discarded("12 Long footnote with number twelve"), _page(), _context())
     assert isinstance(result[0].element, Footnote)
     assert result[0].element.number == 12
 
@@ -593,20 +566,14 @@ def test_handle_discarded_as_metadata_stores_in_context():
 
 def test_handle_discarded_as_metadata_produces_no_elements():
     ctx = _context()
-    result = handle_discarded_as_metadata(
-        _discarded("Page Header", DiscardedBlockType.HEADER), _page(), ctx
-    )
+    result = handle_discarded_as_metadata(_discarded("Page Header", DiscardedBlockType.HEADER), _page(), ctx)
     assert result == []
 
 
 def test_handle_discarded_as_metadata_accumulates_across_pages():
     ctx = _context()
-    handle_discarded_as_metadata(
-        _discarded("Header A", DiscardedBlockType.HEADER), _page(page_idx=0), ctx
-    )
-    handle_discarded_as_metadata(
-        _discarded("Header B", DiscardedBlockType.HEADER), _page(page_idx=1), ctx
-    )
+    handle_discarded_as_metadata(_discarded("Header A", DiscardedBlockType.HEADER), _page(page_idx=0), ctx)
+    handle_discarded_as_metadata(_discarded("Header B", DiscardedBlockType.HEADER), _page(page_idx=1), ctx)
     assert len(ctx.metadata["headers"]) == 2
     assert ctx.metadata["headers"][1]["page"] == 2
 

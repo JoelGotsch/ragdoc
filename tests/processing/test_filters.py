@@ -1,4 +1,5 @@
 """Unit tests for document filter processors."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +9,6 @@ import pytest
 from ragdoc.document import Document, Paragraph
 from ragdoc.processing.base import DocumentProcessor, ProcessingPipeline
 from ragdoc.processing.filters import EmptyDocumentFilter
-
 
 # ---------------------------------------------------------------------------
 # EmptyDocumentFilter
@@ -94,7 +94,6 @@ async def test_document_pipeline_returns_empty_chunks_when_document_filtered(
     tmp_path: Path,
 ):
     """A pipeline that always drops the document must return zero chunks."""
-    from ragdoc.parsing.parser import Parser
     from ragdoc.pipeline import DocumentPipeline
 
     fixture = tmp_path / "empty.txt"

@@ -1,11 +1,12 @@
 """Integration tests: DocumentDumpProcessor → parse_ragdoc_json / load() roundtrip."""
-import pytest
+
 from pathlib import Path
+
+import pytest
 
 from ragdoc.document import Document, Footnote, Heading, Image, Paragraph
 from ragdoc.parsing.ragdoc_json import ProvenanceMode, parse_ragdoc_json
 from ragdoc.processing.dump import DocumentDumpProcessor, default_file_namer
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -67,7 +68,6 @@ async def test_roundtrip_original_mode(tmp_path: Path, complex_document: Documen
 async def test_roundtrip_via_load(tmp_path: Path, complex_document: Document):
     """End-to-end: dump then load() via the parser registry (ORIGINAL mode)."""
     import ragdoc.parsing  # noqa: F401 — ensures ragdoc_json is registered
-
     from ragdoc.parsing import load
 
     proc = DocumentDumpProcessor(output_dir=tmp_path)

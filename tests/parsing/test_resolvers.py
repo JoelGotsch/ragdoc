@@ -1,6 +1,5 @@
 """Tests for secondary-file resolvers."""
 
-import pytest
 from pathlib import Path
 
 from ragdoc.parsing.resolvers import sibling_resolver

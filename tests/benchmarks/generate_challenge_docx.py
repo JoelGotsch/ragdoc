@@ -32,17 +32,11 @@ from docx.shared import Inches, Pt, RGBColor
 from lxml import etree
 from PIL import Image as PILImage, ImageDraw
 
-OUTPUT_PATH = (
-    Path(__file__).parent / "fixtures" / "slice_d" / "challenge_01.docx"
-)
+OUTPUT_PATH = Path(__file__).parent / "fixtures" / "slice_d" / "challenge_01.docx"
 
 # ── Namespace / relationship constants ──────────────────────────────────────
-FN_REL = (
-    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
-)
-FN_CT = (
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"
-)
+FN_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
+FN_CT = "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"
 FN_URI = "/word/footnotes.xml"
 
 _INITIAL_FN_XML = etree.fromstring(
@@ -176,7 +170,7 @@ def make_placeholder_image() -> io.BytesIO:
 # ── Document builder ─────────────────────────────────────────────────────────
 
 
-def build_document() -> Document:  # noqa: PLR0912 (many branches intentional)
+def build_document() -> Document:
     doc = Document()
     fn = FootnoteManager(doc)
 
@@ -187,15 +181,11 @@ def build_document() -> Document:  # noqa: PLR0912 (many branches intentional)
 
     # Three proper OOXML footnotes embedded inline
     p1 = doc.add_paragraph()
-    p1.add_run(
-        "The International Verification Commission published its annual report in March 2024."
-    )
+    p1.add_run("The International Verification Commission published its annual report in March 2024.")
     fn.add(p1, "Published as IVC/2024/Report-7.")
     p1.add_run(" The report cited findings from three independent laboratories")
     fn.add(p1, "Laboratories operated in Vienna, Geneva, and Tokyo respectively.")
-    p1.add_run(
-        ", confirming earlier estimates of the compound\u2019s stability under pressure."
-    )
+    p1.add_run(", confirming earlier estimates of the compound\u2019s stability under pressure.")
     fn.add(p1, "See also Appendix C for the full dataset.")
     p1.add_run(" All measurements were conducted under standard conditions.")
 
@@ -246,9 +236,7 @@ def build_document() -> Document:  # noqa: PLR0912 (many branches intentional)
 
     # FAKE HEADING — all-caps body text, visually prominent
     p_allcaps = doc.add_paragraph()
-    r_allcaps = p_allcaps.add_run(
-        "THIS ENTIRELY UPPERCASE PARAGRAPH COULD FOOL A NAIVE CLASSIFIER"
-    )
+    r_allcaps = p_allcaps.add_run("THIS ENTIRELY UPPERCASE PARAGRAPH COULD FOOL A NAIVE CLASSIFIER")
     r_allcaps.font.size = Pt(11)
     # Still Normal style — only text transform makes it look like a section title
 
@@ -274,9 +262,7 @@ def build_document() -> Document:  # noqa: PLR0912 (many branches intentional)
     doc.add_paragraph("Alpha-level item", style="List Bullet")
     doc.add_paragraph("Beta-level item (nested once)", style="List Bullet 2")
     doc.add_paragraph("Gamma-level item (nested twice)", style="List Bullet 3")
-    doc.add_paragraph(
-        "Another gamma-level item — parser should see list continuation", style="List Bullet 3"
-    )
+    doc.add_paragraph("Another gamma-level item — parser should see list continuation", style="List Bullet 3")
     doc.add_paragraph("Beta-level item two", style="List Bullet 2")
     doc.add_paragraph("Alpha-level item two", style="List Bullet")
     doc.add_paragraph("Alpha-level item three", style="List Bullet")
@@ -399,8 +385,7 @@ def build_document() -> Document:  # noqa: PLR0912 (many branches intentional)
     doc.add_heading("The Caption Confusion", level=1)
 
     doc.add_paragraph(
-        "The diagram below illustrates the document processing architecture "
-        "described in the previous section:"
+        "The diagram below illustrates the document processing architecture described in the previous section:"
     )
 
     # Inline image (actual PNG bytes, no alt text via high-level API)
@@ -431,17 +416,11 @@ def build_document() -> Document:  # noqa: PLR0912 (many branches intentional)
     p_chaos = doc.add_paragraph()
     p_chaos.add_run("Chaos line one: The plenary session commenced at 09:00 sharp.")
     linebreak(p_chaos)
-    p_chaos.add_run(
-        "Chaos line two: Attendance was recorded by the duty secretary."
-    )
+    p_chaos.add_run("Chaos line two: Attendance was recorded by the duty secretary.")
     linebreak(p_chaos)
-    p_chaos.add_run(
-        "Chaos line three: The minutes of the previous meeting were adopted without amendment."
-    )
+    p_chaos.add_run("Chaos line three: The minutes of the previous meeting were adopted without amendment.")
     linebreak(p_chaos)
-    p_chaos.add_run(
-        "Chaos line four: The session was adjourned sine die at 10:45."
-    )
+    p_chaos.add_run("Chaos line four: The session was adjourned sine die at 10:45.")
 
     # Three empty spacing paragraphs — layout hack that should be dropped
     doc.add_paragraph()
@@ -464,8 +443,7 @@ def build_document() -> Document:  # noqa: PLR0912 (many branches intentional)
     # but is plain body text with no Word footer section.
     p_footer = doc.add_paragraph()
     r_footer = p_footer.add_run(
-        "CONFIDENTIAL\u2003|\u2003Internal Use Only\u2003"
-        "|\u2003Document Ref: TMP-2024-001\u2003|\u2003Page 12 of 15"
+        "CONFIDENTIAL\u2003|\u2003Internal Use Only\u2003|\u2003Document Ref: TMP-2024-001\u2003|\u2003Page 12 of 15"
     )
     r_footer.font.size = Pt(9)
     r_footer.font.color.rgb = RGBColor(0x88, 0x88, 0x88)

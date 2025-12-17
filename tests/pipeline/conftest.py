@@ -1,4 +1,5 @@
 """Shared fixtures for pipeline tests."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +9,6 @@ import pytest
 from ragdoc.chunking import Chunk
 from ragdoc.document import Document, Heading, Paragraph
 from ragdoc.parsing.parser import Parser
-
 
 # ---------------------------------------------------------------------------
 # Document factories

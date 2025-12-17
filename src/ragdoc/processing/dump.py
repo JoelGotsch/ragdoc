@@ -8,8 +8,8 @@ reads them back.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from ragdoc.document import Document
 from ragdoc.processing.base import DocumentProcessor

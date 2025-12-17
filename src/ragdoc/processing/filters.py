@@ -3,6 +3,7 @@
 Filters are :class:`~ragdoc.processing.base.DocumentProcessor` subclasses that
 return ``None`` to drop a document from the pipeline rather than transforming it.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -36,7 +37,7 @@ class EmptyDocumentFilter(DocumentProcessor):
         ```
     """
 
-    async def process(self, document: "Document") -> "Document | None":
+    async def process(self, document: Document) -> Document | None:
         """Return the document unchanged, or ``None`` if it has no elements.
 
         Args:

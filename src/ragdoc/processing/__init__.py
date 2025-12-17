@@ -24,86 +24,87 @@ from ragdoc.processing.base import (
 from ragdoc.processing.heading import (
     HeadingLevelProcessor,
     HeadingVisualInfo,
+    SizeToLevelMapper,
     TitleDetectionProcessor,
+    compute_size_to_level_mapping,
     # Standalone functions
     extract_font_size,
-    is_centered,
-    is_bold,
     is_all_caps,
-    compute_size_to_level_mapping,
-    SizeToLevelMapper,
+    is_bold,
+    is_centered,
 )
+
 try:
     from ragdoc.processing.heading_llm import (
+        HeadingInfo,
         LLMHeadingResolver,
         LLMHeadingResolverSettings,
-        HeadingInfo,
     )
 except ImportError:
     pass  # pydantic_settings not installed; LLMHeadingResolver unavailable
+from ragdoc.processing.dump import DocumentDumpProcessor, FileNamer, default_file_namer
+from ragdoc.processing.filters import EmptyDocumentFilter
 from ragdoc.processing.footnote import (
     FootnoteCandidate,
-    FootnoteResolver,
-    SimpleFootnoteResolver,
-    LLMFootnoteResolver,
     FootnoteProcessor,
+    FootnoteResolver,
+    LLMFootnoteResolver,
+    SimpleFootnoteResolver,
     SyncFootnoteProcessor,
+    apply_ref_patches,
     build_footnote_pattern,
     find_footnote_candidates,
     score_footnote_candidates,
-    apply_ref_patches,
 )
 from ragdoc.processing.summary_base import ImageSummary
 from ragdoc.processing.summary_image import (
-    ImageSummaryProcessor,
+    DEFAULT_TRANSFORMATIONS,
     ImageSummarizeFn,
+    ImageSummaryProcessor,
     build_image_messages,
     openai_image_summarizer,
-    DEFAULT_TRANSFORMATIONS,
 )
-from ragdoc.processing.dump import DocumentDumpProcessor, FileNamer, default_file_namer
-from ragdoc.processing.filters import EmptyDocumentFilter
 
 __all__ = [
+    "DEFAULT_TRANSFORMATIONS",
+    # Document dump
+    "DocumentDumpProcessor",
     # Base classes
     "DocumentProcessor",
-    "ProcessingPipeline",
+    # Filters
+    "EmptyDocumentFilter",
+    "FileNamer",
+    # Footnote processors
+    "FootnoteCandidate",
+    "FootnoteProcessor",
+    "FootnoteResolver",
+    "HeadingInfo",
     # Heading processors
     "HeadingLevelProcessor",
     "HeadingVisualInfo",
-    "TitleDetectionProcessor",
-    # Standalone functions
-    "extract_font_size",
-    "is_centered",
-    "is_bold",
-    "is_all_caps",
-    "compute_size_to_level_mapping",
-    "SizeToLevelMapper",
+    # Image summary
+    "ImageSummarizeFn",
+    # Summary result models
+    "ImageSummary",
+    "ImageSummaryProcessor",
+    "LLMFootnoteResolver",
     # LLM heading processor
     "LLMHeadingResolver",
     "LLMHeadingResolverSettings",
-    "HeadingInfo",
-    # Footnote processors
-    "FootnoteCandidate",
-    "FootnoteResolver",
+    "ProcessingPipeline",
     "SimpleFootnoteResolver",
-    "LLMFootnoteResolver",
-    "FootnoteProcessor",
+    "SizeToLevelMapper",
     "SyncFootnoteProcessor",
-    "find_footnote_candidates",
+    "TitleDetectionProcessor",
     "apply_ref_patches",
-    # Summary result models
-    "ImageSummary",
-    # Image summary
-    "ImageSummarizeFn",
     "build_image_messages",
-    "openai_image_summarizer",
-    "DEFAULT_TRANSFORMATIONS",
-    "ImageSummaryProcessor",
-    # Document dump
-    "DocumentDumpProcessor",
-    "FileNamer",
+    "compute_size_to_level_mapping",
     "default_file_namer",
-    # Filters
-    "EmptyDocumentFilter",
+    # Standalone functions
+    "extract_font_size",
+    "find_footnote_candidates",
+    "is_all_caps",
+    "is_bold",
+    "is_centered",
+    "openai_image_summarizer",
 ]

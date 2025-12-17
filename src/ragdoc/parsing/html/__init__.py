@@ -1,10 +1,10 @@
-from ragdoc.parsing.html.load import generate_document as generate_html_document, HTML
-
-from pydantic import BaseModel
 from pathlib import Path
 
-from ragdoc.parsing.base import load_file
+from pydantic import BaseModel
+
 from ragdoc.document import Document
+from ragdoc.parsing.base import load_file
+from ragdoc.parsing.html.load import HTML, generate_document as generate_html_document
 from ragdoc.parsing.parser import Parser
 
 
@@ -29,6 +29,7 @@ HTMLFile = HTMLSource
 # ---------------------------------------------------------------------------
 # Registry integration
 # ---------------------------------------------------------------------------
+
 
 class HTMLParser(Parser):
     name: str = "html"

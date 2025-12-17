@@ -1,10 +1,8 @@
 """Comprehensive tests for document.py element classes and Document model."""
-import re
+
 import pytest
-from bs4 import BeautifulSoup
 
 from ragdoc.document import (
-    BaseElement,
     Document,
     DocumentList,
     ElementTypeEnum,
@@ -16,7 +14,6 @@ from ragdoc.document import (
     Table,
     join_documents,
 )
-
 
 # ---------------------------------------------------------------------------
 # Heading
@@ -171,8 +168,7 @@ def test_paragraph_html_tag_property():
 # ---------------------------------------------------------------------------
 
 TABLE_SIMPLE_TABLE = (
-    "<table><thead><tr><th>A</th><th>B</th></tr></thead>"
-    "<tbody><tr><td>1</td><td>2</td></tr></tbody></table>"
+    "<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>"
 )
 
 
@@ -290,7 +286,7 @@ def test_image_from_html_no_img_tag():
 
 def test_image_ids_on_paragraph_with_ref():
     img = Image(image=IMAGE_SAMPLE_B64)
-    p = Paragraph.from_html(f'<p>{img.placeholder_html}</p>')
+    p = Paragraph.from_html(f"<p>{img.placeholder_html}</p>")
     assert img.id in p.image_ids
 
 
@@ -392,27 +388,41 @@ def test_footnote_referenced_in_paragraph():
 # Cross-element parametrized tests
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("element,expected_type", [
-    (Heading.from_html("<h1>Test</h1>"), ElementTypeEnum.HEADING),
-    (Paragraph.from_html("<p>test</p>"), ElementTypeEnum.PARAGRAPH),
-    (Table.from_html("<table><tr><td>a</td></tr></table>"), ElementTypeEnum.TABLE),
-    (DocumentList.from_html("<ul><li>x</li></ul>"), ElementTypeEnum.DOCUMENT_LIST),
-    (Image(image="iVBORw0KGgoAAAANSUhEUg=="), ElementTypeEnum.IMAGE),
-    (RawText.from_html("<div>x</div>"), ElementTypeEnum.RAW_TEXT),
-    (Footnote(number=1, innerhtml="x"), ElementTypeEnum.FOOTNOTE),
-], ids=["heading", "paragraph", "table", "list", "image", "raw_text", "footnote"])
+
+@pytest.mark.parametrize(
+    "element,expected_type",
+    [
+        (Heading.from_html("<h1>Test</h1>"), ElementTypeEnum.HEADING),
+        (Paragraph.from_html("<p>test</p>"), ElementTypeEnum.PARAGRAPH),
+        (Table.from_html("<table><tr><td>a</td></tr></table>"), ElementTypeEnum.TABLE),
+        (DocumentList.from_html("<ul><li>x</li></ul>"), ElementTypeEnum.DOCUMENT_LIST),
+        (Image(image="iVBORw0KGgoAAAANSUhEUg=="), ElementTypeEnum.IMAGE),
+        (RawText.from_html("<div>x</div>"), ElementTypeEnum.RAW_TEXT),
+        (Footnote(number=1, innerhtml="x"), ElementTypeEnum.FOOTNOTE),
+    ],
+    ids=["heading", "paragraph", "table", "list", "image", "raw_text", "footnote"],
+)
 def test_element_type(element, expected_type):
     assert element.element_type == expected_type
 
 
-@pytest.mark.parametrize("element,new_html,check_field,expected", [
-    (Heading.from_html("<h1>Original</h1>"), "<h2>Updated</h2>", "text", "Updated"),
-    (Paragraph.from_html("<p>old</p>"), "<p>new</p>", "html", "<p>new</p>"),
-    (Table.from_html("<table><tr><td>old</td></tr></table>"), "<table><tr><td>new</td></tr></table>", "html", "new"),
-    (DocumentList.from_html("<ul><li>old</li></ul>"), "<ol><li>new</li></ol>", "html", "<ol><li>new</li></ol>"),
-    (RawText.from_html("<div>old</div>"), "<div>new</div>", "text", "new"),
-    (Footnote(number=1, innerhtml="old"), "<p>[7] replaced</p>", "number", 7),
-], ids=["heading", "paragraph", "table", "list", "raw_text", "footnote"])
+@pytest.mark.parametrize(
+    "element,new_html,check_field,expected",
+    [
+        (Heading.from_html("<h1>Original</h1>"), "<h2>Updated</h2>", "text", "Updated"),
+        (Paragraph.from_html("<p>old</p>"), "<p>new</p>", "html", "<p>new</p>"),
+        (
+            Table.from_html("<table><tr><td>old</td></tr></table>"),
+            "<table><tr><td>new</td></tr></table>",
+            "html",
+            "new",
+        ),
+        (DocumentList.from_html("<ul><li>old</li></ul>"), "<ol><li>new</li></ol>", "html", "<ol><li>new</li></ol>"),
+        (RawText.from_html("<div>old</div>"), "<div>new</div>", "text", "new"),
+        (Footnote(number=1, innerhtml="old"), "<p>[7] replaced</p>", "number", 7),
+    ],
+    ids=["heading", "paragraph", "table", "list", "raw_text", "footnote"],
+)
 def test_html_setter(element, new_html, check_field, expected):
     element.html = new_html
     actual = getattr(element, check_field)
@@ -422,11 +432,15 @@ def test_html_setter(element, new_html, check_field, expected):
         assert actual == expected
 
 
-@pytest.mark.parametrize("from_html_cls,raw_html,expected_html", [
-    (Paragraph, "   <p>trimmed</p>   ", "<p>trimmed</p>"),
-    (Table, "  <table><tr><td>x</td></tr></table>  ", "<table><tr><td>x</td></tr></table>"),
-    (DocumentList, "   <ul><li>x</li></ul>   ", "<ul><li>x</li></ul>"),
-], ids=["paragraph", "table", "list"])
+@pytest.mark.parametrize(
+    "from_html_cls,raw_html,expected_html",
+    [
+        (Paragraph, "   <p>trimmed</p>   ", "<p>trimmed</p>"),
+        (Table, "  <table><tr><td>x</td></tr></table>  ", "<table><tr><td>x</td></tr></table>"),
+        (DocumentList, "   <ul><li>x</li></ul>   ", "<ul><li>x</li></ul>"),
+    ],
+    ids=["paragraph", "table", "list"],
+)
 def test_whitespace_strip(from_html_cls, raw_html, expected_html):
     element = from_html_cls.from_html(raw_html)
     assert element.html == expected_html
@@ -475,14 +489,18 @@ def test_document_empty_document():
     assert doc.footnotes == []
 
 
-@pytest.mark.parametrize("element,attr", [
-    (Heading(innerhtml="H", level=1), "headings"),
-    (Table.from_html("<table><tr><td>x</td></tr></table>"), "tables"),
-    (DocumentList.from_html("<ul><li>a</li></ul>"), "lists"),
-    (Image(image="abc"), "images"),
-    (RawText(innerhtml="raw"), "raw_texts"),
-    (Footnote(number=1, innerhtml="fn"), "footnotes"),
-], ids=["heading", "table", "list", "image", "raw_text", "footnote"])
+@pytest.mark.parametrize(
+    "element,attr",
+    [
+        (Heading(innerhtml="H", level=1), "headings"),
+        (Table.from_html("<table><tr><td>x</td></tr></table>"), "tables"),
+        (DocumentList.from_html("<ul><li>a</li></ul>"), "lists"),
+        (Image(image="abc"), "images"),
+        (RawText(innerhtml="raw"), "raw_texts"),
+        (Footnote(number=1, innerhtml="fn"), "footnotes"),
+    ],
+    ids=["heading", "table", "list", "image", "raw_text", "footnote"],
+)
 def test_document_filter_by_type(element, attr):
     doc = _make_doc(element)
     assert getattr(doc, attr) == [element]
@@ -556,9 +574,7 @@ def test_document_merge_titles():
     joined = d1 | d2
     assert joined.title == "First"
     # d2's title becomes a heading element
-    assert any(
-        isinstance(e, Heading) and e.text == "Second" for e in joined.elements
-    )
+    assert any(isinstance(e, Heading) and e.text == "Second" for e in joined.elements)
 
 
 def test_document_merge_one_title():
@@ -648,31 +664,37 @@ def test_orphaned_footnotes_no_footnotes():
 
 
 def test_orphaned_footnotes_all_orphaned():
-    doc = Document(elements=[
-        Paragraph.from_html("<p>No ref tags here.</p>"),
-        Footnote(id="fn-1", number=1, innerhtml="Orphan one."),
-        Footnote(id="fn-2", number=2, innerhtml="Orphan two."),
-    ])
+    doc = Document(
+        elements=[
+            Paragraph.from_html("<p>No ref tags here.</p>"),
+            Footnote(id="fn-1", number=1, innerhtml="Orphan one."),
+            Footnote(id="fn-2", number=2, innerhtml="Orphan two."),
+        ]
+    )
     orphans = doc.orphaned_footnotes
     assert len(orphans) == 2
     assert {f.id for f in orphans} == {"fn-1", "fn-2"}
 
 
 def test_orphaned_footnotes_none_orphaned_all_referenced():
-    doc = Document(elements=[
-        Paragraph(html_content='<p>See <ref id="fn-1" rel="footnote"/> and <ref id="fn-2" rel="footnote"/>.</p>'),
-        Footnote(id="fn-1", number=1, innerhtml="First footnote."),
-        Footnote(id="fn-2", number=2, innerhtml="Second footnote."),
-    ])
+    doc = Document(
+        elements=[
+            Paragraph(html_content='<p>See <ref id="fn-1" rel="footnote"/> and <ref id="fn-2" rel="footnote"/>.</p>'),
+            Footnote(id="fn-1", number=1, innerhtml="First footnote."),
+            Footnote(id="fn-2", number=2, innerhtml="Second footnote."),
+        ]
+    )
     assert doc.orphaned_footnotes == []
 
 
 def test_orphaned_footnotes_mixed_referenced_and_orphaned():
-    doc = Document(elements=[
-        Paragraph(html_content='<p>See <ref id="fn-1" rel="footnote"/> for details.</p>'),
-        Footnote(id="fn-1", number=1, innerhtml="Referenced footnote."),
-        Footnote(id="fn-2", number=2, innerhtml="Orphaned footnote."),
-    ])
+    doc = Document(
+        elements=[
+            Paragraph(html_content='<p>See <ref id="fn-1" rel="footnote"/> for details.</p>'),
+            Footnote(id="fn-1", number=1, innerhtml="Referenced footnote."),
+            Footnote(id="fn-2", number=2, innerhtml="Orphaned footnote."),
+        ]
+    )
     orphans = doc.orphaned_footnotes
     assert len(orphans) == 1
     assert orphans[0].id == "fn-2"
@@ -680,9 +702,11 @@ def test_orphaned_footnotes_mixed_referenced_and_orphaned():
 
 def test_orphaned_footnotes_ref_in_different_element_counts_as_referenced():
     """A footnote referenced in any element is not orphaned."""
-    doc = Document(elements=[
-        Paragraph(html_content='<p>First paragraph.</p>'),
-        Paragraph(html_content='<p>Second paragraph <ref id="fn-1" rel="footnote"/>.</p>'),
-        Footnote(id="fn-1", number=1, innerhtml="Somewhere else."),
-    ])
+    doc = Document(
+        elements=[
+            Paragraph(html_content="<p>First paragraph.</p>"),
+            Paragraph(html_content='<p>Second paragraph <ref id="fn-1" rel="footnote"/>.</p>'),
+            Footnote(id="fn-1", number=1, innerhtml="Somewhere else."),
+        ]
+    )
     assert doc.orphaned_footnotes == []

@@ -11,6 +11,7 @@ discover orphans without any local state file.
 Implementations should use ``chunk.source_id`` and ``chunk.source_hash``
 (the dedicated fields, not ``chunk.metadata``) for their internal indexing.
 """
+
 from __future__ import annotations
 
 from typing import Protocol, runtime_checkable

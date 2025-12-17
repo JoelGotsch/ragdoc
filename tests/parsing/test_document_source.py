@@ -1,24 +1,24 @@
 """Tests for DocumentSource types, load_document, and from_path (Phase 4.6)."""
-import pytest
+
 from pathlib import Path
 
-from ragdoc.parsing import (
-    HTMLSource,
-    HTMLFile,
-    ExcelSource,
-    ExcelPackage,
-    PandocFile,
-    WordFile,
-    AzureJSONFile,
-    DocumentSource,
-    load_document,
-    from_path,
-)
+import pytest
 
+from ragdoc.parsing import (
+    AzureJSONFile,
+    ExcelPackage,
+    ExcelSource,
+    HTMLFile,
+    HTMLSource,
+    PandocFile,
+    from_path,
+    load_document,
+)
 
 # =============================================================================
 # Rename aliases
 # =============================================================================
+
 
 def test_htmlfile_is_htmlsource():
     """HTMLFile is an alias for HTMLSource."""
@@ -33,6 +33,7 @@ def test_excelpackage_is_excelsource():
 # =============================================================================
 # from_path factory
 # =============================================================================
+
 
 def test_from_path_html(html_file_path: Path):
     source = from_path(html_file_path)
@@ -52,9 +53,7 @@ def test_from_path_xlsx(xlsx_file_path: Path):
 
 def test_from_path_azure_json(azure_test_pdf_json_file_path: Path):
     # Rename to *.azure.json to trigger Azure branch
-    azure_path = azure_test_pdf_json_file_path.parent / (
-        azure_test_pdf_json_file_path.stem + ".azure.json"
-    )
+    azure_path = azure_test_pdf_json_file_path.parent / (azure_test_pdf_json_file_path.stem + ".azure.json")
     source = from_path(azure_path)
     assert isinstance(source, AzureJSONFile)
 
@@ -72,6 +71,7 @@ def test_from_path_string_input(html_file_path: Path):
 # =============================================================================
 # load_document
 # =============================================================================
+
 
 def test_load_document_html(html_file_path: Path):
     source = from_path(html_file_path)

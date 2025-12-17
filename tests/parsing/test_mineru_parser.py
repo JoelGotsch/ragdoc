@@ -6,6 +6,7 @@ Verifies that:
 - parse_mineru_file is importable as a module-level function
 - The registry entry is correct after _register()
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,7 +17,7 @@ import pytest
 pytest.importorskip("pylatexenc", reason="pdf_mineru extra not installed")
 
 from ragdoc.document import Document
-from ragdoc.parsing.mineru import MinerUExtractor, MinerUParser, parse_mineru_file
+from ragdoc.parsing.mineru import MinerUExtractor, MinerUParser
 from ragdoc.parsing.parser import Parser
 
 
@@ -30,14 +31,14 @@ def test_mineru_extractor_is_not_parser_subclass() -> None:
 
 def test_mineru_extractor_importable() -> None:
     """MinerUExtractor must be importable from ragdoc.parsing.mineru."""
-    from ragdoc.parsing.mineru import MinerUExtractor as E  # noqa: F401
+    from ragdoc.parsing.mineru import MinerUExtractor as E
 
     assert E is MinerUExtractor
 
 
 def test_parse_mineru_file_module_level() -> None:
     """parse_mineru_file must be importable directly from ragdoc.parsing.mineru."""
-    from ragdoc.parsing.mineru import parse_mineru_file as f  # noqa: F401
+    from ragdoc.parsing.mineru import parse_mineru_file as f
 
     assert callable(f)
 

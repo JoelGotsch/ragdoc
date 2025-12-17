@@ -3,9 +3,9 @@
 di_available = True
 
 try:
-    from azure.core.credentials import AzureKeyCredential
     from azure.ai.documentintelligence import DocumentIntelligenceClient
     from azure.ai.documentintelligence.models import DocumentContentFormat
+    from azure.core.credentials import AzureKeyCredential
 except ImportError:
     di_available = False
 
@@ -21,10 +21,7 @@ def get_analyze_result(file_path: Path) -> dict:
         ImportError: If the ``azure_di`` extra is not installed.
     """
     if not di_available:
-        raise ImportError(
-            "Azure SDK not available, cannot process PDF files. "
-            "Please install the `azure_di` extra."
-        )
+        raise ImportError("Azure SDK not available, cannot process PDF files. Please install the `azure_di` extra.")
     config = get_config()
     credential = AzureKeyCredential(config.azure_key)
     document_intelligence_client = DocumentIntelligenceClient(config.azure_endpoint, credential)

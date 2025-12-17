@@ -6,6 +6,7 @@ content, same inline-ref relationships). Element IDs are regenerated on every pa
 are never asserted equal -- except for Footnote UUIDs which are preserved via the
 id="footnote-{uuid}" attribute.
 """
+
 import pytest
 
 from ragdoc.document import Document, DocumentList, Footnote, Heading, Image, Paragraph, Table
@@ -13,10 +14,7 @@ from ragdoc.merging.patch import validate_inline_refs
 from ragdoc.parsing.html.load import HTML, generate_document
 from ragdoc.rendering import OutputFormat, Renderer, render_raw
 
-_PNG_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQ"
-    "AABjkB6QAAAABJRU5ErkJggg=="
-)
+_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQAABjkB6QAAAABJRU5ErkJggg=="
 
 
 @pytest.fixture(scope="module")
@@ -28,34 +26,39 @@ def reference_html():
     img_inline = Image(image=_PNG_B64, image_type="png", alt="1px test image", width=1, height=1)
     img_standalone = Image(image=_PNG_B64, image_type="png", alt="Standalone image", width=1, height=1)
 
-    doc = Document(elements=[
-        Heading(innerhtml="Document Title", level=1),
-        Heading(innerhtml="Section with <em>italic heading</em>", level=2),
-        Heading(innerhtml="Subsection", level=3),
-        Heading(innerhtml="Deep heading", level=4),
-        Paragraph(html_content="<p>Plain paragraph.</p>"),
-        Paragraph(html_content="<p><strong>Bold</strong>, <em>italic</em>, <code>code</code>.</p>"),
-        Paragraph(html_content="<p>Math: E\u2009=\u2009<math>mc<sup>2</sup></math></p>"),
-        Paragraph(html_content='<p style="text-align: center;">Centred paragraph.</p>'),
-        Paragraph(html_content="<p>Entities: a &amp; b, x &lt; y, z &gt; w.</p>"),
-        Paragraph(html_content=f'<p>Text with footnote<ref id="{fn1.id}" rel="footnote"/>.</p>'),
-        fn1,
-        Paragraph(html_content=f'<p>See <ref id="{img_inline.id}" rel="image"/> for details.</p>'),
-        img_inline,
-        Paragraph(html_content=(
-            f'<p>Combined<ref id="{fn2.id}" rel="footnote"/> '
-            f'and <ref id="{img_inline.id}" rel="image"/>.</p>'
-        )),
-        fn2,
-        fn_orphan,
-        img_standalone,
-        Table(html_content=(
-            "<table><thead><tr><th>Col A</th><th>Col B</th></tr></thead>"
-            "<tbody><tr><td>R1C1</td><td>R1C2 with <em>markup</em></td></tr></tbody></table>"
-        )),
-        DocumentList(html_content="<ul><li>Apple</li><li>Banana</li></ul>"),
-        DocumentList(html_content="<ol><li>First</li><li>Second</li></ol>"),
-    ])
+    doc = Document(
+        elements=[
+            Heading(innerhtml="Document Title", level=1),
+            Heading(innerhtml="Section with <em>italic heading</em>", level=2),
+            Heading(innerhtml="Subsection", level=3),
+            Heading(innerhtml="Deep heading", level=4),
+            Paragraph(html_content="<p>Plain paragraph.</p>"),
+            Paragraph(html_content="<p><strong>Bold</strong>, <em>italic</em>, <code>code</code>.</p>"),
+            Paragraph(html_content="<p>Math: E\u2009=\u2009<math>mc<sup>2</sup></math></p>"),
+            Paragraph(html_content='<p style="text-align: center;">Centred paragraph.</p>'),
+            Paragraph(html_content="<p>Entities: a &amp; b, x &lt; y, z &gt; w.</p>"),
+            Paragraph(html_content=f'<p>Text with footnote<ref id="{fn1.id}" rel="footnote"/>.</p>'),
+            fn1,
+            Paragraph(html_content=f'<p>See <ref id="{img_inline.id}" rel="image"/> for details.</p>'),
+            img_inline,
+            Paragraph(
+                html_content=(
+                    f'<p>Combined<ref id="{fn2.id}" rel="footnote"/> and <ref id="{img_inline.id}" rel="image"/>.</p>'
+                )
+            ),
+            fn2,
+            fn_orphan,
+            img_standalone,
+            Table(
+                html_content=(
+                    "<table><thead><tr><th>Col A</th><th>Col B</th></tr></thead>"
+                    "<tbody><tr><td>R1C1</td><td>R1C2 with <em>markup</em></td></tr></tbody></table>"
+                )
+            ),
+            DocumentList(html_content="<ul><li>Apple</li><li>Banana</li></ul>"),
+            DocumentList(html_content="<ol><li>First</li><li>Second</li></ol>"),
+        ]
+    )
     renderer = Renderer(format=OutputFormat.HTML, element_renderer=render_raw)
     return renderer.render(doc)
 

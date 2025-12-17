@@ -8,6 +8,7 @@ If two roots reference the same element it is duplicated into both groups —
 downstream consumers work with Chunks (not Documents) so duplicate
 element IDs in intermediate Documents are harmless.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -32,7 +33,7 @@ class ElementGroup:
     @property
     def all_elements(self) -> list[BaseElement]:
         """root followed by referenced elements in document order."""
-        return [self.root] + self.referenced
+        return [self.root, *self.referenced]
 
 
 def build_element_groups(elements: list[BaseElement]) -> list[Heading | ElementGroup]:
@@ -58,12 +59,8 @@ def build_element_groups(elements: list[BaseElement]) -> list[Heading | ElementG
         List of Headings and ElementGroups in reading order.
     """
     el_by_id: dict[str, BaseElement] = {el.id: el for el in elements}
-    refs_to: dict[str, list[str]] = {
-        el.id: [ref.target_id for ref in el.inline_refs] for el in elements
-    }
-    all_referenced_ids: set[str] = {
-        target_id for targets in refs_to.values() for target_id in targets
-    }
+    refs_to: dict[str, list[str]] = {el.id: [ref.target_id for ref in el.inline_refs] for el in elements}
+    all_referenced_ids: set[str] = {target_id for targets in refs_to.values() for target_id in targets}
     doc_order: dict[str, int] = {el.id: i for i, el in enumerate(elements)}
 
     def _collect_refs(root_id: str) -> list[BaseElement]:

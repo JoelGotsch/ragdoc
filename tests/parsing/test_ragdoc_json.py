@@ -1,10 +1,11 @@
 """Tests for RagdocJsonParser, parse_ragdoc_json, and ProvenanceMode."""
-import pytest
+
 from pathlib import Path
+
+import pytest
 
 from ragdoc.document import Document, Heading
 from ragdoc.parsing.ragdoc_json import ProvenanceMode, RagdocJsonParser, parse_ragdoc_json
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -97,7 +98,6 @@ async def test_ragdoc_json_parser_call_json_file_mode(tmp_path: Path):
 def test_ragdoc_json_registered_after_import():
     """Importing ragdoc.parsing should register the ragdoc_json parser."""
     import ragdoc.parsing  # noqa: F401
-
     from ragdoc.parsing.registry import get_parser
 
     get_parser("ragdoc_json")  # raises if not registered
@@ -106,7 +106,6 @@ def test_ragdoc_json_registered_after_import():
 def test_ragdoc_json_resolves_by_extension(tmp_path: Path):
     """_resolve_parser should pick ragdoc_json for .ragdoc.json files."""
     import ragdoc.parsing  # noqa: F401
-
     from ragdoc.parsing.registry import _resolve_parser
 
     resolved = _resolve_parser(tmp_path / "file.ragdoc.json")

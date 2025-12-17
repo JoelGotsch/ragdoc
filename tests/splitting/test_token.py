@@ -18,9 +18,10 @@ Several tests specifically target the new group-aware behaviour:
   slice operates on *rendered* text (refs already inlined), so no raw
   ``<ref id="..." rel="..."/>`` XML survives into output chunks.
 """
+
 import pytest
 
-from ragdoc.document import Document, Footnote, Heading, Image, Paragraph, RawText, Table
+from ragdoc.document import Document, Footnote, Heading, Image, Paragraph, Table
 from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
 from ragdoc.splitting.groups import ElementGroup, build_element_groups
 from ragdoc.splitting.token import (
@@ -30,7 +31,6 @@ from ragdoc.splitting.token import (
     split_document,
     split_oversized_element,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -248,6 +248,7 @@ def test_oversized_table_is_split():
     big_cell = "X" * 50
     table_html = f"<table><tr>{''.join(f'<td>{big_cell}</td>' for _ in range(20))}</tr></table>"
     from ragdoc.document import Table as TableEl
+
     tbl = TableEl(html=table_html)
     doc = Document(elements=[tbl])
     r = rdr()
@@ -286,9 +287,7 @@ def test_oversized_tier3_token_slice_no_raw_ref_tags_in_output():
     With rendering first (refs inlined), no such tags remain.
     """
     fn1 = fn(1, "This is footnote content that expands the rendered size significantly.")
-    para = Paragraph(
-        html=f'<p>{"Word " * 60}<ref id="{fn1.id}" rel="footnote"/>{"More " * 60}</p>'
-    )
+    para = Paragraph(html=f'<p>{"Word " * 60}<ref id="{fn1.id}" rel="footnote"/>{"More " * 60}</p>')
     doc = Document(elements=[para, fn1])
     r = rdr()
     total = measured(doc, r)
@@ -297,9 +296,7 @@ def test_oversized_tier3_token_slice_no_raw_ref_tags_in_output():
     for chunk in result:
         chunk_text = r.render(chunk)
         # No raw <ref .../> tags should survive into the output
-        assert '<ref id=' not in chunk_text, (
-            f"Raw <ref> tag found in tier-3 output: {chunk_text[:200]}"
-        )
+        assert "<ref id=" not in chunk_text, f"Raw <ref> tag found in tier-3 output: {chunk_text[:200]}"
 
 
 # ---------------------------------------------------------------------------
@@ -436,16 +433,12 @@ def test_split_by_elements_referenced_element_stays_with_root():
     The group-aware code bundles Fn1 with Para1.
     """
     fn1 = fn(1, "footnote text")
-    para1 = Paragraph(
-        html=f'<p>{"A" * 80}<ref id="{fn1.id}" rel="footnote"/></p>'
-    )
+    para1 = Paragraph(html=f'<p>{"A" * 80}<ref id="{fn1.id}" rel="footnote"/></p>')
     para2 = p("B" * 80)
     doc = Document(elements=[fn1, para1, para2])
     r = rdr()
     # Budget: fits one group (para1+fn1 rendered together) but not both groups
-    group1_tokens = CharTokenizer().count(
-        r.render(Document(elements=[para1, fn1]))
-    )
+    group1_tokens = CharTokenizer().count(r.render(Document(elements=[para1, fn1])))
     group2_tokens = measured(para2, r)
     max_t = group1_tokens + group2_tokens - 1
     result = split_by_elements(doc, r, tok(), max_tokens=max_t, overlap_tokens=_OVERLAP)
@@ -475,10 +468,7 @@ def test_split_by_elements_referenced_element_duplicated_across_chunks():
     assert len(result) >= 2
     # im must appear in every chunk that contains a paragraph referencing it
     for chunk in result:
-        has_para_with_ref = any(
-            isinstance(e, Paragraph) and im.id in e.html
-            for e in chunk.elements
-        )
+        has_para_with_ref = any(isinstance(e, Paragraph) and im.id in e.html for e in chunk.elements)
         if has_para_with_ref:
             assert im in chunk.elements, "referenced image missing from chunk that references it"
 
@@ -499,9 +489,9 @@ def test_split_by_elements_split_shifts_earlier_when_ref_inflates_group_size():
     The group itself fits alone (group1 < max_t), so para1 and fn1 remain
     as original element objects in the output (no further oversized-split).
     """
-    fn1 = fn(1, "X" * 60)   # medium footnote -- inflates group but group still fits alone
+    fn1 = fn(1, "X" * 60)  # medium footnote -- inflates group but group still fits alone
     para1 = Paragraph(html=f'<p>short text<ref id="{fn1.id}" rel="footnote"/></p>')
-    para2 = p("B" * 80)     # medium paragraph
+    para2 = p("B" * 80)  # medium paragraph
     doc = Document(elements=[fn1, para1, para2])
     r = rdr()
     t = tok()
@@ -513,17 +503,11 @@ def test_split_by_elements_split_shifts_earlier_when_ref_inflates_group_size():
     # Budget fits para1-alone + para2 but not para1-group + para2
     max_t = p1_alone_t + p2_t + 20
     assert p1_alone_t + p2_t < max_t, "test setup: para1-alone + para2 should fit"
-    assert group1_t + p2_t > max_t, (
-        "test setup: para1-group + para2 must exceed max_t to force the earlier split"
-    )
-    assert group1_t < max_t, (
-        "test setup: para1-group alone must fit so para1/fn1 survive unsplit as elements"
-    )
+    assert group1_t + p2_t > max_t, "test setup: para1-group + para2 must exceed max_t to force the earlier split"
+    assert group1_t < max_t, "test setup: para1-group alone must fit so para1/fn1 survive unsplit as elements"
 
     result = split_by_elements(doc, r, t, max_tokens=max_t, overlap_tokens=_OVERLAP)
-    assert len(result) >= 2, (
-        "Expected split: para1-group + para2 exceed budget, so para2 lands in its own chunk"
-    )
+    assert len(result) >= 2, "Expected split: para1-group + para2 exceed budget, so para2 lands in its own chunk"
     # para1 and fn1 must be in the same chunk
     for chunk in result:
         if para1 in chunk.elements:
@@ -617,6 +601,7 @@ def test_split_document_parent_ref_chain_set():
 def test_split_sentences_returns_none_when_no_sentence_boundary():
     """Single run-on 'sentence' -> returns None so caller falls back to tier 3."""
     from ragdoc.document import ExternalRef
+
     para = p("A" * 200)  # no sentence-ending punctuation
     parent_ref = ExternalRef(target_id="parent", rel_type="external-parent")
     result = split_at_sentences(
@@ -634,6 +619,7 @@ def test_split_sentences_returns_none_when_no_sentence_boundary():
 
 def test_split_sentences_splits_at_period_boundaries():
     from ragdoc.document import ExternalRef
+
     text = "First sentence. " * 20
     para = p(text)
     parent_ref = ExternalRef(target_id="parent", rel_type="external-parent")
@@ -656,6 +642,7 @@ def test_split_sentences_splits_at_period_boundaries():
 def test_split_sentences_pluggable_splitter():
     """Custom sentence splitter (split on newline) is respected."""
     from ragdoc.document import ExternalRef
+
     text = "line one\nline two\nline three\n" * 10
     para = p(text)
     parent_ref = ExternalRef(target_id="parent", rel_type="external-parent")
@@ -688,6 +675,7 @@ def test_split_sentences_pluggable_splitter():
 def test_split_html_tags_returns_none_for_plain_paragraph():
     from ragdoc.document import ExternalRef
     from ragdoc.splitting.groups import ElementGroup
+
     para = p("No HTML structure inside, just text " * 10)
     parent_ref = ExternalRef(target_id="parent", rel_type="external-parent")
     result = split_at_html_tags(
@@ -706,6 +694,7 @@ def test_split_html_tags_returns_none_for_plain_paragraph():
 def test_split_html_tags_splits_table_rows():
     from ragdoc.document import ExternalRef
     from ragdoc.splitting.groups import ElementGroup
+
     rows = "".join(f"<tr><td>{'X' * 40}</td><td>{'Y' * 40}</td></tr>" for _ in range(10))
     tbl = Table(html=f"<table>{rows}</table>")
     parent_ref = ExternalRef(target_id="parent", rel_type="external-parent")

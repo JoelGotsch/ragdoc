@@ -1,11 +1,11 @@
 """Unit tests for serialize_metadata_value (pure function)."""
+
 import json
 
 import pytest
 from pydantic import BaseModel
 
 from ragdoc.rendering.elements import serialize_metadata_value
-
 
 # --- Helper models ---
 
@@ -17,11 +17,13 @@ class _SampleModel(BaseModel):
 
 class _InnerModel(BaseModel):
     """Deeply nested: own dict field with plain scalar values."""
+
     additional_data: dict[str, str]
 
 
 class _OuterModel(BaseModel):
     """Top-level model: a dict *field* whose values are another BaseModel."""
+
     name: str
     metadata: dict[str, _InnerModel]
 

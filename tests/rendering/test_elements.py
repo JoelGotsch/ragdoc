@@ -1,11 +1,9 @@
 """Tests for element renderer functions (rendering/elements.py)."""
-import pytest
 
 from ragdoc.document import Document, Footnote, Image, Paragraph
 from ragdoc.rendering import OutputFormat, Renderer
 from ragdoc.rendering.base import RenderContext
 from ragdoc.rendering.elements import render_for_prompt, render_raw
-
 
 # --- TestElementRenderers ---
 

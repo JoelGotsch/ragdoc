@@ -30,9 +30,7 @@ from ragdoc.rendering.elements import render_for_prompt, render_raw
 FIXTURE_PATH = Path(__file__).parent / "data" / "inline_footnote_fixture.json"
 _FIXTURE_FOOTNOTE_TEXT = "Service Agreement, section 4."
 
-_requires_fixture = pytest.mark.skipif(
-    not FIXTURE_PATH.exists(), reason="rendering fixture not present"
-)
+_requires_fixture = pytest.mark.skipif(not FIXTURE_PATH.exists(), reason="rendering fixture not present")
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +84,9 @@ def prompt_gfm() -> Renderer:
 # --- TestNoFootnoteNumberInline ---
 
 
-def test_no_footnote_number_prompt_html_no_bare_number(prompt_html: Renderer, inline_doc: Document, inline_fn: Footnote):
+def test_no_footnote_number_prompt_html_no_bare_number(
+    prompt_html: Renderer, inline_doc: Document, inline_fn: Footnote
+):
     result = prompt_html.render(inline_doc)
 
     # [2] is only meaningful in the standalone footnote block, not inline
@@ -112,7 +112,7 @@ def test_no_footnote_number_fixture_prompt_no_bare_numbers(prompt_html: Renderer
 
     # Keep only lines that are NOT standalone footnote blocks; those may contain [N].
     lines = [l for l in result.splitlines() if 'id="footnote-' not in l]
-    bare_numbers = re.findall(r'\[\d+\]', "\n".join(lines))
+    bare_numbers = re.findall(r"\[\d+\]", "\n".join(lines))
     assert bare_numbers == [], f"Bare footnote numbers found inline: {bare_numbers}"
 
 

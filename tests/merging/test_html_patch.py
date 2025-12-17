@@ -1,9 +1,7 @@
 """Tests for Phase 5: DocumentHTMLPatch inspectable layer."""
-import pytest
 
-from ragdoc.document import Document, ElementTypeEnum, Paragraph
+from ragdoc.document import Document, Paragraph
 from ragdoc.merging.html_patch import DocumentHtmlPatch, HtmlMergeOperation, compute_html_patch
-
 
 # --- TestHtmlPatch ---
 

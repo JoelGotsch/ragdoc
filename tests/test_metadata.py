@@ -3,14 +3,12 @@
 Covers §3.1 (BaseMetadata) and §3.3 (metadata_json_schema) from
 PLAN_TYPED_METADATA_EXTENSIONS.md.
 """
+
 from __future__ import annotations
 
 from typing import Annotated, get_type_hints
 
-import pytest
-
 from ragdoc.metadata import BaseMetadata, metadata_json_schema
-
 
 # ---------------------------------------------------------------------------
 # Module-level TypedDict subclasses (Pydantic TypeAdapter cannot resolve
@@ -47,6 +45,7 @@ def test_basemetadata_total_is_false():
 
 def test_basemetadata_filename_is_required():
     from typing import get_origin
+
     from typing_extensions import Required, get_type_hints as ext_hints
 
     hints = ext_hints(BaseMetadata, include_extras=True)

@@ -8,17 +8,17 @@ Tests cover:
 - Empty chunk list → embed not called
 - Vector order preserved across chunks
 """
+
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ragdoc.chunking.chunk import Chunk
 from ragdoc.pipeline.embedders import Embedder, EmbedderConfig, embedding_content_text, prompt_content_text
 from ragdoc.pipeline.vectorstore import VectorStorePipeline
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -129,10 +129,12 @@ async def test_multiple_embedders_all_run() -> None:
     dense_embedder = make_embedder([dense_vec])
     sparse_embedder = make_embedder([sparse_vec])
 
-    vs = _make_pipeline_with_embedders({
-        "dense": EmbedderConfig(embedder=dense_embedder),
-        "sparse": EmbedderConfig(embedder=sparse_embedder, text_fn=prompt_content_text),
-    })
+    vs = _make_pipeline_with_embedders(
+        {
+            "dense": EmbedderConfig(embedder=dense_embedder),
+            "sparse": EmbedderConfig(embedder=sparse_embedder, text_fn=prompt_content_text),
+        }
+    )
     chunk = make_chunk(prompt_content="prompt", embedding_content="embed")
 
     await vs._embed_chunks([chunk])
@@ -165,10 +167,12 @@ async def test_embedders_run_concurrently() -> None:
     embedder_b = MagicMock()
     embedder_b.embed = slow_embed_b
 
-    vs = _make_pipeline_with_embedders({
-        "a": EmbedderConfig(embedder=embedder_a),
-        "b": EmbedderConfig(embedder=embedder_b),
-    })
+    vs = _make_pipeline_with_embedders(
+        {
+            "a": EmbedderConfig(embedder=embedder_a),
+            "b": EmbedderConfig(embedder=embedder_b),
+        }
+    )
     chunk = make_chunk()
     await vs._embed_chunks([chunk])
 

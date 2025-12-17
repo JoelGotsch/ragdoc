@@ -11,6 +11,7 @@ Trade-offs vs. Approach A:
 - Image IDs are regenerated (base64 data is preserved).
 - Page / bounding-box metadata is lost.
 """
+
 from __future__ import annotations
 
 import difflib
@@ -107,9 +108,7 @@ def _block_ratio(keys_a: list[str], keys_b: list[str]) -> float:
         return 1.0  # both sides are images only — treat as matched
     if not text_a or not text_b:
         return 0.0  # one side text, the other images — too different
-    return difflib.SequenceMatcher(
-        None, " ".join(text_a), " ".join(text_b)
-    ).ratio()
+    return difflib.SequenceMatcher(None, " ".join(text_a), " ".join(text_b)).ratio()
 
 
 def _is_insertion_allowed(
@@ -238,9 +237,7 @@ def merge_documents_html(
     for opcode, i1, i2, j1, j2 in matcher.get_opcodes():
         if opcode == "equal":
             for idx_a, idx_b in zip(range(i1, i2), range(j1, j2)):
-                merged_tags.append(
-                    _select_tag(tags_a[idx_a], tags_b[idx_b], prefer_source, hier_a, hier_b)
-                )
+                merged_tags.append(_select_tag(tags_a[idx_a], tags_b[idx_b], prefer_source, hier_a, hier_b))
 
         elif opcode == "replace":
             group_a = tags_a[i1:i2]

@@ -13,10 +13,12 @@ Typical usage::
     chunker = SimpleChunker()
     chunks = await chunker.chunk(doc)
 """
+
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from ragdoc.chunking.base import Chunker
 from ragdoc.chunking.chunk import Chunk
@@ -28,8 +30,9 @@ if TYPE_CHECKING:
     from ragdoc.rendering import Renderer
 
 
-def _default_prompt_renderer() -> "Renderer":
-    from ragdoc.rendering import Renderer, OutputFormat, render_for_prompt
+def _default_prompt_renderer() -> Renderer:
+    from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
+
     return Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
 
 
@@ -54,18 +57,18 @@ class SimpleChunker(Chunker):
 
     def __init__(
         self,
-        prompt_renderer: "Renderer | None" = None,
-        metadata_fn: Callable[["Document"], dict] | None = None,
-        id_fn: Callable[["Document"], str] | None = None,
+        prompt_renderer: Renderer | None = None,
+        metadata_fn: Callable[[Document], dict] | None = None,
+        id_fn: Callable[[Document], str] | None = None,
     ) -> None:
         self._prompt_renderer = prompt_renderer
-        self._metadata_fn: Callable[["Document"], dict] = metadata_fn or (lambda doc: doc.metadata)
-        self._id_fn: Callable[["Document"], str] = id_fn or (lambda doc: doc.content_hash())
+        self._metadata_fn: Callable[[Document], dict] = metadata_fn or (lambda doc: doc.metadata)
+        self._id_fn: Callable[[Document], str] = id_fn or (lambda doc: doc.content_hash())
 
-    def _get_prompt_renderer(self) -> "Renderer":
+    def _get_prompt_renderer(self) -> Renderer:
         return self._prompt_renderer if self._prompt_renderer is not None else _default_prompt_renderer()
 
-    async def chunk(self, document: "Document") -> list[Chunk]:
+    async def chunk(self, document: Document) -> list[Chunk]:
         prompt_content = self._get_prompt_renderer().render(document)
         chunk = Chunk(
             id=self._id_fn(document),

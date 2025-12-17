@@ -21,7 +21,7 @@ Public API:
     build_element_groups(...)         — partition elements into atomic groups for splitting
 """
 
-from ragdoc.splitting.base import split_by_headings, Splitter
+from ragdoc.splitting.base import Splitter, split_by_headings
 from ragdoc.splitting.groups import ElementGroup, build_element_groups
 from ragdoc.splitting.hierarchical import split_hierarchical
 from ragdoc.splitting.token import (
@@ -34,15 +34,15 @@ from ragdoc.splitting.token import (
 )
 
 __all__ = [
-    "split_by_headings",
-    "split_hierarchical",
-    "split_document",
-    "split_by_elements",
-    "split_oversized_element",
-    "split_at_html_tags",
-    "split_at_sentences",
-    "build_element_groups",
     "ElementGroup",
     "SentenceSplitter",
     "Splitter",
+    "build_element_groups",
+    "split_at_html_tags",
+    "split_at_sentences",
+    "split_by_elements",
+    "split_by_headings",
+    "split_document",
+    "split_hierarchical",
+    "split_oversized_element",
 ]

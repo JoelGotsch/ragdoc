@@ -24,14 +24,15 @@ Usage — dense + BM25 server-side sparse::
         sparse_vectors={"sparse": ServerSideVector(model="Qdrant/bm25", text_fn=prompt_content_text)},
     )
 """
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Annotated, Callable, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, get_args, get_origin
 
 try:
-    from qdrant_client import AsyncQdrantClient
-    from qdrant_client import models
+    from qdrant_client import AsyncQdrantClient, models
     from qdrant_client.http.exceptions import UnexpectedResponse
 except ImportError as _e:
     raise ImportError(
@@ -131,6 +132,7 @@ async def register_indexes_from_type(
                 except UnexpectedResponse as exc:
                     if exc.status_code != 409:
                         raise
+
 
 _SCROLL_BATCH = 1000
 _UPSERT_BATCH = 100
@@ -293,7 +295,7 @@ class QdrantVectorStore:
         sparse_vectors: dict[str, ServerSideVector] | None = None,
         dense_vector_name: str = "dense",
         metadata_type: type | None = None,
-    ) -> "QdrantVectorStore":
+    ) -> QdrantVectorStore:
         """Create the collection (if it does not exist) and return a store instance.
 
         A payload index on ``source_id`` is created so that
@@ -335,8 +337,7 @@ class QdrantVectorStore:
                     dense_vector_name: models.VectorParams(size=vector_size, distance=distance)
                 }
                 sparse_cfg: dict[str, models.SparseVectorParams] = {
-                    name: models.SparseVectorParams()
-                    for name in sparse_vectors
+                    name: models.SparseVectorParams() for name in sparse_vectors
                 }
                 await client.create_collection(
                     collection_name=collection_name,

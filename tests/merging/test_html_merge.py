@@ -1,9 +1,10 @@
 """Integration tests for Approach B: render-merge-reparse."""
+
 import base64
 
 import pytest
 
-from ragdoc.document import Document, ElementTypeEnum, Footnote, Heading, Image, Paragraph, Table
+from ragdoc.document import Document, ElementTypeEnum, Footnote, Heading, Image, Paragraph
 from ragdoc.merging.html_merge import merge_documents_html
 from ragdoc.merging.patch import validate_inline_refs
 
@@ -58,9 +59,7 @@ def test_html_merge_basic_empty_docs_return_empty_document():
 
 def test_html_merge_richness_richer_paragraph_from_b_wins():
     doc_a = Document(elements=[Paragraph(html_content="<p>plain body text</p>")])
-    doc_b = Document(
-        elements=[Paragraph(html_content="<p><em>italic</em> body text</p>")]
-    )
+    doc_b = Document(elements=[Paragraph(html_content="<p><em>italic</em> body text</p>")])
     result = merge_documents_html(doc_a, doc_b)
     assert len(result.paragraphs) >= 1
     para_html = result.paragraphs[0].html
@@ -68,9 +67,7 @@ def test_html_merge_richness_richer_paragraph_from_b_wins():
 
 
 def test_html_merge_richness_richer_paragraph_from_a_wins():
-    doc_a = Document(
-        elements=[Paragraph(html_content="<p><b>bold</b> text here</p>")]
-    )
+    doc_a = Document(elements=[Paragraph(html_content="<p><b>bold</b> text here</p>")])
     doc_b = Document(elements=[Paragraph(html_content="<p>plain text here</p>")])
     result = merge_documents_html(doc_a, doc_b)
     assert "<b>" in result.paragraphs[0].html
@@ -92,9 +89,7 @@ def test_html_merge_prefer_source_b_for_headings():
             Paragraph(html_content="<p>Content</p>"),
         ]
     )
-    result = merge_documents_html(
-        doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "b"}
-    )
+    result = merge_documents_html(doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "b"})
     assert len(result.headings) >= 1
     assert result.headings[0].level == 2  # from doc_b
 
@@ -112,9 +107,7 @@ def test_html_merge_prefer_source_a_for_headings():
             Paragraph(html_content="<p><em>Body</em></p>"),
         ]
     )
-    result = merge_documents_html(
-        doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "a"}
-    )
+    result = merge_documents_html(doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "a"})
     # Heading from doc_a (h1)
     assert result.headings[0].level == 1
     # Paragraph still gets <em> from doc_b (no prefer_source for paragraphs)
@@ -154,9 +147,7 @@ def test_html_merge_insertions_enabled_includes_extra_b_elements():
 def test_html_merge_footnote_structure_reconstructed_after_reparse():
     """Footnote structure is preserved: Footnote.html renders as <aside> which is parsed directly."""
     fn = Footnote(number=1, innerhtml="Important note text.")
-    para = Paragraph(
-        html_content=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>'
-    )
+    para = Paragraph(html_content=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>')
     doc_a = Document(elements=[Paragraph(html_content="<p>Body text.</p>")])
     doc_b = Document(elements=[para, fn], parser="html")
     result = merge_documents_html(doc_a, doc_b)
@@ -168,9 +159,7 @@ def test_html_merge_footnote_structure_reconstructed_after_reparse():
 def test_html_merge_footnote_inline_ref_intact_after_html_merge():
     """After merging, validate_inline_refs returns [] — inline refs are reconstructed."""
     fn = Footnote(number=1, innerhtml="Detailed footnote content.")
-    para = Paragraph(
-        html_content=f'<p>Sentence with note<ref id="{fn.id}" rel="footnote"/>.</p>'
-    )
+    para = Paragraph(html_content=f'<p>Sentence with note<ref id="{fn.id}" rel="footnote"/>.</p>')
     doc_a = Document(elements=[Paragraph(html_content="<p>Sentence with note.</p>")])
     doc_b = Document(elements=[para, fn], parser="html")
     result = merge_documents_html(doc_a, doc_b)
@@ -181,13 +170,9 @@ def test_html_merge_footnote_inline_ref_intact_after_html_merge():
 
 
 @_INSERT_PARAMS
-def test_html_merge_real_world_scenario(
-    real_world_docs, allow_insertions_from_b, extra_para_present, footnote_present
-):
-    doc_a, doc_b, fn, img, para1, para2, para_extra = real_world_docs
-    result = merge_documents_html(
-        doc_a, doc_b, allow_insertions_from_b=allow_insertions_from_b
-    )
+def test_html_merge_real_world_scenario(real_world_docs, allow_insertions_from_b, extra_para_present, footnote_present):
+    doc_a, doc_b, fn, _img, _para1, _para2, _para_extra = real_world_docs
+    result = merge_documents_html(doc_a, doc_b, allow_insertions_from_b=allow_insertions_from_b)
 
     assert result.parser == "merged"
 
