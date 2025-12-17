@@ -252,6 +252,11 @@ commands =
 
 [testenv:py{310,311,312}-lowest]
 uv_resolution = lowest-direct
+# Marks the lowest-resolution leg so output-snapshot tests (exact pandoc markdown,
+# tokenizer-dependent chunk counts) can skip — the floors legitimately produce
+# different exact output; this leg verifies they install and the suite runs.
+set_env =
+    RAGDOC_RESOLUTION = lowest
 
 [testenv:lint]
 skip_install = true

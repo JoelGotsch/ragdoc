@@ -11,6 +11,7 @@ Verifies against the ground-truth structure in tests/data/test_cases.json.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -449,6 +450,10 @@ async def test_document_pipeline_with_nested_multi_source_parser():
 
 @pytest.mark.skipif(not _ALL_DATA_EXISTS, reason="Test data files missing")
 @pytest.mark.skipif(not _TEST_CASES_EXIST, reason="test_cases.json missing")
+@pytest.mark.skipif(
+    os.getenv("RAGDOC_RESOLUTION") == "lowest",
+    reason="EXPECTED_CHUNK_COUNT snapshot depends on tiktoken/transformers tokenization at the dep floor",
+)
 @pytest.mark.anyio
 async def test_vector_store_pipeline_with_llm_chunker(tmp_path: Path):
     """VectorStorePipeline: nested MSP → processing → TokenSplitter(7000) → LLMChunker.
