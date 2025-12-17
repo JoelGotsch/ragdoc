@@ -458,7 +458,7 @@ class Renderer:
                 head_parts.append(f"<title>{h1.get_text()}</title>")
             dl = header.find("dl")
             if dl:
-                for dt, dd in zip(dl.find_all("dt"), dl.find_all("dd")):
+                for dt, dd in zip(dl.find_all("dt"), dl.find_all("dd"), strict=False):
                     head_parts.append(f'<meta name="{dt.get_text()}" content="{dd.get_text()}"/>')
             header.extract()
             full_html = f"<html><head>{''.join(head_parts)}</head><body>{soup}</body></html>"

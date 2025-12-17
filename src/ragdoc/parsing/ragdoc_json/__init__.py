@@ -70,9 +70,9 @@ async def parse_ragdoc_json(path: Path, provenance_mode: ProvenanceMode) -> Docu
         async with aiofiles.open(path, encoding="utf-8") as f:
             content = await f.read()
         logger.debug(f"parse_ragdoc_json: read {path} via aiofiles")
-    except Exception:
-        logger.debug(f"parse_ragdoc_json: aiofiles unavailable or failed, falling back to sync read for {path}")
-        content = path.read_text(encoding="utf-8")
+    except OSError:
+        logger.debug(f"parse_ragdoc_json: async read failed, falling back to sync read for {path}")
+        content = path.read_text(encoding="utf-8")  # noqa: ASYNC240 -- rare fallback path; async I/O sweep is Phase 8 (D9)
 
     document = Document.model_validate_json(content)
 

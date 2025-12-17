@@ -51,7 +51,7 @@ def load_test_cases() -> dict:
             extractor.use(CoreExtractionMiddleware())
             document = asyncio.run(extractor.parse(mineru_doc))
             data[test_case_name]["parsed_doc"] = document
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- fixture loader; parse failures surface in test_mineru_base.py
             # should be handled/ detected by test_mineru_base.py
             print(f"Error loading {middle_json}: {e}")
     return data

@@ -139,7 +139,7 @@ class QdrantMentionStore:
         vectors = await self._embedder([m.payload for m in mentions])
         points = [
             models.PointStruct(id=_point_id(m.mention_id), vector=vec, payload=m.model_dump(mode="json"))
-            for m, vec in zip(mentions, vectors)
+            for m, vec in zip(mentions, vectors, strict=True)
         ]
         for i in range(0, len(points), _UPSERT_BATCH):
             await self._client.upsert(collection_name=self._collection_name, points=points[i : i + _UPSERT_BATCH])

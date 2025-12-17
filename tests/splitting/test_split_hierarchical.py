@@ -1,6 +1,5 @@
 """Tests for split_hierarchical."""
 
-
 from ragdoc.document import Document, Footnote, Heading, Paragraph
 from ragdoc.splitting.hierarchical import split_hierarchical
 

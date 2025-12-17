@@ -73,9 +73,11 @@ def _(mo):
 @app.cell
 def _():
     from pathlib import Path
+
     from dotenv import load_dotenv
     from httpx import AsyncClient
     from openai import AsyncOpenAI
+
     from ragdoc.processing import LLMHeadingResolver, LLMHeadingResolverSettings
 
     load_dotenv()
@@ -138,14 +140,14 @@ def _(mo):
 
 @app.cell
 def _(LLMHeadingResolver, Path, llm_model, openai_client):
-    from ragdoc.parsing.mineru import MinerUParser
-    from ragdoc.processing import (
-        TitleDetectionProcessor,
-        FootnoteProcessor,
-        DocumentDumpProcessor,
-    )
     from ragdoc.chunking import LLMChunker
+    from ragdoc.parsing.mineru import MinerUParser
     from ragdoc.pipeline import DocumentPipeline, TokenSplitter
+    from ragdoc.processing import (
+        DocumentDumpProcessor,
+        FootnoteProcessor,
+        TitleDetectionProcessor,
+    )
 
     DOCUMENTS_DIR = Path("data/raw")
     DUMP_DIR = Path("data/documents_dump")
@@ -167,9 +169,9 @@ def _(LLMHeadingResolver, Path, llm_model, openai_client):
         on_error="skip",
     )
     print("DocumentPipeline ready")
-    print(f"  Parser:    MinerUParser")
-    print(f"  Splitter:  TokenSplitter(max_tokens=7000, overlap_tokens=200)")
-    print(f"  Chunker:   LLMChunker (generates per-topic embedding_content)")
+    print("  Parser:    MinerUParser")
+    print("  Splitter:  TokenSplitter(max_tokens=7000, overlap_tokens=200)")
+    print("  Chunker:   LLMChunker (generates per-topic embedding_content)")
     print(f"  Dump dir:  {DUMP_DIR}")
     return (
         DOCUMENTS_DIR,
@@ -237,7 +239,9 @@ def _(mo):
 @app.cell
 async def _():
     import os
+
     from qdrant_client import AsyncQdrantClient
+
     from ragdoc.integrations.vector_stores import QdrantVectorStore, ServerSideVector
     from ragdoc.pipeline import prompt_content_text
 
@@ -315,11 +319,11 @@ def _(mo):
 
 @app.cell
 def _(doc_pipeline):
+    # prompt_content_text is already imported in the QdrantVectorStore cell above
     from ragdoc.pipeline import (
-        VectorStorePipeline,
         EmbedderConfig,
+        VectorStorePipeline,
         embedding_content_text,
-        prompt_content_text,
     )
 
     # class MyDenseEmbedder:
@@ -354,7 +358,6 @@ def _(doc_pipeline):
         EmbedderConfig,
         VectorStorePipeline,
         embedding_content_text,
-        prompt_content_text,
     )
 
 

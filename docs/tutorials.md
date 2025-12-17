@@ -34,6 +34,6 @@ marimo edit docs/notebooks/<notebook>.py
 
 | Notebook | Description |
 |---|---|
-| [Qdrant Sync Pipeline](../notebooks/qdrant_sync/) | Production incremental sync: MinerU + LLMChunker + QdrantVectorStore |
+| [Qdrant Sync Pipeline](../notebooks/qdrant_pipeline/) | Production incremental sync: MinerU + LLMChunker + QdrantVectorStore |
 | [Custom Elements](../notebooks/custom_elements/) | Define custom element types, parsers, and renderers |
 | [MinerU Example](../notebooks/mineru_example/) | Minimal MinerU parser usage |

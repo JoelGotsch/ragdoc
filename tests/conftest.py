@@ -5,9 +5,17 @@ from pathlib import Path
 
 import pytest
 
-logger = logging.getLogger("ragdoc")
-logger.setLevel(logging.DEBUG)
-logger.addHandler(logging.FileHandler("test.log"))
+
+@pytest.fixture(scope="session", autouse=True)
+def _ragdoc_file_log(tmp_path_factory: pytest.TempPathFactory):
+    """Session-scoped DEBUG file log in a temp dir (never in the repo/CWD)."""
+    logger = logging.getLogger("ragdoc")
+    logger.setLevel(logging.DEBUG)
+    handler = logging.FileHandler(tmp_path_factory.mktemp("logs") / "test.log")
+    logger.addHandler(handler)
+    yield
+    logger.removeHandler(handler)
+    handler.close()
 
 
 @pytest.fixture(scope="session")

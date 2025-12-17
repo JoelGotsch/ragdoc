@@ -162,7 +162,7 @@ def _(mo):
 
 @app.cell
 def _(doc_a, doc_b):
-    from ragdoc.merging import compute_patch, PatchOperationType
+    from ragdoc.merging import PatchOperationType, compute_patch
 
     patch_a = compute_patch(doc_a, doc_b)
 

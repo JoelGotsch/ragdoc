@@ -47,6 +47,7 @@ def _(mo):
 @app.cell
 async def _():
     from pathlib import Path
+
     from ragdoc.pipeline import DocumentPipeline
 
     pipeline = DocumentPipeline()

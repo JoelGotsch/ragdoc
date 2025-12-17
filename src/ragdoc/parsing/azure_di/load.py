@@ -24,7 +24,7 @@ class FigureExtractor:
 
     def _rectangular_hull(self, polygon: list[tuple[float, float]], dpi: int = 72) -> tuple[float, float, float, float]:
         polygon = [(x * dpi, y * dpi) for x, y in polygon]
-        x_values, y_values = zip(*polygon)
+        x_values, y_values = zip(*polygon, strict=True)
         return min(y_values), max(y_values), min(x_values), max(x_values)
 
     def extract_document_image(self, page: int, polygon: list[tuple[float, float]]) -> tuple[tuple[int, int], bytes]:
@@ -45,7 +45,11 @@ def _get_figure_information(figure: dict) -> tuple[int | None, list[tuple[float,
 
     bounding_region = figure["boundingRegions"][0]
     page = bounding_region.get("pageNumber")
-    polygon = list(zip(islice(bounding_region["polygon"], 0, None, 2), islice(bounding_region["polygon"], 1, None, 2)))
+    polygon = list(
+        zip(
+            islice(bounding_region["polygon"], 0, None, 2), islice(bounding_region["polygon"], 1, None, 2), strict=False
+        )
+    )
     return page, polygon
 
 
@@ -65,17 +69,19 @@ def replace_figure_tags(soup: BeautifulSoup, azure_bundle) -> BeautifulSoup:
 
     try:
         extractor = FigureExtractor(azure_bundle.source_path)
-    except Exception:
+    except Exception:  # noqa: BLE001 -- any extractor-init failure degrades to figure-less parse
+        logger.warning("FigureExtractor could not open %s; document will have no figures", azure_bundle.source_path)
         return soup
 
-    for azure_figure, html_figure in zip(figures, html_figures):
+    for azure_figure, html_figure in zip(figures, html_figures, strict=True):
         page, polygon = _get_figure_information(azure_figure)
         if page is None or len(polygon) == 0:
             continue
 
         try:
             (width, height), b64_image = extractor.extract_document_image(page, polygon)
-        except Exception:
+        except Exception:  # noqa: BLE001 -- per-figure extraction failure skips just that figure
+            logger.warning("Could not extract figure image on page %s; figure skipped", page)
             continue
 
         img_tag = soup.new_tag(

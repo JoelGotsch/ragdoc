@@ -35,11 +35,17 @@ def _(mo):
 
 @app.cell
 async def _():
+    from pathlib import Path
+
     from ragdoc.parsing import load
 
-    document = await load("report.docx")
-    print(f"parser={document.parser!r}  elements={len(document.elements)}")
-    return (document, load)
+    document = None
+    if Path("report.docx").exists():  # noqa: ASYNC240 — placeholder-file guard in a doc example
+        document = await load("report.docx")
+        print(f"parser={document.parser!r}  elements={len(document.elements)}")
+    else:
+        print("report.docx not found — replace the path with a real file to run this cell")
+    return (Path, document, load)
 
 
 @app.cell(hide_code=True)
@@ -56,10 +62,14 @@ def _(mo):
 
 
 @app.cell
-async def _(load):
-    doc_docx = await load("report.docx")
-    # doc_docx.parser == "pandoc"
-    print(f"parser={doc_docx.parser!r}")
+async def _(Path, load):
+    doc_docx = None
+    if Path("report.docx").exists():
+        doc_docx = await load("report.docx")
+        # doc_docx.parser == "pandoc"
+        print(f"parser={doc_docx.parser!r}")
+    else:
+        print("report.docx not found — replace the path with a real .docx file to run this cell")
     return (doc_docx,)
 
 
@@ -75,10 +85,14 @@ def _(mo):
 
 
 @app.cell
-async def _(load):
-    doc_html = await load("page.html")
-    # doc_html.parser == "html"
-    print(f"parser={doc_html.parser!r}")
+async def _(Path, load):
+    doc_html = None
+    if Path("page.html").exists():
+        doc_html = await load("page.html")
+        # doc_html.parser == "html"
+        print(f"parser={doc_html.parser!r}")
+    else:
+        print("page.html not found — replace the path with a real .html file to run this cell")
     return (doc_html,)
 
 
@@ -94,10 +108,14 @@ def _(mo):
 
 
 @app.cell
-async def _(load):
-    doc_xlsx = await load("data.xlsx")
-    # doc_xlsx.parser == "xlsx"
-    print(f"parser={doc_xlsx.parser!r}")
+async def _(Path, load):
+    doc_xlsx = None
+    if Path("data.xlsx").exists():
+        doc_xlsx = await load("data.xlsx")
+        # doc_xlsx.parser == "xlsx"
+        print(f"parser={doc_xlsx.parser!r}")
+    else:
+        print("data.xlsx not found — replace the path with a real .xlsx file to run this cell")
     return (doc_xlsx,)
 
 
@@ -113,10 +131,14 @@ def _(mo):
 
 
 @app.cell
-async def _(load):
-    doc_azure = await load("result.azure.json")
-    # doc_azure.parser == "azure_di"
-    print(f"parser={doc_azure.parser!r}")
+async def _(Path, load):
+    doc_azure = None
+    if Path("result.azure.json").exists():
+        doc_azure = await load("result.azure.json")
+        # doc_azure.parser == "azure_di"
+        print(f"parser={doc_azure.parser!r}")
+    else:
+        print("result.azure.json not found — replace the path with a real Azure DI output file to run this cell")
     return (doc_azure,)
 
 

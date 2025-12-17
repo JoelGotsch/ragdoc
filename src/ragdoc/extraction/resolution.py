@@ -191,7 +191,7 @@ class EntityResolutionPipeline(Generic[PayloadT]):
         pending: list[tuple[str, ...]] = []
 
         iterations = 0
-        for iterations in range(1, self.settings.max_iterations + 1):
+        for iterations in range(1, self.settings.max_iterations + 1):  # noqa: B007 -- read after the loop (ResolutionResult.iterations)
             edges, round_pending = await self._propose_and_review(clusters)
             pending.extend(round_pending)
             if not edges:

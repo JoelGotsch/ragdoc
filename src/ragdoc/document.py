@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from enum import Enum
@@ -17,6 +18,8 @@ from ragdoc.metadata import MetadataDict, TMetadata, validate_metadata_dict
 
 if TYPE_CHECKING:
     from ragdoc.rendering import Renderer
+
+logger = logging.getLogger(__name__)
 
 
 class InlineRef(BaseModel):
@@ -144,8 +147,8 @@ class BaseElement(BaseModel):
             if ref_id and rel_type:
                 try:
                     refs.append(InlineRef(target_id=str(ref_id), rel_type=str(rel_type)))  # type: ignore[arg-type]  # rel_type validated by pydantic
-                except Exception:
-                    pass  # skip unknown rel_type values
+                except Exception:  # noqa: BLE001 -- unknown rel_type must not break parsing; narrowed in Phase 6
+                    logger.debug(f"Skipping inline ref with unknown rel_type {rel_type!r} (id={ref_id!r})")
         return refs
 
     @property

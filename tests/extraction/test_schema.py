@@ -7,7 +7,7 @@ from typing import Literal
 from unittest.mock import patch
 
 import pytest
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from ragdoc.extraction.schema import (
     EdgeRef,
@@ -196,7 +196,7 @@ def test_build_node_union_multi_returns_discriminated_union():
 def test_build_node_union_rejects_bad_kind():
     union = build_node_union((Person, Company))
     adapter = TypeAdapter(union)
-    with pytest.raises(Exception):  # Pydantic ValidationError
+    with pytest.raises(ValidationError):
         adapter.validate_python({"kind": "UnknownKind", "full_name": "Alice"})
 
 

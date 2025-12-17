@@ -216,9 +216,9 @@ def _reconstruct_footnote_refs(document: Document) -> None:
     if not id_to_fn:
         return
     for element in document.elements:
-        if not hasattr(element, "html_content"):
+        if not isinstance(element, (Heading, Paragraph, Table, DocumentList)):
             continue
-        soup = BeautifulSoup(getattr(element, "html_content"), "html.parser")
+        soup = BeautifulSoup(element.html_content, "html.parser")
         changed = False
         for a in soup.find_all("a", href=True):
             href = str(a.get("href", ""))
@@ -229,7 +229,7 @@ def _reconstruct_footnote_refs(document: Document) -> None:
                     a.replace_with(BeautifulSoup(fn.placeholder_html, "html.parser"))
                     changed = True
         if changed:
-            setattr(element, "html_content", str(soup))
+            element.html_content = str(soup)
 
 
 def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | None = None) -> Document:

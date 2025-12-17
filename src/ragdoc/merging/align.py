@@ -260,7 +260,7 @@ def align_elements(  # noqa: C901  (inherently branchy alignment/merge algorithm
 
     for opcode, i1, i2, j1, j2 in matcher.get_opcodes():
         if opcode == "equal":
-            for idx_a, idx_b in zip(range(i1, i2), range(j1, j2)):
+            for idx_a, idx_b in zip(range(i1, i2), range(j1, j2), strict=True):
                 anchor_a, trailing_a = groups_a[idx_a]
                 anchor_b, trailing_b = groups_b[idx_b]
                 etype = ElementTypeEnum(anchor_a.element_type)
@@ -313,7 +313,7 @@ def align_elements(  # noqa: C901  (inherently branchy alignment/merge algorithm
             if ratio >= similarity_threshold or (len_a == len_b == 1):
                 if len_a == len_b:
                     # Equal-length groups: 1:1 element-wise merge
-                    for idx_a, idx_b in zip(range(i1, i2), range(j1, j2)):
+                    for idx_a, idx_b in zip(range(i1, i2), range(j1, j2), strict=True):
                         anchor_a, trailing_a = groups_a[idx_a]
                         anchor_b, trailing_b = groups_b[idx_b]
                         ea = [anchor_a, *trailing_a]

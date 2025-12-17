@@ -738,7 +738,7 @@ Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate
 
             return None
 
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- any LLM failure degrades to unresolved, never a wrong answer
             logger.warning(
                 f"LLMFootnoteResolver: LLM call failed for footnote {footnote_number} ({exc!r}); "
                 "leaving footnote unresolved."
@@ -924,7 +924,7 @@ class FootnoteProcessor(DocumentProcessor):
             coros: list[Awaitable[None]] = [_resolve_one(i, f) for i, f in enumerate(sorted_footnotes)]
             await _fan_out(coros, self._concurrency)
 
-            for footnote, best in zip(sorted_footnotes, results):
+            for footnote, best in zip(sorted_footnotes, results, strict=True):
                 if best is None:
                     continue
                 resolved_count += 1

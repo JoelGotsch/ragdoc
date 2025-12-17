@@ -33,41 +33,30 @@ def _(mo):
     mo.md(r"""
     ## Minimal example
 
-    The simplest pipeline: infer source type from file extension, parse, split at heading
-    boundaries, and render each section into a `Chunk`.
+    `DocumentPipeline` wires together parse → process → split → chunk in one call:
+    the parser is inferred from the file extension, `TokenSplitter` splits at heading
+    boundaries within a token budget, and the default `SimpleChunker` renders each
+    split into a `Chunk` (with `embedding_content = prompt_content`).
     """)
     return
 
 
 @app.cell
 async def _(FILE_PATH):
-    from ragdoc.parsing import load
-    from ragdoc.rendering import Renderer, render_for_prompt, OutputFormat
-    from ragdoc.splitting import split_by_headings
-    from ragdoc.chunking import Chunk
+    from pathlib import Path
 
-    # 1. Parse — infers parser from file extension
-    document = await load(FILE_PATH)
+    from ragdoc.pipeline import DocumentPipeline, TokenSplitter
 
-    # 2. Split into sections at heading boundaries
-    sections = split_by_headings(document)
+    pipeline = DocumentPipeline(splitter=TokenSplitter(max_tokens=4000))
 
-    # 3. Render and chunk
-    renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
-
-    chunks = [
-        Chunk(
-            prompt_content=renderer.render(doc),
-            embedding_content=renderer.render(doc),
-            metadata=doc.metadata,
-        )
-        for doc in sections
-    ]
-
-    print(f"Produced {len(chunks)} chunks")
-    print(chunks[0].prompt_content[:500])
-    return (Chunk, OutputFormat, Renderer, chunks, document, render_for_prompt,
-            sections, split_by_headings)
+    chunks = []
+    if Path(FILE_PATH).exists():  # noqa: ASYNC240 — placeholder-file guard in a doc example
+        chunks = await pipeline.run(Path(FILE_PATH))
+        print(f"Produced {len(chunks)} chunks")
+        print(chunks[0].prompt_content[:500])
+    else:
+        print(f"{FILE_PATH!r} not found — set FILE_PATH to a real document to run this cell")
+    return (DocumentPipeline, Path, TokenSplitter, chunks, pipeline)
 
 
 @app.cell(hide_code=True)
@@ -83,43 +72,33 @@ def _(mo):
 
 
 @app.cell
-async def _(FILE_PATH):
-    # Private imports (_-prefix) to avoid name clashes with the minimal example cell above
-    from ragdoc.parsing import load as _load
-    from ragdoc.rendering import Renderer as _Renderer, render_for_prompt as _rfp, OutputFormat as _OutputFormat
+async def _(DocumentPipeline, FILE_PATH, Path, TokenSplitter):
+    import os
+
+    from openai import AsyncOpenAI
+
     from ragdoc.processing import (
-        ProcessingPipeline as _ProcessingPipeline,
-        HeadingLevelProcessor as _HeadingLevelProcessor,
-        TitleDetectionProcessor as _TitleDetectionProcessor,
-        ImageSummaryProcessor as _ImageSummaryProcessor,
+        HeadingLevelProcessor,
+        ImageSummaryProcessor,
+        TitleDetectionProcessor,
+        openai_image_summarizer,
     )
-    from ragdoc.splitting import split_by_headings as _split_by_headings
-    from ragdoc.chunking import Chunk as _Chunk
-    from openai import AsyncOpenAI as _AsyncOpenAI
 
-    async def build_chunks(file_path: str) -> list:
-        client = _AsyncOpenAI()
-        document = await _load(file_path)
-        pipeline = _ProcessingPipeline([
-            _HeadingLevelProcessor(),
-            _TitleDetectionProcessor(),
-            _ImageSummaryProcessor(client=client),
-        ])
-        document = await pipeline.process(document)
-        sections = _split_by_headings(document)
-        renderer = _Renderer(format=_OutputFormat.MARKDOWN, element_renderer=_rfp)
-        # SimpleChunker sets embedding_content = prompt_content
-        return [
-            _Chunk(
-                prompt_content=renderer.render(doc),
-                embedding_content=renderer.render(doc),
-                metadata=doc.metadata,
-            )
-            for doc in sections
-        ]
-
-    enriched_chunks = await build_chunks(FILE_PATH)
-    print(f"Produced {len(enriched_chunks)} enriched chunks")
+    enriched_chunks = []
+    if Path(FILE_PATH).exists() and os.environ.get("OPENAI_API_KEY"):
+        client = AsyncOpenAI()  # reads OPENAI_API_KEY from the environment
+        enriched_pipeline = DocumentPipeline(
+            processors=[
+                HeadingLevelProcessor(),
+                TitleDetectionProcessor(),
+                ImageSummaryProcessor(summarize=openai_image_summarizer(client, model="gpt-4o")),
+            ],
+            splitter=TokenSplitter(max_tokens=4000),
+        )
+        enriched_chunks = await enriched_pipeline.run(Path(FILE_PATH))
+        print(f"Produced {len(enriched_chunks)} enriched chunks")
+    else:
+        print("Set FILE_PATH to a real document and OPENAI_API_KEY in the environment to run this cell")
     return (enriched_chunks,)
 
 

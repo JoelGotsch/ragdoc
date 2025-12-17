@@ -38,7 +38,7 @@ async def _process_file(path: Path, extractor: MinerUExtractor) -> MiddleJsonFil
             footnote_count=len(document.footnotes),
             title=document.title or (document.main_heading.text if document.main_heading else None),
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- eval script collects per-file errors into results
         return MiddleJsonFileResult(
             path=path,
             page_count=0,
