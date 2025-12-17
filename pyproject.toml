@@ -53,12 +53,15 @@ authors = [
     { name = "Joel GOTSCH", email = "contact@joelgotsch.com" },
 ]
 dependencies = [
-    "tiktoken>=0.4.0,<1.0.0",
+    # Floors are the true minimums: each has wheels on all supported Pythons
+    # (3.10–3.12) and provides the APIs the code uses. The CI `-lowest` leg runs
+    # on 3.10 to enforce this lower bound.
+    "tiktoken>=0.7.0,<1.0.0",  # 0.7 is the first with py3.12 wheels (Rust ext)
     "funcy>=2.0,<3",
-    "pandas>=2.0.3,<3",
-    "pandas-stubs>=2.0.3.230814,<3",
-    "numpy>=1.26.4,<3",
-    "transformers>=4.31.0,<6",
+    "pandas>=2.2.0,<3",  # py3.12 wheels land in pandas 2.1.1+
+    "pandas-stubs>=2.2.0.240218,<3",
+    "numpy>=1.26.4,<3",  # 1.26 has py3.12 wheels
+    "transformers>=4.40.0,<6",  # pulls tokenizers>=0.19 (py3.12 wheels)
     "openpyxl>=3.1.2,<4",
     "tabulate>=0.9.0,<1",
     "pypandoc-binary>=1.14,<2",
@@ -89,7 +92,7 @@ pdf-mineru = [
     "pydantic-settings>=2.13.0",
     "latex2mathml>=3.79.0",
 ]
-qdrant = ["qdrant-client>=1.9,<2"]
+qdrant = ["qdrant-client>=1.12,<2"]  # 1.12+ has models.Document server-side inference
     
 
 [dependency-groups]
@@ -231,7 +234,7 @@ env_list =
     lint
     type
     py{310,311,312}-highest
-    py{310,311,312}-lowest
+    py310-lowest
 
 [testenv]
 runner = uv-venv-runner

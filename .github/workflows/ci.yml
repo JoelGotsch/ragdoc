@@ -53,8 +53,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # highest resolution on every supported Python; lowest only on the
+        # minimum Python (3.10) — the floors are pinned to versions with 3.10
+        # wheels, and lowest-on-newest-Python would pull pre-wheel releases.
         python-version: ["3.10", "3.11", "3.12"]
-        resolution: ["highest", "lowest"]
+        resolution: ["highest"]
+        include:
+          - python-version: "3.10"
+            resolution: "lowest"
 
     steps:
       - uses: actions/checkout@v4
