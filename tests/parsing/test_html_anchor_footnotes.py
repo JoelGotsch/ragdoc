@@ -89,6 +89,7 @@ Proof that pandoc handles this correctly — see
 
 from __future__ import annotations
 
+import os
 import re
 
 import pytest
@@ -277,6 +278,10 @@ def test_unreferenced_footnote_standalone_rendering_per_renderer() -> None:
 # =============================================================================
 
 
+@pytest.mark.skipif(
+    os.getenv("RAGDOC_RESOLUTION") == "lowest",
+    reason="exact pandoc footnote markdown ([^1]/[^1]:) varies by the bundled pandoc version",
+)
 def test_pandoc_html_footnote_convention() -> None:
     """Pandoc converts its own HTML footnote markup to ``[^N]:`` markdown.
 
