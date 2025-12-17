@@ -7,6 +7,8 @@ the full DocumentPipeline.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from ragdoc.chunking import SimpleChunker
@@ -108,6 +110,67 @@ async def test_simple_chunker_custom_id_fn_overrides_default():
     doc = make_document()
     chunker = SimpleChunker(id_fn=lambda _: "fixed-id")
     assert (await chunker.chunk(doc))[0].id == "fixed-id"
+
+
+# --- TestChunkerProvenanceFallbacks (Phase 1: Option A) ---
+# source_id/source_hash are required on Chunk; chunkers must always supply them.
+
+
+@pytest.mark.anyio
+async def test_simple_chunker_forwards_document_provenance():
+    doc = make_document(title="A", body="B")
+    doc.source_id = "real-id"
+    doc.source_hash = "real-hash"
+    chunk = (await SimpleChunker().chunk(doc))[0]
+    assert chunk.source_id == "real-id"
+    assert chunk.source_hash == "real-hash"
+    assert chunk.content_hash == doc.content_hash()
+
+
+@pytest.mark.anyio
+async def test_simple_chunker_falls_back_to_source_path_then_content_hash():
+    """Bare document (no source_id/source_hash) still produces a valid Chunk."""
+    doc = make_document(title="A", body="B")
+    doc.source_path = "folder/report.pdf"
+    chunk = (await SimpleChunker().chunk(doc))[0]
+    assert chunk.source_id == "folder/report.pdf"  # source_path fallback
+    assert chunk.source_hash == doc.content_hash()  # content_hash fallback
+    assert chunk.content_hash == doc.content_hash()
+
+
+@pytest.mark.anyio
+async def test_simple_chunker_falls_back_to_doc_id_when_no_source_path():
+    doc = make_document(title="A", body="B")  # source_path defaults to ""
+    chunk = (await SimpleChunker().chunk(doc))[0]
+    assert chunk.source_id == doc.id  # last-resort fallback, never None
+
+
+# --- TestChunkDocument (Phase 3: DocumentPipeline.chunk_document + source_id_fn) ---
+
+
+@pytest.mark.anyio
+async def test_chunk_document_stamps_uniform_provenance():
+    from ragdoc.pipeline import DocumentPipeline
+
+    doc = make_document(title="A", body="B")
+    doc.source_id = "sync-id"
+    doc.source_hash = "file-hash"
+    chunks = await DocumentPipeline().chunk_document(doc)
+    assert chunks
+    for chunk in chunks:
+        assert chunk.source_id == "sync-id"
+        assert chunk.source_hash == "file-hash"
+        assert chunk.content_hash == doc.content_hash()
+
+
+@pytest.mark.anyio
+async def test_process_one_sets_source_id_from_source_id_fn(simple_parser):
+    from ragdoc.pipeline import DocumentPipeline
+
+    pipeline = DocumentPipeline(parser=simple_parser, source_id_fn=lambda p: f"custom::{p.name}")
+    chunks = await pipeline.run(Path("report.html"))
+    assert chunks
+    assert all(c.source_id == "custom::report.html" for c in chunks)
 
 
 # --- TestTokenSplitter ---
