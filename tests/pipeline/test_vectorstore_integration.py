@@ -28,7 +28,7 @@ async def test_skip_persists_across_pipeline_instances(tmp_path: Path):
         vector_store=vstore,
     )
     r1 = await p1.run([doc_path])
-    assert r1.processed == [doc_path]
+    assert r1.processed == [doc_path.name]
 
     # New pipeline instance, same vector store
     p2 = VectorStorePipeline(
@@ -36,7 +36,7 @@ async def test_skip_persists_across_pipeline_instances(tmp_path: Path):
         vector_store=vstore,
     )
     r2 = await p2.run([doc_path])
-    assert r2.skipped == [doc_path]
+    assert r2.skipped == [doc_path.name]
     assert r2.processed == []
 
 
@@ -59,12 +59,12 @@ async def test_delete_works_across_pipeline_instances(tmp_path: Path):
     )
     await p1.run([a_path, b_path])
 
-    # New pipeline instance removes b by running only a
+    # New pipeline instance removes b by running only a — orphan deletion is opt-in.
     p2 = VectorStorePipeline(
         pipeline=DocumentPipeline(parser=_parse),
         vector_store=vstore,
     )
-    r2 = await p2.run([a_path])
+    r2 = await p2.run([a_path], delete_orphans=True)
     assert b_path.name in r2.deleted
 
     # b's chunks should be gone from the store

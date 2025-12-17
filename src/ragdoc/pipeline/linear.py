@@ -123,6 +123,16 @@ class DocumentPipeline(Generic[TMetadata]):
         else:
             self._processing_pipeline = PP(processors)
 
+    @property
+    def source_id_fn(self) -> Callable[[Path], str]:
+        """The Path -> source_id function this pipeline stamps onto documents.
+
+        Read by sync pipelines (``VectorStorePipeline`` / ``DocumentStorePipeline``) so the
+        pre-parse collision/orphan checks use the same identity function — single source of
+        truth, no drift.
+        """
+        return self._source_id_fn
+
     async def run(self, source: Path) -> list[Chunk[TMetadata]]:
         """Parse, process, split, and chunk a single file.
 
@@ -220,6 +230,14 @@ class DocumentPipeline(Generic[TMetadata]):
             batch = await coro
             logger.debug(f"Stream batch yielded: {len(batch)} chunks")
             yield batch
+
+    async def parse_and_process(self, source: Path) -> Document | None:
+        """Parse + process a file into a Document, **without** splitting or chunking.
+
+        Boundary-1 entry point for :class:`~ragdoc.pipeline.DocumentStorePipeline`, which
+        stores Documents (not chunks).  Returns ``None`` if a processor drops the document.
+        """
+        return await self._processing_pipeline.process(await self._parser(source))
 
     async def _process_one(self, source: Path) -> list[Chunk[TMetadata]]:
         logger.debug(f"Parsing {source.name}")

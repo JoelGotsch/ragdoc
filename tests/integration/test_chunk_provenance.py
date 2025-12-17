@@ -57,6 +57,15 @@ class _MemoryVectorStore:
     async def list_source_ids(self) -> set[str]:
         return {c.source_id for c in self.stored.values() if c.source_id}
 
+    async def list_source_state(self) -> dict:
+        from ragdoc.pipeline.stores import SourceState
+
+        return {
+            c.source_id: SourceState(source_hash=c.source_hash, content_hash=c.content_hash)
+            for c in self.stored.values()
+            if c.source_id
+        }
+
 
 # ---------------------------------------------------------------------------
 # Tests

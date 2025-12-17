@@ -266,6 +266,15 @@ class MemoryVectorStore:
     async def list_source_ids(self) -> set[str]:
         return {c.source_id for c in self.stored.values() if c.source_id is not None}
 
+    async def list_source_state(self) -> dict:
+        from ragdoc.pipeline.stores import SourceState
+
+        return {
+            c.source_id: SourceState(source_hash=c.source_hash, content_hash=c.content_hash)
+            for c in self.stored.values()
+            if c.source_id is not None
+        }
+
 
 # ---------------------------------------------------------------------------
 # Parser + pipeline construction helpers
@@ -484,7 +493,8 @@ async def test_vector_store_pipeline_with_llm_chunker(tmp_path: Path):
     # --- First run ---
     result = await vs_pipeline.run([INPUT_PATH])
 
-    assert result.processed == [INPUT_PATH], f"Expected processed=[{INPUT_PATH}], got {result.processed}"
+    # UpdateResult is keyed on source_id (default source_id_fn = path.name).
+    assert result.processed == [INPUT_PATH.name], f"Expected processed=[{INPUT_PATH.name}], got {result.processed}"
     assert len(result.errors) == 0, f"Pipeline errors: {result.errors}"
     assert len(result.skipped) == 0
 
