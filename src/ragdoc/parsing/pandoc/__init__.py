@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 from ragdoc.document import Document
@@ -25,7 +26,8 @@ class PandocParser(Parser):
     description: str = "Word documents via pandoc"
 
     async def __call__(self, path: Path) -> Document:
-        return load_pandoc(path)
+        # pypandoc forks a pandoc subprocess and blocks on it — run off the event loop.
+        return await asyncio.to_thread(load_pandoc, path)
 
 
 def _register() -> None:

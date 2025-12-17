@@ -10,8 +10,13 @@ Ragdoc is an **ingestion library** for retrieval-augmented generation. It parses
 uv add ragdoc        # or: pip install ragdoc
 ```
 
-The first PyPI release is 0.1.0. Optional extras:
+The first PyPI release is 0.1.0. The base install is lean (no ML-sized
+dependencies); features that need more live behind extras:
 
+- `llm` — LLM features: `LLMChunker`, LLM processors, OpenAI embedders (openai + pillow)
+- `pdf` — zero-config local PDF parsing (pymupdf)
+- `xlsx` — Excel parsing (pandas + openpyxl)
+- `tokenizers` — HuggingFace tokenizers, e.g. `RerankerTokenizer` (transformers)
 - `azure-di` — Azure Document Intelligence PDF parsing
 - `pdf-mineru` — MinerU-based PDF parsing
 - `qdrant` — Qdrant vector-store integration
@@ -21,7 +26,7 @@ Full documentation: <https://joelgotsch.github.io/ragdoc/>
 
 ## Quickstart
 
-Sync a folder of HTML files into a local Qdrant collection. Requires `ragdoc[qdrant]`, the `openai` package, and an OpenAI API key in the environment.
+Sync a folder of HTML files into a local Qdrant collection. Requires `ragdoc[qdrant,llm]` and an OpenAI API key in the environment.
 
 ```python
 import asyncio
@@ -97,15 +102,23 @@ document = await load("page.html")
 document = await load("data.xlsx")
 ```
 
-Supported formats: `.html`, `.docx`/`.doc`, `.xlsx`, `.json` (Azure DI output), PDF.
+Supported formats: `.html`, `.docx`/`.doc`, `.xlsx` (with `ragdoc[xlsx]`), `.json` (Azure DI output), PDF.
 
-PDF parsing currently requires the `azure-di` extra (plus Azure credentials) or the `pdf-mineru` extra — there is no zero-config PDF path yet; a local zero-config PDF parser is planned. With Azure DI:
+PDF parsing is zero-config with the `pdf` extra (`pip install 'ragdoc[pdf]'` — local pymupdf text + font-size headings):
+
+```python
+from ragdoc import load
+
+document = await load("report.pdf")   # resolves to the pdf_basic parser
+```
+
+For higher fidelity, install `azure-di` (plus Azure credentials) or `pdf-mineru`; the registry automatically prefers the highest-priority *available* parser:
 
 ```python
 from ragdoc import RagdocConfig, configure, load
 
 async with configure(RagdocConfig(azure_key="...", azure_endpoint="...")):
-    document = await load("report.pdf")
+    document = await load("report.pdf")   # resolves to azure_di
 ```
 
 ### Stage 2: Processing

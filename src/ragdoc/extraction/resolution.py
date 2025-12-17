@@ -227,7 +227,12 @@ class EntityResolutionPipeline(Generic[PayloadT]):
     ) -> tuple[list[tuple[int, int]], list[tuple[str, ...]]]:
         if len(clusters) < 2:
             return [], []
-        import numpy as np
+        try:
+            import numpy as np
+        except ImportError as exc:
+            raise ImportError(
+                "EntityResolutionPipeline requires numpy (installed with the 'extraction' extra)"
+            ) from exc
 
         texts = [c.representative_text for c in clusters]
         arr = np.asarray(await self._embed(texts), dtype=float)

@@ -7,6 +7,8 @@ import io
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
+pytest.importorskip("PIL", reason="llm extra (pillow) not installed")
 from PIL import Image as PILImage, UnidentifiedImageError
 
 from ragdoc.document import Document, Image

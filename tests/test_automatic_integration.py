@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
+from ragdoc.config import RagdocConfig, configure
 from ragdoc.parsing import load
 
 try:
@@ -34,11 +35,13 @@ async def test_pdf_pragmatic_paths(pdf_file_path: Path, azure_test_pdf_json_file
     with open(azure_test_pdf_json_file_path, "rb") as f:
         analyze_dict = json.load(f)
 
-    with patch("ragdoc.parsing.azure_di.client.get_analyze_result", return_value=analyze_dict):
-        name, rest = pdf_file_path.name.split(".")
-        new_file = ".".join([name, "many", "fun", "suffixes", rest])
-        path = pdf_file_path.parent / new_file
-        d = await load(path)
+    # azure_di is only *available* (and thus preferred over pdf_basic) with credentials configured.
+    async with configure(RagdocConfig(azure_key="k", azure_endpoint="https://example.invalid")):
+        with patch("ragdoc.parsing.azure_di.client.get_analyze_result", return_value=analyze_dict):
+            name, rest = pdf_file_path.name.split(".")
+            new_file = ".".join([name, "many", "fun", "suffixes", rest])
+            path = pdf_file_path.parent / new_file
+            d = await load(path)
 
     assert len(d.headings) > 0
 
@@ -72,16 +75,21 @@ async def test_pdf(pdf_file_path: Path, azure_test_pdf_json_file_path: Path):
     with open(azure_test_pdf_json_file_path, "rb") as f:
         analyze_dict = json.load(f)
 
-    with patch("ragdoc.parsing.azure_di.client.get_analyze_result", return_value=analyze_dict):
-        document = await load(pdf_file_path)
+    # azure_di is only *available* (and thus preferred over pdf_basic) with credentials configured.
+    async with configure(RagdocConfig(azure_key="k", azure_endpoint="https://example.invalid")):
+        with patch("ragdoc.parsing.azure_di.client.get_analyze_result", return_value=analyze_dict):
+            document = await load(pdf_file_path)
 
+    assert document.parser == "azure_di"
     assert len(document.headings) == 5
     assert document.tables and "I am a super merged" in document.tables[0].html
     assert document.metadata.get("filename")
 
 
 @pytest.mark.anyio
-async def test_pdf_no_di(pdf_file_path: Path):
-    with patch("ragdoc.parsing.azure_di.client.di_available", False):
-        with pytest.raises(ImportError):
-            await load(pdf_file_path)
+async def test_pdf_no_di_falls_back_to_pdf_basic(pdf_file_path: Path):
+    """Without Azure credentials, azure_di is unavailable and .pdf resolves to pdf_basic."""
+    pytest.importorskip("pymupdf", reason="pdf extra not installed")
+    document = await load(pdf_file_path)
+    assert document.parser == "pdf_basic"
+    assert document.elements

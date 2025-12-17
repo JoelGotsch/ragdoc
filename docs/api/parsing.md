@@ -92,6 +92,24 @@ Functions and source types for loading documents from files.
 
 ---
 
+## Basic PDF Parser (`pdf` extra)
+
+### PdfBasicParser
+
+::: ragdoc.parsing.pdf_basic.PdfBasicParser
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### parse_pdf_basic
+
+::: ragdoc.parsing.pdf_basic.load.parse_pdf_basic
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
 ## MinerU Parser
 
 See the [MinerU guide](../guide/parsing.md#mineru-_middle-json) for an overview of
@@ -121,9 +139,9 @@ handler swapping, image loading, and metadata propagation.
       show_source: true
       heading_level: 4
 
-### CoreExtractionMiddleware
+### CoreExtractor
 
-::: ragdoc.parsing.mineru.CoreExtractionMiddleware
+::: ragdoc.parsing.mineru.CoreExtractor
     options:
       show_root_heading: true
       show_source: true

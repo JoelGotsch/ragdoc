@@ -12,11 +12,11 @@ Typical customisation::
         handle_discarded_as_raw_text,
     )
     from ragdoc.parsing.mineru.base import DiscardedBlockType
-    from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware
+    from ragdoc.parsing.mineru.parser import CoreExtractor
 
     config = ExtractionConfig()
     config.discarded_handlers[DiscardedBlockType.HEADER] = handle_discarded_as_raw_text
-    middleware = CoreExtractionMiddleware(config=config)
+    stage = CoreExtractor(config=config)
 """
 
 from __future__ import annotations
@@ -119,7 +119,7 @@ def _css_from_block(
 
 
 # ---------------------------------------------------------------------------
-# Heading HTML builder (public so middlewares can reuse it)
+# Heading HTML builder (public so extraction stages can reuse it)
 # ---------------------------------------------------------------------------
 
 
@@ -626,8 +626,8 @@ def handle_discarded_as_metadata(block: DiscardedBlock, page: PageInfo, context:
     dicts.
 
     This handler does **not** propagate data to ``Document.metadata`` on its
-    own.  It is intended for custom middleware authors who need to read
-    accumulated values from ``context.metadata`` in a later middleware step.
+    own.  It is intended for custom extraction-stage authors who need to read
+    accumulated values from ``context.metadata`` in a later extraction stage.
     """
     text = extract_text_from_lines(block.lines).strip()
     if not text:
@@ -669,12 +669,12 @@ def _default_discarded_handlers() -> dict[DiscardedBlockType, DiscardedBlockHand
 @dataclass
 class ExtractionConfig:
     """
-    Handler table for :class:`~ragdoc.parsing.mineru.parser.CoreExtractionMiddleware`.
+    Handler table for :class:`~ragdoc.parsing.mineru.parser.CoreExtractor`.
 
     Every field is a callable with the signature
     ``(block, page, context) -> list[ParsedElement]``.  Set any field to change
     how that block type is converted without subclassing or modifying the
-    middleware.
+    extraction stage.
 
     **Para-block handlers** are typed to their specific MinerU block class so
     that static type checkers can verify that custom handlers receive the right
@@ -730,13 +730,13 @@ class ExtractionConfig:
       a :class:`~ragdoc.document.Footnote` element; drops the block with a
       warning when the format does not match.
     - :func:`handle_discarded_as_metadata` — accumulate text in
-      ``context.metadata`` for use by a subsequent custom middleware; does not
+      ``context.metadata`` for use by a subsequent custom extraction stage; does not
       produce document elements and does not propagate to
       ``Document.metadata``.
 
     ``default_heading_level`` sets the heading level assigned to every
     :class:`~ragdoc.parsing.mineru.base.TitleBlock` before downstream
-    middlewares (e.g. ``HeadingLevelProcessor``) refine it.
+    processors (e.g. ``HeadingLevelProcessor``) refine it.
     """
 
     handle_title: Callable[[TitleBlock, PageInfo, ParseContext], list[ParsedElement]] = field(

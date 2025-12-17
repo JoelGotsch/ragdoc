@@ -218,8 +218,8 @@ def _openai_errors() -> _OpenAIErrorTypes:
     """Lazy, cached import of openai's exception types (keeps ``ragdoc.llm`` importable without openai)."""
     try:
         import openai
-    except ImportError as exc:  # pragma: no cover - openai is currently a hard dependency
-        raise ImportError('LLM features require the openai package. Install it with: uv add "ragdoc[llm]"') from exc
+    except ImportError as exc:
+        raise ImportError("LLM features require the 'llm' extra: pip install 'ragdoc[llm]'") from exc
     return _OpenAIErrorTypes(
         rate_limit=openai.RateLimitError,
         connection=openai.APIConnectionError,

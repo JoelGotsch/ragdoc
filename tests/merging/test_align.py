@@ -19,7 +19,7 @@ from ragdoc.merging.patch import PatchOperationType
 def test_alignment_key_paragraph_returns_normalized_text():
     p = Paragraph(html="<p>Hello World</p>")
     key = alignment_key(p)
-    assert "hello world" in key  # lowercased via _normalize_text
+    assert "hello world" in key  # lowercased via normalize_text
 
 
 def test_alignment_key_image_returns_unique_sentinel():

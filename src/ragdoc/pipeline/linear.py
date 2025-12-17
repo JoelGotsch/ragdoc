@@ -277,10 +277,17 @@ class DocumentPipeline(Generic[TMetadata]):
                 return await self._process_one(path)
 
         tasks = [asyncio.create_task(_run_one(p)) for p in source_list]
-        for coro in asyncio.as_completed(tasks):
-            batch = await coro
-            logger.debug(f"Stream batch yielded: {len(batch)} chunks")
-            yield batch
+        try:
+            for coro in asyncio.as_completed(tasks):
+                batch = await coro
+                logger.debug(f"Stream batch yielded: {len(batch)} chunks")
+                yield batch
+        finally:
+            # If the consumer stops iterating early or a task raises, the remaining
+            # tasks must not be abandoned: cancel and await them all.
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _parse(self, source: Path) -> Document:
         """Parse *source* and stamp ``source_id`` (a pure function of the path). Shared parse prefix."""
@@ -367,7 +374,10 @@ class DocumentPipeline(Generic[TMetadata]):
 
         typed_doc: Document[TMetadata] = cast("Document[TMetadata]", doc)
 
-        splits = self._splitter(typed_doc) if self._splitter else [typed_doc]
+        # Splitting renders per element/group to measure token budgets — a pandoc-subprocess
+        # storm for non-HTML formats. Splitters are sync callables, so hop off the event loop
+        # at this orchestration boundary.
+        splits = await asyncio.to_thread(self._splitter, typed_doc) if self._splitter else [typed_doc]
         logger.debug(f"Split into {len(splits)} sub-documents")
 
         chunks: list[Chunk[TMetadata]] = []

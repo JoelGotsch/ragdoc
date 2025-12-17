@@ -33,7 +33,7 @@ from pydantic import BaseModel
 
 from ragdoc.pipeline.changeset import ChangeSet, SourceChange
 from ragdoc.pipeline.stores import SourceState
-from ragdoc.processing._concurrency import _resolve_semaphore
+from ragdoc.utils.concurrency import resolve_semaphore
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +228,7 @@ async def build_current_map(
             + "\nConsider a relative-path strategy: lambda p: str(p.relative_to(base_dir))"
         )
 
-    sem = _resolve_semaphore(concurrency)
+    sem = resolve_semaphore(concurrency)
 
     async def _hash_one(sid: str, path: Path) -> tuple[str, Path, str]:
         async with sem:
@@ -303,7 +303,7 @@ class SyncEngine(Generic[T]):
         """
         state = await self._store.list_source_state()
         logger.info(f"sync: {len(request.sources)} sources, {len(state)} known in store")
-        sem = _resolve_semaphore(self._concurrency)
+        sem = resolve_semaphore(self._concurrency)
 
         async def _guarded(src: SyncSource) -> SourceOutcome[T]:
             async with sem:

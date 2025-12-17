@@ -59,10 +59,10 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ragdoc.llm import ChatClient, call_structured, resolve_openai_client
-from ragdoc.processing._concurrency import _fan_out
 from ragdoc.processing.base import DocumentProcessor
 from ragdoc.processing.summary_base import DocumentSummary
 from ragdoc.utils import Tokenizer
+from ragdoc.utils.concurrency import fan_out
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -370,7 +370,7 @@ class DocumentSummarizerProcessor(DocumentProcessor):
             async def _run(i: int, coro: Awaitable[str]) -> None:
                 results[i] = await coro
 
-            await _fan_out([_run(i, c) for i, c in enumerate(coros)], self._concurrency)
+            await fan_out([_run(i, c) for i, c in enumerate(coros)], self._concurrency)
             return results
 
         async def reduce(summaries: list[str], depth: int) -> str:

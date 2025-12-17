@@ -52,8 +52,7 @@ class ProvenanceMode(str, Enum):
 async def parse_ragdoc_json(path: Path, provenance_mode: ProvenanceMode) -> Document:
     """Deserialize a ``.ragdoc.json`` file into a :class:`~ragdoc.document.Document`.
 
-    Reads the file asynchronously via :mod:`aiofiles`, falling back to a
-    synchronous read if aiofiles is unavailable or raises.
+    Reads the file asynchronously via :mod:`aiofiles`.
 
     Args:
         path: Path to the ``.ragdoc.json`` file.
@@ -64,15 +63,11 @@ async def parse_ragdoc_json(path: Path, provenance_mode: ProvenanceMode) -> Docu
     Returns:
         The deserialized :class:`~ragdoc.document.Document`.
     """
-    try:
-        import aiofiles
+    import aiofiles
 
-        async with aiofiles.open(path, encoding="utf-8") as f:
-            content = await f.read()
-        logger.debug(f"parse_ragdoc_json: read {path} via aiofiles")
-    except OSError:
-        logger.debug(f"parse_ragdoc_json: async read failed, falling back to sync read for {path}")
-        content = path.read_text(encoding="utf-8")  # noqa: ASYNC240 -- rare fallback path; async I/O sweep is Phase 8 (D9)
+    async with aiofiles.open(path, encoding="utf-8") as f:
+        content = await f.read()
+    logger.debug(f"parse_ragdoc_json: read {path} via aiofiles")
 
     document = Document.model_validate_json(content)
 

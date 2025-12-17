@@ -1,7 +1,9 @@
 from io import StringIO
 from pathlib import Path
 
-import pandas as pd
+import pytest
+
+pd = pytest.importorskip("pandas", reason="xlsx extra not installed")
 
 from ragdoc.parsing import ExcelConfig
 from ragdoc.parsing.xlsx import load_excel
@@ -86,7 +88,7 @@ def test_sheet_params_override_truthy_default_params(monkeypatch):
         captured[sheet_name] = params
         return pd.DataFrame({"a": [1]})
 
-    monkeypatch.setattr("ragdoc.parsing.xlsx.load.pd.read_excel", fake_read_excel)
+    monkeypatch.setattr("pandas.read_excel", fake_read_excel)  # generate_document imports pandas lazily
     fake_file = SimpleNamespace(sheet_names=["Sheet1"])
     config = ExcelConfig(default_params={"skiprows": 1}, sheet_params={"Sheet1": {"skiprows": 5, "nrows": 2}})
     xlsx_generate_document(fake_file, config)  # type: ignore[arg-type]

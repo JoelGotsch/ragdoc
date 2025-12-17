@@ -1,4 +1,8 @@
-"""Scan a folder for *_middle.json files and print a summary of each document."""
+"""Scan a folder for *_middle.json files and print a summary of each document.
+
+Repo-only script (not shipped in the wheel). Requires tabulate, which is not a
+ragdoc dependency: run via ``uv run --with tabulate python scripts/evaluate_middle_json.py <dir>``.
+"""
 
 import sys
 from pathlib import Path

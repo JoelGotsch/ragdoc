@@ -178,3 +178,42 @@ def test_token_splitter_respects_max_tokens_param():
     splitter_tight = TokenSplitter(max_tokens=150, overlap_tokens=20)
     splitter_loose = TokenSplitter(max_tokens=1000, overlap_tokens=20)
     assert len(splitter_tight(doc)) >= len(splitter_loose(doc))
+
+
+# --- stream() task hygiene (Phase 8, D9) ---
+
+
+@pytest.mark.anyio
+async def test_stream_cancels_pending_tasks_when_consumer_stops_early():
+    """Breaking out of stream() must cancel (not abandon) the still-pending parse tasks."""
+    import asyncio
+
+    from ragdoc.pipeline import DocumentPipeline
+
+    release = asyncio.Event()
+    cancelled: list[str] = []
+
+    async def parser(path: Path) -> Document:
+        if path.name == "fast.html":
+            doc = make_document(title="fast", body="done")
+            doc.source_path = str(path)
+            return doc
+        try:
+            await release.wait()  # blocks forever unless cancelled
+        except asyncio.CancelledError:
+            cancelled.append(path.name)
+            raise
+        doc = make_document(title="slow", body="done")
+        doc.source_path = str(path)
+        return doc
+
+    pipeline = DocumentPipeline(parser=parser, concurrency=3)
+    paths = [Path("fast.html"), Path("slow-1.html"), Path("slow-2.html")]
+
+    stream = pipeline.stream(paths)
+    async for batch in stream:
+        assert batch
+        break  # stop consuming after the first yielded batch
+    await stream.aclose()  # closing the generator runs its finally: cancel + gather
+
+    assert sorted(cancelled) == ["slow-1.html", "slow-2.html"]

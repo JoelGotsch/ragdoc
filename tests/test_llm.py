@@ -11,9 +11,10 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
-import openai
 import pytest
 from pydantic import BaseModel
+
+openai = pytest.importorskip("openai", reason="llm extra not installed")
 
 import ragdoc.llm
 from ragdoc.config import RagdocConfig, configure

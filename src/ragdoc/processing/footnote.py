@@ -71,8 +71,8 @@ from pydantic import BaseModel, Field
 
 from ragdoc.document import Footnote
 from ragdoc.llm import ChatClient, call_structured, resolve_openai_client
-from ragdoc.processing._concurrency import _fan_out
 from ragdoc.processing.base import DocumentProcessor
+from ragdoc.utils.concurrency import fan_out
 
 logger = logging.getLogger(__name__)
 
@@ -919,7 +919,7 @@ class FootnoteProcessor(DocumentProcessor):
                 results[idx] = await self._resolve_footnote(document, footnote, None)
 
             coros: list[Awaitable[None]] = [_resolve_one(i, f) for i, f in enumerate(sorted_footnotes)]
-            await _fan_out(coros, self._concurrency)
+            await fan_out(coros, self._concurrency)
 
             for footnote, best in zip(sorted_footnotes, results, strict=True):
                 if best is None:

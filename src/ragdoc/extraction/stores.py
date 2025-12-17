@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 from urllib.parse import quote, unquote
 
+import aiofiles
 from pydantic import BaseModel
 
 from ragdoc.extraction.mention import Mention
@@ -88,18 +89,20 @@ class LocalMentionStore:
         payload_model = self._payload_model
         return Mention[payload_model]
 
-    def _load(self, path: Path) -> list[Mention]:
+    async def _load(self, path: Path) -> list[Mention]:
         import json
 
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        async with aiofiles.open(path, encoding="utf-8") as f:
+            raw = json.loads(await f.read())
         mtype = self._mention_type()
         return [mtype.model_validate(d) for d in raw]
 
-    def _write(self, source_id: str, mentions: list[Mention]) -> None:
+    async def _write(self, source_id: str, mentions: list[Mention]) -> None:
         import json
 
         payload = [m.model_dump(mode="json") for m in mentions]
-        self._path(source_id).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        async with aiofiles.open(self._path(source_id), "w", encoding="utf-8") as f:
+            await f.write(json.dumps(payload, indent=2))
 
     async def upsert(self, mentions: list[Mention]) -> list[str]:
         """Merge *mentions* into their per-source files (update existing ids, add new ones)."""
@@ -109,10 +112,12 @@ class LocalMentionStore:
         written: list[str] = []
         for source_id, incoming in by_source.items():
             existing = (
-                {m.mention_id: m for m in self._load(self._path(source_id))} if self._path(source_id).exists() else {}
+                {m.mention_id: m for m in await self._load(self._path(source_id))}
+                if self._path(source_id).exists()
+                else {}
             )
             existing.update(incoming)
-            self._write(source_id, list(existing.values()))
+            await self._write(source_id, list(existing.values()))
             written.extend(m.mention_id for m in incoming.values())
         return written
 
@@ -125,14 +130,14 @@ class LocalMentionStore:
     async def list_source_state(self) -> dict[str, SourceState]:
         state: dict[str, SourceState] = {}
         for path in self._iter_files():
-            mentions = self._load(path)
+            mentions = await self._load(path)
             if mentions:
                 first = mentions[0]
                 state[first.source_id] = SourceState(source_hash=first.source_hash, content_hash=first.content_hash)
         return state
 
     async def list_mentions(self, payload_type: type[BaseModel] | None = None) -> list[Mention]:
-        all_mentions = [m for path in self._iter_files() for m in self._load(path)]
+        all_mentions = [m for path in self._iter_files() for m in await self._load(path)]
         if payload_type is None:
             return all_mentions
         return [m for m in all_mentions if isinstance(m.payload, payload_type)]

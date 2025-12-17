@@ -246,4 +246,4 @@ uv add <package>           # production
 uv add --dev <package>     # dev only
 ```
 
-Optional extras: `azure-di`, `pdf-mineru`, `qdrant`, `extraction`.
+Optional extras: `llm` (openai + pillow), `tokenizers` (transformers), `xlsx` (pandas + openpyxl), `pdf` (pymupdf), `azure-di`, `pdf-mineru`, `qdrant`, `extraction`. The base install is lean — optional imports are lazy and fail with an actionable 'pip install ragdoc[<extra>]' message.

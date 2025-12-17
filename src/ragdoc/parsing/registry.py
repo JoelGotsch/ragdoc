@@ -203,7 +203,15 @@ def _resolve_parser(path: Path, parser_name: str | None = None) -> Parser:
 
     # Sort by longest pattern first, then highest priority
     matches.sort(key=lambda r: (-len(r.pattern), -r.priority))
-    return matches[0].parser
+    usable = [r for r in matches if r.parser.is_available()]
+    if not usable:
+        reasons = "; ".join(sorted({r.parser.unavailable_reason() or r.name for r in matches}))
+        raise ValueError(
+            f"No usable parser for {path.name!r}. Matching parsers are unavailable: {reasons}. "
+            "For PDFs: install 'ragdoc[pdf]' for the basic local parser, or 'ragdoc[pdf-mineru]' / "
+            "'ragdoc[azure-di]' for higher fidelity."
+        )
+    return usable[0].parser
 
 
 def _clear_registry() -> None:

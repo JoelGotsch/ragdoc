@@ -58,9 +58,22 @@ from ragdoc.utils import GPTTokenizer, Tokenizer
 
 logger = logging.getLogger(__name__)
 
-_default_tokenizer = GPTTokenizer()
+_default_tokenizer: GPTTokenizer | None = None
 DEFAULT_OVERLAP_TOKENS = 200
 DEFAULT_MAX_TOKENS = 7_000
+
+
+def _get_default_tokenizer() -> GPTTokenizer:
+    """Memoized default tokenizer.
+
+    tiktoken's BPE load (network on a cold cache) must not run at import time —
+    the instance is created on first use and reused afterwards.
+    """
+    global _default_tokenizer
+    if _default_tokenizer is None:
+        _default_tokenizer = GPTTokenizer()
+    return _default_tokenizer
+
 
 # TODO: evaluate if split-helpers could operate on a Document
 # so its possible for them to be used standalone.
@@ -428,7 +441,7 @@ def split_oversized_element(
         List of Documents in reading order.  Returns ``[document]`` when no
         split is needed.
     """
-    tokenizer = tokenizer or _default_tokenizer
+    tokenizer = tokenizer or _get_default_tokenizer()
 
     if tokenizer.count(renderer.render(document)) <= max_tokens:
         return [document]
@@ -554,7 +567,7 @@ def split_by_elements(
         Does not set ``split_sequence`` / ``split_total`` in metadata. Call
         :func:`split_document` for reading-order numbering.
     """
-    tokenizer = tokenizer or _default_tokenizer
+    tokenizer = tokenizer or _get_default_tokenizer()
     doc_label = f"{Path(document.source_path).name} ({document.id})" if document.source_path else document.id
 
     if not document.elements:
@@ -697,7 +710,7 @@ def split_document(
         Useful for sorting after retrieval:
         ``sorted(splits, key=lambda d: d.metadata["split_sequence"])``.
     """
-    tokenizer = tokenizer or _default_tokenizer
+    tokenizer = tokenizer or _get_default_tokenizer()
     doc_label = f"{Path(document.source_path).name} ({document.id})" if document.source_path else document.id
 
     if tokenizer.count(renderer.render(document)) <= max_tokens:

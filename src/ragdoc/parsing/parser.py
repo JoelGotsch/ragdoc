@@ -36,5 +36,13 @@ class Parser(BaseModel, ABC):
     priority: int = Field(default=0, description="Higher value = higher precedence when multiple parsers match a path")
     description: str = Field(default="", description="Human-readable description for registry display")
 
+    def is_available(self) -> bool:
+        """Whether this parser can actually run in the current environment (deps + config)."""
+        return True
+
+    def unavailable_reason(self) -> str:
+        """Human-readable requirement hint shown when resolution finds only unavailable parsers."""
+        return ""
+
     @abstractmethod
     async def __call__(self, path: Path) -> Document: ...

@@ -15,6 +15,70 @@ Pre-1.0: breaking changes land at will and are documented here.
 > once too. Phases 5 and 6 (canonical hash + element-model normalization) ship in **this one
 > release** so the corpus migrates a single time.
 
+> **⚠ BREAKING INSTALL CHANGE — the dependency set is now split into extras.**
+> The base `pip install ragdoc` no longer ships pandas, transformers, pymupdf, openai,
+> pillow, or numpy. Install the extras you use: `llm` (openai + pillow — `LLMChunker`, LLM
+> processors, `OpenAIEmbedder`), `tokenizers` (transformers — `RerankerTokenizer`), `xlsx`
+> (pandas + openpyxl), `pdf` (pymupdf — the new `pdf_basic` parser), plus the existing
+> `azure-di` (now also pulls pymupdf), `pdf-mineru`, `qdrant`, and `extraction` (now also
+> pulls numpy). Every optional import fails loudly with the exact `pip install
+> 'ragdoc[<extra>]'` command. `funcy`, `orjson`, `lxml`, and `tabulate` were unused and are
+> gone entirely; `pydantic-settings` moved into the base dependencies (fixing a base-install
+> crash in `ragdoc.processing`).
+
+### Added (Phase 8 — dependency diet, PDF path, async remainder)
+
+- **Extras split** (see the breaking-change note above): base deps are now just pydantic,
+  pydantic-settings, beautifulsoup4, pypandoc-binary, tiktoken, aiofiles, markdownify, click,
+  and httpx. `import ragdoc` imports none of torch/transformers/pandas/openai/PIL/pymupdf/
+  numpy (enforced by a test and a new CI base-install smoke job).
+- **Zero-config local PDF parsing** — `parsing/pdf_basic/` (`ragdoc[pdf]`): pymupdf text
+  extraction with font-size/bold heading detection (reusing
+  `compute_size_to_level_mapping`), registered for `.pdf` at priority 10 (below `azure_di`
+  40 and `mineru` 50). Font sizes are emitted as inline CSS so downstream visual processors
+  keep working.
+- **Availability-aware parser resolution** — `Parser.is_available()` /
+  `Parser.unavailable_reason()`: resolution skips parsers whose dependencies or credentials
+  are missing and, when nothing usable matches, raises an actionable `ValueError` **at
+  resolve time** (e.g. a `.pdf` on a base install explains `ragdoc[pdf]` /
+  `ragdoc[azure-di]` / `ragdoc[pdf-mineru]` before any network/credential use).
+- Python 3.13 support: `requires-python` cap lifted to `<3.14`; 3.13 legs added to the CI
+  matrix and tox.
+
+### Changed (Phase 8)
+
+- **Async honesty**: blocking work is now wrapped off the event loop — splitter invocation in
+  `DocumentPipeline.chunk_document`, chunker rendering (`SimpleChunker`/`LLMChunker`), the
+  pandoc and xlsx and pdf_basic parsers, and PIL transforms in `ImageSummaryProcessor` all
+  run under `asyncio.to_thread`; `LocalDocumentStore`, `LocalMentionStore`, and
+  `LocalGraphStore` file I/O moved to `aiofiles`; `VectorStorePipeline.run_directory`'s glob
+  is threaded. `DocumentPipeline.stream()` no longer abandons in-flight tasks when the
+  consumer stops early or a task raises (cancel + gather in a `finally`).
+- `GPTTokenizer` is no longer instantiated at import time in `ragdoc.splitting.token`
+  (tiktoken's BPE load — network on a cold cache — now happens on first use).
+- MinerU "middleware" terminology renamed: `CoreExtractionMiddleware` → `CoreExtractor`,
+  `ParserMiddleware` → `ExtractionStage`, `BaseMiddleware` → `BaseExtractionStage`,
+  `MinerUExtractor(middlewares=…, use_default_middlewares=…)` →
+  `MinerUExtractor(stages=…, use_default_stages=…)`. The mineru package now imports without
+  the `pdf-mineru` extra (LaTeX conversion is guarded lazily); the parser reports itself
+  unavailable until the extra is installed.
+- `ragdoc.rendering.serialize_metadata_value` renamed to `format_metadata_value` (it formats
+  for display; the canonical serializer stays `ragdoc.metadata.serialize_metadata_value`).
+- Cross-package underscore helpers got public homes: `ragdoc.utils.concurrency.fan_out` /
+  `resolve_semaphore` (from `processing._concurrency`) and `ragdoc.utils.normalize_text`
+  (from `_normalize_text`).
+
+### Removed (Phase 8)
+
+- Dead code: the unused `DocumentPrimaryElement`/`DocumentSecondaryElement` unions, the
+  string-typed `Renderable` alias, the dead `fallback_rendered` renderer parameter,
+  `MinerUExtractor.use_before`/`use_after` (zero callers), and the mineru-internal
+  `_latex_to_text` (now a test helper).
+- The evaluation/debug scripts `evaluate_footnotes.py`, `evaluate_middle_json.py`, and
+  `debug_footnotes.py` moved out of the wheel (`ragdoc.utils` → repo `scripts/`).
+- Renderer docs no longer claim "no I/O in rendering" — non-HTML formats fork a pandoc
+  subprocess per render; call it via `asyncio.to_thread` from async code.
+
 ### Added (Phase 7 — shared LLM reliability layer)
 
 - **`ragdoc.llm` — one module for every LLM call**: structural client protocols

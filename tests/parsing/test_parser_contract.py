@@ -24,6 +24,7 @@ _PARSER_FIXTURES: dict[str, Path | None] = {
     "xlsx": DATA / "test.xlsx",
     "azure_json": DATA / "test_pdf_azure_di.json",
     "azure_di": None,  # requires Azure credentials + network
+    "pdf_basic": DATA / "test.pdf",
     "mineru": MINERU_DATA / "bert-paper_middle.json",
     "ragdoc_json": None,  # fixture built on the fly (needs tmp_path); handled below
 }

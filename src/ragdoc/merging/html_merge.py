@@ -23,7 +23,7 @@ from ragdoc.document import Document, ElementTypeEnum
 from ragdoc.merging.heuristics import has_heading_hierarchy, markup_richness_score
 from ragdoc.parsing.html.load import HTML, generate_document
 from ragdoc.rendering import OutputFormat, Renderer, render_raw
-from ragdoc.utils.helpers import _normalize_text
+from ragdoc.utils.helpers import normalize_text
 
 # Mapping from HTML tag names to ElementTypeEnum values.
 _TAG_TO_TYPE: dict[str, ElementTypeEnum] = {
@@ -86,7 +86,7 @@ def _alignment_key(tag: Tag) -> str:
         if isinstance(alt, str) and alt.strip():
             return f"__image__{alt.strip()}"
         return f"__image__{id(tag)}"
-    return _normalize_text(tag.get_text())
+    return normalize_text(tag.get_text())
 
 
 def _block_ratio(keys_a: list[str], keys_b: list[str]) -> float:

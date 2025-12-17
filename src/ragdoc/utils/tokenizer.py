@@ -1,7 +1,6 @@
 from typing import Protocol, runtime_checkable
 
 import tiktoken
-import transformers
 
 
 @runtime_checkable
@@ -51,6 +50,12 @@ class TransformerTokenizer:
 
 class RerankerTokenizer:  # implements Tokenizer
     def __init__(self, architecture: str = "BAAI/bge-reranker-v2-m3"):
+        try:
+            import transformers
+        except ImportError as exc:
+            raise ImportError(
+                "RerankerTokenizer requires the 'tokenizers' extra: pip install 'ragdoc[tokenizers]'"
+            ) from exc
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(architecture)
 
     def __call__(self, text: str) -> list[int]:

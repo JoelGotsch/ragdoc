@@ -1,10 +1,11 @@
-"""Tests for the debug_footnotes utility."""
+"""Tests for the debug_footnotes repo script (scripts/, not shipped in the wheel)."""
 
-from ragdoc.document import Document, Footnote, Heading, Paragraph
-from ragdoc.utils.debug_footnotes import (
+from scripts.debug_footnotes import (
     describe_orphan_footnotes,
     describe_orphan_footnotes_batch,
 )
+
+from ragdoc.document import Document, Footnote, Heading, Paragraph
 
 # =============================================================================
 # Helpers

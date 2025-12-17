@@ -1,9 +1,16 @@
-import html
+from __future__ import annotations
 
-import pandas as pd
+import html
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, Field
 
 from ragdoc.document import Document, Heading, Table
+
+if TYPE_CHECKING:
+    import pandas as pd
+
+_XLSX_IMPORT_ERROR = "The xlsx parser requires the 'xlsx' extra: pip install 'ragdoc[xlsx]'"
 
 
 class ExcelConfig(BaseModel):
@@ -27,6 +34,11 @@ class ExcelConfig(BaseModel):
 
 
 def generate_document(excel_file: pd.ExcelFile, config: ExcelConfig | None = None) -> Document:
+    try:
+        import pandas as pd
+    except ImportError as exc:
+        raise ImportError(_XLSX_IMPORT_ERROR) from exc
+
     document = Document()
     config = ExcelConfig() if config is None else config
     for i, sheet_name in enumerate(excel_file.sheet_names):

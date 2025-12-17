@@ -41,6 +41,7 @@ def _register_builtin_parsers() -> None:
     from ragdoc.parsing.html import _register as _reg_html
     from ragdoc.parsing.mineru import _register as _reg_mineru
     from ragdoc.parsing.pandoc import _register as _reg_pandoc
+    from ragdoc.parsing.pdf_basic import _register as _reg_pdf_basic
     from ragdoc.parsing.ragdoc_json import _register as _reg_ragdoc_json
     from ragdoc.parsing.xlsx import _register as _reg_xlsx
 
@@ -48,6 +49,7 @@ def _register_builtin_parsers() -> None:
     _reg_pandoc()
     _reg_xlsx()
     _reg_azure_di()
+    _reg_pdf_basic()
     _reg_mineru()
     _reg_ragdoc_json()
 
@@ -67,7 +69,9 @@ async def load(path: Path | str, parser: str | None = None) -> Document:
 
     1. Explicit ``parser=`` argument (e.g. ``parser="azure_di"``).
     2. Config ``parser_preferences`` from :func:`~ragdoc.config.configure`.
-    3. Highest-priority matching parser from the registry.
+    3. Highest-priority matching parser from the registry whose
+       :meth:`~ragdoc.parsing.parser.Parser.is_available` returns True
+       (missing extras / credentials are skipped).
 
     Args:
         path: Path to the file to parse.
@@ -77,7 +81,8 @@ async def load(path: Path | str, parser: str | None = None) -> Document:
         A parsed :class:`~ragdoc.document.Document`.
 
     Raises:
-        ValueError: If no matching parser is found.
+        ValueError: If no parser matches, or every matching parser is
+            unavailable (the message names the extras/credentials needed).
     """
     path = Path(path)
     resolved = _resolve_parser(path, parser_name=parser)
