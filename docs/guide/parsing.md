@@ -240,7 +240,7 @@ levels based on font size — the same mechanism used by the HTML and Azure DI p
 ### ragdoc JSON snapshots (`.ragdoc.json`)
 
 Deserializes `.ragdoc.json` files produced by
-[`DocumentDumpProcessor`](../api/processing.md#DocumentDumpProcessor) back into
+[`DocumentDumpProcessor`](../api/processing.md#documentdumpprocessor) back into
 `Document` objects. Registered at priority 60 — the highest of any built-in parser —
 so `.ragdoc.json` files always resolve here, even if another parser also matches.
 
@@ -283,7 +283,7 @@ document = await proc.process(document)  # writes cache/{stem}_{id[:8]}.ragdoc.j
 
 ### Registering a custom parser
 
-Subclass [`Parser`](../api/parsing.md#Parser) and register an instance:
+Subclass [`Parser`](../api/parsing.md#parser) and register an instance:
 
 ```python
 from pathlib import Path
@@ -435,7 +435,7 @@ All parsers produce a `Document` where:
 - `document.source_path` is set to the full path as a string (e.g. `"/data/report.docx"`)
 
 The CSS-in-HTML convention is what allows processors like
-[`HeadingLevelProcessor`](../api/processing.md#HeadingLevelProcessor) to work uniformly
+[`HeadingLevelProcessor`](../api/processing.md#headinglevelprocessor) to work uniformly
 across all parsers without parser-specific logic.
 
 ---

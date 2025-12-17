@@ -10,6 +10,7 @@ Skip guards:
 - pipeline_walkthrough      -> makes REAL LLM calls; opt in with
   ``RAGDOC_RUN_LLM_NOTEBOOKS=1`` (plus LLM credentials).
 - mineru_example            -> needs the MinerU parser to be importable.
+- extraction                -> needs numpy (``extraction`` extra) for entity resolution.
 """
 
 import os
@@ -56,6 +57,22 @@ def test_document_model_notebook():
     _outputs, defs = app.run()
     assert defs["doc"].title == "Annual Report"
     assert len(defs["demo_doc"].headings) == 2
+
+
+def test_extraction_notebook():
+    pytest.importorskip("numpy", reason="extraction extra not installed (numpy needed for resolution)")
+
+    from docs.notebooks.extraction import app
+
+    _outputs, defs = app.run()
+    # 3 mentions across the 2-file corpus; re-run skipped both sources.
+    assert len(defs["mentions"]) == 3
+    assert defs["result_second"].processed == []
+    assert sorted(defs["result_second"].skipped) == ["letters.html", "notes.html"]
+    # Resolution merged the two Ada mentions: 3 mentions -> 2 entities.
+    entities = defs["entities"]
+    assert [e.payload.name for e in entities] == ["Ada Lovelace", "Charles Babbage"]
+    assert len(entities[0].member_mention_ids) == 2
 
 
 def test_merging_notebook():

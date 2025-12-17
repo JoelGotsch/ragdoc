@@ -10,7 +10,7 @@ and use them for filtered retrieval in vector stores.
 
 ## 1. Declare a TypedDict
 
-Subclass [`BaseMetadata`](../api/metadata.md#BaseMetadata) and list your fields:
+Subclass [`BaseMetadata`](../api/metadata.md#basemetadata) and list your fields:
 
 ```python
 from typing import Annotated
@@ -33,7 +33,7 @@ class MyMetadata(ragdoc.BaseMetadata, total=False):
 automatically, so you never need to add it yourself.
 
 Use `Required[T]` (from `typing_extensions`) to mark fields that a processor must
-populate.  The [`DocumentPipeline`](../api/pipeline.md#DocumentPipeline) checks
+populate.  The [`DocumentPipeline`](../api/pipeline.md#documentpipeline) checks
 required keys at runtime and raises `ValueError` for any that are missing after
 all processors have run.
 
@@ -66,7 +66,7 @@ Processors must not drop or overwrite keys set by earlier processors.
 ## 3. Build a typed pipeline
 
 Pass your `TypedDict` as `metadata_type` to
-[`DocumentPipeline`](../api/pipeline.md#DocumentPipeline):
+[`DocumentPipeline`](../api/pipeline.md#documentpipeline):
 
 ```python
 from ragdoc.pipeline import DocumentPipeline
@@ -102,7 +102,7 @@ for chunk in chunks:
 
 ## 5. Register Qdrant payload indexes
 
-When using [`QdrantVectorStore`](../api/integrations.md#QdrantVectorStore), pass
+When using [`QdrantVectorStore`](../api/integrations.md#qdrantvectorstore), pass
 `metadata_type` to `create` so indexes are registered automatically:
 
 ```python

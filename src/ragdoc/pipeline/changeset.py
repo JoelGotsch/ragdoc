@@ -56,9 +56,13 @@ class ChangeSet(BaseModel, Generic[T]):
         to_delete: source_ids to remove (orphans); empty unless ``delete_orphans=True``.
     """
 
-    to_add: list[SourceChange[T]] = Field(default_factory=list)
-    to_update: list[SourceChange[T]] = Field(default_factory=list)
-    to_delete: list[str] = Field(default_factory=list)
+    to_add: list[SourceChange[T]] = Field(default_factory=list, description="Sources new to the target store.")
+    to_update: list[SourceChange[T]] = Field(
+        default_factory=list, description="Sources whose change token differs; their stale entries are replaced."
+    )
+    to_delete: list[str] = Field(
+        default_factory=list, description="source_ids to remove (orphans); empty unless delete_orphans=True."
+    )
 
     def save(self, path: Path) -> None:
         """Write this ChangeSet to *path* as indented JSON."""

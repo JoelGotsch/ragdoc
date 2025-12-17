@@ -53,7 +53,7 @@ parameter, a `ChunkPipeline` has no parser/processors parameter.
 ### Adding a splitter
 
 To split documents into retrieval-sized chunks, pass a
-[`TokenSplitter`](../api/pipeline.md#TokenSplitter).
+[`TokenSplitter`](../api/pipeline.md#tokensplitter).
 Chunk size is independent of your LLM's context window — chunks are sized
 for retrieval quality, typically 1/50th to 1/10th of the context window.
 Test different `max_tokens` values for your use case:
@@ -145,7 +145,7 @@ standalone (outside a pipeline) leave `Chunk.id` at its uuid4 default.
 ### Processing many files
 
 `run_many` fans out across a list of paths and returns a
-[`PipelineResult`](../api/pipeline.md#PipelineResult) with all chunks
+[`PipelineResult`](../api/pipeline.md#pipelineresult) with all chunks
 aggregated:
 
 ```python
@@ -210,6 +210,10 @@ TokenSplitter(
 `VectorStorePipeline` wraps `DocumentPipeline` and adds hash-based change detection
 so that a corpus of documents can be kept in sync with a vector store
 incrementally — only changed or new files are re-processed.
+
+> All sync pipelines share one plan/apply/run engine — change detection, error isolation,
+> orphan deletion, and the review workflow are described once in the
+> [Sync Engine Guide](sync-engine.md).
 
 The **vector store is the single source of truth** for provenance.  Each chunk
 carries `source_id` and `source_hash` as first-class fields, so the pipeline
@@ -302,7 +306,7 @@ for path, exc in result.errors:
 
 ## Scenario C — Qdrant vector store
 
-[`QdrantVectorStore`](../api/integrations.md#QdrantVectorStore) is the built-in
+[`QdrantVectorStore`](../api/integrations.md#qdrantvectorstore) is the built-in
 concrete implementation of `VectorStore`, backed by `qdrant-client`'s
 `AsyncQdrantClient`.
 
@@ -475,5 +479,7 @@ splitting or dropping image data.
 ## See Also
 
 - [API Reference: Pipeline](../api/pipeline.md)
+- [Sync Engine Guide](sync-engine.md) — the shared plan/apply/run core behind Scenarios B/E
+- [Processing Guide](processing.md) — the processor catalog and ordering
 - [Chunking Guide](chunking.md) — `SimpleChunker`, `LLMChunker`
 - [Splitting Guide](splitting.md) — lower-level splitting API

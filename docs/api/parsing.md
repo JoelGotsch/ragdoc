@@ -112,7 +112,7 @@ Functions and source types for loading documents from files.
 
 ## MinerU Parser
 
-See the [MinerU guide](../guide/parsing.md#mineru-_middle-json) for an overview of
+See the [MinerU guide](../guide/parsing.md#mineru-_middlejson) for an overview of
 handler swapping, image loading, and metadata propagation.
 
 ### MinerUParser

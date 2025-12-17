@@ -48,7 +48,7 @@ Four principles govern all design decisions:
 
 1. **`Document` is the single source of truth.** Every stage operates on structured `Document` objects. Never pass rendered strings between stages. The `Document` model is the unifying interface throughout parsing, processing, splitting, and chunking.
 
-2. **The library is async-only.** All public entry points are `async`. Do not add sync convenience wrappers. Callers use `asyncio.run(...)` or their own event loop.
+2. **The library is async-only.** All public entry points are `async`. Do not add sync convenience wrappers. Callers use `asyncio.run(...)` or their own event loop. Blocking work (pandoc/xlsx/pdf parsing, PIL transforms, file hashing, splitter/chunker rendering) is wrapped in `asyncio.to_thread` at orchestration points; local-store file I/O uses `aiofiles`.
 
 3. **Chunkers own the embedding content strategy.** The library produces two text representations per chunk (`prompt_content` and `embedding_content`), but the chunker decides how:
    - **`SimpleChunker`** — sets `embedding_content = prompt_content` (no LLM calls). Use when a single rendering suffices.
@@ -67,10 +67,12 @@ PARSING → PROCESSING ─┐
                        ↓
               (post-split PROCESSING, e.g. summarizers)
                        ↓
-                   CHUNKING ← (chunker owns embedding strategy)
-                       ↓
-               Chunk
+                   CHUNKING ← (chunker owns embedding strategy)      EXTRACTION ← (Extractor on splits
+                       ↓                                                  ↓         → typed Mentions)
+                     Chunk                                             Mention → Entity → Graph
 ```
+
+Chunking and extraction are parallel consumers of the split documents: chunks feed vector stores, mentions feed the knowledge-graph layers (see the Extraction section).
 
 The pipeline classes are split at the sync boundaries: **`IngestPipeline`** (parser + processors + `source_id_fn`; Boundary 1) and **`ChunkPipeline`** (splitter + chunker + `chunk_id_fn` + `metadata_type`; Boundary 2). **`DocumentPipeline`** composes both for the direct path (`pipeline.ingest` / `pipeline.chunk`); its flat kwargs (`DocumentPipeline(splitter=…)`) delegate into freshly built sub-pipelines. A stage on the wrong side is a `TypeError` at construction (there is no parameter for it) — do not add boundary-validation predicates or runtime rejections.
 
@@ -86,16 +88,18 @@ The pipeline is **not strictly linear**:
 
 Cross-document relationships use `ExternalRef` (parent/child/related); within-document references (images, footnotes, tables embedded in text) use `InlineRef` with `<ref id='...'/>` placeholders in HTML. The `Renderer` resolves these placeholders during rendering.
 
-### Stage 1: Parsing (`src/ragdoc/parsing/`: `html/`, `pandoc/`, `xlsx/`, `azure_di/`, `mineru/`, `ragdoc_json/`)
+### Stage 1: Parsing (`src/ragdoc/parsing/`: `html/`, `pandoc/`, `xlsx/`, `azure_di/`, `mineru/`, `pdf_basic/`, `ragdoc_json/`)
 
 Each parser converts a format → `Document` and sets parser-specific fields (e.g. `document.parser = "mineru"`). File provenance is stamped **centrally** by `parsing.load()` via `stamp_provenance` (`parser` if unset, `source_path`, `metadata["filename"]`) — individual loaders do not stamp it. Processors check `document.parser` to adjust behavior.
+
+Parsers declare availability via `Parser.is_available()` / `unavailable_reason()`: resolution skips parsers whose extra/credentials are missing and raises an actionable `ValueError` at resolve time when nothing usable matches. PDF parsers by priority: `mineru` (50) > `azure_di` (40) > `pdf_basic` (10, pymupdf, zero-config via the `pdf` extra).
 
 ### Stage 2: Processing (`src/ragdoc/processing/`)
 
 - `DocumentProcessor` (async ABC) — all processors subclass this; pure-sync processors simply don't `await`
 - `ProcessingPipeline` — chains processors in sequence
 
-Built-in processors: `HeadingLevelProcessor`, `TitleDetectionProcessor`, `LLMHeadingResolver`, `FootnoteProcessor`, `EmptyDocumentFilter`. Pluggable strategies use `Protocol` (e.g., `FootnoteResolver`).
+Built-in processors: `HeadingLevelProcessor`, `TitleDetectionProcessor`, `LLMHeadingResolver`, `FootnoteProcessor`, `EmptyDocumentFilter`, `ImageSummaryProcessor`, `DocumentSummarizerProcessor`, `DocumentDumpProcessor`. Pluggable strategies use `Protocol` (e.g., `FootnoteResolver`). See `docs/guide/processing.md` for the catalog and ordering.
 
 Processors may return `None` to drop a document. `ProcessingPipeline` short-circuits on `None`; `IngestPipeline.run()` returns `None` and `DocumentPipeline.run()` returns `[]` chunks for filtered documents.
 
@@ -113,6 +117,8 @@ Processors may return `None` to drop a document. `ProcessingPipeline` short-circ
 
 Incremental synchronisation follows a **plan → apply** shape across two boundaries plus a direct path. Every sync pipeline exposes `plan()` (compute a reviewable `ChangeSet`, no store writes), `apply()` (write it), and `run = apply(plan(...))`.
 
+**One engine, three pipelines.** All sync pipelines (`VectorStorePipeline`, `DocumentStorePipeline`, `MentionStorePipeline`) are thin compositions over the generic streaming core `SyncEngine[T]` (`pipeline/sync.py`) — do not re-implement change detection, orphan handling, or write discipline in a pipeline. The engine owns: token comparison against `store.list_source_state()`, per-source concurrency, per-source error isolation (`except Exception`, never `BaseException` — cancellation propagates), delete-then-upsert with an optional `pre_write` hook (embedding; `apply()` calls it whole-corpus-first, `run()` per source), and opt-in orphan deletion. A pipeline contributes only (a) resolution of its request into a `SyncPlanInput` and (b) a producer coroutine `SyncSource -> SourceChange[T] | None` (`None` ⇒ unavailable, warn + skip; empty `items` ⇒ source yields nothing, stale entries deleted). Sinks satisfy the structural `SourceSyncStore[T]` protocol (`upsert`/`delete_by_source`/`list_source_state`). See `docs/guide/sync-engine.md`.
+
 **Two change-detection hashes** (first-class, never in `chunk.metadata`):
 - `source_hash` — SHA-256 of the **raw source-file bytes** (Boundary 1 / direct path).
 - `content_hash` — `Document.content_hash()`, a canonical-JSON hash over `(title, elements)` (pandoc-free, dependency-stable; Boundary 2). `None` ⇒ treated as "always changed".
@@ -129,7 +135,7 @@ Incremental synchronisation follows a **plan → apply** shape across two bounda
 `delete_orphans` defaults to **`False`** (footgun guard: in direct mode only pass your complete corpus). `UpdateResult` (`processed`/`skipped`/`deleted`/`errors`) is keyed on `source_id`.
 
 **Stores** (`src/ragdoc/pipeline/stores.py`):
-- `VectorStore` protocol — `upsert` / `delete` / `delete_by_source` / `list_source_ids` / `list_source_state() -> {source_id: SourceState}`. (`get_source_hash` is retained but unused — superseded by the bulk `list_source_state`.) Index on `chunk.source_id`/`chunk.source_hash`, not metadata.
+- `VectorStore` protocol — `upsert` / `delete` / `delete_by_source` / `list_source_ids` / `list_source_state() -> {source_id: SourceState}`. Index on `chunk.source_id`/`chunk.source_hash`, not metadata. (`get_source_hash` was removed — the bulk `list_source_state` superseded it.)
 - `DocumentStore` protocol — `upsert` / `delete_by_source` / `get_document` / `list_source_ids` / `list_source_state`.
 - `SourceState(source_hash, content_hash)` — bulk change-detection state.
 - `LocalDocumentStore` — filesystem-backed `DocumentStore` (one JSON file per source); index-free, so manual edits to stored documents are detected at Boundary 2.
