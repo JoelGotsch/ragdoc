@@ -215,3 +215,13 @@ docs/notebooks/pipeline_walkthrough.py
 # regenerate_test_fixtures.py staging
 scripts/.fixture_pdfs/
 
+# Local-only working dirs (legacy source documents, kept out of git)
+backup/
+scripts/output/
+
+# Corpus-migration artifacts — keep out of git
+scripts/regenerate_test_fixtures.py
+plans/done/PLAN_TYPED_METADATA_EXTENSIONS.md
+plans/done/PLAN_EMBEDDING_CONTENT_REFACTOR.md
+plans/done/PLAN_MINERU_IMAGE_PATHS.md
+
