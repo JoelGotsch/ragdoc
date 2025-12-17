@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-import requests
+import httpx
 from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
 
@@ -143,9 +143,10 @@ def generate_image(image: Tag) -> Image | None:
         return Image(image=content, image_type=image_type, **kwargs)
     elif download_images and (image_src.startswith("https://") or image_src.startswith("http://")):
         try:
-            response = requests.get(image_src)
-        except requests.exceptions.ConnectionError:
-            logger.warning(f"Failed to download image {image_src}: connection error")
+            response = httpx.get(image_src, timeout=10.0, follow_redirects=True)
+        except httpx.HTTPError:
+            # Covers connect errors AND timeouts — a dead host must not hang the parse.
+            logger.warning(f"Failed to download image {image_src}: transport error")
             return None
         if response.status_code == 200:
             content = base64.b64encode(response.content).decode("utf-8")

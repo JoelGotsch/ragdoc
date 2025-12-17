@@ -234,3 +234,34 @@ async def test_openai_summarizer_no_transformations_skips_pil():
     img = Image(image=_tiny_png_base64(), image_type="png")
     result = await summarize(img, context=None)
     assert result.summary == "x"
+
+
+@pytest.mark.anyio
+async def test_openai_summarizer_refusal_raises_value_error():
+    """message.parsed=None (refusal) must raise a clear ValueError inside _summarize (bug 6b)."""
+    client = _make_openai_client()
+    message = MagicMock()
+    message.parsed = None
+    client.beta.chat.completions.parse = AsyncMock(return_value=MagicMock(choices=[MagicMock(message=message)]))
+    summarize = openai_image_summarizer(client, model="gpt-test", transformations=[])
+    image = Image(image=_tiny_png_base64(), image_type="png")
+    with pytest.raises(ValueError, match="no parsed"):
+        await summarize(image, None)
+
+
+@pytest.mark.anyio
+async def test_processor_contains_per_image_refusal(caplog):
+    """One refused image must not abort the document — skip with a warning (bug 6b)."""
+    import logging
+
+    async def refusing_summarize(image, context):
+        raise ValueError("LLM returned no parsed ImageSummary (refusal?)")
+
+    image = Image(image=_tiny_png_base64(), image_type="png")
+    doc = Document(elements=[image])
+    processor = ImageSummaryProcessor(summarize=refusing_summarize)
+    with caplog.at_level(logging.WARNING):
+        result = await processor.process(doc)
+    assert result is doc
+    assert image.text_representation is None
+    assert any("Failed to summarize image" in r.message for r in caplog.records)

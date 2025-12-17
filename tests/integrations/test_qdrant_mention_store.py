@@ -93,3 +93,16 @@ async def test_list_mentions_rehydrates(store, client):
     assert len(mentions) == 1
     assert isinstance(mentions[0], Mention)
     assert mentions[0].payload.title == "E-m0"
+
+
+@pytest.mark.anyio
+async def test_create_indexes_created_when_collection_already_exists(client):
+    """A 409 on create_collection must NOT skip payload-index creation (fable-review Phase 0, bug 4)."""
+    from qdrant_client.http.exceptions import UnexpectedResponse
+
+    conflict = UnexpectedResponse(status_code=409, reason_phrase="Conflict", content=b"exists", headers={})  # type: ignore[arg-type]
+    client.create_collection = AsyncMock(side_effect=conflict)
+    client.create_payload_index = AsyncMock()
+    await QdrantMentionStore.create(client, "mentions", Event, make_embedder(), vector_size=4)
+    created = {c.kwargs["field_name"] for c in client.create_payload_index.await_args_list}
+    assert created == {"source_id"}

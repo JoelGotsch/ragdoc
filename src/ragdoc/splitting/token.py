@@ -342,10 +342,13 @@ def _token_slice(
 ) -> list[Document]:
     """Split ``chunk_doc`` by slicing its rendered token sequence with overlap.
 
-    Renders the full document first (inline refs are resolved — no raw
-    ``<ref/>`` tags remain), then slices the content-token window.
+    Renders and tokenizes ONLY the content elements (inline refs are resolved —
+    no raw ``<ref/>`` tags remain). The heading context is deliberately excluded
+    from the tokenized text: slicing a combined render by the token *count* of a
+    separately rendered overhead document is unsound (BPE merges across the seam
+    drop or duplicate boundary text). ``overhead_tokens`` still sizes the budget,
+    because ``make_chunk`` re-attaches ``heading_ctx`` to every output chunk.
     """
-    rendered = renderer.render(chunk_doc)
     content_budget = max_tokens - overhead_tokens
 
     if content_budget - overlap_tokens <= 100:
@@ -354,8 +357,10 @@ def _token_slice(
             "too little room for content. Reduce overlap_tokens or increase max_tokens."
         )
 
-    token_ids = tokenizer(rendered)
-    content_tokens = token_ids[overhead_tokens:]
+    heading_ids = {h.id for h in heading_ctx}
+    content_elements = [el for el in chunk_doc.elements if el.id not in heading_ids]
+    rendered = renderer.render(Document(elements=content_elements))
+    content_tokens = tokenizer(rendered)
 
     def make_chunk(text: str) -> Document:
         return Document(

@@ -127,3 +127,18 @@ async def test_delete_by_source_only_solely_owned(store, client):
     await store.delete_by_source("s1")
     selector = client.delete.call_args.kwargs["points_selector"]
     assert selector.points == [_point_id("e1")]
+
+
+@pytest.mark.anyio
+async def test_create_indexes_created_when_collection_already_exists(client):
+    """A 409 on create_collection must NOT skip index creation — incl. user indexed_fields (bug 4)."""
+    from qdrant_client.http.exceptions import UnexpectedResponse
+
+    conflict = UnexpectedResponse(status_code=409, reason_phrase="Conflict", content=b"exists", headers={})  # type: ignore[arg-type]
+    client.create_collection = AsyncMock(side_effect=conflict)
+    client.create_payload_index = AsyncMock()
+    await QdrantEntityStore.create(
+        client, "entities", Event, indexed_fields={"title": models.PayloadSchemaType.KEYWORD}
+    )
+    created = {c.kwargs["field_name"] for c in client.create_payload_index.await_args_list}
+    assert created == {"entity_id", "date_start", "date_end", "payload.title"}

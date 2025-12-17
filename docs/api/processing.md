@@ -142,14 +142,6 @@ Processors transform `Document` objects. They run between parsing and splitting 
       show_source: true
       heading_level: 4
 
-### SyncFootnoteProcessor
-
-::: ragdoc.processing.footnote.SyncFootnoteProcessor
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
-
 ### FootnoteResolver
 
 ::: ragdoc.processing.footnote.FootnoteResolver

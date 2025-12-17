@@ -201,7 +201,10 @@ def openai_image_summarizer(
             temperature=0,
             response_format=ImageSummary,
         )
-        return comp.choices[0].message.parsed
+        parsed = comp.choices[0].message.parsed
+        if parsed is None:
+            raise ValueError(f"Image summary LLM ({resolved_model!r}) returned no parsed ImageSummary (refusal?)")
+        return parsed
 
     return _summarize
 
@@ -290,3 +293,6 @@ class ImageSummaryProcessor(DocumentProcessor):
                 image.text_representation = result.text_representation or result.summary
         except (UnidentifiedImageError, OSError):
             logger.exception(f"Failed to summarize image {image.id}: image type {image.image_type!r} not supported")
+        except ValueError as exc:
+            # Contain per-image LLM refusals/schema failures — one bad image must not abort the document.
+            logger.warning(f"Failed to summarize image {image.id}: {exc}")

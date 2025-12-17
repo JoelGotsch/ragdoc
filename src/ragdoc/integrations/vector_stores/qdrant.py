@@ -242,6 +242,23 @@ def _source_id_filter(source_id: str) -> models.Filter:
 # ---------------------------------------------------------------------------
 
 
+async def _create_index_ignore_conflict(
+    client: AsyncQdrantClient, collection_name: str, field_name: str, field_schema: models.PayloadSchemaType
+) -> None:
+    """Create a payload index, ignoring 409 (index already exists).
+
+    Runs per index call so that an already-existing collection still gains any
+    missing payload indexes (a collection-level 409 must not skip indexing).
+    """
+    try:
+        await client.create_payload_index(
+            collection_name=collection_name, field_name=field_name, field_schema=field_schema
+        )
+    except UnexpectedResponse as exc:
+        if exc.status_code != 409:
+            raise
+
+
 class QdrantVectorStore:
     """Async VectorStore backed by Qdrant, implementing ragdoc's VectorStore protocol.
 
@@ -351,17 +368,14 @@ class QdrantVectorStore:
                     collection_name=collection_name,
                     vectors_config=models.VectorParams(size=vector_size, distance=distance),
                 )
-            # Create a payload index on source_id for efficient filtering.
-            await client.create_payload_index(
-                collection_name=collection_name,
-                field_name="source_id",
-                field_schema=models.PayloadSchemaType.KEYWORD,
-            )
         except UnexpectedResponse as exc:
             if exc.status_code == 409:  # Collection already exists — ignore
                 pass
             else:
                 raise
+        # Index creation runs OUTSIDE the collection-409 guard so an existing
+        # collection still gets any missing payload indexes (each call has its own 409 pass).
+        await _create_index_ignore_conflict(client, collection_name, "source_id", models.PayloadSchemaType.KEYWORD)
 
         if metadata_type is not None:
             await register_indexes_from_type(metadata_type, client, collection_name)

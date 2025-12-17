@@ -717,7 +717,13 @@ Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate
                 max_tokens=10,
             )
 
-            result = response.choices[0].message.content.strip().upper()
+            content = response.choices[0].message.content
+            if content is None:
+                logger.warning(
+                    f"LLMFootnoteResolver: model returned empty content for footnote {footnote_number}; skipping."
+                )
+                return None
+            result = content.strip().upper()
 
             if result == "NONE":
                 return None
@@ -732,9 +738,12 @@ Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate
 
             return None
 
-        except Exception:
-            # On error, return the first candidate as fallback
-            return candidates[0] if candidates else None
+        except Exception as exc:
+            logger.warning(
+                f"LLMFootnoteResolver: LLM call failed for footnote {footnote_number} ({exc!r}); "
+                "leaving footnote unresolved."
+            )
+            return None
 
 
 # =============================================================================
@@ -933,76 +942,3 @@ class FootnoteProcessor(DocumentProcessor):
                 apply_ref_patches(document.elements[element_idx], patches)
 
         return document
-
-
-class SyncFootnoteProcessor(DocumentProcessor):
-    """
-    Footnote processor using :class:`SimpleFootnoteResolver` — no LLM required.
-
-    .. note::
-        Each footnote is resolved to **exactly one** reference location (see
-        *Single-reference assumption* in the module docstring).
-
-    Example:
-        >>> processor = SyncFootnoteProcessor()
-        >>> doc = await processor.process(doc)
-    """
-
-    def __init__(
-        self,
-        context_chars: int = 50,
-        same_page_only: bool = True,
-        update_html: bool = True,
-        only_orphaned: bool = True,
-    ):
-        """
-        Initialize the sync footnote processor.
-
-        Args:
-            context_chars: Number of characters before/after reference for context
-            same_page_only: Whether to only search on the same page as the footnote
-            update_html: Whether to update element HTML with <ref> tags
-            only_orphaned: When True (**default**), only resolve not-yet-referenced
-                footnotes — makes ``process`` idempotent (see :class:`FootnoteProcessor`).
-                ``False`` re-resolves every footnote on each call (legacy, non-idempotent).
-        """
-        self.context_chars = context_chars
-        self.same_page_only = same_page_only
-        self.update_html = update_html
-        self.only_orphaned = only_orphaned
-
-    async def process(self, document: Document) -> Document:
-        """
-        Process the document to resolve footnote references.
-
-        Uses SimpleFootnoteResolver internally (no I/O).
-
-        Args:
-            document: The document to process
-
-        Returns:
-            The processed document (modified in place)
-        """
-        import asyncio
-
-        # Create an async processor with SimpleFootnoteResolver
-        async_processor = FootnoteProcessor(
-            resolver=SimpleFootnoteResolver(),
-            context_chars=self.context_chars,
-            same_page_only=self.same_page_only,
-            update_html=self.update_html,
-            only_orphaned=self.only_orphaned,
-        )
-
-        # Run in a new event loop (or existing if available)
-        try:
-            loop = asyncio.get_running_loop()
-            # If we're in an async context, we can't use run_until_complete
-            # This shouldn't happen for a SyncProcessor, but handle it
-            import nest_asyncio
-
-            nest_asyncio.apply()
-            return loop.run_until_complete(async_processor.process(document))
-        except RuntimeError:
-            # No running loop, safe to create one
-            return asyncio.run(async_processor.process(document))

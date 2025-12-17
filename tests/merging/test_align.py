@@ -225,3 +225,18 @@ def test_resolved_populated_all_ops_have_resolved_elements_or_are_delete():
     for op in ops:
         if op.op != PatchOperationType.DELETE_A:
             assert len(op.resolved_elements) > 0, f"Operation {op.op} has empty resolved_elements"
+
+
+def test_with_injected_markup_heading_carries_markup():
+    """Injected inline markup must survive into the returned Heading (Phase 0, bug 2).
+
+    Pre-fix, model_copy(update={"innerhtml": ...}) wrote to a read-only property and the
+    injection was silently dropped for every Heading.
+    """
+    from ragdoc.merging.align import _with_injected_markup
+
+    loser = Heading(html_content="<h2><strong>Q4</strong> results</h2>")
+    winner = Heading(html_content="<h2>Q4 results</h2>")
+    result = _with_injected_markup(winner, loser)
+    assert "<strong>" in result.html, "injected markup must survive into the returned Heading"
+    assert result.text == winner.text

@@ -187,7 +187,13 @@ class LLMChunker(Chunker):
             response_format=DocumentTopicSummaries,
             temperature=0,
         )
-        topic_summaries: DocumentTopicSummaries = response.choices[0].message.parsed
+        parsed: DocumentTopicSummaries | None = response.choices[0].message.parsed
+        if parsed is None:
+            raise ValueError(
+                f"LLMChunker: model {self._model!r} returned no parsed DocumentTopicSummaries for {doc_label} "
+                "(refusal or schema failure)."
+            )
+        topic_summaries = parsed
         logger.info(
             f"LLMChunker: generating topic summaries (model={self._model})"
             f" -> {len(topic_summaries.summaries)} summaries"

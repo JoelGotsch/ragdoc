@@ -281,3 +281,14 @@ async def test_create_is_idempotent_on_conflict(client):
 
 def test_satisfies_document_store_protocol(store):
     assert isinstance(store, DocumentStore)
+
+
+@pytest.mark.anyio
+async def test_create_indexes_created_when_collection_already_exists(client):
+    """A 409 on create_collection must NOT skip payload-index creation (fable-review Phase 0, bug 4)."""
+    conflict = UnexpectedResponse(status_code=409, reason_phrase="Conflict", content=b"exists", headers={})  # type: ignore[arg-type]
+    client.create_collection = AsyncMock(side_effect=conflict)
+    client.create_payload_index = AsyncMock()
+    await QdrantDocumentStore.create(client, "docs")
+    created = {c.kwargs["field_name"] for c in client.create_payload_index.await_args_list}
+    assert created == {"source_id"}

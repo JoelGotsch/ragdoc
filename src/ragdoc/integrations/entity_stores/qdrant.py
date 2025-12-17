@@ -63,6 +63,23 @@ def _entity_to_payload(entity: Entity) -> dict:
     return payload
 
 
+async def _create_index_ignore_conflict(
+    client: AsyncQdrantClient, collection_name: str, field_name: str, field_schema: models.PayloadSchemaType
+) -> None:
+    """Create a payload index, ignoring 409 (index already exists).
+
+    Runs per index call so that an already-existing collection still gains any
+    missing payload indexes (a collection-level 409 must not skip indexing).
+    """
+    try:
+        await client.create_payload_index(
+            collection_name=collection_name, field_name=field_name, field_schema=field_schema
+        )
+    except UnexpectedResponse as exc:
+        if exc.status_code != 409:
+            raise
+
+
 class QdrantEntityStore:
     """Async :class:`~ragdoc.extraction.entity.EntityStore` backed by Qdrant.
 
@@ -108,13 +125,11 @@ class QdrantEntityStore:
                 collection_name=collection_name,
                 vectors_config=models.VectorParams(size=1, distance=models.Distance.DOT),
             )
-            for field_name, schema in indexes.items():
-                await client.create_payload_index(
-                    collection_name=collection_name, field_name=field_name, field_schema=schema
-                )
         except UnexpectedResponse as exc:
             if exc.status_code != 409:
                 raise
+        for field_name, schema in indexes.items():
+            await _create_index_ignore_conflict(client, collection_name, field_name, schema)
         return cls(client, collection_name, payload_model)
 
     async def upsert(self, entities: list[Entity]) -> list[str]:
