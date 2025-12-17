@@ -107,9 +107,9 @@ throughout all pipeline stages.
 
 ## Utility Functions
 
-### merge_documents
+### concat_documents
 
-::: ragdoc.document.merge_documents
+::: ragdoc.document.concat_documents
     options:
       show_root_heading: true
       show_source: true

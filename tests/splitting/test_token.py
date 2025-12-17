@@ -375,6 +375,48 @@ def test_split_by_elements_no_heading_only_chunks():
         assert len(non_headings) >= 1
 
 
+def test_split_by_elements_no_trailing_heading_only_split_after_oversized():
+    """Regression: a document ENDING in an oversized delegation must not flush the
+    re-seeded heading context as a content-free trailing split."""
+    h1 = h(1, "Title")
+    big_para = p("X" * 300)
+    doc = Document(elements=[h1, big_para])
+    r = rdr()
+    max_t = (measured(big_para, r) + measured(h1, r)) // 2
+    result = split_by_elements(doc, r, tok(), max_tokens=max_t, overlap_tokens=_OVERLAP)
+    assert len(result) >= 2
+    for chunk in result:
+        assert any(not isinstance(e, Heading) for e in chunk.elements), (
+            "content-free heading-only split produced after oversized delegation"
+        )
+
+
+def test_split_by_elements_trailing_heading_after_oversized_is_kept():
+    """A NEW heading appearing after the oversized delegation exists nowhere else —
+    it must survive into the final split (conservation), even though that split is
+    heading-only."""
+    h1 = h(1, "Title")
+    big_para = p("X" * 300)
+    h2 = h(2, "Closing heading")
+    doc = Document(elements=[h1, big_para, h2])
+    r = rdr()
+    max_t = (measured(big_para, r) + measured(h1, r)) // 2
+    result = split_by_elements(doc, r, tok(), max_tokens=max_t, overlap_tokens=_OVERLAP)
+    all_ids = {e.id for chunk in result for e in chunk.elements}
+    assert h2.id in all_ids, "trailing heading lost"
+
+
+def test_split_by_elements_heading_only_document_still_splits():
+    """A document consisting solely of headings (no oversized delegation) keeps flushing."""
+    headings = [h(2, f"Heading number {i} with several words of text") for i in range(30)]
+    doc = Document(elements=headings)
+    r = rdr()
+    total = measured(doc, r)
+    result = split_by_elements(doc, r, tok(), max_tokens=total // 2, overlap_tokens=_OVERLAP)
+    all_ids = {e.id for chunk in result for e in chunk.elements}
+    assert {el.id for el in headings} <= all_ids
+
+
 def test_split_by_elements_oversized_single_element_further_split():
     h1 = h(1, "Title")
     big_para = p("X" * 300)

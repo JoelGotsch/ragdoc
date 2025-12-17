@@ -80,6 +80,26 @@ def test_build_image_messages_image_detail_default_is_high():
 # --- TestImageSummaryProcessor ---
 
 
+def test_image_processor_unconfigured_raises_at_construction():
+    """No summarize fn, no client anywhere → LLMNotConfiguredError in __init__, not process()."""
+    from ragdoc.config import RagdocConfig, configure
+    from ragdoc.llm import LLMNotConfiguredError
+
+    with configure(RagdocConfig()), pytest.raises(LLMNotConfiguredError):
+        ImageSummaryProcessor()
+
+
+def test_image_processor_custom_summarize_fn_needs_no_client():
+    """A custom summarize fn must not trigger client resolution."""
+    from ragdoc.config import RagdocConfig, configure
+
+    async def mock_summarize(image: Image, context: str | None) -> ImageSummary:
+        return ImageSummary(summary="x")
+
+    with configure(RagdocConfig()):
+        ImageSummaryProcessor(summarize=mock_summarize)  # must not raise
+
+
 @pytest.mark.anyio
 async def test_image_processor_sets_text_representation_from_structured():
     async def mock_summarize(image: Image, context: str | None) -> ImageSummary:

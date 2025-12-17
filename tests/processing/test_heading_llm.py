@@ -158,6 +158,82 @@ async def test_heading_resolver_handles_api_failure():
 
 
 @pytest.mark.anyio
+async def test_heading_resolver_resolves_levels_on_titled_document():
+    """A pre-set title (e.g. HTML <title>, MinerU document_title) must not skip level resolution."""
+    doc = Document(
+        title="Pre-set Title",
+        elements=[
+            Heading(html="<h3>Section</h3>"),
+            Heading(html="<h5>Subsection</h5>"),
+        ],
+    )
+    response = HeadingResponse(
+        judgments=[
+            HeadingJudgment(id=1, level=HeadingLevel.H1),
+            HeadingJudgment(id=2, level=HeadingLevel.H2),
+        ]
+    )
+    client = _make_mock_client(response)
+    resolver = LLMHeadingResolver(client)
+    result = await resolver.process(doc)
+
+    client.chat.completions.parse.assert_called_once()  # resolution ran despite existing title
+    assert result.elements[0].level == 1
+    assert result.elements[1].level == 2
+
+
+@pytest.mark.anyio
+async def test_heading_resolver_does_not_overwrite_existing_title():
+    """DOCUMENT_TITLE judgment on a titled document: keep the title, skip element removal."""
+    doc = Document(
+        title="Existing Title",
+        elements=[
+            Heading(html="<h1>LLM-Detected Title</h1>"),
+            Heading(html="<h2>Section</h2>"),
+        ],
+    )
+    response = HeadingResponse(
+        judgments=[
+            HeadingJudgment(id=1, level=HeadingLevel.DOCUMENT_TITLE),
+            HeadingJudgment(id=2, level=HeadingLevel.H1),
+        ]
+    )
+    client = _make_mock_client(response)
+    resolver = LLMHeadingResolver(client, remove_title_from_elements=True, remove_elements_before_title=True)
+    result = await resolver.process(doc)
+
+    assert result.title == "Existing Title"  # never overwritten
+    # No destructive title-element handling on an already-titled document.
+    assert len(result.elements) == 2
+    assert "is_document_title" not in result.elements[0].metadata
+    assert result.elements[1].level == 1  # level resolution still applied
+
+
+@pytest.mark.anyio
+async def test_heading_resolver_sets_title_when_absent():
+    """First run on an untitled document still detects and applies the title (with removal)."""
+    doc = Document(
+        elements=[
+            Heading(html="<h1>The Title</h1>"),
+            Heading(html="<h2>Section</h2>"),
+        ]
+    )
+    response = HeadingResponse(
+        judgments=[
+            HeadingJudgment(id=1, level=HeadingLevel.DOCUMENT_TITLE),
+            HeadingJudgment(id=2, level=HeadingLevel.H1),
+        ]
+    )
+    client = _make_mock_client(response)
+    resolver = LLMHeadingResolver(client, remove_title_from_elements=True)
+    result = await resolver.process(doc)
+
+    assert result.title == "The Title"
+    assert len(result.elements) == 1  # title element removed
+    assert result.elements[0].level == 1
+
+
+@pytest.mark.anyio
 async def test_heading_resolver_degrades_to_empty_on_exhaustion():
     """Behavior pin: a non-retryable 400 degrades to [] (headings unchanged) after ONE call."""
     import httpx

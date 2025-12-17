@@ -31,8 +31,11 @@ Shape mirrors the sync pipelines (all compose the shared
   (``ChangeSet[Mention[P]]``; load with ``ChangeSet[Mention[P]].load(path)``).
 
 A source's mentions share one ``content_hash`` (the parent Document's), stamped uniformly via
-:func:`~ragdoc.extraction.mention.finalize_mention`. This pipeline emits **mentions, not
-chunks** — it never touches a vector store.
+:func:`~ragdoc.extraction.mention.finalize_mention` with a **running per-source ordinal** across
+splits (identical payloads in different splits mint distinct ids); edge-carrying payloads have
+their endpoint refs rewritten through the finalization old → new id map
+(:func:`~ragdoc.extraction.mention.rewrite_edge_refs`), so KG edges never dangle. This pipeline
+emits **mentions, not chunks** — it never touches a vector store.
 """
 
 from __future__ import annotations
@@ -44,8 +47,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Generic, cast
 
 from ragdoc.extraction.extractor import Extractor
-from ragdoc.extraction.mention import Mention, PayloadT, finalize_mention
+from ragdoc.extraction.mention import Mention, PayloadT, finalize_mention, rewrite_edge_refs
 from ragdoc.pipeline.changeset import ChangeSet, SourceChange
+from ragdoc.pipeline.splitter import TokenSplitter
 from ragdoc.pipeline.sync import (
     SyncEngine,
     SyncPlanInput,
@@ -88,8 +92,9 @@ class MentionStorePipeline(Generic[PayloadT]):
             (e.g. ``StructuredExtractor`` or ``KnowledgeGraphExtractor``); its ``extract()``
             returns the typed mentions directly.
         mention_store: target :class:`MentionStore`.
-        splitter: ``Document -> list[Document]`` splitter run before extraction. ``None`` builds a
-            default token splitter (``split_document`` with a Markdown prompt renderer).
+        splitter: ``Document -> list[Document]`` splitter run before extraction. ``None`` uses
+            :class:`~ragdoc.pipeline.splitter.TokenSplitter` with its documented defaults,
+            resolved once at construction.
         hash_fn: ``Path -> str`` file-byte change-detection hash (default
             :func:`~ragdoc.pipeline.sync.file_hash`, SHA-256 of bytes).
         concurrency: max sources processed concurrently.
@@ -139,7 +144,7 @@ class MentionStorePipeline(Generic[PayloadT]):
             document_store: source :class:`~ragdoc.pipeline.stores.DocumentStore` holding
                 already-parsed-and-processed Documents.
             splitter: ``Document -> list[Document]`` splitter run before extraction
-                (``None`` builds the default token splitter).
+                (``None`` uses :class:`~ragdoc.pipeline.splitter.TokenSplitter` defaults).
             concurrency: max sources processed concurrently.
 
         Returns:
@@ -176,7 +181,8 @@ class MentionStorePipeline(Generic[PayloadT]):
         self._extractor = extractor
         self._store = mention_store
         self._document_store = document_store
-        self._splitter = splitter
+        # Resolved once at construction — the documented default splitter, not a per-document rebuild.
+        self._splitter: Splitter = splitter if splitter is not None else TokenSplitter()
         self._hash_fn = hash_fn
         self._concurrency = concurrency
         self._engine: SyncEngine[Mention[PayloadT]] = SyncEngine(
@@ -192,17 +198,6 @@ class MentionStorePipeline(Generic[PayloadT]):
             raise AssertionError("source_id_fn is a direct-mode concern; Boundary 2 has no paths")
         return self._ingest.source_id_fn
 
-    def _get_splitter(self) -> Splitter:
-        if self._splitter is not None:
-            return self._splitter
-        from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
-        from ragdoc.splitting.token import split_document
-        from ragdoc.utils import GPTTokenizer
-
-        renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
-        tokenizer = GPTTokenizer()
-        return lambda document: split_document(document, renderer, tokenizer)
-
     # ------------------------------------------------------------------
     # extraction primitives
     # ------------------------------------------------------------------
@@ -210,21 +205,45 @@ class MentionStorePipeline(Generic[PayloadT]):
     async def _extract_from_document(self, parent: Document) -> list[Mention[PayloadT]]:
         """Split + extract on an already-parsed-and-processed Document.
 
-        The Document must carry ``source_id`` and ``source_hash`` (caller's responsibility).
+        The Document must carry ``source_id`` and ``source_hash`` (caller's responsibility;
+        ``source_hash`` may honestly be ``None`` — it is never faked from the content hash).
         Source-of-truth path: both file-mode and Boundary-2 mode delegate here.
+
+        Splits are extracted concurrently, then finalized **in split order** with a running
+        per-source ordinal (so identical payloads in different splits mint distinct
+        ``mention_id``\\ s) while recording the old → new mention-id map; every edge-carrying
+        payload's refs are rewritten through that map, so KG edges keep pointing at the
+        finalized node mention ids even though finalization re-mints them with the parent's
+        ``content_hash``.
         """
         source_id = parent.source_id or parent.source_path or parent.id
-        source_hash = parent.source_hash or ""
+        source_hash = parent.source_hash
         content_hash = parent.content_hash()
 
-        splitter = self._get_splitter()
-        out: list[Mention[PayloadT]] = []
-        for split in splitter(parent):
+        # Splitting renders per element/group to measure token budgets — sync CPU/pandoc work,
+        # so hop off the event loop at this orchestration boundary (see IngestPipeline).
+        splits = await asyncio.to_thread(self._splitter, parent)
+        for split in splits:
             split.source_id = source_id
             split.source_hash = source_hash
-            for mention in await self._extractor.extract(split):
+        results = await asyncio.gather(*(self._extractor.extract(split) for split in splits), return_exceptions=True)
+        for res in results:
+            if isinstance(res, BaseException):
+                raise res  # first failing split fails the source, as before
+
+        out: list[Mention[PayloadT]] = []
+        id_map: dict[str, str] = {}
+        ordinal = 0
+        for split_mentions in cast("list[list[Mention[PayloadT]]]", results):
+            for mention in split_mentions:
+                old_id = mention.mention_id
+                mention.ordinal = ordinal
+                ordinal += 1
                 finalize_mention(mention, content_hash=content_hash, source_id=source_id, source_hash=source_hash)
+                id_map[old_id] = mention.mention_id
                 out.append(mention)
+        for mention in out:
+            rewrite_edge_refs(mention.payload, id_map)
         return out
 
     async def _extract_source(self, path: Path, source_id: str, file_hash: str) -> list[Mention[PayloadT]]:
@@ -286,7 +305,9 @@ class MentionStorePipeline(Generic[PayloadT]):
                 sources=[
                     SyncSource(source_id=sid, change_token=digest, path=path) for sid, (path, digest) in current.items()
                 ],
-                live_source_ids=frozenset(current),
+                # Failed ids stay in live_source_ids: an unreadable file is not an orphan.
+                live_source_ids=frozenset(current) | frozenset(current.errors),
+                pre_failed=tuple(current.errors.items()),
             )
 
         doc_state = await self._document_store.list_source_state()

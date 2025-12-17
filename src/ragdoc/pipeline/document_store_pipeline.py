@@ -12,8 +12,11 @@ no embedding step.  Change detection at this boundary uses the file-byte ``sourc
 
 :meth:`DocumentStorePipeline.run` is **streaming**: each source is written as soon as it is
 produced (per-source durability), instead of buffering the whole corpus first. A source
-whose Document is filtered out by processing (processor returns ``None``) yields an empty
-change — it is counted ``processed`` and any stale stored Document for it is deleted.
+whose Document is filtered out by processing (processor returns ``None``) is **skipped with
+a warning and any previously stored Document is preserved** — filtering is potentially
+transient (an LLM/filter misclassification must not destroy durable state, nor cascade
+into chunk deletion via a later Boundary-2 ``delete_orphans`` run). Genuine deletion stays
+reserved for ``delete_orphans`` and for sources that vanish from the input set.
 """
 
 from __future__ import annotations
@@ -87,15 +90,16 @@ class DocumentStorePipeline(Generic[TMetadata]):
         return self._ingest.source_id_fn
 
     async def _produce(self, src: SyncSource) -> SourceChange[Document] | None:
-        """Parse + process one file into a single-Document change (empty when filtered)."""
+        """Parse + process one file into a single-Document change (``None`` when filtered)."""
         if src.path is None:  # pragma: no cover - resolution always sets it
             raise AssertionError("DocumentStorePipeline SyncSource without a path")
         doc = await self._ingest.run(src.path)
         if doc is None:
-            logger.info(f"Document filtered out: {src.path.name}")
-            # Empty change (NOT None): the source still exists, it just yields nothing —
-            # counted processed, and any stale stored Document is deleted.
-            return SourceChange(source_id=src.source_id, source_hash=src.change_token, content_hash=None, items=[])
+            # None (NOT an empty change): the engine warns + skips, leaving any stored
+            # Document untouched. Filtering may be a transient misclassification; deleting
+            # here would destroy durable state and later cascade into chunk deletion.
+            logger.warning(f"sync: document {src.source_id!r} filtered by processing; stored copy preserved")
+            return None
         doc.source_id = src.source_id
         doc.source_hash = src.change_token
         return SourceChange(
@@ -111,7 +115,10 @@ class DocumentStorePipeline(Generic[TMetadata]):
             sources=[
                 SyncSource(source_id=sid, change_token=digest, path=path) for sid, (path, digest) in current.items()
             ],
-            live_source_ids=frozenset(current),
+            # Sources whose hashing failed are still live (unreadable ≠ vanished):
+            # they must never become orphan-deletion candidates.
+            live_source_ids=frozenset(current) | frozenset(current.errors),
+            pre_failed=tuple(current.errors.items()),
         )
 
     async def plan(self, sources: Iterable[Path], delete_orphans: bool = False) -> ChangeSet[Document]:

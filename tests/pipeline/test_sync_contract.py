@@ -13,7 +13,9 @@ Every case pins the **unified** behavior implemented by
 
 * §2.4 — a custom ``BaseException`` propagates (``except Exception`` only).
 * §2.5 — ``apply()`` skips the upsert after a failed stale-delete (no old/new mixing).
-* §2.6 — a filtered source clears its stale stored entry (counted processed).
+* §2.6 — a filtered source clears its stale **derived** entries (chunks/mentions, counted
+  processed) but **preserves** the stored Document at Boundary 1 (skip-with-warning —
+  a transient filter misclassification must not destroy durable state).
 * §2.2 — a target sid missing from the doc store is warned + skip-counted.
 * §2.3 — a document that vanishes between ``list_source_state`` and ``get_document`` is
   warned + skip-counted.
@@ -790,9 +792,10 @@ async def test_run_equals_apply_plan_end_state(case_name, make_case):
 # ===========================================================================
 
 
-@for_cases(DIRECT_CASES)
+@for_cases(["vector-direct", "mention-direct"])
 @pytest.mark.anyio
-async def test_filtered_source_clears_stale_entry(case_name, make_case):
+async def test_filtered_source_clears_stale_derived_entries(case_name, make_case):
+    """Derived stores (chunks/mentions): a filtered source yields nothing — stale entries go."""
     case = make_case(case_name)
     await case.add("a.txt", "v1")
     await case.run()
@@ -805,6 +808,27 @@ async def test_filtered_source_clears_stale_entry(case_name, make_case):
     assert result.processed == ["a.txt"]
     assert case.items("a.txt") == []
     assert "a.txt" not in await case.store_ids()
+
+
+@for_cases(["docstore"])
+@pytest.mark.anyio
+async def test_filtered_source_preserves_stored_document(case_name, make_case, caplog):
+    """Boundary 1 (durable Documents): a filtered source is skipped and its stored copy kept."""
+    case = make_case(case_name)
+    await case.add("a.txt", "v1")
+    await case.run()
+    old_markers = case.markers("a.txt")
+    assert old_markers
+
+    await case.edit("a.txt", "v2 which processing now filters out")
+    case.filtered.add("a.txt")
+    with caplog.at_level(logging.WARNING):
+        result = await case.run()
+
+    assert result.skipped == ["a.txt"] and result.processed == []
+    assert case.markers("a.txt") == old_markers  # the v1 Document survives
+    assert "a.txt" in await case.store_ids()
+    assert any("filtered by processing" in r.getMessage() for r in caplog.records)
 
 
 # ===========================================================================

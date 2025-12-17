@@ -116,9 +116,36 @@ async def test_query_builds_overlap_and_where_filter(store, client):
 
     assert [r.entity_id for r in results] == ["e1"]
     flt = client.scroll.call_args.kwargs["scroll_filter"]
-    keys = {c.key for c in flt.must}
-    # half-open overlap: date_start < query.end AND date_end > query.start, plus the where match
-    assert keys == {"date_start", "date_end", "payload.title"}
+    field_conditions = {c.key for c in flt.must if isinstance(c, models.FieldCondition)}
+    assert field_conditions == {"payload.title"}
+    # each date bound is a nested should: in-range OR key-missing (missing key = unbounded)
+    bound_filters = [c for c in flt.must if isinstance(c, models.Filter) and c.should]
+    bound_keys = set()
+    for bf in bound_filters:
+        range_cond, empty_cond = bf.should
+        assert isinstance(range_cond, models.FieldCondition) and range_cond.range is not None
+        assert isinstance(empty_cond, models.IsEmptyCondition)
+        assert empty_cond.is_empty.key == range_cond.key
+        bound_keys.add(range_cond.key)
+    # half-open overlap: date_start < query.end AND date_end > query.start
+    assert bound_keys == {"date_start", "date_end"}
+    # undated entities (date null/missing) stay excluded, matching LocalEntityStore
+    undated_excluders = [c for c in flt.must if isinstance(c, models.Filter) and c.must_not]
+    assert len(undated_excluders) == 1
+    (excluder,) = undated_excluders[0].must_not
+    assert isinstance(excluder, models.IsEmptyCondition) and excluder.is_empty.key == "date"
+
+
+@pytest.mark.anyio
+async def test_query_half_bounded_query_adds_single_bound_condition(store, client):
+    import datetime as dt
+
+    await store.query(EntityQuery(date=DateRange(start=dt.date(2000, 1, 1))))
+    flt = client.scroll.call_args.kwargs["scroll_filter"]
+    bound_filters = [c for c in flt.must if isinstance(c, models.Filter) and c.should]
+    assert len(bound_filters) == 1  # only the date_end bound (query.end is unbounded)
+    range_cond = bound_filters[0].should[0]
+    assert range_cond.key == "date_end" and range_cond.range.gt is not None
 
 
 @pytest.mark.anyio

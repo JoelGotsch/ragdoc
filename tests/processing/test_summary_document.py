@@ -160,6 +160,24 @@ def _para(text: str) -> Paragraph:
     return Paragraph(html=f"<p>{text}</p>")
 
 
+def test_unconfigured_client_raises_at_construction():
+    """No explicit client and no configured client → LLMNotConfiguredError in __init__, not process()."""
+    from ragdoc.config import RagdocConfig, configure
+    from ragdoc.llm import LLMNotConfiguredError
+
+    with configure(RagdocConfig()), pytest.raises(LLMNotConfiguredError):
+        DocumentSummarizerProcessor()
+
+
+def test_configured_client_resolved_at_construction():
+    from ragdoc.config import RagdocConfig, configure
+
+    configured = MagicMock()
+    with configure(RagdocConfig(openai_client=configured)):
+        processor = DocumentSummarizerProcessor()
+    assert processor._client is configured
+
+
 @pytest.mark.anyio
 async def test_passthrough_below_min_returns_rendered_text_no_call():
     client, _calls = _make_client(lambda t: "UNUSED")

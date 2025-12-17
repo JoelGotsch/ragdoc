@@ -273,8 +273,8 @@ class Heading(BaseElement):
 
         ``tag.decode(formatter="html")`` escapes attribute values, replacing the old manual
         attribute rebuild and its escaping bug. When no hN tag is found the text content is
-        escaped and wrapped in ``<h1>``. h0 is unrepresentable here (the pattern is h[1-6]);
-        the explicit level-0 guard lives in the ``level`` setter.
+        escaped and wrapped in ``<h1>``. Out-of-range levels are unrepresentable here (the
+        pattern is h[1-6]); the explicit 1-6 range guard lives in the ``level`` setter.
         """
         soup = BeautifulSoup(value, "html.parser")
         tag = soup.find(_HEADING_TAG_PATTERN)
@@ -292,11 +292,13 @@ class Heading(BaseElement):
     def level(self, new_level: int) -> None:
         """Rebuild html with the heading tag renamed to ``h{new_level}``.
 
-        Raises ValueError on level 0. Assigning ``self.html`` re-validates and invalidates
-        the soup cache.
+        Raises ValueError for any level outside 1-6: a tag like ``<h7>`` would be missed by
+        the normalizing validator's h[1-6] pattern and silently destroy inline content (the
+        text-escape fallback strips e.g. ``<ref/>`` tags). Assigning ``self.html``
+        re-validates and invalidates the soup cache.
         """
-        if new_level == 0:
-            raise ValueError("Heading level 0 (h0) is not allowed. Use level 1-6.")
+        if not 1 <= new_level <= 6:
+            raise ValueError(f"Heading level {new_level} is not allowed. Use level 1-6.")
         soup = BeautifulSoup(self.html, "html.parser")  # fresh parse — the tree is mutated below
         tag = soup.find(_HEADING_TAG_PATTERN)
         if isinstance(tag, Tag):
@@ -342,6 +344,10 @@ class Table(BaseElement):
         return value.strip()
 
 
+_IMG_DATA_URI_PATTERN = re.compile(r"data:image/(?P<image_type>[^;]+);base64,(?P<image_data>.+)")
+"""Matches an ``<img src>`` data URI, capturing the image type and base64 payload."""
+
+
 def image_fields_from_html(html_str: str) -> dict[str, str | int | None]:
     """Parse an ``<img>`` tag into :class:`Image` field values.
 
@@ -360,8 +366,7 @@ def image_fields_from_html(html_str: str) -> dict[str, str | int | None]:
     if not isinstance(img_tag, Tag):
         return {}
     src = img_tag.get("src", "")
-    data_pattern = re.compile(r"data:image/(?P<image_type>[^;]+);base64,(?P<image_data>.+)")
-    data_match = data_pattern.match(src)  # type: ignore[arg-type]  # src is the str 'src' attribute
+    data_match = _IMG_DATA_URI_PATTERN.match(src)  # type: ignore[arg-type]  # src is the str 'src' attribute
     data: dict[str, str | int | None] = {}
     if data_match:
         width = img_tag.get("width")
@@ -436,8 +441,34 @@ class Image(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:  # pyright: ignore[reportIncompatibleVariableOverride]  # property implements the typing-only base declaration
-        for k, v in image_fields_from_html(value).items():
-            setattr(self, k, v)
+        """Re-derive **all** derivable fields from an ``<img>`` tag with a ``data:`` URI src.
+
+        Attributes absent from the new tag reset to ``None`` — assignment never leaves stale
+        values from the previous tag. A missing ``<img>`` tag or a non-``data:`` src raises
+        ``ValueError``: :class:`Image` stores base64 content, so such an assignment cannot be
+        represented and silently ignoring it would violate ``validate_assignment`` semantics.
+        (Construction via ``Image(html=...)`` keeps its lenient parsed-fields-as-defaults
+        behavior — see :func:`image_fields_from_html`.)
+        """
+        soup = BeautifulSoup(value, "html.parser")
+        img_tag = soup.find("img")
+        if not isinstance(img_tag, Tag):
+            raise ValueError("Image.html assignment requires an <img> tag; none found in the assigned HTML.")
+        src = str(img_tag.get("src") or "")
+        data_match = _IMG_DATA_URI_PATTERN.match(src)
+        if data_match is None:
+            raise ValueError(
+                "Image.html assignment requires a data: URI src (Image stores base64 content); "
+                f"got src={src[:100]!r}. Set structured fields directly for non-embedded images."
+            )
+        width = img_tag.get("width")
+        height = img_tag.get("height")
+        alt = img_tag.get("alt")
+        self.image = data_match.group("image_data")
+        self.image_type = data_match.group("image_type")
+        self.alt = str(alt) if alt is not None else None
+        self.width = int(str(width)) if width else None
+        self.height = int(str(height)) if height else None
 
 
 class RawText(BaseElement):
@@ -886,11 +917,14 @@ class Document(BaseModel, Generic[TMetadata]):
 
 
 MetadataMergePolicy = Literal["first", "second", "strict"]
-"""Conflict policy for metadata keys present on both inputs of :func:`merge_documents`."""
+"""Conflict policy for metadata keys present on both inputs of :func:`concat_documents`."""
 
 
-def merge_documents(first: Document, second: Document, *, metadata_policy: MetadataMergePolicy = "first") -> Document:
+def concat_documents(first: Document, second: Document, *, metadata_policy: MetadataMergePolicy = "first") -> Document:
     """Concatenate two documents into a new one. Inputs are never mutated.
+
+    Not to be confused with :func:`ragdoc.merging.merge_documents`, which *aligns* two parses
+    of the same source — this function appends ``second``'s elements after ``first``'s.
 
     Field policy:
 
@@ -930,7 +964,7 @@ def merge_documents(first: Document, second: Document, *, metadata_policy: Metad
     if metadata_policy == "strict":
         conflicts = sorted(key for key in first_meta.keys() & second_meta.keys() if first_meta[key] != second_meta[key])
         if conflicts:
-            raise ValueError(f"merge_documents(metadata_policy='strict'): conflicting metadata keys {conflicts}")
+            raise ValueError(f"concat_documents(metadata_policy='strict'): conflicting metadata keys {conflicts}")
         metadata = {**first_meta, **second_meta}
     elif metadata_policy == "second":
         metadata = {**first_meta, **second_meta}
@@ -951,7 +985,7 @@ def merge_documents(first: Document, second: Document, *, metadata_policy: Metad
 
 
 def join_documents(documents: list[Document], *, metadata_policy: MetadataMergePolicy = "first") -> Document:
-    """Merge documents left-to-right via :func:`merge_documents`; an empty list yields ``Document()``."""
+    """Concatenate documents left-to-right via :func:`concat_documents`; an empty list yields ``Document()``."""
     if len(documents) == 0:
         return Document()
-    return reduce(lambda a, b: merge_documents(a, b, metadata_policy=metadata_policy), documents)
+    return reduce(lambda a, b: concat_documents(a, b, metadata_policy=metadata_policy), documents)

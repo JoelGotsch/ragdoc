@@ -90,6 +90,7 @@ doc = await ingest.run(path)                     # parse + process (pre-split)
 splits = split_document(doc, renderer, tokenizer)
 
 summarizer = DocumentSummarizerProcessor()       # writes metadata["summary"] per split
+# (requires a configured LLM client — raises LLMNotConfiguredError at construction otherwise)
 enriched = [await summarizer.process(s) for s in splits]
 
 chunker = SimpleChunker()                        # then chunk each enriched split

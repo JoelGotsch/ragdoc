@@ -49,17 +49,21 @@ def vstore() -> MemoryVectorStore:
     return MemoryVectorStore()
 
 
-def make_vs_pipeline(vstore, source_id_fn=None, embedders=None) -> VectorStorePipeline:
+def make_vs_pipeline(vstore, source_id_fn=None, embedders=None, hash_fn=None) -> VectorStorePipeline:
     async def _parse(path: Path) -> Document:
         return make_document(title=path.stem, body=path.read_text(encoding="utf-8"))
 
     dp_kwargs = {}
     if source_id_fn is not None:
         dp_kwargs["source_id_fn"] = source_id_fn
+    vs_kwargs = {}
+    if hash_fn is not None:
+        vs_kwargs["hash_fn"] = hash_fn
     return VectorStorePipeline(
         pipeline=DocumentPipeline(parser=_parse, **dp_kwargs),
         vector_store=vstore,
         embedders=embedders,
+        **vs_kwargs,
     )
 
 
@@ -283,6 +287,47 @@ async def test_run_one_bad_source_does_not_block_others(tmp_path, vstore):
     result = await pipeline.run([good, bad])
     assert result.processed == ["good.html"]
     assert [sid for sid, _ in result.errors] == ["bad.html"]
+
+
+def _flaky_hash(path: Path) -> str:
+    """hash_fn that fails for c.html (simulates an unreadable file)."""
+    if path.name == "c.html":
+        raise PermissionError("unreadable")
+    return file_hash(path)
+
+
+@pytest.mark.anyio
+async def test_run_unreadable_file_isolated_others_sync(make_files, vstore):
+    """One unhashable file: the other sources still sync, and the failure lands in errors."""
+    paths = make_files({"a.html": "A", "b.html": "B", "c.html": "C"})
+    result = await make_vs_pipeline(vstore, hash_fn=_flaky_hash).run(paths)
+
+    assert set(result.processed) == {"a.html", "b.html"}
+    assert [(sid, type(exc)) for sid, exc in result.errors] == [("c.html", PermissionError)]
+    assert await vstore.list_source_ids() == {"a.html", "b.html"}
+
+
+@pytest.mark.anyio
+async def test_run_unreadable_file_is_not_orphan_deleted(make_files, vstore):
+    """A source whose hash failed is live-but-unreadable: delete_orphans must not remove its chunks."""
+    paths = make_files({"a.html": "A", "b.html": "B", "c.html": "C"})
+    await make_vs_pipeline(vstore).run(paths)  # seed all three, incl. c.html
+
+    result = await make_vs_pipeline(vstore, hash_fn=_flaky_hash).run(paths, delete_orphans=True)
+    assert result.deleted == []
+    assert "c.html" in await vstore.list_source_ids()
+    assert [sid for sid, _ in result.errors] == ["c.html"]
+
+
+@pytest.mark.anyio
+async def test_plan_unreadable_file_not_in_changeset_nor_orphaned(make_files, vstore):
+    paths = make_files({"a.html": "A", "b.html": "B", "c.html": "C"})
+    await make_vs_pipeline(vstore).run(paths)
+
+    changeset = await make_vs_pipeline(vstore, hash_fn=_flaky_hash).plan(paths, delete_orphans=True)
+    planned = {sc.source_id for sc in changeset.to_add + changeset.to_update}
+    assert "c.html" not in planned
+    assert "c.html" not in changeset.to_delete
 
 
 # ---------------------------------------------------------------------------

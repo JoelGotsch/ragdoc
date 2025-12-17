@@ -12,6 +12,7 @@ Requires the ``ragdoc[qdrant]`` extra (the import guard lives here, stated once)
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from typing import ClassVar
@@ -28,6 +29,8 @@ except ImportError as _e:
     ) from _e
 
 from ragdoc.pipeline.stores import SourceState
+
+logger = logging.getLogger(__name__)
 
 # Payload keys read by the bulk change-detection path (must stay cheap — no full bodies).
 _STATE_KEYS = ["source_id", "source_hash", "content_hash"]
@@ -172,12 +175,35 @@ class _QdrantCollectionStore:
     # ------------------------------------------------------------------
 
     async def _batched_upsert(self, points: list[models.PointStruct], collection: str | None = None) -> None:
-        """Upsert *points* in ``_UPSERT_BATCH``-sized batches (avoids message-size limits)."""
-        for i in range(0, len(points), self._UPSERT_BATCH):
-            await self._client.upsert(
-                collection_name=collection or self._collection_name,
-                points=points[i : i + self._UPSERT_BATCH],
-            )
+        """Upsert *points* in ``_UPSERT_BATCH``-sized batches (avoids message-size limits).
+
+        On a mid-run batch failure, earlier batches are already persisted carrying the NEW
+        ``source_hash``/``content_hash`` — the next sync would read that state as "unchanged"
+        and skip the half-written source forever. So a failure triggers a **best-effort
+        rollback**: every distinct ``source_id`` present in *points* is deleted from the
+        collection, then the original exception is re-raised. The next run sees those sources
+        missing and re-processes them. Cancellation is never caught (no rollback on
+        ``asyncio.CancelledError`` — consistent with the sync engine's error discipline).
+        """
+        try:
+            for i in range(0, len(points), self._UPSERT_BATCH):
+                await self._client.upsert(
+                    collection_name=collection or self._collection_name,
+                    points=points[i : i + self._UPSERT_BATCH],
+                )
+        except Exception as exc:
+            source_ids = sorted({sid for p in points if isinstance(sid := (p.payload or {}).get("source_id"), str)})
+            if source_ids:
+                logger.warning(
+                    f"batched upsert failed mid-run ({exc!r}); rolling back sources {source_ids} "
+                    "so the next sync re-processes them instead of seeing a half-written 'unchanged' state"
+                )
+            for sid in source_ids:
+                try:
+                    await self._delete_by_source_filter(sid, collection=collection)
+                except Exception:
+                    logger.error(f"rollback delete_by_source({sid!r}) failed", exc_info=True)
+            raise
 
     async def _delete_by_source_filter(self, source_id: str, collection: str | None = None) -> None:
         """Delete every point whose ``source_id`` payload key equals *source_id*."""

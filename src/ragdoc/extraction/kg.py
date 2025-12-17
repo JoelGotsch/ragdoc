@@ -32,9 +32,10 @@ missed; results are merged with offset chunk-local ids to avoid collision. Glean
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, Field, create_model
 
@@ -207,7 +208,8 @@ class KnowledgeGraphExtractor:
     Args:
         schema: :class:`~ragdoc.extraction.schema.GraphSchema` declaring node types,
             edge types, and legal patterns (enforced — see the module docstring).
-        client: Async OpenAI-compatible client; ``None`` falls back to ``get_config().openai_client``.
+        client: Async OpenAI-compatible client; ``None`` falls back to ``get_config().openai_client``,
+            resolved fail-loud at construction.
         model: Model name; ``None`` falls back to ``settings.model_name`` then config default.
         settings: :class:`~ragdoc.extraction.structured.ExtractionSettings`; ``None`` reads
             env (``EXTRACTION_*``).
@@ -218,6 +220,7 @@ class KnowledgeGraphExtractor:
 
     Raises:
         ValueError: when the schema's node or edge union exceeds ``settings.max_union_size``.
+        LLMNotConfiguredError: when no client is given and the active config has none.
     """
 
     def __init__(
@@ -247,7 +250,7 @@ class KnowledgeGraphExtractor:
                 f"multiple KnowledgeGraphExtractors, or raise the limit."
             )
         self._schema = schema
-        self._client = client
+        self._client: ChatClient = resolve_openai_client(client)
         self._model = model
         self._renderer = renderer
         self._tokenizer = tokenizer
@@ -362,8 +365,18 @@ class KnowledgeGraphExtractor:
                 len(right),
                 exc,
             )
-            primary = await self._extract_with_halving(left, client, model, graph_batch_cls, depth=depth + 1)
-            secondary = await self._extract_with_halving(right, client, model, graph_batch_cls, depth=depth + 1)
+            # Extract both halves concurrently; the merge consumes them positionally after both
+            # complete. return_exceptions=True keeps the losing half awaited (no orphan task /
+            # unretrieved-exception warning) — the first failure still propagates as before.
+            halved = await asyncio.gather(
+                self._extract_with_halving(left, client, model, graph_batch_cls, depth=depth + 1),
+                self._extract_with_halving(right, client, model, graph_batch_cls, depth=depth + 1),
+                return_exceptions=True,
+            )
+            for res in halved:
+                if isinstance(res, BaseException):
+                    raise res from exc  # first failing half propagates; *exc* triggered the halving
+            primary, secondary = cast("tuple[BaseModel, BaseModel]", halved)
             offset = len(primary.node_mentions)  # type: ignore[attr-defined]
             merged_nodes, merged_edges = _merge_gleaning(
                 list(primary.node_mentions),  # type: ignore[attr-defined]
@@ -377,7 +390,8 @@ class KnowledgeGraphExtractor:
     async def extract(self, document: Document) -> list[Mention[BaseModel]]:
         """Extract nodes + edges from *document*; returns the merged mention list (nodes first)."""
         renderer = resolve_renderer(self._renderer)
-        rendered = renderer.render(document)
+        # Rendering is sync CPU/pandoc work — hop off the event loop (chunker precedent).
+        rendered = await asyncio.to_thread(renderer.render, document)
         if not rendered.strip():
             return []
         min_tokens = self.settings.min_tokens
@@ -386,7 +400,7 @@ class KnowledgeGraphExtractor:
             return []
 
         graph_batch_cls, _ = build_graph_batch_model(self._schema)
-        client = resolve_openai_client(self._client)
+        client = self._client
         model = resolve_model(self._model, self.settings)
 
         primary = await self._extract_with_halving(rendered, client, model, graph_batch_cls)
@@ -420,7 +434,8 @@ class KnowledgeGraphExtractor:
 
         content_hash = document.content_hash()
         source_id = document.source_id or document.source_path or document.id
-        source_hash = document.source_hash or content_hash
+        # Honestly optional: the file-byte hash, or None — never faked from the content hash.
+        source_hash = document.source_hash
         metadata_copy = dict(document.metadata)
 
         # Build the merged mention list (nodes first so the local_id map is ready for edges).
@@ -552,19 +567,37 @@ def _merge_gleaning(
     secondary_edges: list,
     offset: int,
 ) -> tuple[list, list]:
-    """Renumber the secondary batch's local ids to avoid collision with the primary, then concat.
+    """Renumber the secondary batch's local ids to fresh, collision-free ids, then concat.
 
-    The secondary nodes' ``local_id`` strings are remapped through ``"n{offset + i}"``; each
-    secondary edge's endpoint refs are rewritten through the same remap so the connections stay
-    intact across the offset.
+    Fresh ids start at ``"n{offset}"`` but skip any id already used by a primary node, so
+    non-contiguous primary ids (e.g. ``n0, n2``) can never collide with a renumbered secondary
+    id. Each secondary edge's endpoint refs are rewritten through the same remap so the
+    connections stay intact; refs naming a primary id pass through untouched.
+
+    Raises:
+        ValueError: when the secondary batch itself contains duplicate ``local_id``\\ s — the
+            same fail-loud product as the primary-batch duplicate check in ``extract()``
+            (silent last-wins remapping would attach edges to the wrong node).
     """
-    # Build remap: secondary local_id -> renumbered local_id
+    secondary_ids = [wrapped.local_id for wrapped in secondary_nodes]
+    duplicates = {lid for lid in secondary_ids if secondary_ids.count(lid) > 1}
+    if duplicates:
+        raise ValueError(
+            f"Duplicate node local_id(s) {sorted(duplicates)!r} in the secondary (gleaning/halving) "
+            f"extraction output; the LLM must assign each node a unique chunk-local id."
+        )
+
+    # Build remap: secondary local_id -> fresh local_id (guaranteed absent from the primary set).
+    taken = {wrapped.local_id for wrapped in primary_nodes}
     remap: dict[str, str] = {}
     renumbered_secondary_nodes = []
-    for i, wrapped in enumerate(secondary_nodes):
-        old = wrapped.local_id
-        new = f"n{offset + i}"
-        remap[old] = new
+    counter = offset
+    for wrapped in secondary_nodes:
+        while (new := f"n{counter}") in taken:
+            counter += 1
+        counter += 1
+        taken.add(new)
+        remap[wrapped.local_id] = new
         # mutate in place — the wrapper is locally owned
         wrapped.local_id = new
         renumbered_secondary_nodes.append(wrapped)

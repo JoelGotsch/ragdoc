@@ -178,6 +178,68 @@ async def test_batched_upsert_collection_override(store: _StoreA, client: MagicM
 
 
 # ---------------------------------------------------------------------------
+# _batched_upsert — rollback on mid-run batch failure
+# ---------------------------------------------------------------------------
+
+
+def _points_for_sources(n: int, source_ids: list[str]) -> list[models.PointStruct]:
+    return [
+        models.PointStruct(id=str(uuid.uuid4()), vector=[0.0], payload={"source_id": source_ids[i % len(source_ids)]})
+        for i in range(n)
+    ]
+
+
+@pytest.mark.anyio
+async def test_batched_upsert_mid_run_failure_rolls_back_all_sources_and_reraises(
+    store: _StoreA, client: MagicMock
+) -> None:
+    """A failure on batch 2 must delete every source touched by this call (else the already-
+    persisted batch 1 carries the NEW source_hash and the next sync sees 'unchanged' forever)."""
+    batch = _QdrantCollectionStore._UPSERT_BATCH
+    points = _points_for_sources(batch + 1, ["src-a", "src-b"])
+    client.upsert = AsyncMock(side_effect=[None, RuntimeError("batch 2 boom")])
+
+    with pytest.raises(RuntimeError, match="batch 2 boom"):
+        await store._batched_upsert(points)
+
+    deleted = {c.kwargs["points_selector"].must[0].match.value for c in client.delete.call_args_list}
+    assert deleted == {"src-a", "src-b"}
+    assert all(c.kwargs["collection_name"] == "base_col" for c in client.delete.call_args_list)
+
+
+@pytest.mark.anyio
+async def test_batched_upsert_rollback_failure_still_raises_original(store: _StoreA, client: MagicMock) -> None:
+    batch = _QdrantCollectionStore._UPSERT_BATCH
+    points = _points_for_sources(batch + 1, ["src-a"])
+    client.upsert = AsyncMock(side_effect=[None, RuntimeError("original boom")])
+    client.delete = AsyncMock(side_effect=OSError("delete down"))
+
+    with pytest.raises(RuntimeError, match="original boom"):
+        await store._batched_upsert(points)
+    client.delete.assert_awaited()  # rollback was attempted
+
+
+@pytest.mark.anyio
+async def test_batched_upsert_rollback_uses_collection_override(store: _StoreA, client: MagicMock) -> None:
+    batch = _QdrantCollectionStore._UPSERT_BATCH
+    points = _points_for_sources(batch + 1, ["src-a"])
+    client.upsert = AsyncMock(side_effect=[None, RuntimeError("boom")])
+
+    with pytest.raises(RuntimeError):
+        await store._batched_upsert(points, collection="other_col")
+    assert client.delete.call_args.kwargs["collection_name"] == "other_col"
+
+
+@pytest.mark.anyio
+async def test_batched_upsert_failure_without_source_ids_skips_rollback(store: _StoreA, client: MagicMock) -> None:
+    """Points without a source_id payload (nothing to roll back by) still re-raise."""
+    client.upsert = AsyncMock(side_effect=RuntimeError("boom"))
+    with pytest.raises(RuntimeError, match="boom"):
+        await store._batched_upsert(_dummy_points(1))
+    client.delete.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # _ensure_collection — creation matrix (per-index 409 handling)
 # ---------------------------------------------------------------------------
 

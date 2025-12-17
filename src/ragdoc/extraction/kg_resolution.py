@@ -24,14 +24,13 @@ and aggregate pending/iteration metrics.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from ragdoc.extraction.entity import Entity
+from ragdoc.extraction.entity import Entity, mint_entity_id
 from ragdoc.extraction.mention import Mention
 from ragdoc.extraction.query import EntityQuery, filter_entities
 from ragdoc.extraction.resolution import (
@@ -234,7 +233,7 @@ def _promote_mentions_to_entities(mentions: list[Mention]) -> list[Entity]:
     for m in mentions:
         out.append(
             Entity(
-                entity_id=_mint_entity_id([m.mention_id]),
+                entity_id=mint_entity_id([m.mention_id]),
                 payload=m.payload,
                 aliases=[],
                 member_mention_ids=[m.mention_id],
@@ -244,12 +243,6 @@ def _promote_mentions_to_entities(mentions: list[Mention]) -> list[Entity]:
             )
         )
     return out
-
-
-def _mint_entity_id(member_mention_ids: list[str]) -> str:
-    """Content-hash of the sorted member mention ids (matches Entity's existing scheme)."""
-    sorted_ids = sorted(member_mention_ids)
-    return hashlib.sha256("\x00".join(sorted_ids).encode("utf-8")).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +273,8 @@ class _ExplicitMentionStore:
         from ragdoc.pipeline.stores import SourceState
 
         return {
-            m.source_id: SourceState(source_hash=m.source_hash, content_hash=m.content_hash) for m in self._mentions
+            m.source_id: SourceState(source_hash=m.source_hash or "", content_hash=m.content_hash)
+            for m in self._mentions
         }
 
     async def list_mentions(self, payload_type: type[BaseModel] | None = None) -> list[Mention]:

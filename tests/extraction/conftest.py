@@ -70,7 +70,7 @@ class MemoryMentionStore:
     async def list_source_state(self) -> dict[str, SourceState]:
         state: dict[str, SourceState] = {}
         for m in self.stored.values():
-            state[m.source_id] = SourceState(source_hash=m.source_hash, content_hash=m.content_hash)
+            state[m.source_id] = SourceState(source_hash=m.source_hash or "", content_hash=m.content_hash)
         return state
 
     async def list_mentions(self, payload_type: type[BaseModel] | None = None) -> list[Mention]:

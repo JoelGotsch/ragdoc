@@ -45,11 +45,19 @@ def _normalise_hyphen_year_range(s: str) -> str:
     insists on ``/`` as the range separator. Other hyphenated forms (``2024-03``, ``2024-03-12``)
     are valid EDTF and pass through unchanged because the regex requires exactly four-then-four
     digits separated by a single hyphen.
+
+    Only a **plausible ascending year range** (second year strictly greater than the first) is
+    rewritten. Anything else — e.g. ``"2024-0312"``, a mangled day that would otherwise become
+    the reversed interval ``2024/0312`` (year 312!) — is returned untouched so ``parse_edtf``
+    fails loud and the deterministic validation failure triggers the LLM retry.
     """
     m = _HYPHEN_YEAR_RANGE.match(s.strip())
     if m is None:
         return s
-    return f"{m.group(1)}/{m.group(2)}"
+    first, second = m.group(1), m.group(2)
+    if int(second) <= int(first):
+        return s
+    return f"{first}/{second}"
 
 
 def _is_iso_8601_duration(s: str) -> bool:

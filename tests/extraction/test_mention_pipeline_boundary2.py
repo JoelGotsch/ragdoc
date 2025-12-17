@@ -145,6 +145,21 @@ async def test_unchanged_document_skipped_no_llm_call(docs, mstore):
 
 
 @pytest.mark.anyio
+async def test_boundary2_source_hash_none_not_faked(docs, mstore):
+    """A stored Document without a file-byte source_hash yields mentions with source_hash=None —
+    never a value faked from the content hash (F7: source_hash is honestly optional)."""
+    doc = _make_doc("a.pdf", "Alpha")
+    doc.source_hash = None
+    await docs.upsert([doc])
+
+    result = await make_b2_pipeline(docs, make_extractor([Event(title="Ev")]), mstore).run()
+    assert result.processed == ["a.pdf"]
+    mentions = await mstore.list_mentions()
+    assert mentions and all(m.source_hash is None for m in mentions)
+    assert all(m.content_hash == doc.content_hash() for m in mentions)
+
+
+@pytest.mark.anyio
 async def test_edited_document_is_reextracted(docs, mstore):
     await _seed(docs, "a.pdf", "Original")
     client = make_event_client([[Event(title="First")], [Event(title="Second")]])

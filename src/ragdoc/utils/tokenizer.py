@@ -94,3 +94,10 @@ class MaxTokenizer:  # implements Tokenizer
 
     def count(self, text: str) -> int:
         return len(self(text))
+
+
+def resolve_tokenizer(explicit: Tokenizer | None) -> Tokenizer:
+    """Resolve a tokenizer: explicit → ``GPTTokenizer()`` (the library-wide default)."""
+    if explicit is not None:
+        return explicit
+    return GPTTokenizer()

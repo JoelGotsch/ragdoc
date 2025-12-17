@@ -47,6 +47,21 @@ async def test_list_source_state(tmp_path: Path):
 
 
 @pytest.mark.anyio
+async def test_source_hash_none_roundtrips_and_state_token(tmp_path: Path):
+    """source_hash is honestly optional (F7): None round-trips, and the SourceState token
+    degrades to '' (⇒ unknown ⇒ always changed on the direct path)."""
+    store = LocalMentionStore(tmp_path, Event)
+    m = Mention[Event](mention_id="x", source_id="s", content_hash="c", payload=Event(title="E"))
+    await store.upsert([m])
+
+    (reloaded,) = await store.list_mentions()
+    assert reloaded.source_hash is None
+    state = await store.list_source_state()
+    assert state["s"].source_hash == ""  # '' ⇒ unknown ⇒ direct-path token treats as changed
+    assert state["s"].content_hash == "c"  # Boundary-2 token still works
+
+
+@pytest.mark.anyio
 async def test_delete_by_source(tmp_path: Path):
     store = LocalMentionStore(tmp_path, Event)
     await store.upsert([mention("a", 0), mention("b", 0)])

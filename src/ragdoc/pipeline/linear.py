@@ -59,6 +59,30 @@ if TYPE_CHECKING:
     from ragdoc.processing.base import DocumentProcessor, ProcessingPipeline
 
 
+def required_metadata_keys(metadata_type: type[TMetadata]) -> frozenset[str]:
+    """Required keys of a metadata TypedDict, robust to PEP 563 stringified annotations.
+
+    Under ``from __future__ import annotations`` a ``Required[...]`` marker is stored as a
+    string, so ``__required_keys__`` computed at class creation misses it (and, dually, a
+    stringified ``NotRequired[...]`` in a ``total=True`` TypedDict is wrongly included).
+    Resolving the type hints recovers the true set.
+
+    Args:
+        metadata_type: A :class:`~ragdoc.metadata.BaseMetadata` subclass (TypedDict).
+
+    Returns:
+        The keys a document's metadata must contain to satisfy *metadata_type*.
+    """
+    from typing import get_origin
+
+    from typing_extensions import NotRequired, Required, get_type_hints
+
+    hints = get_type_hints(metadata_type, include_extras=True)
+    required_marked = {key for key, hint in hints.items() if get_origin(hint) is Required}
+    not_required_marked = {key for key, hint in hints.items() if get_origin(hint) is NotRequired}
+    return frozenset((set(metadata_type.__required_keys__) | required_marked) - not_required_marked)
+
+
 @dataclass
 class PipelineResult:
     """Aggregated result from :meth:`DocumentPipeline.run_many`.
@@ -106,8 +130,10 @@ class IngestPipeline(Generic[TMetadata]):
             from ragdoc.parsing import load
 
             self._parser: Callable[[Path], Awaitable[Document]] = load
+            self._parser_name = "load"
         else:
             self._parser = parser
+            self._parser_name = getattr(parser, "__name__", None) or type(parser).__name__
         self._source_id_fn: Callable[[Path], str] = source_id_fn if source_id_fn is not None else (lambda p: p.name)
 
         if processors is None:
@@ -130,17 +156,19 @@ class IngestPipeline(Generic[TMetadata]):
     async def run(self, source: Path) -> Document | None:
         """Parse + process one file into a Document; ``None`` if a processor drops it.
 
+        Provenance (``document.parser`` / ``source_path`` / ``metadata["filename"]``) is
+        stamped via :func:`~ragdoc.parsing.registry.stamp_provenance` so the explicit-parser
+        path and the default :func:`~ragdoc.parsing.load` path produce identical provenance
+        (stamping fills only fields the parser left unset — a no-op after ``load()``).
         ``source_id`` is stamped from ``source_id_fn`` (a pure function of the path); the
         file-byte ``source_hash`` is a sync concern stamped by the sync pipelines.
         """
+        from ragdoc.parsing.registry import stamp_provenance
+
         logger.debug(f"Parsing {source.name}")
         doc = await self._parser(source)
         logger.debug(f"Parsed {source.name}: {len(doc.elements)} elements")
-        if not doc.source_path:
-            logger.warning(
-                f"Parser did not set source_path on document from {source}. "
-                "Set doc.source_path in your parser function."
-            )
+        stamp_provenance(doc, source, self._parser_name)
         doc.source_id = self._source_id_fn(source)
         return await self._processing_pipeline.process(doc)
 
@@ -227,12 +255,13 @@ class ChunkPipeline(Generic[TMetadata]):
         doc = document
 
         if self._metadata_type is not None:
-            required = self._metadata_type.__required_keys__ - {"filename"}
+            required = required_metadata_keys(self._metadata_type)
             missing = required - set(doc.metadata.keys())
             if missing:
                 raise ValueError(
-                    f"Processors did not set required metadata fields: {missing}. "
-                    f"Expected by {self._metadata_type.__name__}."
+                    f"Document metadata is missing required fields: {sorted(missing)}. "
+                    f"Expected by {self._metadata_type.__name__} "
+                    "(parsers stamp 'filename'; processors must set custom Required keys)."
                 )
 
         # Source-level provenance (uniform across all of this document's chunks).

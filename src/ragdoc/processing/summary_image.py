@@ -233,8 +233,10 @@ class ImageSummaryProcessor(DocumentProcessor):
     Args:
         summarize: An :data:`ImageSummarizeFn` callable ``(image, context) -> ImageSummary``.
             When ``None``, falls back to
-            ``openai_image_summarizer(get_config().openai_client)`` at
-            :meth:`process` time.
+            ``openai_image_summarizer(get_config().openai_client)`` — resolved at
+            construction, raising :class:`~ragdoc.llm.LLMNotConfiguredError` when no
+            client is configured (fail-loud, never at :meth:`process` time). A custom
+            ``summarize`` fn needs no client.
         context_fn: Optional ``(image, document) -> str | None`` injecting
             per-image context into the LLM prompt.
         concurrency: Maximum number of images summarized concurrently.  Accepts
@@ -261,19 +263,17 @@ class ImageSummaryProcessor(DocumentProcessor):
         context_fn: Callable[[Image, Document], str | None] | None = None,
         concurrency: int | asyncio.Semaphore = 1,
     ):
-        self._summarize = summarize
+        if summarize is None:
+            # Fail-loud at construction (library client policy): a missing client raises
+            # LLMNotConfiguredError here, never mid-pipeline. A custom summarize fn skips
+            # client resolution entirely.
+            summarize = openai_image_summarizer(resolve_openai_client(None))
+        self._summarize: ImageSummarizeFn = summarize
         self._context_fn = context_fn
         self._concurrency = concurrency
 
-    def _get_summarize(self) -> ImageSummarizeFn:
-        if self._summarize is not None:
-            return self._summarize
-        # Fail-loud when no client is configured (LLMNotConfiguredError instead of a
-        # None-attribute crash mid-document).
-        return openai_image_summarizer(resolve_openai_client(None))
-
     async def process(self, document: Document) -> Document:
-        summarize = self._get_summarize()
+        summarize = self._summarize
         all_images = [img for img in document.images if img.image is not None]
         images = [img for img in all_images if not img.text_representation]
         skipped = len(all_images) - len(images)

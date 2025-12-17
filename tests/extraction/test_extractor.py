@@ -86,6 +86,26 @@ async def test_provenance_and_metadata_copy():
 
 
 @pytest.mark.anyio
+async def test_source_hash_none_when_document_has_none():
+    """source_hash is honestly optional — never faked from the content hash."""
+    client = make_client([Event(title="A")])
+    doc = make_doc(source_id="s1")  # no source_hash on the document
+    mentions = await extractor(client).extract(doc)
+
+    assert mentions[0].source_hash is None
+    assert mentions[0].content_hash == doc.content_hash()  # content_hash still real
+
+
+def test_construction_without_client_fails_loud():
+    """Client resolution happens in __init__ (fail-loud at construction), never at extract time."""
+    from ragdoc.config import RagdocConfig, configure
+    from ragdoc.llm import LLMNotConfiguredError
+
+    with configure(RagdocConfig()), pytest.raises(LLMNotConfiguredError):
+        StructuredExtractor(Event)
+
+
+@pytest.mark.anyio
 async def test_document_metadata_untouched_by_extract():
     client = make_client([Event(title="A")])
     doc = make_doc(source_id="s1", split_sequence=1, custom={"nested": [1, 2]})

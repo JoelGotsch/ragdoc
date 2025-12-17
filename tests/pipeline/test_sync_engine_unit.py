@@ -281,6 +281,26 @@ async def test_build_current_map_hashes_all_sources(tmp_path: Path):
 
     current = await build_current_map(paths, lambda p: p.name, lambda p: f"h::{p.name}", concurrency=2)
     assert current == {p.name: (p, f"h::{p.name}") for p in paths}
+    assert current.errors == {}
+
+
+@pytest.mark.anyio
+async def test_build_current_map_isolates_per_path_hash_failures(tmp_path: Path):
+    """One unreadable file must not abort hashing; it is excluded and its error captured."""
+    good = tmp_path / "good.txt"
+    good.write_text("g", encoding="utf-8")
+    bad = tmp_path / "bad.txt"
+    bad.write_text("b", encoding="utf-8")
+
+    def flaky_hash(path: Path) -> str:
+        if path.name == "bad.txt":
+            raise PermissionError("unreadable")
+        return f"h::{path.name}"
+
+    current = await build_current_map([good, bad], lambda p: p.name, flaky_hash, concurrency=2)
+    assert dict(current) == {"good.txt": (good, "h::good.txt")}
+    assert set(current.errors) == {"bad.txt"}
+    assert isinstance(current.errors["bad.txt"], PermissionError)
 
 
 # ---------------------------------------------------------------------------

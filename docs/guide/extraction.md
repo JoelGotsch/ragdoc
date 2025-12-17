@@ -75,7 +75,7 @@ class KeywordPersonExtractor:
                     Mention(
                         mention_id=mint_mention_id(document.source_id or document.id, None, ordinal, payload),
                         source_id=document.source_id or document.id,
-                        source_hash=document.source_hash or "",
+                        source_hash=document.source_hash,  # honestly optional: None when unknown, never faked
                         ordinal=ordinal,
                         metadata=dict(document.metadata),
                         payload=payload,

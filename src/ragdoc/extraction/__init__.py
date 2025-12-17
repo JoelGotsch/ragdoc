@@ -17,14 +17,14 @@ payload model. The extractors/settings require the ``extraction`` extra (``edtf`
 """
 
 from ragdoc.extraction.dates import FuzzyDate, Precision
-from ragdoc.extraction.entity import Entity, EntityStore, LocalEntityStore
+from ragdoc.extraction.entity import Entity, EntityStore, LocalEntityStore, mint_entity_id
 from ragdoc.extraction.extractor import Extractor, as_processor
 from ragdoc.extraction.graph_store import GraphStore, LocalGraphStore
 from ragdoc.extraction.kg_resolution import (
     KGResolutionResult,
     KnowledgeGraphResolutionPipeline,
 )
-from ragdoc.extraction.mention import Mention, finalize_mention, mint_mention_id
+from ragdoc.extraction.mention import Mention, finalize_mention, mint_mention_id, rewrite_edge_refs
 from ragdoc.extraction.pipeline import MentionStorePipeline
 from ragdoc.extraction.query import DateRange, EntityQuery, entity_matches, filter_entities
 from ragdoc.extraction.resolution import (
@@ -84,8 +84,10 @@ __all__ = [
     "finalize_mention",
     "kind_of",
     "make_llm_reviewer",
+    "mint_entity_id",
     "mint_mention_id",
     "render_patterns_prompt",
+    "rewrite_edge_refs",
 ]
 
 try:
