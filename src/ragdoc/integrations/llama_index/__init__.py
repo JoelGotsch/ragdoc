@@ -1,3 +1,8 @@
+# llama_index is an optional, uninstalled dependency here; whether basedpyright can resolve it
+# depends on its bundled stubs, so suppress the missing-import check file-wide (a config
+# directive, not an ignore comment, so it is never flagged as "unnecessary").
+# pyright: reportMissingImports=false
+
 # TODO: Long-term, each integration (llama_index, langchain, etc.) should live in its own
 # separate repository as an optional add-on package. For now they live here.
 #
@@ -6,7 +11,7 @@
 # of ragdoc works without the extra dependency installed.
 
 try:
-    import llama_index  # type: ignore[reportMissingImports]  # optional, untyped integration dependency
+    import llama_index  # optional, untyped integration dependency
 
     _llama_index_available = True
 except ImportError:
