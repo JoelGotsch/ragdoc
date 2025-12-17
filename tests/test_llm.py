@@ -38,6 +38,15 @@ class _Out(BaseModel):
 _OK = _Out(value="ok")
 
 
+class _StubLLMClient:
+    # RagdocConfig validates openai_client via isinstance against the runtime-checkable
+    # LLMClient protocol; on Python 3.12+ that uses getattr_static, which a bare
+    # MagicMock's dynamic attributes never satisfy — the stub's must be real attributes.
+    def __init__(self) -> None:
+        self.chat = MagicMock()
+        self.embeddings = MagicMock()
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -303,12 +312,12 @@ async def test_non_beta_namespace_used():
 
 def test_resolve_client_explicit_wins():
     explicit = MagicMock()
-    with configure(RagdocConfig(openai_client=MagicMock())):
+    with configure(RagdocConfig(openai_client=_StubLLMClient())):
         assert resolve_openai_client(explicit) is explicit
 
 
 def test_resolve_client_falls_back_to_config():
-    configured = MagicMock()
+    configured = _StubLLMClient()
     with configure(RagdocConfig(openai_client=configured)):
         assert resolve_openai_client(None) is configured
 

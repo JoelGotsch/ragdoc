@@ -172,7 +172,14 @@ def test_unconfigured_client_raises_at_construction():
 def test_configured_client_resolved_at_construction():
     from ragdoc.config import RagdocConfig, configure
 
-    configured = MagicMock()
+    class _StubLLMClient:
+        # RagdocConfig's isinstance check against the runtime-checkable LLMClient protocol
+        # uses getattr_static on Python 3.12+ — a bare MagicMock's dynamic attributes fail it.
+        def __init__(self) -> None:
+            self.chat = MagicMock()
+            self.embeddings = MagicMock()
+
+    configured = _StubLLMClient()
     with configure(RagdocConfig(openai_client=configured)):
         processor = DocumentSummarizerProcessor()
     assert processor._client is configured
