@@ -16,8 +16,8 @@ from ragdoc.processing.dump import DocumentDumpProcessor, default_file_namer
 def sample_document() -> Document:
     return Document(
         elements=[
-            Heading(innerhtml="Introduction", level=1, page=1),
-            Paragraph(html_content="<p>Hello world.</p>", page=1),
+            Heading(html="<h1>Introduction</h1>", page=1),
+            Paragraph(html="<p>Hello world.</p>", page=1),
         ],
         parser="html",
         source_path="/data/report.html",

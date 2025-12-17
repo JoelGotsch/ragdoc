@@ -9,12 +9,12 @@ from ragdoc.parsing.xlsx.load import ExcelConfig, generate_document as generate_
 
 
 def load_excel(path: Path | str, config: ExcelConfig | None = None) -> Document:
-    """Parse an Excel workbook into a Document. Sets ``source_path`` and ``metadata["filename"]``."""
-    file_path = Path(path)
-    document = generate_xlsx_documents(pd.ExcelFile(file_path), config or ExcelConfig())
-    document.metadata["filename"] = file_path.name
-    document.source_path = str(file_path)
-    return document
+    """Parse an Excel workbook into a Document.
+
+    Provenance (``source_path``, ``metadata["filename"]``) is stamped centrally by
+    :func:`ragdoc.parsing.load` — not here.
+    """
+    return generate_xlsx_documents(pd.ExcelFile(Path(path)), config or ExcelConfig())
 
 
 # ---------------------------------------------------------------------------

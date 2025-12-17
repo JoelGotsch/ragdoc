@@ -12,7 +12,7 @@ from ragdoc.utils.debug_footnotes import (
 
 
 def _make_heading(text: str, **kwargs) -> Heading:
-    return Heading(html_content=f"<h1>{text}</h1>", **kwargs)
+    return Heading(html=f"<h1>{text}</h1>", **kwargs)
 
 
 def _make_footnote(fn_id: str, number: int, text: str, **kwargs) -> Footnote:
@@ -20,7 +20,7 @@ def _make_footnote(fn_id: str, number: int, text: str, **kwargs) -> Footnote:
 
 
 def _make_paragraph(html: str) -> Paragraph:
-    return Paragraph(html_content=f"<p>{html}</p>")
+    return Paragraph(html=f"<p>{html}</p>")
 
 
 # =============================================================================

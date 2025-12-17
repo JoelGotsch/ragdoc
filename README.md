@@ -185,7 +185,7 @@ Change detection uses two hashes: `source_hash` (SHA-256 of the raw file bytes) 
 `Document` contains a list of `BaseElement` subclasses:
 `Heading`, `Paragraph`, `Table`, `Image`, `DocumentList`, `Footnote`, `RawText`.
 
-Visual properties are stored as **inline CSS** in `innerhtml` (e.g. `font-size`, `text-align`).
+Visual properties are stored as **inline CSS** in each element's `html` (e.g. `font-size`, `text-align`).
 Cross-document relationships use `ExternalRef` (parent/child/related).
 Within-document inline references use `InlineRef` with `<ref id='...'/>` placeholders.
 

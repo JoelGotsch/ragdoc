@@ -65,7 +65,8 @@ def tok() -> CharTokenizer:
 
 
 def h(level: int, text: str = "") -> Heading:
-    return Heading(innerhtml=text or f"H{level}", level=level)
+    inner = text or f"H{level}"
+    return Heading(html=f"<h{level}>{inner}</h{level}>")
 
 
 def p(text: str) -> Paragraph:
@@ -519,10 +520,15 @@ def test_split_by_elements_split_shifts_earlier_when_ref_inflates_group_size():
 # ---------------------------------------------------------------------------
 
 
-def test_split_document_fits_returns_original():
+def test_split_document_fits_returns_copy_with_sequence():
     doc = Document(elements=[p("short")])
     result = split_document(doc, rdr(), tok(), max_tokens=10_000, overlap_tokens=_OVERLAP)
-    assert result == [doc]
+    assert len(result) == 1
+    assert result[0].elements == doc.elements  # elements shared by reference
+    assert result[0].metadata["split_sequence"] == 1
+    assert result[0].metadata["split_total"] == 1
+    # the input document is never mutated
+    assert "split_sequence" not in doc.metadata
 
 
 def test_split_document_uses_hierarchical_split_when_possible():
@@ -755,8 +761,8 @@ def _token_slice_setup(content_words: list[str], tokenizer):
     from ragdoc.document import ExternalRef
     from ragdoc.splitting.token import _token_slice
 
-    heading = Heading(html_content="<h1>CTXEND</h1>")
-    content = Paragraph(html_content=f"<p>{' '.join(content_words)}</p>")
+    heading = Heading(html="<h1>CTXEND</h1>")
+    content = Paragraph(html=f"<p>{' '.join(content_words)}</p>")
     chunk_doc = Document(elements=[heading, content])
     renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
     overhead_tokens = tokenizer.count(renderer.render(Document(elements=[heading])))

@@ -28,7 +28,7 @@ from .conftest import Event, MemoryMentionStore, make_event_client, make_extract
 def make_doc(**metadata) -> Document:
     return Document(
         title="Report",
-        elements=[Heading(innerhtml="Report", level=1), Paragraph(html_content="<p>Body text.</p>")],
+        elements=[Heading(html="<h1>Report</h1>"), Paragraph(html="<p>Body text.</p>")],
         metadata=metadata,
     )
 

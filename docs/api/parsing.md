@@ -10,6 +10,14 @@ Functions and source types for loading documents from files.
       show_source: true
       heading_level: 3
 
+## stamp_provenance
+
+::: ragdoc.parsing.registry.stamp_provenance
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 3
+
 ## Parser
 
 ::: ragdoc.parsing.parser.Parser

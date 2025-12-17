@@ -6,12 +6,12 @@ from ragdoc.parsing.parser import Parser
 
 
 def load_html(path: Path | str) -> Document:
-    """Parse an HTML file into a Document. Sets ``source_path`` and ``metadata["filename"]``."""
-    file_path = Path(path)
-    document = generate_html_document(HTML.from_file(file_path))
-    document.metadata["filename"] = file_path.name
-    document.source_path = str(file_path)
-    return document
+    """Parse an HTML file into a Document.
+
+    Provenance (``source_path``, ``metadata["filename"]``) is stamped centrally by
+    :func:`ragdoc.parsing.load` — not here.
+    """
+    return generate_html_document(HTML.from_file(Path(path)))
 
 
 # ---------------------------------------------------------------------------

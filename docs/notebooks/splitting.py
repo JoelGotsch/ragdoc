@@ -41,14 +41,14 @@ def _():
     sample_doc = Document(
         title="Annual Report",
         elements=[
-            Heading(innerhtml="Introduction", level=1),
-            Paragraph(html_content="<p>Overview paragraph.</p>"),
-            Heading(innerhtml="Section A", level=2),
-            Paragraph(html_content="<p>Section A content.</p>"),
-            Heading(innerhtml="Section B", level=2),
-            Paragraph(html_content="<p>Section B content.</p>"),
-            Heading(innerhtml="Subsection B1", level=3),
-            Paragraph(html_content="<p>Subsection B1 content.</p>"),
+            Heading(html="<h1>Introduction</h1>"),
+            Paragraph(html="<p>Overview paragraph.</p>"),
+            Heading(html="<h2>Section A</h2>"),
+            Paragraph(html="<p>Section A content.</p>"),
+            Heading(html="<h2>Section B</h2>"),
+            Paragraph(html="<p>Section B content.</p>"),
+            Heading(html="<h3>Subsection B1</h3>"),
+            Paragraph(html="<p>Subsection B1 content.</p>"),
         ],
         metadata={"source": "annual_report.docx"},
     )

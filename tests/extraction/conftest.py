@@ -193,7 +193,7 @@ def make_parser():
     async def _parse(path: Path) -> Document:
         return Document(
             title=path.stem,
-            elements=[Heading(innerhtml=path.stem, level=1), Paragraph(html_content=f"<p>{path.read_text()}</p>")],
+            elements=[Heading(html=f"<h1>{path.stem}</h1>"), Paragraph(html=f"<p>{path.read_text()}</p>")],
         )
 
     return _parse

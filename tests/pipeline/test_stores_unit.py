@@ -171,7 +171,7 @@ async def test_local_document_store_detects_manual_file_edit(tmp_path: Path):
     # Simulate a manual edit: load, change content, write back to the same file.
     loaded = await store.get_document("a.pdf")
     assert loaded is not None
-    loaded.elements[-1].html_content = "<p>Edited body, totally different.</p>"
+    loaded.elements[-1].html = "<p>Edited body, totally different.</p>"
     store._doc_path("a.pdf").write_text(loaded.model_dump_json(indent=2), encoding="utf-8")
 
     after = (await store.list_source_state())["a.pdf"].content_hash

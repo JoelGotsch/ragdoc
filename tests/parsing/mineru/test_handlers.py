@@ -328,7 +328,7 @@ def test_handle_table_block_body_produces_table():
 
 def test_handle_table_block_footnote_produces_raw_text():
     result = handle_table_block(_table_block(body_html="<table/>", footnote="* p < 0.05"), _page(), _context())
-    assert any(isinstance(r.element, RawText) and "p < 0.05" in r.element.innerhtml for r in result)
+    assert any(isinstance(r.element, RawText) and "p < 0.05" in r.element.text for r in result)
 
 
 def test_handle_table_block_order_caption_table_footnote():
@@ -398,9 +398,9 @@ def test_handle_chart_block_markdown_body_produces_table_with_converted_html():
     tables = [r.element for r in result if isinstance(r.element, Table)]
     assert len(tables) == 1
     # markdown pipe-table converted to an HTML <table>, not left as raw markdown
-    assert "<table" in tables[0].html_content
-    assert "Revenue" in tables[0].html_content
-    assert "|" not in tables[0].html_content
+    assert "<table" in tables[0].html
+    assert "Revenue" in tables[0].html
+    assert "|" not in tables[0].html
 
 
 def test_handle_chart_block_footnote_produces_raw_text():

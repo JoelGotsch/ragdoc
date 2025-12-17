@@ -107,9 +107,33 @@ throughout all pipeline stages.
 
 ## Utility Functions
 
+### merge_documents
+
+::: ragdoc.document.merge_documents
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
 ### join_documents
 
 ::: ragdoc.document.join_documents
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### image_fields_from_html
+
+::: ragdoc.document.image_fields_from_html
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### footnote_fields_from_html
+
+::: ragdoc.document.footnote_fields_from_html
     options:
       show_root_heading: true
       show_source: true

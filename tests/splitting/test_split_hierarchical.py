@@ -5,7 +5,8 @@ from ragdoc.splitting.hierarchical import split_hierarchical
 
 
 def h(level: int, text: str = "") -> Heading:
-    return Heading(innerhtml=text or f"H{level}", level=level)
+    inner = text or f"H{level}"
+    return Heading(html=f"<h{level}>{inner}</h{level}>")
 
 
 def p(text: str = "para") -> Paragraph:

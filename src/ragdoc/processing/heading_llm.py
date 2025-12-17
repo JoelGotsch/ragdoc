@@ -390,7 +390,7 @@ Guidelines:
                 # Explicitly not a heading — convert Heading to Paragraph in place
                 font_size_css = f"font-size: {info.font_size}pt; " if info.font_size is not None else ""
                 align_css = "text-align: center;" if info.is_centered else "text-align: left;"
-                new_elem = Paragraph(html_content=f'<p style="{font_size_css}{align_css}">{element.innerhtml}</p>')
+                new_elem = Paragraph(html=f'<p style="{font_size_css}{align_css}">{element.innerhtml}</p>')
                 new_elem.metadata["llm_heading_level"] = "none"
                 document.elements[info.index] = new_elem
             elif judgment.level == HeadingLevel.DOCUMENT_TITLE:

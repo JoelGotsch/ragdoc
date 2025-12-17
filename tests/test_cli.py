@@ -101,7 +101,7 @@ class TestChunkCommand:
     def test_chunk_creates_rendered_output(self, tmp_path: Path, html_file_path: Path):
         from ragdoc.document import Paragraph
 
-        doc = Document(elements=[Paragraph(html_content="<p>Hello world</p>")])
+        doc = Document(elements=[Paragraph(html="<p>Hello world</p>")])
         runner = CliRunner()
         output_dir = tmp_path / "out"
         with patch("ragdoc.cli.load", new_callable=AsyncMock) as mock_load:
@@ -132,7 +132,7 @@ class TestChunkCommand:
     def test_chunk_format_option(self, tmp_path: Path, html_file_path: Path):
         from ragdoc.document import Paragraph
 
-        doc = Document(elements=[Paragraph(html_content="<p>Hello world</p>")])
+        doc = Document(elements=[Paragraph(html="<p>Hello world</p>")])
         runner = CliRunner()
         output_dir = tmp_path / "out"
         with patch("ragdoc.cli.load", new_callable=AsyncMock) as mock_load:

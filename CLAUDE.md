@@ -80,13 +80,13 @@ The pipeline is **not strictly linear**:
 
 ### Core Model
 
-`Document` is the central model. It contains a list of `BaseElement` subclasses (Heading, Paragraph, Table, Image, DocumentList, Footnote, RawText). Elements hold content as `innerhtml` (HTML string) with visual properties stored as **inline CSS** (e.g., `font-size`, `font-weight`, `text-align`). This CSS-in-HTML convention enables universal processors that work across all parsers without parser-specific fields.
+`Document` is the central model. It contains a list of `BaseElement` subclasses (Heading, Paragraph, Table, Image, DocumentList, Footnote, RawText). Elements hold content as `html` — the full HTML including the outer tag — with visual properties stored as **inline CSS** (e.g., `font-size`, `font-weight`, `text-align`). This CSS-in-HTML convention enables universal processors that work across all parsers without parser-specific fields. `html` is a **stored field with a normalizing validator** on Heading/Paragraph/Table/DocumentList/RawText, and a **derived property (with setter)** on Image and Footnote (their html is a projection of structured fields). Derived accessors (`text`, `inline_refs`, `level`, `innerhtml`, …) share one identity-keyed cached BeautifulSoup per element; `html_tag` is deliberately fresh-parse (it returns a mutable `Tag`). Elements use `validate_assignment=True`, so `element.html = value` re-normalizes. `merge_documents(first, second, *, metadata_policy)` / `join_documents` concatenate documents (there is no `|` operator).
 
 Cross-document relationships use `ExternalRef` (parent/child/related); within-document references (images, footnotes, tables embedded in text) use `InlineRef` with `<ref id='...'/>` placeholders in HTML. The `Renderer` resolves these placeholders during rendering.
 
 ### Stage 1: Parsing (`src/ragdoc/parsing/`: `html/`, `pandoc/`, `xlsx/`, `azure_di/`, `mineru/`, `ragdoc_json/`)
 
-Each parser converts a format → `Document`, sets `document.parser` (provenance string, e.g., `"mineru"`, `"azure_di"`), sets `document.source_path`, and writes `document.metadata["filename"] = path.name`. Processors check `document.parser` to adjust behavior.
+Each parser converts a format → `Document` and sets parser-specific fields (e.g. `document.parser = "mineru"`). File provenance is stamped **centrally** by `parsing.load()` via `stamp_provenance` (`parser` if unset, `source_path`, `metadata["filename"]`) — individual loaders do not stamp it. Processors check `document.parser` to adjust behavior.
 
 ### Stage 2: Processing (`src/ragdoc/processing/`)
 
@@ -103,7 +103,7 @@ Processors may return `None` to drop a document. `ProcessingPipeline` short-circ
 
 ### Stage 4–5: Splitting & Chunking (`src/ragdoc/splitting/`, `src/ragdoc/chunking/`)
 
-`split_document()` splits by heading hierarchy and token budget. Output of chunking is `Chunk` (id, source_path, source_id, source_hash, prompt_content, embedding_content, metadata) for loading into vector stores.
+`split_document()` splits by heading hierarchy and token budget. Every split copies the parent's `metadata` dict at construction (mutation-isolated); elements are shared across splits by reference (by design). The no-split path returns a shallow copy — the input document is never mutated. Output of chunking is `Chunk` (id, source_path, source_id, source_hash, content_hash, prompt_content, embedding_content, metadata) for loading into vector stores.
 
 **Chunkers** (`src/ragdoc/chunking/`): `SimpleChunker` — pure rendering, one chunk per document (`embedding_content = prompt_content`). `LLMChunker` — calls LLM to produce N topic summaries, returns N chunks with the same `prompt_content` but distinct `embedding_content` per topic. Both implement the `Chunker` ABC.
 
@@ -115,7 +115,7 @@ Incremental synchronisation follows a **plan → apply** shape across two bounda
 - `source_hash` — SHA-256 of the **raw source-file bytes** (Boundary 1 / direct path).
 - `content_hash` — `Document.content_hash()`, a canonical-JSON hash over `(title, elements)` (pandoc-free, dependency-stable; Boundary 2). `None` ⇒ treated as "always changed".
 
-**Provenance ownership.** `DocumentPipeline` owns `source_id_fn` (`Path -> str`, default `p.name`); it stamps `document.source_id` and chunkers propagate `source_id`/`source_hash`/`content_hash` onto every `Chunk` (with fallbacks, so the fields — required on `Chunk` — are never None). The file-byte `hash_fn` is a sync concern living on the sync pipelines. **There is no `ProvenanceProcessor`** (do not add one).
+**Provenance ownership.** `DocumentPipeline` owns `source_id_fn` (`Path -> str`, default `p.name`); it stamps `document.source_id`, and `chunking/provenance.py` (`resolve_chunk_provenance`) is the single fallback chain stamping `source_id`/`source_hash`/`content_hash` onto every `Chunk`. `source_id` is never None (falls back `source_id → source_path → doc.id`); `source_hash` is **honestly optional** (`str | None`) — the file-byte hash from the sync pipelines' `hash_fn`, never faked from the content hash. **Chunk ids are minted by `DocumentPipeline.chunk_document`** (not by chunkers) via `mint_chunk_id` over `(source_id, split_sequence, chunk_ordinal, content_hash)` — deterministic and collision-free across identical-content splits; override with `DocumentPipeline(chunk_id_fn=…)`. The file-byte `hash_fn` is a sync concern living on the sync pipelines. **There is no `ProvenanceProcessor`** (do not add one).
 
 `source_id_fn` strategies: `lambda p: p.name` (default), `str(p)` (full path), `str(p.relative_to(base_dir))` (portable). Duplicate source_ids raise `ValueError` before any processing.
 

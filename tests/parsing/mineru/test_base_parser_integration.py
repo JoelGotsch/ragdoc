@@ -136,10 +136,10 @@ def test_table_parsed_by_core_middleware(test_case_name: str, table_index: int, 
 
     assert len(tables) > 0, f"[{test_case_name}] No tables extracted by CoreExtractionMiddleware"
 
-    found = any(expected_text in table.html_content for table in tables)
+    found = any(expected_text in table.html for table in tables)
     assert found, (
         f"[{test_case_name}] table{table_index}: expected text not found in any table: '{expected_text}'\n"
-        f"  Parsed tables ({len(tables)}): {[t.html_content[:80] for t in tables]}"
+        f"  Parsed tables ({len(tables)}): {[t.html[:80] for t in tables]}"
     )
 
 

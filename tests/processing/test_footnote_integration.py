@@ -334,12 +334,12 @@ async def test_integration_full_pipeline_with_simple_resolver():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>Research shows important findings 1 for the field.</p>",
+                html="<p>Research shows important findings 1 for the field.</p>",
                 page=1,
             ),
             Paragraph(
                 id="para-2",
-                html_content="<p>Method 2 was used in the study.</p>",
+                html="<p>Method 2 was used in the study.</p>",
                 page=1,
             ),
             Footnote(
@@ -379,7 +379,7 @@ async def test_integration_document_get_element_after_processing():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>See reference 1 for details.</p>",
+                html="<p>See reference 1 for details.</p>",
                 page=1,
             ),
             Footnote(
@@ -425,7 +425,7 @@ async def test_sequential_footnotes_two_adjacent_refs_in_same_paragraph():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content=(
+                html=(
                     "<p>executed under the Joint Operating Procedures "
                     "(the Service Agreement1).2 entered into force.</p>"
                 ),
@@ -479,12 +479,12 @@ async def test_isolation_unpicked_candidate_html_unchanged():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>Smith study 1 confirms this finding.</p>",
+                html="<p>Smith study 1 confirms this finding.</p>",
                 page=1,
             ),
             Paragraph(
                 id="para-2",
-                html_content="<p>See also result 1 elsewhere in the document.</p>",
+                html="<p>See also result 1 elsewhere in the document.</p>",
                 page=1,
             ),
             Footnote(id="fn-1", number=1, innerhtml="Smith study original.", page=1),
@@ -510,7 +510,7 @@ async def test_isolation_resolver_returns_none_leaves_html_unchanged():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>See 1 for details.</p>",
+                html="<p>See 1 for details.</p>",
                 page=1,
             ),
             Footnote(id="fn-1", number=1, innerhtml="Smith.", page=1),
@@ -532,7 +532,7 @@ async def test_idempotency_second_pass_does_not_corrupt_html():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>See reference 1 for details.</p>",
+                html="<p>See reference 1 for details.</p>",
                 page=1,
             ),
             Footnote(id="fn-1", number=1, innerhtml="Smith 2023.", page=1),
@@ -554,12 +554,12 @@ async def test_isolation_multiple_footnotes_each_patched_in_correct_element():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>Method 1 was applied here.</p>",
+                html="<p>Method 1 was applied here.</p>",
                 page=1,
             ),
             Paragraph(
                 id="para-2",
-                html_content="<p>Result 2 was observed.</p>",
+                html="<p>Result 2 was observed.</p>",
                 page=1,
             ),
             Footnote(id="fn-1", number=1, innerhtml="Standard method.", page=1),

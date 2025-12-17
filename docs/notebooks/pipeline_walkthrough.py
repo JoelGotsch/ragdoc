@@ -243,7 +243,7 @@ def _(mo):
     `MinerUParser` runs a middleware chain (`CoreExtractionMiddleware`) that:
 
     1. Reads each block type and creates the corresponding `BaseElement` subclass.
-    2. Encodes visual properties — font size, text alignment — as **inline CSS** on the element's `html_content`.
+    2. Encodes visual properties — font size, text alignment — as **inline CSS** on the element's `html`.
        This CSS-in-HTML convention is what later processors (`LLMHeadingResolver`) depend on.
     3. Returns a flat `Document` with all heading-type blocks tagged `h3` (MinerU's default) and `parser="mineru"` set.
 

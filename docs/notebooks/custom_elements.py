@@ -149,7 +149,7 @@ def _(CalloutElement):
                 kind, title, body = line.split("|", maxsplit=2)
                 callout = CalloutElement(kind=kind.strip(), title=title.strip(), body=body.strip())
                 # Document.elements is a closed union — store the callout's HTML as RawText
-                elements.append(RawText(innerhtml=callout.html))
+                elements.append(RawText(html=callout.html))
 
             return Document(elements=elements, parser="callout")
 

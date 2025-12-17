@@ -403,7 +403,7 @@ the merge strategy and nesting `MultiSourceParser` for three-way merges.
 
 All parsers produce a `Document` where:
 
-- Elements store content as `innerhtml` (HTML string)
+- Elements store content as `html` (full HTML including the outer tag)
 - Visual properties (font size, weight, alignment) are stored as **inline CSS** on the HTML tags
 - `document.parser` is set to identify the source parser
 - Inline references (`<ref id="..." rel="..."/>`) are embedded in HTML for images and footnotes

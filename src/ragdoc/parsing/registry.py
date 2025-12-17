@@ -16,7 +16,34 @@ from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
+    from ragdoc.document import Document
     from ragdoc.parsing.parser import Parser
+
+
+def stamp_provenance(document: Document, source: Path, parser_name: str) -> Document:
+    """Stamp parser provenance onto *document* — the single stamping site, called by ``load()``.
+
+    Fills ``document.parser``, ``document.source_path``, and ``metadata["filename"]`` only
+    when the parser left them unset, so parsers with special provenance semantics (e.g.
+    ``ragdoc_json``'s ``ProvenanceMode.ORIGINAL``, which preserves the original document's
+    provenance) keep their values.  Individual parsers no longer stamp these fields
+    themselves; they set only parser-specific extras.
+
+    Args:
+        document: The freshly parsed document.
+        source: The file the parser was invoked on.
+        parser_name: The resolved parser's registry name.
+
+    Returns:
+        The same document, mutated in place (returned for chaining).
+    """
+    if document.parser is None:
+        document.parser = parser_name
+    if not document.source_path:
+        document.source_path = str(source)
+    if "filename" not in document.metadata:
+        document.metadata["filename"] = source.name
+    return document
 
 
 class ParserRegistration(NamedTuple):

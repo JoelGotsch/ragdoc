@@ -18,7 +18,7 @@ def _write_doc_json(path: Path, doc: Document) -> None:
 
 def _make_doc(**kwargs) -> Document:
     defaults: dict = dict(
-        elements=[Heading(innerhtml="Title", level=1, page=1)],
+        elements=[Heading(html="<h1>Title</h1>", page=1)],
         parser="html",
         source_path="/data/source.html",
         metadata={"filename": "source.html"},

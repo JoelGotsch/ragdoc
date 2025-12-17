@@ -21,6 +21,7 @@ while the Renderer handles structural concerns.
 
 from __future__ import annotations
 
+import html as html_stdlib
 import math
 import re
 from collections.abc import Callable
@@ -455,11 +456,14 @@ class Renderer:
             head_parts: list[str] = []
             h1 = header.find("h1")
             if h1:
-                head_parts.append(f"<title>{h1.get_text()}</title>")
+                head_parts.append(f"<title>{html_stdlib.escape(h1.get_text())}</title>")
             dl = header.find("dl")
             if dl:
                 for dt, dd in zip(dl.find_all("dt"), dl.find_all("dd"), strict=False):
-                    head_parts.append(f'<meta name="{dt.get_text()}" content="{dd.get_text()}"/>')
+                    head_parts.append(
+                        f'<meta name="{html_stdlib.escape(dt.get_text(), quote=True)}" '
+                        f'content="{html_stdlib.escape(dd.get_text(), quote=True)}"/>'
+                    )
             header.extract()
             full_html = f"<html><head>{''.join(head_parts)}</head><body>{soup}</body></html>"
             result = convert_text(full_html, to=self.format.value, format="html", extra_args=["--standalone"])

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from ragdoc.chunking.chunk import Chunk
 from ragdoc.document import Document, Heading, Paragraph
 from ragdoc.processing.dump import default_file_namer
@@ -34,14 +36,14 @@ def test_chunk_has_no_filename_field():
 # ---------------------------------------------------------------------------
 
 
-def test_html_parser_sets_metadata_filename(tmp_path: Path):
-    import ragdoc.parsing  # noqa: F401 — ensure parsers registered
-    from ragdoc.parsing.html import load_html
+@pytest.mark.anyio
+async def test_html_parser_sets_metadata_filename(tmp_path: Path):
+    from ragdoc.parsing import load
 
     html_file = tmp_path / "report.html"
     html_file.write_text("<html><body><h1>Hello</h1></body></html>", encoding="utf-8")
 
-    doc = load_html(html_file)
+    doc = await load(html_file)
     assert "filename" in doc.metadata
     assert doc.metadata["filename"] == "report.html"
 
@@ -54,10 +56,10 @@ def test_html_parser_sets_metadata_filename(tmp_path: Path):
 def test_filename_propagates_through_split():
     doc = Document(
         elements=[
-            Heading(innerhtml="Section A", level=1),
-            Paragraph(html_content="<p>Text A.</p>"),
-            Heading(innerhtml="Section B", level=1),
-            Paragraph(html_content="<p>Text B.</p>"),
+            Heading(html="<h1>Section A</h1>"),
+            Paragraph(html="<p>Text A.</p>"),
+            Heading(html="<h1>Section B</h1>"),
+            Paragraph(html="<p>Text B.</p>"),
         ],
         metadata={"filename": "report.pdf"},
         source_path="/x/report.pdf",

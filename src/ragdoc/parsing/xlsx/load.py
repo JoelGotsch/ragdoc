@@ -1,3 +1,5 @@
+import html
+
 import pandas as pd
 from pydantic import BaseModel, Field
 
@@ -33,8 +35,8 @@ def generate_document(excel_file: pd.ExcelFile, config: ExcelConfig | None = Non
             continue
         params = (config.default_params or {}) | config.sheet_params.get(sheet_name, {})
         df = pd.read_excel(excel_file, sheet_name=sheet_name, **params)
-        document_heading = Heading(html_content=f"<h2>{sheet_name}</h2>", page=i)
-        document_table = Table(html_content=df.to_html(), page=i)
+        document_heading = Heading(html=f"<h2>{html.escape(sheet_name)}</h2>", page=i)
+        document_table = Table(html=df.to_html(), page=i)
         document.elements.append(document_heading)
         document.elements.append(document_table)
     document.parser = "xlsx"

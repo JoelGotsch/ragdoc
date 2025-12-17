@@ -26,12 +26,12 @@ def _make_doc() -> Document:
         source_path=SOURCE_PATH,
         metadata=CUSTOM_METADATA,
         elements=[
-            Heading(innerhtml="Introduction", level=1),
-            Paragraph(html_content="<p>Intro text.</p>"),
-            Heading(innerhtml="Methods", level=1),
-            Paragraph(html_content="<p>Methods text.</p>"),
-            Heading(innerhtml="Results", level=1),
-            Paragraph(html_content="<p>Results text.</p>"),
+            Heading(html="<h1>Introduction</h1>"),
+            Paragraph(html="<p>Intro text.</p>"),
+            Heading(html="<h1>Methods</h1>"),
+            Paragraph(html="<p>Methods text.</p>"),
+            Heading(html="<h1>Results</h1>"),
+            Paragraph(html="<p>Results text.</p>"),
         ],
     )
 

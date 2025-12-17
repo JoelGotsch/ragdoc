@@ -58,9 +58,9 @@ def _():
     sample_doc = Document(
         title="Sample Document",
         elements=[
-            Heading(innerhtml="Introduction", level=1),
-            Paragraph(html_content="<p>This document explains the rendering system.</p>"),
-            Table(html_content="<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>"),
+            Heading(html="<h1>Introduction</h1>"),
+            Paragraph(html="<p>This document explains the rendering system.</p>"),
+            Table(html="<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>"),
         ],
         metadata={"source": "sample.docx", "date": "2024-01-01"},
     )
@@ -144,7 +144,7 @@ def _(Document, Heading, Image, prompt_renderer):
     img.text_representation = "A simple bar chart showing quarterly revenue."
 
     img_doc = Document(elements=[
-        Heading(innerhtml="Report", level=1),
+        Heading(html="<h1>Report</h1>"),
         img,
     ])
 
@@ -167,8 +167,8 @@ def _(mo):
 @app.cell
 def _(Document, Heading, OutputFormat, Paragraph, Renderer, render_for_prompt):
     all_documents = [
-        Document(title="Parent", elements=[Heading(innerhtml="Parent", level=1)]),
-        Document(title="Child", elements=[Paragraph(html_content="<p>Child content.</p>")]),
+        Document(title="Parent", elements=[Heading(html="<h1>Parent</h1>")]),
+        Document(title="Child", elements=[Paragraph(html="<p>Child content.</p>")]),
     ]
     all_docs = {doc.id: doc for doc in all_documents}
 

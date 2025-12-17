@@ -4,14 +4,16 @@ Pre-1.0: breaking changes land at will and are documented here.
 
 ## Unreleased
 
-> **⚠ MIGRATION — every stored `content_hash` changes once.** `Document.content_hash()` is now
-> a versioned canonical-JSON hash (`ragdoc.content_hash.v1`) over `(title, elements)` — pure
-> Python, pandoc-free. Its values differ from the old renderer-based hashes, so the **first
-> Boundary-2 sync after upgrading re-chunks and re-embeds the full corpus once**. Direct-path
-> syncs are unaffected for unchanged files (`source_hash`, the file-byte hash, short-circuits
-> before any content hashing). `SimpleChunker`'s default chunk ids (which *are* the content
-> hash) also change once. Ships together with Phase 6 (element-model normalization) so the
-> corpus migrates a single time.
+> **⚠ MIGRATION — every stored `content_hash` and every chunk id changes once.**
+> `Document.content_hash()` is now a versioned canonical-JSON hash (`ragdoc.content_hash.v1`)
+> over `(title, elements)` — pure Python, pandoc-free. Its values differ from the old
+> renderer-based hashes, so the **first Boundary-2 sync after upgrading re-chunks and re-embeds
+> the full corpus once**. Direct-path syncs are unaffected for unchanged files (`source_hash`,
+> the file-byte hash, short-circuits before any content hashing). Chunk ids move to a new
+> deterministic scheme minted by the pipeline (`mint_chunk_id` over
+> `(source_id, split_sequence, chunk_ordinal, content_hash)`), so all stored chunk ids change
+> once too. Phases 5 and 6 (canonical hash + element-model normalization) ship in **this one
+> release** so the corpus migrates a single time.
 
 ### Added (Phase 4 — first-class `Extractor` stage)
 
@@ -88,6 +90,68 @@ Pre-1.0: breaking changes land at will and are documented here.
   imports from `ragdoc.rendering`.
 - `VectorStorePipeline.plan()` over an unchanged Boundary-2 corpus now makes **zero** pandoc
   invocations (previously one pandoc subprocess per stored document per plan).
+
+### Changed (Phase 6 — element model normalization; ships with Phase 5, one corpus migration)
+
+- **`BaseElement.html` is a plain stored field on `Heading`, `Paragraph`, `Table`,
+  `DocumentList`, and `RawText`** (Decision D5-A), each with a normalizing `field_validator`
+  (Heading: first `<h1>`–`<h6>` tag re-serialized by bs4, else text escaped + `<h1>`-wrapped;
+  Paragraph/Table/DocumentList: `.strip()`; RawText: normalized to a single outer `<div>`).
+  The `html_content`/`innerhtml` dual-storage split, the `@computed_field html`
+  property/abstract-setter machinery, `_fields_from_html`, the `_parse_html_input`
+  before-validator, and the seven per-subclass `fset` blocks are **gone**. Construct with
+  `Heading(html="<h2>…</h2>")` etc.; `Heading(innerhtml=…, level=…)` and `html_content=` no
+  longer exist. `Heading.innerhtml` / `RawText.innerhtml` survive as read-only properties;
+  `Heading.level` is derived (setter rebuilds html).
+- **`Image` and `Footnote` keep *derived* `html`** (property + real setter): Image's html is a
+  projection of six structured fields (a stored copy would duplicate base64 and desync);
+  Footnote's html embeds the live `id="footnote-{id}"`. `Image(html='<img …/>')` /
+  `Footnote(html='<aside …>')` still work via before-validators; the parsing helpers are public
+  standalone functions `image_fields_from_html` / `footnote_fields_from_html`.
+- **Identity-keyed soup cache**: derived accessors (`text`, `inline_refs`, `footnote_ids`,
+  `image_ids`, `level`, `innerhtml`) share one cached BeautifulSoup per element, invalidated by
+  string-object identity on assignment — at most one parse per element per pipeline pass
+  (previously a fresh parse per access). `html_tag` deliberately stays fresh-parse (it returns
+  a mutable `Tag`). `BaseElement` now has `validate_assignment=True`: every field assignment
+  re-validates and re-normalizes.
+- **`from_html` removed; `from_markdown` is typed** — `cls(html=…)` replaces `from_html(…)`;
+  `from_markdown(markdown_text, *, page=0)` lost its `**kwargs`.
+- `BaseElement.inline_refs` skips refs with unknown `rel` values with a WARNING (once per
+  value) instead of a blind `except Exception: pass`.
+- **Serialization shape**: `model_dump()` now emits `html` as a real field for the five
+  stored-html classes (no `html_content`/`innerhtml` keys) and **no** `html` key for
+  Image/Footnote. Old dumps happen to load under the new model (the old computed `"html"` key
+  feeds the new field) — pinned by a test but **not promised**; new dumps are the format.
+- **Splits own their metadata**: every splitter output `Document` copies the parent's metadata
+  dict at construction (previously shared by reference and compensated downstream), and the
+  `split_document` no-split path **no longer mutates the input document** — it returns a
+  shallow copy carrying `split_sequence`/`split_total`. Elements remain shared across splits
+  by design.
+- **Chunk ids are minted by `DocumentPipeline.chunk_document`** over
+  `(source_id, split_sequence, chunk_ordinal, content_hash)` via the new
+  `ragdoc.chunking.provenance.mint_chunk_id` (override with `DocumentPipeline(chunk_id_fn=…)`,
+  type `ChunkIdFn`). This fixes the collision where two identical-content splits of one source
+  produced one chunk id, and gives `LLMChunker` stable ids. The chunkers' `id_fn` constructor
+  parameters are **removed**; standalone chunker use yields uuid4 ids.
+- **`Chunk.source_hash` is `str | None` and honest** — it is the file-byte hash from the sync
+  pipelines' `hash_fn` or `None`; the silent `content_hash` fallback at every stamping site is
+  gone (use `content_hash` for content change detection). The shared fallback chain lives in
+  `ragdoc.chunking.provenance.resolve_chunk_provenance`.
+- **`merge_documents(first, second, *, metadata_policy="first"|"second"|"strict")` replaces
+  `Document.__or__`** with an explicit, documented field policy (title bridge heading is now
+  HTML-escaped; `parser`/`parser_version` kept iff identical; metadata always a fresh dict;
+  `"strict"` raises on conflicting keys). `join_documents` gained the same `metadata_policy`
+  keyword. (Not to be confused with `ragdoc.merging.merge_documents`, which aligns two parses
+  of the *same* source.)
+- **Parser provenance is stamped centrally in `ragdoc.parsing.load()`** via the new
+  `stamp_provenance(document, source, parser_name)` (fills `parser`, `source_path`,
+  `metadata["filename"]` only when unset). The standalone loaders (`load_html`, `load_pandoc`,
+  `load_excel`, `load_azure_json`, mineru) no longer stamp these fields themselves — call
+  them through `load()` (or stamp manually) when you need file provenance.
+- **Escaping fixes** (four injection sites): Heading attribute values (via bs4
+  re-serialization), `Image.html` alt text, the renderer's metadata `<head>`
+  (title + `<meta>` tags), and xlsx sheet-name headings.
+- HTML parser: `<h7>`+ tags (a pandoc docx artifact) are clamped to level 6.
 
 ### Added
 

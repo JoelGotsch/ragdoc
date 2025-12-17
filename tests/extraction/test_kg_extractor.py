@@ -88,7 +88,7 @@ def make_kg_client(schema: GraphSchema, batches: list[tuple[list, list]]) -> Mag
 def make_doc(body: str = "Alice works at Acme.") -> Document:
     return Document(
         title="t",
-        elements=[Heading(innerhtml="t", level=1), Paragraph(html_content=f"<p>{body}</p>")],
+        elements=[Heading(html="<h1>t</h1>"), Paragraph(html=f"<p>{body}</p>")],
     )
 
 

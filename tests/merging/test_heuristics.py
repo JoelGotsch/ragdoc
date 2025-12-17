@@ -67,9 +67,9 @@ def test_markup_richness_multiple_tags_accumulate():
 
 def test_select_heading_trusted_parser_level_wins():
     """html parser is in trust_parsers -> its heading level wins."""
-    h_a = Heading(html_content="<h3>Section</h3>")
+    h_a = Heading(html="<h3>Section</h3>")
     h_a.metadata["parser"] = "mineru"
-    h_b = Heading(html_content="<h2>Section</h2>")
+    h_b = Heading(html="<h2>Section</h2>")
     h_b.metadata["parser"] = "html"
 
     result = select_heading(h_a, h_b, parser_a="mineru", parser_b="html")
@@ -78,8 +78,8 @@ def test_select_heading_trusted_parser_level_wins():
 
 def test_select_heading_untrusted_parsers_keeps_innerhtml_from_richer_side():
     """Neither parser is trusted -> keep innerhtml from richer side."""
-    h_a = Heading(html_content="<h2>Plain heading</h2>")
-    h_b = Heading(html_content="<h3><strong>Bold</strong> heading</h3>")
+    h_a = Heading(html="<h2>Plain heading</h2>")
+    h_b = Heading(html="<h3><strong>Bold</strong> heading</h3>")
 
     result = select_heading(h_a, h_b, parser_a="mineru", parser_b="mineru")
     # h_b has richer markup; result should have h_b's innerhtml
@@ -88,8 +88,8 @@ def test_select_heading_untrusted_parsers_keeps_innerhtml_from_richer_side():
 
 def test_select_heading_trust_parsers_customizable():
     """Custom trust_parsers set."""
-    h_a = Heading(html_content="<h1>Title</h1>")
-    h_b = Heading(html_content="<h3>Title</h3>")
+    h_a = Heading(html="<h1>Title</h1>")
+    h_b = Heading(html="<h3>Title</h3>")
     # Only "azure_di" is trusted
     result = select_heading(
         h_a,
@@ -103,8 +103,8 @@ def test_select_heading_trust_parsers_customizable():
 
 def test_select_heading_both_trusted_uses_lower_level_number():
     """Both parsers trusted -> lower level number (more prominent heading) wins."""
-    h_a = Heading(html_content="<h1>Title</h1>")
-    h_b = Heading(html_content="<h2>Title</h2>")
+    h_a = Heading(html="<h1>Title</h1>")
+    h_b = Heading(html="<h2>Title</h2>")
     result = select_heading(
         h_a,
         h_b,
@@ -117,8 +117,8 @@ def test_select_heading_both_trusted_uses_lower_level_number():
 
 def test_select_heading_neither_trusted_tiebreak_by_level():
     """Neither trusted, equal richness -> lower level number wins."""
-    h_a = Heading(html_content="<h2>Plain</h2>")
-    h_b = Heading(html_content="<h4>Plain</h4>")
+    h_a = Heading(html="<h2>Plain</h2>")
+    h_b = Heading(html="<h4>Plain</h4>")
     result = select_heading(h_a, h_b, parser_a="mineru", parser_b="mineru")
     assert result.level == 2
 
@@ -129,29 +129,29 @@ def test_select_heading_neither_trusted_tiebreak_by_level():
 
 
 def test_select_paragraph_richer_markup_wins():
-    p_a = Paragraph(html_content="<p>plain text</p>")
-    p_b = Paragraph(html_content="<p><em>italic text</em></p>")
+    p_a = Paragraph(html="<p>plain text</p>")
+    p_b = Paragraph(html="<p><em>italic text</em></p>")
     result = select_paragraph(p_a, p_b)
     assert result.id == p_b.id
 
 
 def test_select_paragraph_equal_richness_tiebreak_by_text_length():
-    p_a = Paragraph(html_content="<p>short</p>")
-    p_b = Paragraph(html_content="<p>much longer text here</p>")
+    p_a = Paragraph(html="<p>short</p>")
+    p_b = Paragraph(html="<p>much longer text here</p>")
     result = select_paragraph(p_a, p_b)
     assert result.id == p_b.id
 
 
 def test_select_paragraph_a_richer_than_b():
-    p_a = Paragraph(html_content="<p><b>bold</b> and <em>italic</em></p>")
-    p_b = Paragraph(html_content="<p>plain</p>")
+    p_a = Paragraph(html="<p><b>bold</b> and <em>italic</em></p>")
+    p_b = Paragraph(html="<p>plain</p>")
     result = select_paragraph(p_a, p_b)
     assert result.id == p_a.id
 
 
 def test_select_paragraph_math_formula_preferred():
-    p_plain = Paragraph(html_content="<p>E equals mc squared</p>")
-    p_math = Paragraph(html_content="<p>E = <math>mc\u00b2</math></p>")
+    p_plain = Paragraph(html="<p>E equals mc squared</p>")
+    p_math = Paragraph(html="<p>E = <math>mc\u00b2</math></p>")
     result = select_paragraph(p_plain, p_math)
     assert result.id == p_math.id
 
@@ -162,22 +162,22 @@ def test_select_paragraph_math_formula_preferred():
 
 
 def test_select_table_more_th_elements_wins():
-    t_a = Table(html_content="<table><tr><td>A</td><td>B</td></tr></table>")
-    t_b = Table(html_content="<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>")
+    t_a = Table(html="<table><tr><td>A</td><td>B</td></tr></table>")
+    t_b = Table(html="<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>")
     result = select_table(t_a, t_b)
     assert result.id == t_b.id
 
 
 def test_select_table_equal_headers_tiebreak_by_row_count():
-    t_a = Table(html_content="<table><tr><td>A</td></tr></table>")
-    t_b = Table(html_content="<table><tr><td>A</td></tr><tr><td>B</td></tr><tr><td>C</td></tr></table>")
+    t_a = Table(html="<table><tr><td>A</td></tr></table>")
+    t_b = Table(html="<table><tr><td>A</td></tr><tr><td>B</td></tr><tr><td>C</td></tr></table>")
     result = select_table(t_a, t_b)
     assert result.id == t_b.id
 
 
 def test_select_table_a_has_more_headers():
-    t_a = Table(html_content="<table><tr><th>X</th><th>Y</th><th>Z</th></tr></table>")
-    t_b = Table(html_content="<table><tr><td>1</td><td>2</td></tr></table>")
+    t_a = Table(html="<table><tr><th>X</th><th>Y</th><th>Z</th></tr></table>")
+    t_b = Table(html="<table><tr><td>1</td><td>2</td></tr></table>")
     result = select_table(t_a, t_b)
     assert result.id == t_a.id
 

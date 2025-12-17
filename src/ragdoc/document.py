@@ -1,22 +1,22 @@
 from __future__ import annotations
 
 import hashlib
+import html as html_stdlib
 import json
 import logging
 import re
 import uuid
 from enum import Enum
 from functools import reduce
-from operator import or_
-from typing import Annotated, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Annotated, Generic, Literal, TypeVar, cast
 
 from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify as md
-from pydantic import BaseModel, Field, SkipValidation, computed_field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, SkipValidation, field_validator, model_validator
 from pypandoc import convert_text
 from typing_extensions import Self
 
-from ragdoc.metadata import MetadataDict, TMetadata, validate_metadata_dict
+from ragdoc.metadata import BaseMetadata, MetadataDict, TMetadata, validate_metadata_dict
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,31 @@ class ElementTypeEnum(str, Enum):
     FOOTNOTE = "footnote"
 
 
+_INLINE_REL_TYPES = frozenset({"image", "footnote", "table", "figure"})
+"""Valid ``rel`` values for inline ``<ref/>`` tags (mirrors :class:`InlineRef`.rel_type)."""
+
+_warned_rel_types: set[str] = set()
+"""Unknown inline-ref ``rel`` values already warned about — one warning per value per process."""
+
+_HEADING_TAG_PATTERN = re.compile(r"h[1-6]")
+"""Matches heading tag names ``h1``–``h6`` (bs4 name matcher)."""
+
+
 class BaseElement(BaseModel):
+    """Base class for all document elements.
+
+    Every concrete subclass exposes ``html`` — the full HTML of the element including its
+    outer tag.  Heading/Paragraph/Table/DocumentList/RawText **store** ``html`` as a plain
+    field with a normalizing ``field_validator``; Image and Footnote **derive** ``html`` from
+    their structured fields (property + setter), because storing it would duplicate base64
+    image data or denormalize the embedded element id.
+
+    ``validate_assignment=True``: assigning ``element.html = value`` (or any field) re-runs
+    the field validators, so assignments normalize exactly like construction.
+    """
+
+    model_config = ConfigDict(validate_assignment=True)
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for the element")
     element_type: str = Field(
         ...,
@@ -129,25 +153,54 @@ class BaseElement(BaseModel):
         description="Bounding box of the element in the format (x0, y0, x1, y1). Coordinates are expected to be normalized between 0 and 1, relative to the page dimensions.",
     )
 
+    if TYPE_CHECKING:
+        # Typing-only declaration: every concrete subclass provides `html` either as a stored
+        # field (Heading/Paragraph/Table/DocumentList/RawText) or as a property with a setter
+        # (Image/Footnote). Not a runtime annotation, so Pydantic creates no field here and no
+        # "shadows an attribute in parent" warning fires in subclasses. The typing-only default
+        # keeps `html` optional in the synthesized constructors of the derived-html subclasses.
+        html: str = ""
+
+    _soup: BeautifulSoup | None = PrivateAttr(default=None)
+    _soup_source: str | None = PrivateAttr(default=None)
+
+    def _parsed(self) -> BeautifulSoup:
+        """Cached BeautifulSoup parse of ``self.html``.
+
+        Cache validity is keyed on the *identity* of the html string object: any assignment
+        binds a new ``str``, so ``self._soup_source is not html`` detects staleness without
+        assignment hooks (``el.html = el.html`` keeps the cache warm — strings are immutable).
+        Never hand the cached soup to callers; read-only derivations only.
+        """
+        html_str = self.html
+        if self._soup is None or self._soup_source is not html_str:
+            self._soup = BeautifulSoup(html_str, "html.parser")
+            self._soup_source = html_str
+        return self._soup
+
     @property
     def inline_refs(self) -> list[InlineRef]:
         """Inline references parsed from <ref id="..." rel="..."/> tags in this element's HTML.
 
         The element's HTML is the single source of truth. To add an inline ref,
         embed a <ref id="<target-id>" rel="<rel-type>"/> tag in the HTML content.
+        Refs with an unknown ``rel`` value are skipped with a warning (logged once per value).
         """
-        soup = BeautifulSoup(self.html, "html.parser")
         refs: list[InlineRef] = []
-        for ref_tag in soup.find_all("ref"):
+        for ref_tag in self._parsed().find_all("ref"):
             ref_id = ref_tag.get("id")
             rel_attr = ref_tag.get("rel")
             # BeautifulSoup may return list for multi-valued attrs
             rel_type = rel_attr[0] if isinstance(rel_attr, list) else rel_attr
-            if ref_id and rel_type:
-                try:
-                    refs.append(InlineRef(target_id=str(ref_id), rel_type=str(rel_type)))  # type: ignore[arg-type]  # rel_type validated by pydantic
-                except Exception:  # noqa: BLE001 -- unknown rel_type must not break parsing; narrowed in Phase 6
-                    logger.debug(f"Skipping inline ref with unknown rel_type {rel_type!r} (id={ref_id!r})")
+            if not (ref_id and rel_type):
+                continue
+            rel_str = str(rel_type)
+            if rel_str not in _INLINE_REL_TYPES:
+                if rel_str not in _warned_rel_types:
+                    _warned_rel_types.add(rel_str)
+                    logger.warning("ignoring inline ref with unknown rel type %r", rel_str)
+                continue
+            refs.append(InlineRef(target_id=str(ref_id), rel_type=rel_str))  # type: ignore[arg-type]  # rel_str checked against _INLINE_REL_TYPES
         return refs
 
     @property
@@ -158,69 +211,21 @@ class BaseElement(BaseModel):
             return (page, self.bounding_box[1], self.bounding_box[0])  # (page, y, x)
         return (page, 0.0, 0.0)
 
-    @computed_field
-    @property
-    def html(self) -> str:
-        """
-        HTML representation of the element content. Should be implemented by subclasses.
-
-        Should include the outer tag (e.g. <p> for paragraphs, <hN> for headings, etc.).
-        Footnotes should be represented as <p id='footnote-{id}'>[{number}] {text}</p>.
-        Images referenced inline use <ref id='{id}' rel='image'/> tags.
-        Lists should be represented as <ul>, <ol>, or <dl> with appropriate child elements.
-        """
-        raise NotImplementedError
-
-    @html.setter
-    def html(self, value: str) -> None:
-        """
-        HTML representation of the element content. Should be implemented by subclasses.
-        This setter should be used for things like updating the text content (e.g. for footnotes parsing)
-
-        Should include the outer tag (e.g. <p> for paragraphs, <hN> for headings, etc.).
-        Footnotes should be represented as <p id='footnote-{id}'>[{number}] {text}</p>.
-        Images referenced inline use <ref id='{id}' rel='image'/> tags.
-        Lists should be represented as <ul> or <ol> with list items as <li>.
-        """
-        for k, v in type(self)._fields_from_html(value).items():
-            setattr(self, k, v)
-
-    @classmethod
-    def _fields_from_html(cls, html: str) -> dict:  # pyright: ignore[reportUnusedParameter]  # overridden by subclasses
-        """Parse HTML and return a dict of field values for construction.
-        Subclasses should override this to enable from_html / from_markdown construction."""
-        raise NotImplementedError(f"{cls.__name__} does not support construction from HTML")
-
-    @model_validator(mode="before")
-    @classmethod
-    def _parse_html_input(cls, data):
-        if isinstance(data, dict) and "html" in data:
-            try:
-                parsed = cls._fields_from_html(data.pop("html"))
-                merged = data | parsed
-                data = {**merged}
-            except NotImplementedError:
-                pass
-        return data
-
     @model_validator(mode="after")
     def _validate_metadata(self) -> Self:
         validate_metadata_dict(self.metadata)
         return self
 
     @classmethod
-    def from_html(cls, html: str, **kwargs) -> Self:
-        """Create an element from an HTML string."""
-        return cls(html=html, **kwargs)  # type: ignore[call-arg]  # 'html' consumed by _parse_html_input validator
+    def from_markdown(cls, markdown_text: str, *, page: int | None = 0) -> Self:
+        """Create an element from markdown text (converted to HTML via pandoc).
 
-    @classmethod
-    def from_markdown(cls, markdown_text: str, page: int = 0, **kwargs) -> Self:
-        """Create a BaseElement from markdown text.
         Expects img links in markdown format (e.g. ![alt text](document_image/id/{id})).
         Embedded footnotes are expected in markdown format (e.g. [^footnote-<footnote-id>]).
+        Set further fields (``id``, ``metadata``, ``bounding_box``) by assignment afterwards.
         """
-        html = convert_text(markdown_text, "html", format="md").strip()
-        return cls(html=html, page=page, **kwargs)  # type: ignore[call-arg]  # 'html' consumed by _parse_html_input validator
+        html_str = convert_text(markdown_text, "html", format="md").strip()
+        return cls(html=html_str, page=page)  # pyright: ignore[reportCallIssue]  # concrete subclasses default element_type
 
     @property
     def footnote_ids(self) -> list[str]:
@@ -235,11 +240,16 @@ class BaseElement(BaseModel):
     @property
     def text(self) -> str:
         """Plain text content of the element, derived from html via BeautifulSoup get_text()."""
-        return BeautifulSoup(self.html, "html.parser").get_text().strip("\n -")
+        return self._parsed().get_text().strip("\n -")
 
     @property
     def html_tag(self) -> Tag:
-        """BeautifulSoup Tag representation of the element. Parses the html property."""
+        """BeautifulSoup Tag representation of the element.
+
+        Deliberately a **fresh parse per call** (never the cached soup): the returned ``Tag``
+        is live and callers may mutate it — handing out the cached soup would let callers
+        desync the cache from the stored html.
+        """
         tag = BeautifulSoup(self.html, "html.parser")
         return tag.contents[0] if tag.contents else Tag(name="div")  # type: ignore[return-value]  # first content is a Tag
 
@@ -254,113 +264,117 @@ E = TypeVar("E", bound=BaseElement)
 
 class Heading(BaseElement):
     element_type: Literal[ElementTypeEnum.HEADING] = Field(default=ElementTypeEnum.HEADING)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
-    html_content: str = Field(..., description="Full HTML of the heading element including the outer <hN> tag")
+    html: str = Field(..., description="Full HTML of the heading including the outer <h1>-<h6> tag.")  # pyright: ignore[reportGeneralTypeIssues]  # required override of the typing-only base declaration
 
-    @model_validator(mode="before")
+    @field_validator("html", mode="after")
     @classmethod
-    def _from_innerhtml_level(cls, data):
-        if isinstance(data, dict) and "html_content" not in data and "innerhtml" in data:
-            innerhtml = data.pop("innerhtml")
-            level = data.pop("level", 1)
-            if level == 0:
-                raise ValueError("Heading level 0 (h0) is not allowed. Use level 1-6.")
-            data["html_content"] = f"<h{level}>{innerhtml}</h{level}>"
-        return data
+    def _normalize_heading_html(cls, value: str) -> str:
+        """Normalize to exactly the first <h1>-<h6> tag, re-serialized by bs4.
 
-    @classmethod
-    def _fields_from_html(cls, html: str) -> dict:
-        soup = BeautifulSoup(html, "html.parser")
-        tag = soup.find(re.compile(r"h[1-6]"))
-        if tag:
-            inner = tag.decode_contents(formatter="html").strip()
-            level = int(tag.name[1])
-            attrs_html = "".join(
-                f' {k}="{v if not isinstance(v, list) else " ".join(v)}"' for k, v in tag.attrs.items()
-            )
-            return {"html_content": f"<h{level}{attrs_html}>{inner}</h{level}>"}
-        return {"html_content": f"<h1>{soup.get_text().strip()}</h1>"}
-
-    @property
-    def html(self) -> str:
-        return self.html_content
-
-    @html.setter
-    def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
+        ``tag.decode(formatter="html")`` escapes attribute values, replacing the old manual
+        attribute rebuild and its escaping bug. When no hN tag is found the text content is
+        escaped and wrapped in ``<h1>``. h0 is unrepresentable here (the pattern is h[1-6]);
+        the explicit level-0 guard lives in the ``level`` setter.
+        """
+        soup = BeautifulSoup(value, "html.parser")
+        tag = soup.find(_HEADING_TAG_PATTERN)
+        if isinstance(tag, Tag):
+            return tag.decode(formatter="html").strip()
+        return f"<h1>{html_stdlib.escape(soup.get_text().strip())}</h1>"
 
     @property
     def level(self) -> int:
-        tag = BeautifulSoup(self.html_content, "html.parser").find(re.compile(r"h[1-6]"))
-        return int(tag.name[1]) if tag else 1
+        """Heading level (1-6) parsed from the stored html; 1 when no hN tag is present."""
+        tag = self._parsed().find(_HEADING_TAG_PATTERN)
+        return int(tag.name[1]) if isinstance(tag, Tag) else 1
 
     @level.setter
     def level(self, new_level: int) -> None:
+        """Rebuild html with the heading tag renamed to ``h{new_level}``.
+
+        Raises ValueError on level 0. Assigning ``self.html`` re-validates and invalidates
+        the soup cache.
+        """
         if new_level == 0:
             raise ValueError("Heading level 0 (h0) is not allowed. Use level 1-6.")
-        soup = BeautifulSoup(self.html_content, "html.parser")
-        tag = soup.find(re.compile(r"h[1-6]"))
-        if tag:
+        soup = BeautifulSoup(self.html, "html.parser")  # fresh parse — the tree is mutated below
+        tag = soup.find(_HEADING_TAG_PATTERN)
+        if isinstance(tag, Tag):
             tag.name = f"h{new_level}"
-            self.html_content = str(tag)
+            self.html = str(tag)
         else:
-            self.html_content = f"<h{new_level}>{self.html_content}</h{new_level}>"
+            self.html = f"<h{new_level}>{self.html}</h{new_level}>"
 
     @property
     def innerhtml(self) -> str:
-        tag = BeautifulSoup(self.html_content, "html.parser").find(re.compile(r"h[1-6]"))
-        return tag.decode_contents(formatter="html").strip() if tag else self.html_content
+        """Inner HTML of the heading tag (without the outer <hN>). Read-only convenience."""
+        tag = self._parsed().find(_HEADING_TAG_PATTERN)
+        return tag.decode_contents(formatter="html").strip() if isinstance(tag, Tag) else self.html
 
 
 class Paragraph(BaseElement):
     element_type: Literal[ElementTypeEnum.PARAGRAPH] = Field(default=ElementTypeEnum.PARAGRAPH)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
-    html_content: str = ""
+    html: str = Field(default="", description="Full HTML of the paragraph including the outer tag (typically <p>).")
 
+    @field_validator("html", mode="after")
     @classmethod
-    def _fields_from_html(cls, html: str) -> dict:
-        return {"html_content": html.strip()}
-
-    @property
-    def html(self) -> str:
-        return self.html_content
-
-    @html.setter
-    def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
+    def _normalize_html(cls, value: str) -> str:
+        return value.strip()
 
 
 class DocumentList(BaseElement):
     element_type: Literal[ElementTypeEnum.DOCUMENT_LIST] = Field(default=ElementTypeEnum.DOCUMENT_LIST)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
-    html_content: str = Field(..., description="HTML content of the list. Should be a <ul>, <ol>, or <dl> element.")
+    html: str = Field(..., description="Full HTML of the list. Expected outer tag: <ul>, <ol>, or <dl>.")  # pyright: ignore[reportGeneralTypeIssues]  # required override of the typing-only base declaration
 
+    @field_validator("html", mode="after")
     @classmethod
-    def _fields_from_html(cls, html: str) -> dict:
-        return {"html_content": html.strip()}
-
-    @property
-    def html(self) -> str:
-        """Backward-compatible read alias for html."""
-        return self.html_content
-
-    @html.setter
-    def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
+    def _normalize_html(cls, value: str) -> str:
+        return value.strip()
 
 
 class Table(BaseElement):
     element_type: Literal[ElementTypeEnum.TABLE] = Field(default=ElementTypeEnum.TABLE)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
-    html_content: str = Field(..., description="HTML content of the table. Should be a <table> element.")
+    html: str = Field(..., description="Full HTML of the table. Expected outer tag: <table>.")  # pyright: ignore[reportGeneralTypeIssues]  # required override of the typing-only base declaration
 
+    @field_validator("html", mode="after")
     @classmethod
-    def _fields_from_html(cls, html: str) -> dict:
-        return {"html_content": html.strip()}
+    def _normalize_html(cls, value: str) -> str:
+        return value.strip()
 
-    @property
-    def html(self) -> str:
-        return self.html_content
 
-    @html.setter
-    def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
+def image_fields_from_html(html_str: str) -> dict[str, str | int | None]:
+    """Parse an ``<img>`` tag into :class:`Image` field values.
+
+    Only ``data:`` URIs yield image data; keys with ``None`` values are dropped so parsed
+    values can serve as defaults that explicit kwargs override.  Returns ``{}`` when no
+    ``<img>`` tag (or no data URI) is present.
+
+    Args:
+        html_str: HTML containing an ``<img>`` tag (e.g. ``<img src="data:image/png;base64,..."/>``).
+
+    Returns:
+        Field values for ``image``, ``image_type``, ``alt``, ``width``, ``height`` (subset).
+    """
+    soup = BeautifulSoup(html_str, "html.parser")
+    img_tag = soup.find("img")
+    if not isinstance(img_tag, Tag):
+        return {}
+    src = img_tag.get("src", "")
+    data_pattern = re.compile(r"data:image/(?P<image_type>[^;]+);base64,(?P<image_data>.+)")
+    data_match = data_pattern.match(src)  # type: ignore[arg-type]  # src is the str 'src' attribute
+    data: dict[str, str | int | None] = {}
+    if data_match:
+        width = img_tag.get("width")
+        height = img_tag.get("height")
+        alt = img_tag.get("alt", None)
+        data = {
+            "image": data_match.group("image_data"),
+            "image_type": data_match.group("image_type"),
+            "alt": str(alt) if alt is not None else None,
+            "width": int(str(width)) if width else None,
+            "height": int(str(height)) if height else None,
+        }
+    return {k: v for k, v in data.items() if v is not None}
 
 
 class Image(BaseElement):
@@ -382,6 +396,16 @@ class Image(BaseElement):
                                                 None if image content cannot be represented as text.",
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _from_html_kwarg(cls, data: object) -> object:
+        """Allow ``Image(html='<img .../>')``: parsed fields are defaults, explicit kwargs win."""
+        if isinstance(data, dict) and "html" in data:
+            html_value = data.pop("html")
+            if isinstance(html_value, str):
+                data = image_fields_from_html(html_value) | data
+        return data
+
     @property
     def src(self) -> str:
         """Returns a data URI when base64 data is available, or an empty string."""
@@ -401,62 +425,78 @@ class Image(BaseElement):
 
     @property
     def html(self) -> str:
-        src = self.src
+        """Derived ``<img>`` HTML — a projection of the structured image fields (never stored)."""
         return (
-            f'<img src="{src}"'
-            + (f' alt="{self.alt}"' if self.alt else "")
+            f'<img src="{self.src}"'
+            + (f' alt="{html_stdlib.escape(self.alt, quote=True)}"' if self.alt else "")
             + (f' width="{self.width}"' if self.width else "")
             + (f' height="{self.height}"' if self.height else "")
             + "/>"
         )
 
     @html.setter
-    def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
-
-    @classmethod
-    def _fields_from_html(cls, html: str) -> dict:
-        soup = BeautifulSoup(html, "html.parser")
-        img_tag = soup.find("img")
-        if not img_tag:
-            return {}
-        src = img_tag.get("src", "")
-        data_pattern = re.compile(r"data:image/(?P<image_type>[^;]+);base64,(?P<image_data>.+)")
-        data_match = data_pattern.match(src)  # type: ignore[arg-type]  # src is the str 'src' attribute
-        data = {}
-        if data_match:
-            width = img_tag.get("width")
-            height = img_tag.get("height")
-            data = {
-                "image": data_match.group("image_data"),
-                "image_type": data_match.group("image_type"),
-                "alt": img_tag.get("alt", None),
-                "width": int(width) if width else None,  # type: ignore[arg-type]  # width attr is str
-                "height": int(height) if height else None,  # type: ignore[arg-type]  # height attr is str
-            }
-        return {k: v for k, v in data.items() if v is not None}
+    def html(self, value: str) -> None:  # pyright: ignore[reportIncompatibleVariableOverride]  # property implements the typing-only base declaration
+        for k, v in image_fields_from_html(value).items():
+            setattr(self, k, v)
 
 
 class RawText(BaseElement):
     element_type: Literal[ElementTypeEnum.RAW_TEXT] = Field(default=ElementTypeEnum.RAW_TEXT)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
-    innerhtml: str = Field(default="", description="Inner HTML content of the element (without outer tag)")
+    html: str = Field(default="<div></div>", description="Full HTML: a single outer <div> wrapping the raw content.")
 
+    @field_validator("html", mode="after")
     @classmethod
-    def _fields_from_html(cls, html: str) -> dict:
-        soup = BeautifulSoup(html, "html.parser")
-        # Find the first element tag and extract its inner contents
-        first_tag = soup.find()
-        if first_tag and hasattr(first_tag, "decode_contents"):
-            return {"innerhtml": first_tag.decode_contents(formatter="html").strip()}
-        return {"innerhtml": soup.decode_contents(formatter="html").strip()}
+    def _normalize_rawtext_html(cls, value: str) -> str:
+        """Normalize to a single outer ``<div>``.
+
+        A single root ``<div>`` passes through unchanged; any other single root tag is
+        unwrapped and its contents re-wrapped in ``<div>``; tag-less (or mixed) content is
+        wrapped in ``<div>`` verbatim.
+        """
+        stripped = value.strip()
+        soup = BeautifulSoup(stripped, "html.parser")
+        roots = [node for node in soup.contents if not (isinstance(node, str) and not node.strip())]
+        if len(roots) == 1 and isinstance(roots[0], Tag):
+            tag = roots[0]
+            if tag.name == "div":
+                return stripped
+            return f"<div>{tag.decode_contents(formatter='html').strip()}</div>"
+        return f"<div>{stripped}</div>"
 
     @property
-    def html(self) -> str:
-        return f"<div>{self.innerhtml}</div>"
+    def innerhtml(self) -> str:
+        """Inner HTML of the outer <div> (the raw content). Read-only convenience."""
+        tag = self._parsed().find("div")
+        return tag.decode_contents(formatter="html") if isinstance(tag, Tag) else self.html
 
-    @html.setter
-    def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
+
+def footnote_fields_from_html(html_str: str) -> dict[str, int | str]:
+    """Parse footnote HTML into :class:`Footnote` field values.
+
+    Accepts the canonical ``<aside class="footnote" data-number="N">text</aside>`` form, the
+    legacy ``[N] text`` pattern, or bare text (``number`` omitted — the Footnote constructor
+    will then require it explicitly).
+
+    Args:
+        html_str: Footnote HTML in one of the accepted forms.
+
+    Returns:
+        Field values for ``number`` and/or ``innerhtml``.
+    """
+    soup = BeautifulSoup(html_str, "html.parser")
+    aside = soup.find("aside", class_="footnote")
+    if isinstance(aside, Tag):
+        try:
+            number = int(str(aside.get("data-number", "0")))
+        except (ValueError, TypeError):
+            number = 0
+        return {"number": number, "innerhtml": aside.decode_contents().strip()}
+    # Fallback: [N] text pattern (legacy or external HTML)
+    raw = soup.get_text().strip()
+    match = re.match(r"^\[(\d+)\]\s*(.*)", raw, re.DOTALL)
+    if match:
+        return {"number": int(match.group(1)), "innerhtml": match.group(2)}
+    return {"innerhtml": raw.strip()}
 
 
 class Footnote(BaseElement):
@@ -466,22 +506,15 @@ class Footnote(BaseElement):
     number: int = Field(..., description="The footnote number as it appears in the document")
     innerhtml: str = Field(..., description="The footnote text content (without number prefix)")
 
+    @model_validator(mode="before")
     @classmethod
-    def _fields_from_html(cls, html: str) -> dict:
-        soup = BeautifulSoup(html, "html.parser")
-        aside = soup.find("aside", class_="footnote")
-        if aside:
-            try:
-                number = int(aside.get("data-number", 0))  # type: ignore[union-attr,arg-type]  # find yields a Tag; attr is str
-            except (ValueError, TypeError):
-                number = 0
-            return {"number": number, "innerhtml": aside.decode_contents().strip()}
-        # Fallback: [N] text pattern (legacy or external HTML)
-        raw = soup.get_text().strip()
-        match = re.match(r"^\[(\d+)\]\s*(.*)", raw, re.DOTALL)
-        if match:
-            return {"number": int(match.group(1)), "innerhtml": match.group(2)}
-        return {"innerhtml": raw.strip()}
+    def _from_html_kwarg(cls, data: object) -> object:
+        """Allow ``Footnote(html='<aside class="footnote" .../>')``: parsed fields are defaults."""
+        if isinstance(data, dict) and "html" in data:
+            html_value = data.pop("html")
+            if isinstance(html_value, str):
+                data = footnote_fields_from_html(html_value) | data
+        return data
 
     @property
     def placeholder_html(self) -> str:
@@ -490,14 +523,17 @@ class Footnote(BaseElement):
 
     @property
     def html(self) -> str:
+        """Derived footnote HTML — embeds the live element id, so it is never stored."""
         return f'<aside class="footnote" data-number="{self.number}" id="footnote-{self.id}">{self.innerhtml}</aside>'
 
     @html.setter
-    def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
+    def html(self, value: str) -> None:  # pyright: ignore[reportIncompatibleVariableOverride]  # property implements the typing-only base declaration
+        for k, v in footnote_fields_from_html(value).items():
+            setattr(self, k, v)
 
     @property
     def text(self) -> str:
+        """Plain text of the footnote content (fresh parse of ``innerhtml`` — not hot)."""
         return BeautifulSoup(self.innerhtml, "html.parser").get_text().strip()
 
 
@@ -848,24 +884,77 @@ class Document(BaseModel, Generic[TMetadata]):
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         return hashlib.sha256(_CONTENT_HASH_DOMAIN + canonical.encode("utf-8")).hexdigest()
 
-    def __or__(self, other: Self) -> Self:
-        title = self.title or other.title
-        if self.title and other.title:
-            new_heading = [Heading(innerhtml=other.title, level=1)]  # type: ignore[call-arg]  # consumed by _from_innerhtml_level validator
-        else:
-            new_heading = []
-        return Document(  # type: ignore[return-value]
-            elements=self.elements + new_heading + other.elements,
-            title=title,
-            source_path=self.source_path or other.source_path,
-            metadata=other.metadata | self.metadata,
-        )
+
+MetadataMergePolicy = Literal["first", "second", "strict"]
+"""Conflict policy for metadata keys present on both inputs of :func:`merge_documents`."""
 
 
-def join_documents(documents: list[Document]) -> Document:
+def merge_documents(first: Document, second: Document, *, metadata_policy: MetadataMergePolicy = "first") -> Document:
+    """Concatenate two documents into a new one. Inputs are never mutated.
+
+    Field policy:
+
+    ========================= =====================================================================
+    Field                     Result
+    ========================= =====================================================================
+    ``id``                    new uuid — the merged document is a new identity
+    ``title``                 ``first.title or second.title``
+    ``elements``              ``[*first.elements, *bridge, *second.elements]`` where *bridge* is a
+                              single ``<h1>`` heading carrying ``second.title`` (HTML-escaped) iff
+                              **both** titles are set, else empty. Always a fresh list — never
+                              aliases either input's list.
+    ``source_path``           ``first.source_path or second.source_path``
+    ``source_id`` / ``source_hash``  ``None`` — merged content is new provenance; re-stamped by
+                              the pipeline if synced
+    ``parser`` / ``parser_version``  kept iff identical on both inputs, else ``None``
+    ``external_refs``         ``[]`` — refs point at pre-merge identities
+    ``metadata``              ``"first"`` (default): ``{**second.metadata, **first.metadata}``
+                              (first wins on conflicts); ``"second"``: second wins; ``"strict"``:
+                              raise ``ValueError`` naming the keys whose values differ. Always a
+                              fresh dict.
+    ========================= =====================================================================
+
+    Args:
+        first: Left document; wins title/source_path/metadata conflicts under the default policy.
+        second: Right document.
+        metadata_policy: How to resolve metadata keys present on both documents.
+
+    Returns:
+        A new :class:`Document` containing both documents' elements.
+
+    Raises:
+        ValueError: Under ``metadata_policy="strict"`` when a shared metadata key differs.
+    """
+    first_meta: MetadataDict = dict(first.metadata)
+    second_meta: MetadataDict = dict(second.metadata)
+    if metadata_policy == "strict":
+        conflicts = sorted(key for key in first_meta.keys() & second_meta.keys() if first_meta[key] != second_meta[key])
+        if conflicts:
+            raise ValueError(f"merge_documents(metadata_policy='strict'): conflicting metadata keys {conflicts}")
+        metadata = {**first_meta, **second_meta}
+    elif metadata_policy == "second":
+        metadata = {**first_meta, **second_meta}
+    else:
+        metadata = {**second_meta, **first_meta}
+
+    bridge: list[ElementType] = (
+        [Heading(html=f"<h1>{html_stdlib.escape(second.title)}</h1>")] if first.title and second.title else []
+    )
+    return Document(
+        title=first.title or second.title,
+        elements=[*first.elements, *bridge, *second.elements],
+        source_path=first.source_path or second.source_path,
+        parser=first.parser if first.parser == second.parser else None,
+        parser_version=first.parser_version if first.parser_version == second.parser_version else None,
+        metadata=cast("BaseMetadata", metadata),
+    )
+
+
+def join_documents(documents: list[Document], *, metadata_policy: MetadataMergePolicy = "first") -> Document:
+    """Merge documents left-to-right via :func:`merge_documents`; an empty list yields ``Document()``."""
     if len(documents) == 0:
         return Document()
-    return reduce(or_, documents)
+    return reduce(lambda a, b: merge_documents(a, b, metadata_policy=metadata_policy), documents)
 
 
 DocumentPrimaryElement = Heading | Paragraph | Table | DocumentList | RawText  # elements that get rendered to md

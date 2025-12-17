@@ -46,8 +46,8 @@ def _():
     doc = Document(
         title="Annual Report",
         elements=[
-            Heading(innerhtml="Introduction", level=1),
-            Paragraph(html_content="<p>This report covers...</p>"),
+            Heading(html="<h1>Introduction</h1>"),
+            Paragraph(html="<p>This report covers...</p>"),
         ],
         metadata={"source": "annual_report.docx", "year": 2024},
     )
@@ -69,7 +69,7 @@ def _(mo):
 
     | Type | Description |
     |------|-------------|
-    | `Heading` | Section heading with `level` (1–6) and `innerhtml` |
+    | `Heading` | Section heading; stored `html` carries the outer `<h1>`–`<h6>` tag (`level` derived) |
     | `Paragraph` | Body text with HTML content |
     | `Table` | Table with HTML content (`<table>...</table>`) |
     | `Image` | Image with base64 data, alt text, and optional `text_representation` |
@@ -85,9 +85,9 @@ def _():
     from ragdoc.document import DocumentList, Footnote, Image, RawText, Table
 
     # Construct examples of each element type
-    table = Table(html_content="<table><tr><th>A</th></tr></table>")
+    table = Table(html="<table><tr><th>A</th></tr></table>")
     fn = Footnote(innerhtml="<p>See IAEA Statute Art. IV.</p>", number=1)
-    raw = RawText(innerhtml="<pre>code block</pre>")
+    raw = RawText(html="<pre>code block</pre>")
 
     print(f"Table element_type: {table.element_type!r}")
     print(f"Footnote number: {fn.number}")
@@ -139,7 +139,7 @@ def _(Document, Image, Paragraph):
 
     doc_with_ref = Document(
         elements=[
-            Paragraph(html_content=f'<p>As shown in <ref id="{img.id}" rel="image"/>, revenue grew...</p>'),
+            Paragraph(html=f'<p>As shown in <ref id="{img.id}" rel="image"/>, revenue grew...</p>'),
             img,
         ],
     )
@@ -169,11 +169,11 @@ def _(Document, Heading, Paragraph):
 
     parent_doc = Document(
         title="Full Report",
-        elements=[Heading(innerhtml="Full Report", level=1)],
+        elements=[Heading(html="<h1>Full Report</h1>")],
     )
     child_doc = Document(
         title="Introduction",
-        elements=[Paragraph(html_content="<p>Introduction text.</p>")],
+        elements=[Paragraph(html="<p>Introduction text.</p>")],
     )
 
     # After splitting, relationships are set automatically by split_by_headings / split_document
@@ -203,10 +203,10 @@ def _(mo):
 def _(Document, Heading, Paragraph, Table):
     demo_doc = Document(
         elements=[
-            Heading(innerhtml="Title", level=1),
-            Paragraph(html_content="<p>Text.</p>"),
-            Table(html_content="<table></table>"),
-            Heading(innerhtml="Section", level=2),
+            Heading(html="<h1>Title</h1>"),
+            Paragraph(html="<p>Text.</p>"),
+            Table(html="<table></table>"),
+            Heading(html="<h2>Section</h2>"),
         ]
     )
 

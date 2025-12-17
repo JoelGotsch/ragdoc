@@ -39,10 +39,7 @@ try:
         """
         source = parse_middle_json_file(path)
         extractor = MinerUExtractor()
-        document = await extractor.parse(source, source_path=path)
-        document.metadata["filename"] = path.name
-        document.source_path = str(path)
-        return document
+        return await extractor.parse(source, source_path=path)
 
     class MinerUParser(Parser):
         """Public parser entry point for MinerU ``_middle.json`` files.
@@ -87,10 +84,7 @@ try:
         async def __call__(self, path: Path) -> Document:
             if self.extractor is not None:
                 source = parse_middle_json_file(path)
-                document = await self.extractor.parse(source, source_path=path)
-                document.metadata["filename"] = path.name
-                document.source_path = str(path)
-                return document
+                return await self.extractor.parse(source, source_path=path)
             return await parse_mineru_file(path)
 
     __all__ = [

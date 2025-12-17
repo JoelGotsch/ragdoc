@@ -22,17 +22,17 @@ def real_world_docs():
     """
     fn = Footnote(number=1, innerhtml="This is the footnote text")
     img = Image(image=None, image_type="png", alt="Figure 1: example diagram")
-    para1 = Paragraph(html_content=f'<p>This is just some text with a footnote<ref id="{fn.id}" rel="footnote"/>.</p>')
-    para2 = Paragraph(html_content="<p>Some text in the middle</p>")
-    para_extra = Paragraph(html_content="<p>This paragraph appears only in doc_b.</p>")
+    para1 = Paragraph(html=f'<p>This is just some text with a footnote<ref id="{fn.id}" rel="footnote"/>.</p>')
+    para2 = Paragraph(html="<p>Some text in the middle</p>")
+    para_extra = Paragraph(html="<p>This paragraph appears only in doc_b.</p>")
 
     doc_a = Document(
         elements=[
-            RawText(innerhtml="This is just some <strong>text</strong> with a footnote1."),
-            RawText(innerhtml="Some additional text"),
-            RawText(innerhtml="Some text in the middle"),
-            RawText(innerhtml="Figure 1: example diagram"),
-            RawText(innerhtml="1: This is the footnote text"),
+            RawText(html="This is just some <strong>text</strong> with a footnote1."),
+            RawText(html="Some additional text"),
+            RawText(html="Some text in the middle"),
+            RawText(html="Figure 1: example diagram"),
+            RawText(html="1: This is the footnote text"),
         ],
         parser="mineru",
     )

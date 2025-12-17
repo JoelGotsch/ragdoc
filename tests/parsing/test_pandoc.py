@@ -38,8 +38,9 @@ def test_h1_content(pandoc_document: Document):
     assert "I am just text under the first paragraph" in paragraphs[0].text
     assert "What it should however provide " in paragraphs[1].text
     assert "And checking how it looks if certain text" in paragraphs[2].text
-    assert Path(pandoc_document.source_path).match("*/tests/data/test.DOCX")
-    assert pandoc_document.metadata["filename"] == "test.DOCX"
+    # Provenance (source_path / metadata["filename"]) is stamped by parsing.load(),
+    # not by load_pandoc — see tests/parsing/test_parser_contract.py.
+    assert pandoc_document.parser == "pandoc"
 
 
 expected_table_markdown = """

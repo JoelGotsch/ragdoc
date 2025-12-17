@@ -28,15 +28,15 @@ _INSERT_PARAMS = pytest.mark.parametrize(
 
 
 def test_html_merge_basic_returns_document():
-    doc_a = Document(elements=[Paragraph(html_content="<p>Hello</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>Hello</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Hello</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>Hello</p>")])
     result = merge_documents_html(doc_a, doc_b)
     assert isinstance(result, Document)
 
 
 def test_html_merge_basic_parser_is_merged():
-    doc_a = Document(elements=[Paragraph(html_content="<p>text</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>text</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>text</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>text</p>")])
     result = merge_documents_html(doc_a, doc_b)
     assert result.parser == "merged"
 
@@ -58,8 +58,8 @@ def test_html_merge_basic_empty_docs_return_empty_document():
 
 
 def test_html_merge_richness_richer_paragraph_from_b_wins():
-    doc_a = Document(elements=[Paragraph(html_content="<p>plain body text</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p><em>italic</em> body text</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>plain body text</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p><em>italic</em> body text</p>")])
     result = merge_documents_html(doc_a, doc_b)
     assert len(result.paragraphs) >= 1
     para_html = result.paragraphs[0].html
@@ -67,8 +67,8 @@ def test_html_merge_richness_richer_paragraph_from_b_wins():
 
 
 def test_html_merge_richness_richer_paragraph_from_a_wins():
-    doc_a = Document(elements=[Paragraph(html_content="<p><b>bold</b> text here</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>plain text here</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p><b>bold</b> text here</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>plain text here</p>")])
     result = merge_documents_html(doc_a, doc_b)
     assert "<b>" in result.paragraphs[0].html
 
@@ -79,14 +79,14 @@ def test_html_merge_richness_richer_paragraph_from_a_wins():
 def test_html_merge_prefer_source_b_for_headings():
     doc_a = Document(
         elements=[
-            Heading(html_content="<h3>Section</h3>"),
-            Paragraph(html_content="<p>Content</p>"),
+            Heading(html="<h3>Section</h3>"),
+            Paragraph(html="<p>Content</p>"),
         ]
     )
     doc_b = Document(
         elements=[
-            Heading(html_content="<h2>Section</h2>"),
-            Paragraph(html_content="<p>Content</p>"),
+            Heading(html="<h2>Section</h2>"),
+            Paragraph(html="<p>Content</p>"),
         ]
     )
     result = merge_documents_html(doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "b"})
@@ -97,14 +97,14 @@ def test_html_merge_prefer_source_b_for_headings():
 def test_html_merge_prefer_source_a_for_headings():
     doc_a = Document(
         elements=[
-            Heading(html_content="<h1>Title</h1>"),
-            Paragraph(html_content="<p>Body</p>"),
+            Heading(html="<h1>Title</h1>"),
+            Paragraph(html="<p>Body</p>"),
         ]
     )
     doc_b = Document(
         elements=[
-            Heading(html_content="<h2>Title</h2>"),
-            Paragraph(html_content="<p><em>Body</em></p>"),
+            Heading(html="<h2>Title</h2>"),
+            Paragraph(html="<p><em>Body</em></p>"),
         ]
     )
     result = merge_documents_html(doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "a"})
@@ -118,11 +118,11 @@ def test_html_merge_prefer_source_a_for_headings():
 
 
 def test_html_merge_insertions_disabled_suppresses_extra_b_elements():
-    doc_a = Document(elements=[Paragraph(html_content="<p>Shared content</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Shared content</p>")])
     doc_b = Document(
         elements=[
-            Paragraph(html_content="<p>Shared content</p>"),
-            Paragraph(html_content="<p>Extra only in B</p>"),
+            Paragraph(html="<p>Shared content</p>"),
+            Paragraph(html="<p>Extra only in B</p>"),
         ]
     )
     result = merge_documents_html(doc_a, doc_b, allow_insertions_from_b=False)
@@ -130,11 +130,11 @@ def test_html_merge_insertions_disabled_suppresses_extra_b_elements():
 
 
 def test_html_merge_insertions_enabled_includes_extra_b_elements():
-    doc_a = Document(elements=[Paragraph(html_content="<p>Shared content</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Shared content</p>")])
     doc_b = Document(
         elements=[
-            Paragraph(html_content="<p>Shared content</p>"),
-            Paragraph(html_content="<p>Extra only in B</p>"),
+            Paragraph(html="<p>Shared content</p>"),
+            Paragraph(html="<p>Extra only in B</p>"),
         ]
     )
     result = merge_documents_html(doc_a, doc_b, allow_insertions_from_b=True)
@@ -147,8 +147,8 @@ def test_html_merge_insertions_enabled_includes_extra_b_elements():
 def test_html_merge_footnote_structure_reconstructed_after_reparse():
     """Footnote structure is preserved: Footnote.html renders as <aside> which is parsed directly."""
     fn = Footnote(number=1, innerhtml="Important note text.")
-    para = Paragraph(html_content=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>')
-    doc_a = Document(elements=[Paragraph(html_content="<p>Body text.</p>")])
+    para = Paragraph(html=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>')
+    doc_a = Document(elements=[Paragraph(html="<p>Body text.</p>")])
     doc_b = Document(elements=[para, fn], parser="html")
     result = merge_documents_html(doc_a, doc_b)
     assert len(result.footnotes) == 1
@@ -159,8 +159,8 @@ def test_html_merge_footnote_structure_reconstructed_after_reparse():
 def test_html_merge_footnote_inline_ref_intact_after_html_merge():
     """After merging, validate_inline_refs returns [] — inline refs are reconstructed."""
     fn = Footnote(number=1, innerhtml="Detailed footnote content.")
-    para = Paragraph(html_content=f'<p>Sentence with note<ref id="{fn.id}" rel="footnote"/>.</p>')
-    doc_a = Document(elements=[Paragraph(html_content="<p>Sentence with note.</p>")])
+    para = Paragraph(html=f'<p>Sentence with note<ref id="{fn.id}" rel="footnote"/>.</p>')
+    doc_a = Document(elements=[Paragraph(html="<p>Sentence with note.</p>")])
     doc_b = Document(elements=[para, fn], parser="html")
     result = merge_documents_html(doc_a, doc_b)
     assert validate_inline_refs(result) == []
@@ -206,7 +206,7 @@ def test_html_merge_real_world_scenario(real_world_docs, allow_insertions_from_b
 
 def test_html_merge_doc_a_unique_element_preserved():
     """Element unique to doc_a with no counterpart in doc_b is kept."""
-    doc_a = Document(elements=[Paragraph(html_content="<p>Unique to A only</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Unique to A only</p>")])
     doc_b = Document(elements=[])
     result = merge_documents_html(doc_a, doc_b)
     assert any("Unique to A" in e.text for e in result.elements)
@@ -216,15 +216,15 @@ def test_html_merge_doc_a_unique_element_preserved_alongside_shared():
     """Mix of shared + doc_a-unique elements: all appear in output."""
     doc_a = Document(
         elements=[
-            Paragraph(html_content="<p>Shared content</p>"),
-            Paragraph(html_content="<p>Background only in A</p>"),
-            Paragraph(html_content="<p>Method description</p>"),
+            Paragraph(html="<p>Shared content</p>"),
+            Paragraph(html="<p>Background only in A</p>"),
+            Paragraph(html="<p>Method description</p>"),
         ]
     )
     doc_b = Document(
         elements=[
-            Paragraph(html_content="<p>Shared content</p>"),
-            Paragraph(html_content="<p>Method description</p>"),
+            Paragraph(html="<p>Shared content</p>"),
+            Paragraph(html="<p>Method description</p>"),
         ]
     )
     result = merge_documents_html(doc_a, doc_b)
@@ -241,7 +241,7 @@ def test_html_merge_image_with_base64_survives_merge():
     """Standalone Image with base64 data in doc_b appears in merged output."""
     data = base64.b64encode(b"fake-png-bytes").decode()
     img = Image(image=data, image_type="png", alt="Chart")
-    doc_a = Document(elements=[Paragraph(html_content="<p>Some text</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Some text</p>")])
     doc_b = Document(elements=[img])
     result = merge_documents_html(doc_a, doc_b)
     assert len(result.images) >= 1
@@ -251,7 +251,7 @@ def test_html_merge_image_with_base64_survives_merge():
 def test_html_merge_image_without_data_gracefully_lost():
     """Image(image=None) produces no error; image is gracefully absent from output."""
     img = Image(image=None, image_type="png", alt="No binary data")
-    doc_a = Document(elements=[Paragraph(html_content="<p>Some text</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Some text</p>")])
     doc_b = Document(elements=[img])
     result = merge_documents_html(doc_a, doc_b)
     assert len(result.images) == 0
@@ -274,16 +274,16 @@ def test_html_merge_heading_hierarchy_parser_wins_heading_level():
     """doc_a all h1 (no hierarchy); doc_b has h1/h2/h3 -> merged uses doc_b levels."""
     doc_a = Document(
         elements=[
-            Heading(html_content="<h1>Chapter 1</h1>"),
-            Heading(html_content="<h1>Section 1.1</h1>"),
-            Heading(html_content="<h1>Subsection 1.1.1</h1>"),
+            Heading(html="<h1>Chapter 1</h1>"),
+            Heading(html="<h1>Section 1.1</h1>"),
+            Heading(html="<h1>Subsection 1.1.1</h1>"),
         ]
     )
     doc_b = Document(
         elements=[
-            Heading(html_content="<h1>Chapter 1</h1>"),
-            Heading(html_content="<h2>Section 1.1</h2>"),
-            Heading(html_content="<h3>Subsection 1.1.1</h3>"),
+            Heading(html="<h1>Chapter 1</h1>"),
+            Heading(html="<h2>Section 1.1</h2>"),
+            Heading(html="<h3>Subsection 1.1.1</h3>"),
         ]
     )
     result = merge_documents_html(doc_a, doc_b)
@@ -295,16 +295,16 @@ def test_html_merge_heading_hierarchy_parser_wins_heading_level_inverse():
     """doc_b all h2 (no hierarchy); doc_a has h1/h2/h3 -> merged uses doc_a levels."""
     doc_a = Document(
         elements=[
-            Heading(html_content="<h1>Chapter 1</h1>"),
-            Heading(html_content="<h2>Section 1.1</h2>"),
-            Heading(html_content="<h3>Subsection 1.1.1</h3>"),
+            Heading(html="<h1>Chapter 1</h1>"),
+            Heading(html="<h2>Section 1.1</h2>"),
+            Heading(html="<h3>Subsection 1.1.1</h3>"),
         ]
     )
     doc_b = Document(
         elements=[
-            Heading(html_content="<h2>Chapter 1</h2>"),
-            Heading(html_content="<h2>Section 1.1</h2>"),
-            Heading(html_content="<h2>Subsection 1.1.1</h2>"),
+            Heading(html="<h2>Chapter 1</h2>"),
+            Heading(html="<h2>Section 1.1</h2>"),
+            Heading(html="<h2>Subsection 1.1.1</h2>"),
         ]
     )
     result = merge_documents_html(doc_a, doc_b)
@@ -316,14 +316,14 @@ def test_html_merge_heading_hierarchy_both_present_richness_fallback():
     """Both docs have hierarchy -> richness fallback, not hierarchy override."""
     doc_a = Document(
         elements=[
-            Heading(html_content="<h1>Title</h1>"),
-            Heading(html_content="<h2>Sub</h2>"),
+            Heading(html="<h1>Title</h1>"),
+            Heading(html="<h2>Sub</h2>"),
         ]
     )
     doc_b = Document(
         elements=[
-            Heading(html_content="<h1><strong>Title</strong></h1>"),
-            Heading(html_content="<h2>Sub</h2>"),
+            Heading(html="<h1><strong>Title</strong></h1>"),
+            Heading(html="<h2>Sub</h2>"),
         ]
     )
     result = merge_documents_html(doc_a, doc_b)
