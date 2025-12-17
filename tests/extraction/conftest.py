@@ -40,7 +40,7 @@ def make_event_client(events_per_call: list[list[Event]]) -> MagicMock:
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(parsed=batch))])
 
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(side_effect=_parse)
+    client.chat.completions.parse = AsyncMock(side_effect=_parse)
     return client
 
 

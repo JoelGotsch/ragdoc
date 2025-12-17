@@ -81,7 +81,7 @@ def make_kg_client(schema: GraphSchema, batches: list[tuple[list, list]]) -> Mag
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(parsed=batch))])
 
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(side_effect=_parse)
+    client.chat.completions.parse = AsyncMock(side_effect=_parse)
     return client
 
 
@@ -328,7 +328,7 @@ async def test_min_tokens_skips_extraction():
     doc = make_doc("tiny")
 
     merged = await extractor.extract(doc)
-    assert client.beta.chat.completions.parse.call_count == 0
+    assert client.chat.completions.parse.call_count == 0
     assert merged == []
     assert doc.metadata == {}
 
@@ -361,7 +361,7 @@ async def test_gleaning_runs_second_call_and_merges():
     extractor = KnowledgeGraphExtractor(SCHEMA, client=client, model="m", gleaning=True)
     merged = await extractor.extract(make_doc())
 
-    assert client.beta.chat.completions.parse.call_count == 2
+    assert client.chat.completions.parse.call_count == 2
     nodes, edges = _split_by_kind(merged, SCHEMA)
     assert len(nodes) == 3  # 2 from first + 1 from gleaning
     assert len(edges) == 2
@@ -378,7 +378,7 @@ async def test_gleaning_off_by_default():
     client = make_kg_client(SCHEMA, [([], [])])
     extractor = KnowledgeGraphExtractor(SCHEMA, client=client, model="m")
     await extractor.extract(make_doc())
-    assert client.beta.chat.completions.parse.call_count == 1  # only the primary call
+    assert client.chat.completions.parse.call_count == 1  # only the primary call
 
 
 @pytest.mark.anyio
@@ -387,7 +387,7 @@ async def test_gleaning_from_settings():
     client = make_kg_client(SCHEMA, [([], [])])
     extractor = KnowledgeGraphExtractor(SCHEMA, client=client, model="m", settings=ExtractionSettings(gleaning=True))
     await extractor.extract(make_doc())
-    assert client.beta.chat.completions.parse.call_count == 2
+    assert client.chat.completions.parse.call_count == 2
 
 
 # ---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ async def test_patterns_injected_into_system_prompt():
     client = make_kg_client(SCHEMA, [([], [])])
     extractor = KnowledgeGraphExtractor(SCHEMA, client=client, model="m")
     await extractor.extract(make_doc())
-    messages = client.beta.chat.completions.parse.call_args.kwargs["messages"]
+    messages = client.chat.completions.parse.call_args.kwargs["messages"]
     system = messages[0]["content"]
     assert "(Person)-[Employment]->(Company)" in system
     assert "ONLY these combinations" in system
@@ -516,7 +516,7 @@ async def test_legal_edges_pass_pattern_enforcement_silently(caplog: pytest.LogC
 
 def make_failing_client() -> MagicMock:
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(side_effect=RuntimeError("boom"))
+    client.chat.completions.parse = AsyncMock(side_effect=RuntimeError("boom"))
     return client
 
 
@@ -528,7 +528,7 @@ async def test_halving_depth_from_settings_zero_disables_halving():
     extractor = KnowledgeGraphExtractor(SCHEMA, client=client, model="m", settings=settings)
     with pytest.raises(RuntimeError, match="boom"):
         await extractor.extract(make_doc("one line\n\nanother line"))
-    assert client.beta.chat.completions.parse.call_count == 1
+    assert client.chat.completions.parse.call_count == 1
 
 
 @pytest.mark.anyio
@@ -539,7 +539,7 @@ async def test_halving_depth_from_settings_one_allows_one_split():
     extractor = KnowledgeGraphExtractor(SCHEMA, client=client, model="m", settings=settings)
     with pytest.raises(RuntimeError, match="boom"):
         await extractor.extract(make_doc("one line\n\nanother line"))
-    assert client.beta.chat.completions.parse.call_count >= 2  # primary + at least the first half
+    assert client.chat.completions.parse.call_count >= 2  # primary + at least the first half
 
 
 @pytest.mark.anyio
@@ -550,4 +550,4 @@ async def test_halving_min_chars_from_settings_blocks_halving():
     extractor = KnowledgeGraphExtractor(SCHEMA, client=client, model="m", settings=settings)
     with pytest.raises(RuntimeError, match="boom"):
         await extractor.extract(make_doc("one line\n\nanother line"))
-    assert client.beta.chat.completions.parse.call_count == 1
+    assert client.chat.completions.parse.call_count == 1

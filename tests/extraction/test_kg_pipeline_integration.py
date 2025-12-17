@@ -69,7 +69,7 @@ def make_kg_client(nodes, edges) -> MagicMock:
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(parsed=batch))])
 
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(side_effect=_parse)
+    client.chat.completions.parse = AsyncMock(side_effect=_parse)
     return client
 
 

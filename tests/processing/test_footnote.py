@@ -10,11 +10,22 @@ from ragdoc.processing.footnote import (
     FootnoteProcessor,
     LLMFootnoteResolver,
     SimpleFootnoteResolver,
+    _FootnoteSelection,
     apply_ref_patches,
     build_footnote_pattern,
     find_footnote_candidates,
     score_footnote_candidates,
 )
+
+
+def _selection_client(selection: int | None, *, refusal: bool = False) -> MagicMock:
+    """Mock chat client whose ``chat.completions.parse`` returns a ``_FootnoteSelection``."""
+    message = MagicMock()
+    message.parsed = None if refusal else _FootnoteSelection(selection=selection)
+    client = MagicMock()
+    client.chat.completions.parse = AsyncMock(return_value=MagicMock(choices=[MagicMock(message=message)]))
+    return client
+
 
 # =============================================================================
 # Test Fixtures
@@ -506,6 +517,15 @@ async def test_simple_resolver_falls_back_to_first_candidate():
 # --- TestLLMFootnoteResolver ---
 
 
+def test_footnote_resolver_requires_client_at_init():
+    """No explicit client and no configured client -> fail-loud at construction, not at resolve time."""
+    from ragdoc.config import RagdocConfig, configure
+    from ragdoc.llm import LLMNotConfiguredError
+
+    with configure(RagdocConfig()), pytest.raises(LLMNotConfiguredError):
+        LLMFootnoteResolver()
+
+
 @pytest.mark.anyio
 async def test_llm_resolver_returns_none_for_empty_candidates():
     """LLMFootnoteResolver returns None for empty candidates list."""
@@ -515,7 +535,7 @@ async def test_llm_resolver_returns_none_for_empty_candidates():
     result = await resolver.resolve([], 1, "Some footnote")
 
     assert result is None
-    mock_client.chat.completions.create.assert_not_called()
+    mock_client.chat.completions.parse.assert_not_called()
 
 
 @pytest.mark.anyio
@@ -541,18 +561,13 @@ async def test_llm_resolver_returns_single_candidate_without_llm():
     result = await resolver.resolve([candidate], 1, "Note")
 
     assert result is candidate
-    mock_client.chat.completions.create.assert_not_called()
+    mock_client.chat.completions.parse.assert_not_called()
 
 
 @pytest.mark.anyio
 async def test_llm_resolver_calls_llm_for_multiple_candidates():
-    """LLMFootnoteResolver calls LLM when multiple candidates exist."""
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = "2"
-
-    mock_client = MagicMock()
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+    """LLMFootnoteResolver calls LLM when multiple candidates exist (structured selection)."""
+    mock_client = _selection_client(2)
 
     resolver = LLMFootnoteResolver(client=mock_client, model="test-model")
 
@@ -586,18 +601,13 @@ async def test_llm_resolver_calls_llm_for_multiple_candidates():
     result = await resolver.resolve([candidate1, candidate2], 1, "Note")
 
     assert result is candidate2
-    mock_client.chat.completions.create.assert_called_once()
+    mock_client.chat.completions.parse.assert_called_once()
 
 
 @pytest.mark.anyio
-async def test_llm_resolver_handles_none_response():
-    """LLMFootnoteResolver handles NONE response from LLM."""
-    mock_response = MagicMock()
-    mock_response.choices = [MagicMock()]
-    mock_response.choices[0].message.content = "NONE"
-
-    mock_client = MagicMock()
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
+async def test_llm_resolver_handles_none_selection():
+    """LLMFootnoteResolver returns None when the model selects no candidate (selection=null)."""
+    mock_client = _selection_client(None)
 
     resolver = LLMFootnoteResolver(client=mock_client)
 
@@ -637,7 +647,7 @@ async def test_llm_resolver_handles_none_response():
 async def test_llm_resolver_handles_llm_error():
     """LLMFootnoteResolver leaves the footnote unresolved (None) on LLM error."""
     mock_client = MagicMock()
-    mock_client.chat.completions.create = AsyncMock(side_effect=Exception("API Error"))
+    mock_client.chat.completions.parse = AsyncMock(side_effect=Exception("API Error"))
 
     resolver = LLMFootnoteResolver(client=mock_client)
 
@@ -1064,13 +1074,10 @@ async def test_only_orphaned_true_processes_all_when_none_prereferred():
 
 @pytest.mark.anyio
 async def test_llm_resolver_none_content_returns_none(caplog):
-    """A response with content=None (refusal) yields None, not an AttributeError."""
+    """A refusal (message.parsed is None) yields None with a warning, not an AttributeError."""
     import logging
 
-    client = MagicMock()
-    message = MagicMock()
-    message.content = None
-    client.chat.completions.create = AsyncMock(return_value=MagicMock(choices=[MagicMock(message=message)]))
+    client = _selection_client(None, refusal=True)
     resolver = LLMFootnoteResolver(client=client, model="test")
     candidates = [
         FootnoteCandidate(
@@ -1091,7 +1098,32 @@ async def test_llm_resolver_none_content_returns_none(caplog):
     with caplog.at_level(logging.WARNING):
         result = await resolver.resolve(candidates, 1, "A study.")
     assert result is None
-    assert any("empty content" in r.message for r in caplog.records)
+    assert any("leaving footnote unresolved" in r.message for r in caplog.records)
+
+
+@pytest.mark.anyio
+async def test_llm_resolver_out_of_range_selection_returns_none():
+    """A selection outside 1..len(candidates) degrades to unresolved, never an IndexError."""
+    client = _selection_client(5)
+    resolver = LLMFootnoteResolver(client=client, model="test")
+    candidates = [
+        FootnoteCandidate(
+            element_id=f"para-{i}",
+            element_idx=i,
+            page=1,
+            match_start=0,
+            match_end=1,
+            context_before="before ",
+            context_after=" after",
+            full_context="before 1 after",
+            reference_number=1,
+            footnote_text="A study.",
+            footnote_id="fn-1",
+        )
+        for i in range(2)
+    ]
+    result = await resolver.resolve(candidates, 1, "A study.")
+    assert result is None
 
 
 @pytest.mark.anyio
@@ -1100,7 +1132,7 @@ async def test_llm_resolver_error_returns_none_with_warning(caplog):
     import logging
 
     client = MagicMock()
-    client.chat.completions.create = AsyncMock(side_effect=RuntimeError("429 Too Many Requests"))
+    client.chat.completions.parse = AsyncMock(side_effect=RuntimeError("429 Too Many Requests"))
     resolver = LLMFootnoteResolver(client=client, model="test")
     candidates = [
         FootnoteCandidate(

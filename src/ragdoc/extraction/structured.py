@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 from functools import cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, Field, create_model, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,12 +33,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from ragdoc.extraction._llm import (
     build_messages,
     parse_with_retry,
-    resolve_client,
     resolve_model,
     resolve_renderer,
     resolve_tokenizer,
 )
 from ragdoc.extraction.mention import Mention, PayloadT, mint_mention_id
+from ragdoc.llm import ChatClient, resolve_openai_client
 from ragdoc.utils import Tokenizer
 
 if TYPE_CHECKING:
@@ -182,7 +182,7 @@ class ExtractionSettings(BaseSettings):
 def _batch_model(payload_model: type[T]) -> type[BaseModel]:
     """Return (cached) an ``ExtractionBatch`` model wrapping ``mentions: list[payload_model]``.
 
-    ``client.beta.chat.completions.parse`` needs a concrete ``response_format`` class, and a list
+    ``client.chat.completions.parse`` needs a concrete ``response_format`` class, and a list
     wrapper avoids the bare-``list[T]`` "one-of" ambiguity while giving the LLM a labelled place to
     return many instances.
     """
@@ -233,7 +233,7 @@ class StructuredExtractor(Generic[PayloadT]):
     def __init__(
         self,
         payload_model: type[PayloadT],
-        client: Any | None = None,
+        client: ChatClient | None = None,
         model: str | None = None,
         settings: ExtractionSettings | None = None,
         renderer: Renderer | None = None,
@@ -262,7 +262,7 @@ class StructuredExtractor(Generic[PayloadT]):
             logger.debug("StructuredExtractor: below min_tokens, skipping extraction")
             return []
 
-        client = resolve_client(self._client)
+        client = resolve_openai_client(self._client)
         model = resolve_model(self._model, self.settings)
         batch_cls = _batch_model(self._payload_model)
         messages = build_extraction_messages(

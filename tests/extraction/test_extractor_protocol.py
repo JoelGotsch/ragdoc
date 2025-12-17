@@ -111,7 +111,7 @@ async def test_as_processor_idempotency_guard():
     doc.metadata["mentions"] = [{"already": "here"}]
     out = await adapter.process(doc)
     assert out is not None
-    client.beta.chat.completions.parse.assert_not_called()
+    client.chat.completions.parse.assert_not_called()
     assert out.metadata["mentions"] == [{"already": "here"}]
 
 
@@ -124,7 +124,7 @@ async def test_as_processor_overwrite_strips_stale_key_before_extract():
     doc.metadata["mentions"] = [{"stale": "data"}]
     out = await adapter.process(doc)
     assert out is not None
-    client.beta.chat.completions.parse.assert_called_once()
+    client.chat.completions.parse.assert_called_once()
     mentions = out.metadata["mentions"]
     assert [m["payload"]["title"] for m in mentions] == ["Fresh"]
     for m in mentions:

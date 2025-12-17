@@ -16,7 +16,7 @@ from ragdoc.processing.heading_llm import (
 
 
 def _make_mock_client(response: HeadingResponse | None = None, *, side_effect: Exception | None = None) -> MagicMock:
-    """Create a mock client whose beta.chat.completions.parse returns *response*."""
+    """Create a mock client whose chat.completions.parse returns *response*."""
     mock_response = MagicMock()
     mock_response.choices = [MagicMock()]
     mock_response.choices[0].message.parsed = response
@@ -24,9 +24,9 @@ def _make_mock_client(response: HeadingResponse | None = None, *, side_effect: E
 
     client = MagicMock()
     if side_effect is not None:
-        client.beta.chat.completions.parse = AsyncMock(side_effect=side_effect)
+        client.chat.completions.parse = AsyncMock(side_effect=side_effect)
     else:
-        client.beta.chat.completions.parse = AsyncMock(return_value=mock_response)
+        client.chat.completions.parse = AsyncMock(return_value=mock_response)
     return client
 
 
@@ -41,7 +41,7 @@ async def test_heading_resolver_process_empty_document():
     resolver = LLMHeadingResolver(client)
     result = await resolver.process(doc)
     assert result is doc
-    client.beta.chat.completions.parse.assert_not_called()
+    client.chat.completions.parse.assert_not_called()
 
 
 @pytest.mark.anyio
@@ -54,7 +54,7 @@ async def test_heading_resolver_process_no_headings():
     resolver = LLMHeadingResolver(client)
     result = await resolver.process(doc)
     assert result is doc
-    client.beta.chat.completions.parse.assert_not_called()
+    client.chat.completions.parse.assert_not_called()
 
 
 @pytest.mark.anyio
@@ -78,7 +78,7 @@ async def test_heading_resolver_process_with_headings():
     resolver = LLMHeadingResolver(client, remove_title_from_elements=False)
     result = await resolver.process(doc)
 
-    client.beta.chat.completions.parse.assert_called_once()
+    client.chat.completions.parse.assert_called_once()
 
     assert result.elements[0].metadata.get("llm_heading_level") == "document-title"
     assert result.elements[0].metadata.get("is_document_title") is True
@@ -155,3 +155,26 @@ async def test_heading_resolver_handles_api_failure():
     result = await resolver.process(doc)
 
     assert result is doc
+
+
+@pytest.mark.anyio
+async def test_heading_resolver_degrades_to_empty_on_exhaustion():
+    """Behavior pin: a non-retryable 400 degrades to [] (headings unchanged) after ONE call."""
+    import httpx
+    import openai
+
+    doc = Document(elements=[Heading(html="<h3>Title</h3>")])
+    error = openai.BadRequestError(
+        "bad request",
+        response=httpx.Response(400, request=httpx.Request("POST", "https://api.test/v1")),
+        body=None,
+    )
+    client = _make_mock_client(side_effect=error)
+    settings = LLMHeadingResolverSettings(max_retries=3)
+    resolver = LLMHeadingResolver(client, settings=settings)
+
+    result = await resolver.process(doc)
+
+    assert result is doc
+    assert result.elements[0].level == 3  # unchanged — degrade to no judgments
+    client.chat.completions.parse.assert_called_once()  # 400 is not retried

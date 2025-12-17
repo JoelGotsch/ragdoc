@@ -6,18 +6,20 @@ client/model/renderer/tokenizer fallback resolution plus the structured-output r
 Those live here once, as standalone functions (house convention: reusable logic = standalone
 functions, not private methods).
 
-Phase-7 note: :func:`parse_with_retry` is deliberately the *only* function whose body the shared
-``ragdoc.llm`` reliability layer will replace (a ``call_structured`` call with real backoff and
-error classification); its signature is final so no call site changes again. Do not inline retry
-logic anywhere else.
+Client resolution and the retry engine live in :mod:`ragdoc.llm`
+(:func:`~ragdoc.llm.resolve_openai_client` / :func:`~ragdoc.llm.call_structured`);
+:func:`parse_with_retry` is a thin extraction-flavoured adapter that maps
+``ExtractionSettings`` knobs onto ``call_structured``. Do not inline retry logic anywhere else.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from pydantic import BaseModel
+
+from ragdoc.llm import ChatClient, call_structured
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -29,21 +31,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 BatchT = TypeVar("BatchT", bound=BaseModel)
-
-
-def resolve_client(explicit: Any | None) -> Any:
-    """Resolve the LLM client: explicit → ``get_config().openai_client`` → ``ValueError``.
-
-    ``Any`` typing is deliberate until the Phase-7 ``ChatClient`` protocol exists.
-    """
-    if explicit is not None:
-        return explicit
-    from ragdoc.config import get_config
-
-    client = get_config().openai_client
-    if client is None:
-        raise ValueError("No client provided and get_config().openai_client is None.")
-    return client
 
 
 def resolve_model(explicit: str | None, settings: ExtractionSettings) -> str:
@@ -84,7 +71,7 @@ def build_messages(text: str, *, system_prompt: str, user_message: str) -> list[
 
 
 async def parse_with_retry(
-    client: Any,
+    client: ChatClient,
     *,
     model: str,
     messages: list[ChatCompletionMessageParam],
@@ -92,38 +79,21 @@ async def parse_with_retry(
     settings: ExtractionSettings,
     log_prefix: str,
 ) -> BatchT:
-    """One structured ``.parse()`` call with the extraction retry policy.
+    """One structured ``.parse()`` call with the library retry policy, from extraction settings.
 
-    ``settings.max_retries`` additional attempts; ``temperature`` and ``request_timeout`` come
-    from *settings* (``timeout`` is forwarded per request only when set — ``None`` defers to the
-    client default). A ``parsed`` of ``None`` raises ``ValueError`` (fed back into the retry
-    loop). Each failure logs an ERROR with attempt counters; when exhausted the last exception
-    re-raises unchanged.
+    Maps ``settings.temperature`` / ``settings.request_timeout`` / ``settings.max_retries`` onto
+    :func:`ragdoc.llm.call_structured`: transport errors (429/connection/timeout/5xx) are retried
+    with backoff, deterministic errors (other 4xx) are not, and a ``parsed`` of ``None`` raises
+    :class:`~ragdoc.llm.LLMRefusalError` without retrying. When exhausted, the last underlying
+    exception re-raises unchanged (the KG halving wrapper catches it above).
     """
-    parse_kwargs: dict[str, Any] = {}
-    if settings.request_timeout is not None:
-        parse_kwargs["timeout"] = settings.request_timeout
-    for attempt in range(settings.max_retries + 1):
-        try:
-            response = await client.beta.chat.completions.parse(
-                model=model,
-                messages=messages,
-                temperature=settings.temperature,
-                response_format=response_format,
-                **parse_kwargs,
-            )
-            parsed = response.choices[0].message.parsed
-            if parsed is None:
-                raise ValueError("LLM returned no parsed extraction")
-            return parsed
-        except Exception as exc:
-            logger.error(
-                "%s: API call failed (attempt %d/%d): %s",
-                log_prefix,
-                attempt + 1,
-                settings.max_retries + 1,
-                exc,
-            )
-            if attempt == settings.max_retries:
-                raise
-    raise RuntimeError("unreachable")  # pragma: no cover
+    return await call_structured(
+        client,
+        model=model,
+        messages=messages,
+        response_format=response_format,
+        temperature=settings.temperature,
+        timeout=settings.request_timeout,
+        max_retries=settings.max_retries,
+        log_prefix=log_prefix,
+    )

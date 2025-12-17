@@ -107,7 +107,7 @@ def _make_resolver(response_content: str) -> LLMHeadingResolver:
     mock_response.choices[0].message.parsed = heading_response
     mock_response.choices[0].message.refusal = None
     mock_client = MagicMock()
-    mock_client.beta.chat.completions.parse = AsyncMock(return_value=mock_response)
+    mock_client.chat.completions.parse = AsyncMock(return_value=mock_response)
     return LLMHeadingResolver(client=mock_client)
 
 

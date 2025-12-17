@@ -1,6 +1,6 @@
 """Tests for StructuredExtractor — generic typed extraction + mention envelope.
 
-The LLM client is mocked: ``.beta.chat.completions.parse`` returns a prebuilt ExtractionBatch, so
+The LLM client is mocked: ``.chat.completions.parse`` returns a prebuilt ExtractionBatch, so
 these tests assert the extractor's envelope/provenance behaviour, not model quality. ``extract()``
 is the typed channel: it RETURNS ``Mention`` objects and never touches ``document.metadata``.
 """
@@ -48,7 +48,7 @@ def make_client(events: list[Event]) -> MagicMock:
     batch = _batch_model(Event)(mentions=events)
     response = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(parsed=batch))])
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(return_value=response)
+    client.chat.completions.parse = AsyncMock(return_value=response)
     return client
 
 
@@ -108,7 +108,7 @@ async def test_empty_render_returns_empty_list():
     client = make_client([Event(title="A")])
     empty_doc = Document(title=None, elements=[])
     mentions = await extractor(client).extract(empty_doc)
-    client.beta.chat.completions.parse.assert_not_called()
+    client.chat.completions.parse.assert_not_called()
     assert mentions == []
     assert empty_doc.metadata == {}
 
@@ -119,7 +119,7 @@ async def test_below_min_tokens_returns_empty_list():
     # a huge min_tokens guarantees the short body is below threshold
     doc = make_doc(source_id="s1")
     mentions = await extractor(client, settings=ExtractionSettings(min_tokens=10_000)).extract(doc)
-    client.beta.chat.completions.parse.assert_not_called()
+    client.chat.completions.parse.assert_not_called()
     assert mentions == []
     assert "mentions" not in doc.metadata
 
@@ -130,14 +130,14 @@ async def test_request_timeout_forwarded():
     client = make_client([Event(title="A")])
     settings = ExtractionSettings(request_timeout=5.0)
     await extractor(client, settings=settings).extract(make_doc(source_id="s1"))
-    assert client.beta.chat.completions.parse.call_args.kwargs["timeout"] == 5.0
+    assert client.chat.completions.parse.call_args.kwargs["timeout"] == 5.0
 
 
 @pytest.mark.anyio
 async def test_no_timeout_kwarg_when_unset():
     client = make_client([Event(title="A")])
     await extractor(client).extract(make_doc(source_id="s1"))
-    assert "timeout" not in client.beta.chat.completions.parse.call_args.kwargs
+    assert "timeout" not in client.chat.completions.parse.call_args.kwargs
 
 
 @pytest.mark.anyio
@@ -146,7 +146,7 @@ async def test_custom_system_prompt_used():
     settings = ExtractionSettings(system_prompt="CUSTOM EXTRACTION PROMPT")
     await extractor(client, settings=settings).extract(make_doc(source_id="s1"))
 
-    messages = client.beta.chat.completions.parse.call_args.kwargs["messages"]
+    messages = client.chat.completions.parse.call_args.kwargs["messages"]
     assert messages[0]["content"] == "CUSTOM EXTRACTION PROMPT"
     assert messages[0]["content"] != EXTRACTION_SYSTEM_PROMPT
 
@@ -155,15 +155,39 @@ async def test_custom_system_prompt_used():
 async def test_default_system_prompt_when_unset():
     client = make_client([Event(title="A")])
     await extractor(client, settings=ExtractionSettings()).extract(make_doc(source_id="s1"))
-    messages = client.beta.chat.completions.parse.call_args.kwargs["messages"]
+    messages = client.chat.completions.parse.call_args.kwargs["messages"]
     assert messages[0]["content"] == EXTRACTION_SYSTEM_PROMPT
 
 
 @pytest.mark.anyio
-async def test_retry_then_reraise_on_exhaustion():
+async def test_retry_then_reraise_on_exhaustion(monkeypatch):
+    """Retryable transport errors (5xx) are retried; exhaustion re-raises the openai error."""
+    import httpx
+    import openai
+
+    import ragdoc.llm
+
+    async def _no_sleep(delay: float) -> None:
+        pass
+
+    monkeypatch.setattr(ragdoc.llm, "_sleep", _no_sleep)
+    error = openai.InternalServerError(
+        "api down", response=httpx.Response(500, request=httpx.Request("POST", "https://api.test/v1")), body=None
+    )
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(side_effect=RuntimeError("api down"))
+    client.chat.completions.parse = AsyncMock(side_effect=error)
     settings = ExtractionSettings(max_retries=1)
+    with pytest.raises(openai.InternalServerError, match="api down"):
+        await extractor(client, settings=settings).extract(make_doc(source_id="s1"))
+    assert client.chat.completions.parse.call_count == 2  # 1 attempt + 1 retry
+
+
+@pytest.mark.anyio
+async def test_non_retryable_error_raises_immediately():
+    """Deterministic errors (non-openai / 4xx) are not retried under the shared LLM policy."""
+    client = MagicMock()
+    client.chat.completions.parse = AsyncMock(side_effect=RuntimeError("api down"))
+    settings = ExtractionSettings(max_retries=3)
     with pytest.raises(RuntimeError, match="api down"):
         await extractor(client, settings=settings).extract(make_doc(source_id="s1"))
-    assert client.beta.chat.completions.parse.call_count == 2  # 1 attempt + 1 retry
+    assert client.chat.completions.parse.call_count == 1

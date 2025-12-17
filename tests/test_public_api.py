@@ -33,9 +33,12 @@ EXPECTED_ALL = {
     "Chunk",
     "ChangeSet",
     "UpdateResult",
-    # config
+    # config + LLM client typing
     "configure",
     "RagdocConfig",
+    "ChatClient",
+    "EmbeddingsClient",
+    "LLMClient",
 }
 
 

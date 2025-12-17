@@ -220,3 +220,74 @@ async def test_embed_order_preserved() -> None:
 
     assert chunk_a.named_embeddings["dense"] == vec_a
     assert chunk_b.named_embeddings["dense"] == vec_b
+
+
+# ---------------------------------------------------------------------------
+# OpenAIEmbedder retry behavior (shared LLM layer)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_embedder_retries_rate_limit(monkeypatch):
+    """OpenAIEmbedder survives one 429 via the shared retry_llm policy."""
+    import httpx
+    import openai
+
+    import ragdoc.llm
+    from ragdoc.pipeline.embedders import OpenAIEmbedder
+
+    sleeps: list[float] = []
+
+    async def _fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    monkeypatch.setattr(ragdoc.llm, "_sleep", _fake_sleep)
+
+    rate_limit = openai.RateLimitError(
+        "rate limited",
+        response=httpx.Response(429, request=httpx.Request("POST", "https://api.test/v1")),
+        body=None,
+    )
+    item = MagicMock()
+    item.index = 0
+    item.embedding = [0.1, 0.2]
+    ok_response = MagicMock()
+    ok_response.data = [item]
+
+    client = MagicMock()
+    client.embeddings.create = AsyncMock(side_effect=[rate_limit, ok_response])
+
+    embedder = OpenAIEmbedder(client, model="text-embedding-3-small")
+    vectors = await embedder.embed(["hello"])
+
+    assert vectors == [[0.1, 0.2]]
+    assert client.embeddings.create.call_count == 2
+    assert len(sleeps) == 1
+
+
+@pytest.mark.anyio
+async def test_embedder_forwards_timeout_and_dimensions():
+    """timeout/dimensions are forwarded only when set (omitted parameters stay omitted)."""
+    from ragdoc.pipeline.embedders import OpenAIEmbedder
+
+    item = MagicMock()
+    item.index = 0
+    item.embedding = [0.5]
+    response = MagicMock()
+    response.data = [item]
+
+    client = MagicMock()
+    client.embeddings.create = AsyncMock(return_value=response)
+    embedder = OpenAIEmbedder(client, model="m", dimensions=64, timeout=9.0)
+    await embedder.embed(["x"])
+    kwargs = client.embeddings.create.call_args.kwargs
+    assert kwargs["dimensions"] == 64
+    assert kwargs["timeout"] == 9.0
+
+    client2 = MagicMock()
+    client2.embeddings.create = AsyncMock(return_value=response)
+    embedder2 = OpenAIEmbedder(client2, model="m")
+    await embedder2.embed(["x"])
+    kwargs2 = client2.embeddings.create.call_args.kwargs
+    assert "dimensions" not in kwargs2
+    assert "timeout" not in kwargs2

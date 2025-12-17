@@ -43,13 +43,13 @@ async def test_unchanged_source_skipped_no_llm_call(make_files, mstore):
     pipeline = make_pipeline(extractor, mstore)
 
     await pipeline.run(paths)
-    calls_after_first = client.beta.chat.completions.parse.call_count
+    calls_after_first = client.chat.completions.parse.call_count
     assert calls_after_first >= 1
 
     result = await pipeline.run(paths)  # nothing changed
     assert result.skipped == ["a.txt"] and result.processed == []
     # the hash gate prevented any further extraction call
-    assert client.beta.chat.completions.parse.call_count == calls_after_first
+    assert client.chat.completions.parse.call_count == calls_after_first
 
 
 @pytest.mark.anyio
@@ -130,11 +130,13 @@ async def test_per_source_durability(make_files):
 
 @pytest.mark.anyio
 async def test_chunker_rejected_at_construction(mstore):
+    from unittest.mock import MagicMock
+
     from ragdoc.chunking import LLMChunker
 
     with pytest.raises(ValueError, match="not chunks"):
         MentionStorePipeline(
-            pipeline=DocumentPipeline(parser=make_parser(), chunker=LLMChunker()),
+            pipeline=DocumentPipeline(parser=make_parser(), chunker=LLMChunker(client=MagicMock())),
             extractor=make_extractor([Event(title="Ev")]),
             mention_store=mstore,
         )

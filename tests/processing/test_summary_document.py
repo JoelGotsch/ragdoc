@@ -152,7 +152,7 @@ def _make_client(summary_fn):
         return MagicMock(choices=[MagicMock(message=MagicMock(parsed=DocumentSummary(summary=summary_fn(text))))])
 
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(side_effect=parse)
+    client.chat.completions.parse = AsyncMock(side_effect=parse)
     return client, calls
 
 
@@ -171,7 +171,7 @@ async def test_passthrough_below_min_returns_rendered_text_no_call():
     result = await processor.process(doc)
 
     assert result.metadata["summary"] == renderer.render(doc)
-    client.beta.chat.completions.parse.assert_not_called()
+    client.chat.completions.parse.assert_not_called()
 
 
 @pytest.mark.anyio
@@ -184,7 +184,7 @@ async def test_single_call_when_between_min_and_max():
     result = await processor.process(doc)
 
     assert result.metadata["summary"] == "ONE"
-    assert client.beta.chat.completions.parse.call_count == 1
+    assert client.chat.completions.parse.call_count == 1
 
 
 @pytest.mark.anyio
@@ -205,7 +205,7 @@ async def test_map_then_single_reduce():
     result = await processor.process(doc)
 
     # 3 map calls + 1 reduce call.
-    assert client.beta.chat.completions.parse.call_count == 4
+    assert client.chat.completions.parse.call_count == 4
     assert result.metadata["summary"] == "s"
 
 
@@ -228,7 +228,7 @@ async def test_deep_recursion_terminates():
     result = await processor.process(doc)
 
     # Reduce had to recurse (more than map + single reduce) but still terminated.
-    assert client.beta.chat.completions.parse.call_count > 4
+    assert client.chat.completions.parse.call_count > 4
     assert result.metadata["summary"] == "x"
 
 
@@ -285,7 +285,7 @@ async def test_idempotent_skips_when_summary_present():
     result = await processor.process(doc)
 
     assert result.metadata["summary"] == "EXISTING"
-    client.beta.chat.completions.parse.assert_not_called()
+    client.chat.completions.parse.assert_not_called()
 
 
 @pytest.mark.anyio
@@ -298,7 +298,7 @@ async def test_overwrite_replaces_existing_summary():
     result = await processor.process(doc)
 
     assert result.metadata["summary"] == "NEW"
-    assert client.beta.chat.completions.parse.call_count == 1
+    assert client.chat.completions.parse.call_count == 1
 
 
 @pytest.mark.anyio
@@ -325,7 +325,7 @@ async def test_empty_document_no_call_no_summary():
     result = await processor.process(doc)
 
     assert "summary" not in result.metadata
-    client.beta.chat.completions.parse.assert_not_called()
+    client.chat.completions.parse.assert_not_called()
 
 
 @pytest.mark.anyio

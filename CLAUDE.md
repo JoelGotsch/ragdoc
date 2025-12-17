@@ -142,8 +142,19 @@ Structured extraction is a **first-class typed stage**, not a processor. The `Ex
 - **`StructuredExtractor(payload_model, ...)`** (`structured.py`) — extracts one caller-supplied Pydantic model; the model's docstring + `Field` descriptions are the LLM schema.
 - **`KnowledgeGraphExtractor(schema, ...)`** (`kg.py`) — multi-type node + edge extraction against a `GraphSchema`; rewrites chunk-local edge refs to real mention ids; recursive halving fallback on LLM failure; optional gleaning pass. **`GraphSchema.patterns` are enforced**: legal triples are injected into the system prompt (`render_patterns_prompt`) and every extracted edge is validated against `allowed_pattern_kinds(schema)` — violations drop (counted + warned) or raise per `ExtractionSettings.on_pattern_violation`. Every edge type must appear in ≥1 pattern (declaration-time rule); union sizes are checked at extractor construction against `settings.max_union_size`.
 - **`ExtractionSettings`** (env prefix `EXTRACTION_`) — `system_prompt` and `request_timeout` are honored by both extractors; the validator never injects a built-in default prompt (each extractor resolves its own fallback). KG knobs: `gleaning`, `max_union_size`, `halving_max_depth`, `halving_min_chars`, `on_pattern_violation`.
-- Shared LLM plumbing (`resolve_client`/`resolve_model`/`resolve_renderer`/`resolve_tokenizer`, `parse_with_retry`, `build_messages`) lives once in `extraction/_llm.py` — do not inline retry loops in extractors (`parse_with_retry` is the single function the shared `ragdoc.llm` layer will later replace).
+- Shared extraction plumbing (`resolve_model`/`resolve_renderer`/`resolve_tokenizer`, `parse_with_retry`, `build_messages`) lives once in `extraction/_llm.py`; `parse_with_retry` is a thin adapter mapping `ExtractionSettings` onto `ragdoc.llm.call_structured` — do not inline retry loops in extractors.
 - **`MentionStorePipeline(pipeline, extractor, mention_store, ...)`** — the mention analogue of the sync pipelines (same `plan`/`apply`/`run`, direct + Boundary-2 modes); consumes `extract()` directly and rejects non-`Extractor` arguments with `TypeError`.
+
+### LLM reliability layer (`src/ragdoc/llm.py`)
+
+**Every LLM call in the library goes through `ragdoc.llm` — never call an OpenAI client directly, and never use the deprecated `beta.chat.completions` namespace.**
+
+- **Protocols:** `ChatClient` (`chat.completions.parse`) and `EmbeddingsClient` (`embeddings.create`) are narrow structural protocols — call sites demand only what they use. `LLMClient` is their intersection and is what `RagdocConfig.openai_client` holds (typed, not `Any`; one configured `AsyncOpenAI` serves both). All three are exported from the `ragdoc` root.
+- **Client resolution:** `resolve_openai_client(explicit)` = explicit → `get_config().openai_client` → `LLMNotConfiguredError`. Call it in `__init__` (fail-loud at construction), never lazily at request time. Exception: `LLMHeadingResolver` keeps its settings-based factory (base_url + api_key → `AsyncOpenAI`) as a documented layer above this chain.
+- **One retry policy** (`retry_llm`, used by `call_structured` and `OpenAIEmbedder`): retry 429 (honoring `Retry-After`) / connection / timeout / 5xx with full-jitter exponential backoff; never retry other 4xx, `ValidationError`, non-openai errors, or `LLMRefusalError` (`parsed is None` — a refusal is deterministic, retrying burns tokens).
+- **Degrade semantics are per-site, not unified** — the shared policy governs *transport* only. Preserve these failure products: heading resolver → `[]`, image summary → skip-with-warning, footnote resolver → `None`, entity reviewer → `ReviewResult()`; summarizer / `LLMChunker` / extractors → raise (KG halving catches and halves on top).
+- No module-level `import openai` in `ragdoc/llm.py` (exception classes load lazily) — keep it that way for the Phase 8 extras split.
+- All call sites pin `temperature=0.0`, so default models must stay in the gpt-4.x family (reasoning models reject non-default temperature).
 
 ## Collaboration Guidelines
 

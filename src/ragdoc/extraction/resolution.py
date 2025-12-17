@@ -27,13 +27,14 @@ import hashlib
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, cast
+from typing import TYPE_CHECKING, Generic, cast
 
 from pydantic import BaseModel, Field
 
 from ragdoc.extraction.dates import FuzzyDate
 from ragdoc.extraction.entity import Entity
 from ragdoc.extraction.mention import Mention, PayloadT
+from ragdoc.llm import ChatClient, LLMRefusalError, call_structured
 
 logger = logging.getLogger(__name__)
 
@@ -374,21 +375,28 @@ distinct entity its own group (a single-index group is fine). Assign each group 
 """.strip()
 
 
-def make_llm_reviewer(client: Any, model: str, *, temperature: float = 0.0) -> Reviewer:
-    """Build a :data:`Reviewer` backed by an LLM ``.parse()`` call returning a :class:`ReviewResult`."""
+def make_llm_reviewer(client: ChatClient, model: str, *, temperature: float = 0.0) -> Reviewer:
+    """Build a :data:`Reviewer` backed by an LLM ``.parse()`` call returning a :class:`ReviewResult`.
+
+    Transport errors are retried by the shared LLM layer; a refusal degrades to an empty
+    :class:`ReviewResult` (no merge groups), preserving the reviewer's safe-degrade contract.
+    """
 
     async def _review(texts: list[str]) -> ReviewResult:
         numbered = "\n".join(f"[{i}] {t}" for i, t in enumerate(texts))
-        response = await client.beta.chat.completions.parse(
-            model=model,
-            messages=[
-                {"role": "system", "content": _REVIEW_SYSTEM_PROMPT},
-                {"role": "user", "content": f"Candidates:\n{numbered}"},
-            ],
-            temperature=temperature,
-            response_format=ReviewResult,
-        )
-        parsed = response.choices[0].message.parsed
-        return parsed if parsed is not None else ReviewResult()
+        try:
+            return await call_structured(
+                client,
+                model=model,
+                messages=[
+                    {"role": "system", "content": _REVIEW_SYSTEM_PROMPT},
+                    {"role": "user", "content": f"Candidates:\n{numbered}"},
+                ],
+                response_format=ReviewResult,
+                temperature=temperature,
+                log_prefix="EntityReviewer",
+            )
+        except LLMRefusalError:
+            return ReviewResult()
 
     return _review
