@@ -5,9 +5,9 @@ from pydantic import BaseModel, Field
 from ragdoc.parsing import load
 from ragdoc.processing import (
     DocumentProcessor,
+    FootnoteProcessor,
     HeadingLevelProcessor,
     ProcessingPipeline,
-    SyncFootnoteProcessor,
     TitleDetectionProcessor,
 )
 
@@ -24,7 +24,7 @@ def _default_processors() -> list[DocumentProcessor]:
     return [
         HeadingLevelProcessor(),
         TitleDetectionProcessor(),
-        SyncFootnoteProcessor(),
+        FootnoteProcessor(),
     ]
 
 
@@ -68,7 +68,7 @@ async def evaluate_footnotes(
     :param paths: File paths to evaluate. Supported extensions: ``.docx``,
         ``.html``, ``.xlsx``, ``.pdf``, ``.azure.json``.
     :param processors: Processors to apply after parsing. Defaults to
-        ``[HeadingLevelProcessor(), TitleDetectionProcessor(), SyncFootnoteProcessor()]``.
+        ``[HeadingLevelProcessor(), TitleDetectionProcessor(), FootnoteProcessor()]``.
     :return: One :class:`FootnoteFileResult` per input path.
     """
     resolved_processors = processors if processors is not None else _default_processors()

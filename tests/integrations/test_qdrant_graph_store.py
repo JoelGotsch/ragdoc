@@ -171,3 +171,21 @@ async def test_delete_by_source_only_solely_owned(store, client):
 
     node_delete = [c for c in client.delete.call_args_list if c.kwargs["collection_name"] == "kg_nodes"]
     assert node_delete[0].kwargs["points_selector"].points == [_point_id(solely.entity_id)]
+
+
+@pytest.mark.anyio
+async def test_create_indexes_created_when_collections_already_exist(client):
+    """A 409 on either collection must NOT skip that collection's field indexes (bug 4)."""
+    from qdrant_client.http.exceptions import UnexpectedResponse
+
+    conflict = UnexpectedResponse(status_code=409, reason_phrase="Conflict", content=b"exists", headers={})  # type: ignore[arg-type]
+    client.create_collection = AsyncMock(side_effect=conflict)
+    client.create_payload_index = AsyncMock()
+    await QdrantGraphStore.create(client, "kg", SCHEMA)
+    indexed = {
+        (c.kwargs["collection_name"], c.kwargs["field_name"]) for c in client.create_payload_index.await_args_list
+    }
+    assert ("kg_nodes", "entity_id") in indexed
+    assert ("kg_nodes", "payload.kind") in indexed
+    assert ("kg_edges", "payload.refs.source_mention_id") in indexed
+    assert ("kg_edges", "payload.refs.target_mention_id") in indexed

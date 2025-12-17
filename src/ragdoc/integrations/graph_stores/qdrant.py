@@ -65,6 +65,23 @@ def _kind_value(payload_type: type[BaseModel]) -> str | None:
     return default if isinstance(default, str) else None
 
 
+async def _create_index_ignore_conflict(
+    client: AsyncQdrantClient, collection_name: str, field_name: str, field_schema: models.PayloadSchemaType
+) -> None:
+    """Create a payload index, ignoring 409 (index already exists).
+
+    Runs per index call so that an already-existing collection still gains any
+    missing payload indexes (a collection-level 409 must not skip indexing).
+    """
+    try:
+        await client.create_payload_index(
+            collection_name=collection_name, field_name=field_name, field_schema=field_schema
+        )
+    except UnexpectedResponse as exc:
+        if exc.status_code != 409:
+            raise
+
+
 class QdrantGraphStore:
     """Async :class:`~ragdoc.extraction.graph_store.GraphStore` backed by Qdrant.
 
@@ -109,13 +126,11 @@ class QdrantGraphStore:
                     collection_name=coll,
                     vectors_config=models.VectorParams(size=1, distance=models.Distance.DOT),
                 )
-                for field_name, schema_type in fields.items():
-                    await client.create_payload_index(
-                        collection_name=coll, field_name=field_name, field_schema=schema_type
-                    )
             except UnexpectedResponse as exc:
                 if exc.status_code != 409:
                     raise
+            for field_name, schema_type in fields.items():
+                await _create_index_ignore_conflict(client, coll, field_name, schema_type)
         return cls(client, collection_name, schema)
 
     # ---- upsert ----

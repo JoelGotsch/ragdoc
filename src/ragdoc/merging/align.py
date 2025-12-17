@@ -133,10 +133,10 @@ def _with_injected_markup(winner: ElementType, loser: ElementType) -> ElementTyp
     new_html = inject_inline_markup(winner.html, loser.html)
     if new_html == winner.html:
         return winner
-    if isinstance(winner, Paragraph):
+    if isinstance(winner, (Paragraph, Heading)):
+        # Both types store their full outer HTML in ``html_content``; ``innerhtml`` is a
+        # read-only property, so a model_copy update against it would be a silent no-op.
         return winner.model_copy(update={"html_content": new_html})
-    if isinstance(winner, Heading):
-        return winner.model_copy(update={"innerhtml": new_html})
     return winner  # unsupported type — return as-is
 
 

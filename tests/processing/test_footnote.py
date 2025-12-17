@@ -10,7 +10,6 @@ from ragdoc.processing.footnote import (
     FootnoteProcessor,
     LLMFootnoteResolver,
     SimpleFootnoteResolver,
-    SyncFootnoteProcessor,
     apply_ref_patches,
     build_footnote_pattern,
     find_footnote_candidates,
@@ -637,7 +636,7 @@ async def test_llm_resolver_handles_none_response():
 
 @pytest.mark.anyio
 async def test_llm_resolver_handles_llm_error():
-    """LLMFootnoteResolver falls back to first candidate on LLM error."""
+    """LLMFootnoteResolver leaves the footnote unresolved (None) on LLM error."""
     mock_client = MagicMock()
     mock_client.chat.completions.create = AsyncMock(side_effect=Exception("API Error"))
 
@@ -672,8 +671,8 @@ async def test_llm_resolver_handles_llm_error():
 
     result = await resolver.resolve([candidate1, candidate2], 1, "Note")
 
-    # Falls back to first candidate
-    assert result is candidate1
+    # An LLM failure must not be masked as a confident answer
+    assert result is None
 
 
 # --- TestFootnoteProcessor ---
@@ -702,19 +701,15 @@ async def test_footnote_processor_uses_custom_resolver(sample_document):
     assert mock_resolver.resolve.call_count == len(sample_document.footnotes)
 
 
-# --- TestSyncFootnoteProcessor ---
+# --- SyncFootnoteProcessor removal (fable-review Phase 0, bug 3) ---
 
 
-@pytest.mark.anyio
-async def test_sync_footnote_processor_processes_document(sample_document):
-    """SyncFootnoteProcessor resolves footnotes."""
-    processor = SyncFootnoteProcessor(update_html=True)
-    result = await processor.process(sample_document)
+def test_sync_footnote_processor_removed():
+    """The forbidden sync wrapper is gone; FootnoteProcessor() covers its use case."""
+    import ragdoc.processing as processing
 
-    assert result is not None
-    # Should have resolved at least one footnote (ref tags embedded in HTML)
-    elements_with_refs = [e for e in result.elements if e.inline_refs]
-    assert len(elements_with_refs) > 0
+    assert not hasattr(processing, "SyncFootnoteProcessor")
+    assert "SyncFootnoteProcessor" not in processing.__all__
 
 
 # --- TestApplyRefPatches ---
@@ -1069,11 +1064,62 @@ async def test_only_orphaned_true_processes_all_when_none_prereferred():
 
 
 @pytest.mark.anyio
-async def test_sync_processor_only_orphaned_skips_referenced_footnote():
-    """SyncFootnoteProcessor(only_orphaned=True) passes the flag to FootnoteProcessor."""
-    doc = _make_only_orphaned_doc()
-    doc = await SyncFootnoteProcessor(only_orphaned=True).process(doc)
+async def test_llm_resolver_none_content_returns_none(caplog):
+    """A response with content=None (refusal) yields None, not an AttributeError."""
+    import logging
 
-    para1 = next(e for e in doc.elements if e.id == "para-1")
-    assert para1.html.count('id="fn-1"') == 1
-    assert doc.orphaned_footnotes == []
+    client = MagicMock()
+    message = MagicMock()
+    message.content = None
+    client.chat.completions.create = AsyncMock(return_value=MagicMock(choices=[MagicMock(message=message)]))
+    resolver = LLMFootnoteResolver(client=client, model="test")
+    candidates = [
+        FootnoteCandidate(
+            element_id=f"para-{i}",
+            element_idx=i,
+            page=1,
+            match_start=0,
+            match_end=1,
+            context_before="before ",
+            context_after=" after",
+            full_context="before 1 after",
+            reference_number=1,
+            footnote_text="A study.",
+            footnote_id="fn-1",
+        )
+        for i in range(2)
+    ]
+    with caplog.at_level(logging.WARNING):
+        result = await resolver.resolve(candidates, 1, "A study.")
+    assert result is None
+    assert any("empty content" in r.message for r in caplog.records)
+
+
+@pytest.mark.anyio
+async def test_llm_resolver_error_returns_none_with_warning(caplog):
+    """An LLM call failure (429, auth, network) must NOT be masked as candidate 1."""
+    import logging
+
+    client = MagicMock()
+    client.chat.completions.create = AsyncMock(side_effect=RuntimeError("429 Too Many Requests"))
+    resolver = LLMFootnoteResolver(client=client, model="test")
+    candidates = [
+        FootnoteCandidate(
+            element_id=f"para-{i}",
+            element_idx=i,
+            page=1,
+            match_start=0,
+            match_end=1,
+            context_before="before ",
+            context_after=" after",
+            full_context="before 1 after",
+            reference_number=1,
+            footnote_text="A study.",
+            footnote_id="fn-1",
+        )
+        for i in range(2)
+    ]
+    with caplog.at_level(logging.WARNING):
+        result = await resolver.resolve(candidates, 1, "A study.")
+    assert result is None
+    assert any(r.levelno == logging.WARNING for r in caplog.records)

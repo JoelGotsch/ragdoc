@@ -75,3 +75,22 @@ def test_xlsx_metadata(xlsx_file_path: Path):
     document = load_file(excel_file)
     assert document.metadata["filename"] == "test.xlsx"
     assert Path(document.source_path).match("*/tests/data/test.xlsx")
+
+
+def test_sheet_params_override_truthy_default_params(monkeypatch):
+    """Per-sheet params must merge over (and win against) truthy default_params (Phase 0, bug 1)."""
+    from types import SimpleNamespace
+
+    from ragdoc.parsing.xlsx.load import generate_document as xlsx_generate_document
+
+    captured: dict = {}
+
+    def fake_read_excel(excel_file, sheet_name, **params):
+        captured[sheet_name] = params
+        return pd.DataFrame({"a": [1]})
+
+    monkeypatch.setattr("ragdoc.parsing.xlsx.load.pd.read_excel", fake_read_excel)
+    fake_file = SimpleNamespace(sheet_names=["Sheet1"])
+    config = ExcelConfig(default_params={"skiprows": 1}, sheet_params={"Sheet1": {"skiprows": 5, "nrows": 2}})
+    xlsx_generate_document(fake_file, config)  # type: ignore[arg-type]
+    assert captured["Sheet1"] == {"skiprows": 5, "nrows": 2}

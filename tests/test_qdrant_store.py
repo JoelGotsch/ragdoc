@@ -308,3 +308,28 @@ async def test_upsert_with_sparse_vectors_includes_document(client: MagicMock) -
     point = (kwargs.get("points") or client.upsert.call_args[0][1])[0]
     assert isinstance(point.vector["sparse"], qdrant_models.Document)
     assert point.vector["sparse"].text == "text for bm25"
+
+
+@pytest.mark.anyio
+async def test_create_indexes_created_when_collection_already_exists(client: MagicMock) -> None:
+    """A 409 on create_collection must NOT skip payload-index creation (fable-review Phase 0, bug 4)."""
+    from qdrant_client.http.exceptions import UnexpectedResponse
+
+    conflict = UnexpectedResponse(status_code=409, reason_phrase="Conflict", content=b"exists", headers={})  # type: ignore[arg-type]
+    client.create_collection = AsyncMock(side_effect=conflict)
+    client.create_payload_index = AsyncMock()
+    await QdrantVectorStore.create(client, "existing_col", vector_size=128)
+    created = {c.kwargs["field_name"] for c in client.create_payload_index.await_args_list}
+    assert "source_id" in created
+
+
+@pytest.mark.anyio
+async def test_create_index_conflict_is_ignored(client: MagicMock) -> None:
+    """A 409 on create_payload_index itself (index already exists) is not an error."""
+    from qdrant_client.http.exceptions import UnexpectedResponse
+
+    conflict = UnexpectedResponse(status_code=409, reason_phrase="Conflict", content=b"exists", headers={})  # type: ignore[arg-type]
+    client.create_collection = AsyncMock(side_effect=conflict)
+    client.create_payload_index = AsyncMock(side_effect=conflict)
+    store = await QdrantVectorStore.create(client, "existing_col", vector_size=128)
+    assert isinstance(store, QdrantVectorStore)

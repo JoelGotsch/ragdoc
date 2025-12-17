@@ -73,6 +73,54 @@ _heading_params = [
     for heading_text, expected_level in tc.get("headings", {}).items()
 ]
 
+# Exact-level expectations HeadingLevelProcessor currently misses — a machine-checked
+# bug tracker. strict=True: fixing one of these forces promoting it out of this set.
+_KNOWN_EXACT_LEVEL_FAILURES: set[tuple[str, str]] = {
+    ("tesla-q4-2024-update", "Cash"),
+    ("tesla-q4-2024-update", "Operations"),
+    ("tesla-q4-2024-update", "Revenue"),
+    ("attention-is-all-you-need", "1 Introduction"),
+    ("attention-is-all-you-need", "2 Background"),
+    ("attention-is-all-you-need", "3 Model Architecture"),
+    ("attention-is-all-you-need", "3.1 Encoder and Decoder Stacks"),
+    ("attention-is-all-you-need", "3.2 Attention"),
+    ("attention-is-all-you-need", "3.2.1 Scaled Dot-Product Attention"),
+    ("attention-is-all-you-need", "3.2.2 Multi-Head Attention"),
+    ("bert-paper", "Abstract"),
+    ("bert-paper", "1 Introduction"),
+    ("bert-paper", "2 Related Work"),
+    ("bert-paper", "2.1 Unsupervised Feature-based Approaches"),
+    ("bert-paper", "2.2 Unsupervised Fine-tuning Approaches"),
+    ("bert-paper", "2.3 Transfer Learning from Supervised Data"),
+    ("bert-paper", "3 BERT"),
+    ("bert-paper", "3.1 Pre-training BERT"),
+    ("bert-paper", "3.2 Fine-tuning BERT"),
+    ("bert-paper", "4 Experiments"),
+    ("vw-sustainability-2023", "Contents"),
+    ("vw-sustainability-2023", "Decarbonization"),
+    ("vw-sustainability-2023", "Circular Economy"),
+}
+
+_exact_level_params = [
+    pytest.param(
+        name,
+        heading_text,
+        expected_level,
+        id=f"{name}[{heading_text[:40]}]",
+        marks=[
+            pytest.mark.xfail(
+                reason="HeadingLevelProcessor does not assign the exact expected level for this heading",
+                strict=True,
+            )
+        ]
+        if (name, heading_text) in _KNOWN_EXACT_LEVEL_FAILURES
+        else [],
+    )
+    for name, tc in _TEST_CASES.items()
+    if name in _MIDDLE_DOCS
+    for heading_text, expected_level in tc.get("headings", {}).items()
+]
+
 # (test_case_name, expected_title) for every doc that declares a title
 _title_params = [
     pytest.param(name, tc["title"], id=name)
@@ -119,9 +167,8 @@ async def test_heading_present_after_level_processor(
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(reason="HeadingLevelProcessor may not assign the exact expected level", strict=False)
-@pytest.mark.skipif(not _heading_params, reason="No headings defined in test cases")
-@pytest.mark.parametrize("test_case_name,heading_text,expected_level", _heading_params)
+@pytest.mark.skipif(not _exact_level_params, reason="No headings defined in test cases")
+@pytest.mark.parametrize("test_case_name,heading_text,expected_level", _exact_level_params)
 async def test_heading_exact_level(test_case_name: str, heading_text: str, expected_level: int) -> None:
     """HeadingLevelProcessor must assign each heading exactly the expected level."""
     doc = await _parse_fresh(test_case_name)

@@ -116,6 +116,23 @@ def _is_too_large(exc: UnexpectedResponse) -> bool:
     return exc.status_code == 400 and any(phrase in text.lower() for phrase in _SIZE_REJECTION_PHRASES)
 
 
+async def _create_index_ignore_conflict(
+    client: AsyncQdrantClient, collection_name: str, field_name: str, field_schema: models.PayloadSchemaType
+) -> None:
+    """Create a payload index, ignoring 409 (index already exists).
+
+    Runs per index call so that an already-existing collection still gains any
+    missing payload indexes (a collection-level 409 must not skip indexing).
+    """
+    try:
+        await client.create_payload_index(
+            collection_name=collection_name, field_name=field_name, field_schema=field_schema
+        )
+    except UnexpectedResponse as exc:
+        if exc.status_code != 409:
+            raise
+
+
 class QdrantDocumentStore:
     """Async DocumentStore backed by Qdrant (one point per ``source_id``).
 
@@ -145,14 +162,10 @@ class QdrantDocumentStore:
                 collection_name=collection_name,
                 vectors_config=models.VectorParams(size=1, distance=models.Distance.DOT),
             )
-            await client.create_payload_index(
-                collection_name=collection_name,
-                field_name="source_id",
-                field_schema=models.PayloadSchemaType.KEYWORD,
-            )
         except UnexpectedResponse as exc:
             if exc.status_code != 409:
                 raise
+        await _create_index_ignore_conflict(client, collection_name, "source_id", models.PayloadSchemaType.KEYWORD)
         return cls(client, collection_name)
 
     # ------------------------------------------------------------------

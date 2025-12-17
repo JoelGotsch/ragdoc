@@ -31,7 +31,7 @@ def generate_document(excel_file: pd.ExcelFile, config: ExcelConfig | None = Non
         sheet_name = str(sheet_name)
         if not config.default_params and config.sheet_params and sheet_name not in config.sheet_params.keys():
             continue
-        params = config.default_params or {} | config.sheet_params.get(sheet_name, {})
+        params = (config.default_params or {}) | config.sheet_params.get(sheet_name, {})
         df = pd.read_excel(excel_file, sheet_name=sheet_name, **params)
         document_heading = Heading(html_content=f"<h2>{sheet_name}</h2>", page=i)
         document_table = Table(html_content=df.to_html(), page=i)
