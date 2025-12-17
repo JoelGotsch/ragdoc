@@ -12,7 +12,6 @@ payload model. The processor/settings require the ``extraction`` extra (``edtf``
 ``pydantic-settings``); the data models do not, so they import unconditionally.
 """
 
-from ragdoc.extraction.changeset import MentionChangeSet, MentionSourceChange
 from ragdoc.extraction.dates import FuzzyDate, Precision
 from ragdoc.extraction.entity import Entity, EntityStore, LocalEntityStore
 from ragdoc.extraction.graph_store import GraphStore, LocalGraphStore
@@ -58,8 +57,6 @@ __all__ = [
     "LocalGraphStore",
     "LocalMentionStore",
     "Mention",
-    "MentionChangeSet",
-    "MentionSourceChange",
     "MentionStore",
     "MentionStorePipeline",
     "Precision",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import uuid
 from typing import Literal
 from unittest.mock import AsyncMock, MagicMock
 
@@ -13,7 +14,12 @@ pytest.importorskip("qdrant_client")
 
 from ragdoc.extraction.entity import Entity
 from ragdoc.extraction.schema import EdgeRef, GraphSchema
-from ragdoc.integrations.graph_stores.qdrant import QdrantGraphStore, _point_id
+from ragdoc.integrations.graph_stores.qdrant import _NAMESPACE, QdrantGraphStore
+
+
+def _point_id(entity_id: str) -> str:
+    """Expected deterministic point id (UUID5 in the graph store's namespace)."""
+    return str(uuid.uuid5(_NAMESPACE, entity_id))
 
 
 class Person(BaseModel):

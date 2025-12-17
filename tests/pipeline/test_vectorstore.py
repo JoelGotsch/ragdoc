@@ -1,7 +1,7 @@
 """Tests for VectorStorePipeline (plan / apply, Mode 1 direct path).
 
 Covers:
-- _file_hash(): 64-char hex, content-stable.
+- file_hash(): 64-char hex, content-stable.
 - plan(): new -> to_add; changed hash -> to_update; unchanged -> skipped (not in ChangeSet);
   plan() does not touch the store; collision raises before processing.
 - delete_orphans: default False (no deletion); True -> to_delete.
@@ -22,7 +22,7 @@ import pytest
 from ragdoc.document import Document
 from ragdoc.pipeline import DocumentPipeline, EmbedderConfig, VectorStorePipeline
 from ragdoc.pipeline.embedders import Embedder
-from ragdoc.pipeline.vectorstore import UpdateResult, _file_hash
+from ragdoc.pipeline.sync import UpdateResult, file_hash
 
 from .conftest import MemoryVectorStore, make_document
 
@@ -64,14 +64,14 @@ def make_vs_pipeline(vstore, source_id_fn=None, embedders=None) -> VectorStorePi
 
 
 # ---------------------------------------------------------------------------
-# _file_hash
+# file_hash
 # ---------------------------------------------------------------------------
 
 
 def test_file_hash_is_64_char_hex(tmp_path: Path):
     p = tmp_path / "f.txt"
     p.write_text("hello", encoding="utf-8")
-    h = _file_hash(p)
+    h = file_hash(p)
     assert len(h) == 64 and all(c in "0123456789abcdef" for c in h)
 
 
@@ -79,7 +79,7 @@ def test_file_hash_content_stable(tmp_path: Path):
     a, b = tmp_path / "a", tmp_path / "b"
     a.write_text("same", encoding="utf-8")
     b.write_text("same", encoding="utf-8")
-    assert _file_hash(a) == _file_hash(b)
+    assert file_hash(a) == file_hash(b)
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ async def test_apply_update_deletes_stale_chunks_before_upsert(tmp_path, vstore)
     await pipeline.run([p])
     assert old_ids.isdisjoint(set(vstore.stored.keys()))
     # source_hash updated to the new file's hash
-    assert all(c.source_hash == _file_hash(p) for c in vstore.stored.values())
+    assert all(c.source_hash == file_hash(p) for c in vstore.stored.values())
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ async def test_run_empty_sources(vstore):
 async def test_run_chunks_carry_provenance(make_files, vstore):
     paths = make_files({"doc.html": "Content"})
     await make_vs_pipeline(vstore).run(paths)
-    expected_hash = _file_hash(paths[0])
+    expected_hash = file_hash(paths[0])
     for chunk in vstore.stored.values():
         assert chunk.source_id == "doc.html"
         assert chunk.source_hash == expected_hash

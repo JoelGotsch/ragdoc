@@ -23,35 +23,20 @@ The point id is a deterministic ``UUID5(entity_id)`` so re-resolution replaces e
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
-
-try:
-    from qdrant_client import AsyncQdrantClient, models
-    from qdrant_client.http.exceptions import UnexpectedResponse
-except ImportError as _e:
-    raise ImportError(
-        "qdrant-client is not installed. "
-        "Install it with: uv add --optional qdrant qdrant-client  "
-        "or: pip install 'ragdoc[qdrant]'"
-    ) from _e
 
 from ragdoc.extraction.entity import Entity
 from ragdoc.extraction.schema import GraphSchema, build_edge_union, build_node_union
+from ragdoc.integrations._qdrant_base import AsyncQdrantClient, _QdrantCollectionStore, models
 
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
 _NAMESPACE = uuid.UUID("e2f3a4b5-6c7d-8e9f-0a1b-2c3d4e5f6a7b")
-_SCROLL_BATCH = 1000
-_UPSERT_BATCH = 100
 _SRC_KEY = "payload.refs.source_mention_id"
 _TGT_KEY = "payload.refs.target_mention_id"
 _KIND_KEY = "payload.kind"
-
-
-def _point_id(entity_id: str) -> str:
-    """Deterministic Qdrant point id for *entity_id* (so upsert replaces in place)."""
-    return str(uuid.uuid5(_NAMESPACE, entity_id))
 
 
 def _kind_value(payload_type: type[BaseModel]) -> str | None:
@@ -65,24 +50,7 @@ def _kind_value(payload_type: type[BaseModel]) -> str | None:
     return default if isinstance(default, str) else None
 
 
-async def _create_index_ignore_conflict(
-    client: AsyncQdrantClient, collection_name: str, field_name: str, field_schema: models.PayloadSchemaType
-) -> None:
-    """Create a payload index, ignoring 409 (index already exists).
-
-    Runs per index call so that an already-existing collection still gains any
-    missing payload indexes (a collection-level 409 must not skip indexing).
-    """
-    try:
-        await client.create_payload_index(
-            collection_name=collection_name, field_name=field_name, field_schema=field_schema
-        )
-    except UnexpectedResponse as exc:
-        if exc.status_code != 409:
-            raise
-
-
-class QdrantGraphStore:
+class QdrantGraphStore(_QdrantCollectionStore):
     """Async :class:`~ragdoc.extraction.graph_store.GraphStore` backed by Qdrant.
 
     Args:
@@ -93,8 +61,10 @@ class QdrantGraphStore:
             payloads into their typed Pydantic models.
     """
 
+    _ID_NAMESPACE = _NAMESPACE
+
     def __init__(self, client: AsyncQdrantClient, collection_name: str, schema: GraphSchema) -> None:
-        self._client = client
+        super().__init__(client, collection_name)
         self._nodes = f"{collection_name}_nodes"
         self._edges = f"{collection_name}_edges"
         self._schema = schema
@@ -121,16 +91,12 @@ class QdrantGraphStore:
             },
         }
         for coll, fields in indexes.items():
-            try:
-                await client.create_collection(
-                    collection_name=coll,
-                    vectors_config=models.VectorParams(size=1, distance=models.Distance.DOT),
-                )
-            except UnexpectedResponse as exc:
-                if exc.status_code != 409:
-                    raise
-            for field_name, schema_type in fields.items():
-                await _create_index_ignore_conflict(client, coll, field_name, schema_type)
+            await cls._ensure_collection(
+                client,
+                coll,
+                models.VectorParams(size=1, distance=models.Distance.DOT),
+                payload_indexes=fields,
+            )
         return cls(client, collection_name, schema)
 
     # ---- upsert ----
@@ -139,11 +105,10 @@ class QdrantGraphStore:
         if not entities:
             return []
         points = [
-            models.PointStruct(id=_point_id(e.entity_id), vector=[0.0], payload=e.model_dump(mode="json"))
+            models.PointStruct(id=self._point_id(e.entity_id), vector=[0.0], payload=e.model_dump(mode="json"))
             for e in entities
         ]
-        for i in range(0, len(points), _UPSERT_BATCH):
-            await self._client.upsert(collection_name=collection, points=points[i : i + _UPSERT_BATCH])
+        await self._batched_upsert(points, collection=collection)
         return [e.entity_id for e in entities]
 
     async def upsert_nodes(self, entities: list[Entity]) -> list[str]:
@@ -158,7 +123,7 @@ class QdrantGraphStore:
 
     async def _get(self, collection: str, etype: type[Entity], entity_id: str) -> Entity | None:
         records = await self._client.retrieve(
-            collection_name=collection, ids=[_point_id(entity_id)], with_payload=True, with_vectors=False
+            collection_name=collection, ids=[self._point_id(entity_id)], with_payload=True, with_vectors=False
         )
         return etype.model_validate(records[0].payload) if records else None
 
@@ -179,7 +144,7 @@ class QdrantGraphStore:
             if kind is not None
             else None
         )
-        out = [etype.model_validate(p) async for p in self._scroll(collection, True, flt)]
+        out = [etype.model_validate(p) async for p in self._scroll_payloads(True, flt, collection=collection)]
         # Couldn't derive a kind discriminator → fall back to an in-memory isinstance filter.
         if payload_type is not None and kind is None:
             out = [e for e in out if isinstance(e.payload, payload_type)]
@@ -199,7 +164,7 @@ class QdrantGraphStore:
         """Remove entities (nodes or edges) by id from both collections (silent on unknown)."""
         if not entity_ids:
             return
-        selector = models.PointIdsList(points=[_point_id(eid) for eid in entity_ids])
+        selector = models.PointIdsList(points=[self._point_id(eid) for eid in entity_ids])
         await self._client.delete(collection_name=self._nodes, points_selector=selector)
         await self._client.delete(collection_name=self._edges, points_selector=selector)
 
@@ -210,7 +175,7 @@ class QdrantGraphStore:
             if stale:
                 await self._client.delete(
                     collection_name=collection,
-                    points_selector=models.PointIdsList(points=[_point_id(eid) for eid in stale]),
+                    points_selector=models.PointIdsList(points=[self._point_id(eid) for eid in stale]),
                 )
 
     async def list_source_ids(self) -> set[str]:
@@ -243,7 +208,7 @@ class QdrantGraphStore:
 
         etype = self._edge_type()
         other_ids: set[str] = set()
-        async for payload in self._scroll(self._edges, True, edge_filter):
+        async for payload in self._scroll_payloads(True, edge_filter, collection=self._edges):
             edge = etype.model_validate(payload)
             src, tgt = edge.payload.refs.source_mention_id, edge.payload.refs.target_mention_id
             if src == entity_id:
@@ -255,7 +220,7 @@ class QdrantGraphStore:
             return []
         records = await self._client.retrieve(
             collection_name=self._nodes,
-            ids=[_point_id(eid) for eid in other_ids],
+            ids=[self._point_id(eid) for eid in other_ids],
             with_payload=True,
             with_vectors=False,
         )
@@ -264,23 +229,6 @@ class QdrantGraphStore:
 
     # ---- scroll helpers ----
 
-    async def _entities(self, collection, etype):
-        async for payload in self._scroll(collection, True):
+    async def _entities(self, collection: str, etype: type[Entity]) -> AsyncIterator[Entity]:
+        async for payload in self._scroll_payloads(True, collection=collection):
             yield etype.model_validate(payload)
-
-    async def _scroll(self, collection, with_payload, scroll_filter: models.Filter | None = None):
-        offset: str | int | None = None
-        while True:
-            results, next_offset = await self._client.scroll(
-                collection_name=collection,
-                scroll_filter=scroll_filter,
-                with_payload=with_payload,
-                with_vectors=False,
-                limit=_SCROLL_BATCH,
-                offset=offset,
-            )
-            for point in results:
-                yield point.payload or {}
-            if next_offset is None:
-                break
-            offset = next_offset  # type: ignore[assignment]
