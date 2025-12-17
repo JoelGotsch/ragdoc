@@ -212,15 +212,12 @@ cython_debug/
 docs/notebooks/document_model.py
 docs/notebooks/pipeline_walkthrough.py
 
-# regenerate_test_fixtures.py staging
+# create_test_fixtures.py PDF download cache
 scripts/.fixture_pdfs/
 
 # Local-only working dirs (legacy source documents, kept out of git)
 backup/
 scripts/output/
-
-# Corpus-migration artifacts — keep out of git
-scripts/regenerate_test_fixtures.py
 
 # Design docs and implementation plans are local-only working notes
 plans/

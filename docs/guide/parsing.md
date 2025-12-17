@@ -100,7 +100,7 @@ document = await load("report_middle.json")
 # document.parser == "mineru"
 ```
 
-Requires the `pdf_mineru` extra: `uv add ragdoc[pdf_mineru]`.
+Requires the `pdf-mineru` extra: `uv add ragdoc[pdf-mineru]`.
 
 #### What the parser extracts
 

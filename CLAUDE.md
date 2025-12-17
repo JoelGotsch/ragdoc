@@ -228,4 +228,4 @@ uv add <package>           # production
 uv add --dev <package>     # dev only
 ```
 
-Optional extras: `azure_di`, `pdf_mineru`, `qdrant`. Local dependency: `aa-utils` at `C:/DEV/aa-utils`.
+Optional extras: `azure-di`, `pdf-mineru`, `qdrant`. Local dependency: `aa-utils` at `C:/DEV/aa-utils`.

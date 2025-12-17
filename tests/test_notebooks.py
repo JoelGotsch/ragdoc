@@ -5,6 +5,7 @@ import pytest
 
 @pytest.mark.anyio
 async def test_splitting_notebook():
+    pytest.importorskip("marimo", reason="marimo (docs/notebook tooling) not installed")
     from docs.notebooks.splitting import app
 
     _outputs, defs = app.run()

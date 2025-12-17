@@ -12,16 +12,16 @@
 uv add ragdoc
 
 # With Azure Document Intelligence support
-uv add "ragdoc[azure_di]"
+uv add "ragdoc[azure-di]"
 
 # With MinerU PDF parsing support
-uv add "ragdoc[pdf_mineru]"
+uv add "ragdoc[pdf-mineru]"
 
 # With Qdrant vector store support
 uv add "ragdoc[qdrant]"
 
 # All extras
-uv add "ragdoc[azure_di,pdf_mineru,qdrant]"
+uv add "ragdoc[azure-di,pdf-mineru,qdrant]"
 ```
 
 ## Install for development
@@ -42,7 +42,7 @@ Some parsers require system tools:
 
 - **Word documents** (`.docx`, `.doc`): requires [Pandoc](https://pandoc.org/installing.html)
   installed and on `PATH`.
-- **PDF via MinerU** (`pdf_mineru` extra): requires additional model downloads on first use.
+- **PDF via MinerU** (`pdf-mineru` extra): requires additional model downloads on first use.
 
 ## Verify installation
 
