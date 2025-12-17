@@ -253,12 +253,6 @@ class MemoryVectorStore:
         for id_ in ids:
             self.stored.pop(id_, None)
 
-    async def get_source_hash(self, source_id: str) -> str | None:
-        for chunk in self.stored.values():
-            if chunk.source_id == source_id:
-                return chunk.source_hash
-        return None
-
     async def delete_by_source(self, source_id: str) -> None:
         to_delete = [cid for cid, c in self.stored.items() if c.source_id == source_id]
         for cid in to_delete:

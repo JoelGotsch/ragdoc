@@ -37,24 +37,17 @@ from __future__ import annotations
 
 import uuid
 
-try:
-    from qdrant_client import AsyncQdrantClient, models
-    from qdrant_client.http.exceptions import UnexpectedResponse
-except ImportError as _e:
-    raise ImportError(
-        "qdrant-client is not installed. "
-        "Install it with: uv add --optional qdrant qdrant-client  "
-        "or: pip install 'ragdoc[qdrant]'"
-    ) from _e
-
 from ragdoc.document import Document
+from ragdoc.integrations._qdrant_base import (
+    AsyncQdrantClient,
+    UnexpectedResponse,
+    _QdrantCollectionStore,
+    models,
+)
 from ragdoc.pipeline.stores import SourceState
 
 # Fixed namespace so UUID5 point ids are stable across processes and versions.
 _NAMESPACE = uuid.UUID("b9c1f4e2-3a7d-5e8c-9f01-2d3c4b5a6e7f")
-_SCROLL_BATCH = 1000
-# Payload keys read by the bulk change-detection path (must stay cheap — no full bodies).
-_STATE_KEYS = ["source_id", "source_hash", "content_hash"]
 
 
 class DocumentTooLargeError(Exception):
@@ -72,30 +65,6 @@ class DocumentTooLargeError(Exception):
             "large. Increase the Qdrant payload/body limit, or reduce the document size "
             "(e.g. externalize image data)."
         )
-
-
-def _point_id(source_id: str) -> str:
-    """Deterministic Qdrant point id for *source_id* (so upsert replaces in place)."""
-    return str(uuid.uuid5(_NAMESPACE, source_id))
-
-
-def _document_to_point(document: Document) -> models.PointStruct:
-    """Convert a Document to a single Qdrant point (dummy vector + JSON payload).
-
-    Raises:
-        ValueError: if ``document.source_id`` is not set (it is the store key).
-    """
-    if not document.source_id:
-        raise ValueError(
-            "QdrantDocumentStore requires document.source_id to be set "
-            "(normally done by DocumentStorePipeline before upsert)."
-        )
-    payload = document.model_dump(mode="json")
-    # Provenance/hash fields are already top-level keys of the Document dump; ensure presence.
-    payload["source_id"] = document.source_id
-    payload["source_hash"] = document.source_hash or ""
-    payload["content_hash"] = document.content_hash()
-    return models.PointStruct(id=_point_id(document.source_id), vector=[0.0], payload=payload)
 
 
 _SIZE_REJECTION_PHRASES = ("too large", "larger than allowed")
@@ -116,24 +85,7 @@ def _is_too_large(exc: UnexpectedResponse) -> bool:
     return exc.status_code == 400 and any(phrase in text.lower() for phrase in _SIZE_REJECTION_PHRASES)
 
 
-async def _create_index_ignore_conflict(
-    client: AsyncQdrantClient, collection_name: str, field_name: str, field_schema: models.PayloadSchemaType
-) -> None:
-    """Create a payload index, ignoring 409 (index already exists).
-
-    Runs per index call so that an already-existing collection still gains any
-    missing payload indexes (a collection-level 409 must not skip indexing).
-    """
-    try:
-        await client.create_payload_index(
-            collection_name=collection_name, field_name=field_name, field_schema=field_schema
-        )
-    except UnexpectedResponse as exc:
-        if exc.status_code != 409:
-            raise
-
-
-class QdrantDocumentStore:
+class QdrantDocumentStore(_QdrantCollectionStore):
     """Async DocumentStore backed by Qdrant (one point per ``source_id``).
 
     Args:
@@ -142,9 +94,25 @@ class QdrantDocumentStore:
             collection).
     """
 
-    def __init__(self, client: AsyncQdrantClient, collection_name: str) -> None:
-        self._client = client
-        self._collection_name = collection_name
+    _ID_NAMESPACE = _NAMESPACE
+
+    def _document_to_point(self, document: Document) -> models.PointStruct:
+        """Convert a Document to a single Qdrant point (dummy vector + JSON payload).
+
+        Raises:
+            ValueError: if ``document.source_id`` is not set (it is the store key).
+        """
+        if not document.source_id:
+            raise ValueError(
+                "QdrantDocumentStore requires document.source_id to be set "
+                "(normally done by DocumentStorePipeline before upsert)."
+            )
+        payload = document.model_dump(mode="json")
+        # Provenance/hash fields are already top-level keys of the Document dump; ensure presence.
+        payload["source_id"] = document.source_id
+        payload["source_hash"] = document.source_hash or ""
+        payload["content_hash"] = document.content_hash()
+        return models.PointStruct(id=self._point_id(document.source_id), vector=[0.0], payload=payload)
 
     @classmethod
     async def create(cls, client: AsyncQdrantClient, collection_name: str) -> QdrantDocumentStore:
@@ -157,15 +125,12 @@ class QdrantDocumentStore:
 
         Safe to call on every startup: a 409 (collection exists) is ignored.
         """
-        try:
-            await client.create_collection(
-                collection_name=collection_name,
-                vectors_config=models.VectorParams(size=1, distance=models.Distance.DOT),
-            )
-        except UnexpectedResponse as exc:
-            if exc.status_code != 409:
-                raise
-        await _create_index_ignore_conflict(client, collection_name, "source_id", models.PayloadSchemaType.KEYWORD)
+        await cls._ensure_collection(
+            client,
+            collection_name,
+            models.VectorParams(size=1, distance=models.Distance.DOT),
+            payload_indexes={"source_id": models.PayloadSchemaType.KEYWORD},
+        )
         return cls(client, collection_name)
 
     # ------------------------------------------------------------------
@@ -181,7 +146,7 @@ class QdrantDocumentStore:
         """
         if not documents:
             return []
-        points = [_document_to_point(doc) for doc in documents]
+        points = [self._document_to_point(doc) for doc in documents]
         try:
             await self._client.upsert(collection_name=self._collection_name, points=points)
         except UnexpectedResponse as exc:
@@ -194,17 +159,21 @@ class QdrantDocumentStore:
         return [doc.source_id for doc in documents if doc.source_id]
 
     async def delete_by_source(self, source_id: str) -> None:
-        """Delete the document stored for *source_id* (no-op if absent)."""
+        """Delete the document stored for *source_id* (no-op if absent).
+
+        Overrides the base's filter delete: documents are keyed 1:1 on ``source_id``, so a
+        direct point-id delete is cheaper.
+        """
         await self._client.delete(
             collection_name=self._collection_name,
-            points_selector=models.PointIdsList(points=[_point_id(source_id)]),
+            points_selector=models.PointIdsList(points=[self._point_id(source_id)]),
         )
 
     async def get_document(self, source_id: str) -> Document | None:
         """Return the single Document for *source_id* (O(1) by point id), or ``None``."""
         records = await self._client.retrieve(
             collection_name=self._collection_name,
-            ids=[_point_id(source_id)],
+            ids=[self._point_id(source_id)],
             with_payload=True,
             with_vectors=False,
         )
@@ -214,25 +183,7 @@ class QdrantDocumentStore:
 
     async def list_source_ids(self) -> set[str]:
         """Return all stored ``source_id`` values (scroll-paginated)."""
-        source_ids: set[str] = set()
-        offset: str | int | None = None
-        while True:
-            results, next_offset = await self._client.scroll(
-                collection_name=self._collection_name,
-                scroll_filter=None,
-                with_payload=["source_id"],
-                with_vectors=False,
-                limit=_SCROLL_BATCH,
-                offset=offset,
-            )
-            for point in results:
-                sid = (point.payload or {}).get("source_id")
-                if sid is not None:
-                    source_ids.add(sid)
-            if next_offset is None:
-                break
-            offset = next_offset  # type: ignore[reportAssignmentType]  # qdrant PointId is str | int at runtime
-        return source_ids
+        return await self._collect_source_ids()
 
     async def list_source_state(self) -> dict[str, SourceState]:
         """Return ``source_id`` -> :class:`SourceState` for every stored document.
@@ -240,26 +191,4 @@ class QdrantDocumentStore:
         A **cheap** read: scrolls only the three hash payload keys with ``with_vectors=False``,
         so it never pulls multi-MB document bodies (keeps ``plan()`` fast).
         """
-        state: dict[str, SourceState] = {}
-        offset: str | int | None = None
-        while True:
-            results, next_offset = await self._client.scroll(
-                collection_name=self._collection_name,
-                scroll_filter=None,
-                with_payload=_STATE_KEYS,
-                with_vectors=False,
-                limit=_SCROLL_BATCH,
-                offset=offset,
-            )
-            for point in results:
-                payload = point.payload or {}
-                sid = payload.get("source_id")
-                if sid is not None:
-                    state[sid] = SourceState(
-                        source_hash=payload.get("source_hash") or "",
-                        content_hash=payload.get("content_hash"),
-                    )
-            if next_offset is None:
-                break
-            offset = next_offset  # type: ignore[reportAssignmentType]  # qdrant PointId is str | int at runtime
-        return state
+        return await self._list_source_state()

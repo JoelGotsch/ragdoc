@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -10,7 +11,12 @@ from pydantic import BaseModel, Field
 pytest.importorskip("qdrant_client")
 
 from ragdoc.extraction.mention import Mention
-from ragdoc.integrations.mention_stores.qdrant import QdrantMentionStore, _point_id
+from ragdoc.integrations.mention_stores.qdrant import _NAMESPACE, QdrantMentionStore
+
+
+def _point_id(mention_id: str) -> str:
+    """Expected deterministic point id (UUID5 in the mention store's namespace)."""
+    return str(uuid.uuid5(_NAMESPACE, mention_id))
 
 
 class Event(BaseModel):

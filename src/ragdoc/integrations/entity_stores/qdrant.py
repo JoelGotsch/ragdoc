@@ -20,32 +20,16 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-try:
-    from qdrant_client import AsyncQdrantClient, models
-    from qdrant_client.http.exceptions import UnexpectedResponse
-except ImportError as _e:
-    raise ImportError(
-        "qdrant-client is not installed. "
-        "Install it with: uv add --optional qdrant qdrant-client  "
-        "or: pip install 'ragdoc[qdrant]'"
-    ) from _e
-
 from pydantic import BaseModel
 
 from ragdoc.extraction.entity import Entity
 from ragdoc.extraction.query import EntityQuery
+from ragdoc.integrations._qdrant_base import AsyncQdrantClient, _QdrantCollectionStore, models
 
 _NAMESPACE = uuid.UUID("c7d8e9f0-1a2b-3c4d-5e6f-7a8b9c0d1e2f")
-_SCROLL_BATCH = 1000
-_UPSERT_BATCH = 100
 # Flat, datetime-indexed payload keys carrying the entity's date interval, for range filtering.
 _DATE_START = "date_start"
 _DATE_END = "date_end"
-
-
-def _point_id(entity_id: str) -> str:
-    """Deterministic Qdrant point id for *entity_id* (so upsert replaces in place)."""
-    return str(uuid.uuid5(_NAMESPACE, entity_id))
 
 
 def _rfc3339(d: dt.date) -> str:
@@ -63,24 +47,7 @@ def _entity_to_payload(entity: Entity) -> dict:
     return payload
 
 
-async def _create_index_ignore_conflict(
-    client: AsyncQdrantClient, collection_name: str, field_name: str, field_schema: models.PayloadSchemaType
-) -> None:
-    """Create a payload index, ignoring 409 (index already exists).
-
-    Runs per index call so that an already-existing collection still gains any
-    missing payload indexes (a collection-level 409 must not skip indexing).
-    """
-    try:
-        await client.create_payload_index(
-            collection_name=collection_name, field_name=field_name, field_schema=field_schema
-        )
-    except UnexpectedResponse as exc:
-        if exc.status_code != 409:
-            raise
-
-
-class QdrantEntityStore:
+class QdrantEntityStore(_QdrantCollectionStore):
     """Async :class:`~ragdoc.extraction.entity.EntityStore` backed by Qdrant.
 
     Args:
@@ -89,9 +56,10 @@ class QdrantEntityStore:
         payload_model: The payload model to rehydrate entities into (e.g. ``Event``).
     """
 
+    _ID_NAMESPACE = _NAMESPACE
+
     def __init__(self, client: AsyncQdrantClient, collection_name: str, payload_model: type[BaseModel]) -> None:
-        self._client = client
-        self._collection_name = collection_name
+        super().__init__(client, collection_name)
         self._payload_model = payload_model
 
     def _entity_type(self) -> type[Entity]:
@@ -120,16 +88,12 @@ class QdrantEntityStore:
         }
         for field_name, schema in (indexed_fields or {}).items():
             indexes[f"payload.{field_name}"] = schema
-        try:
-            await client.create_collection(
-                collection_name=collection_name,
-                vectors_config=models.VectorParams(size=1, distance=models.Distance.DOT),
-            )
-        except UnexpectedResponse as exc:
-            if exc.status_code != 409:
-                raise
-        for field_name, schema in indexes.items():
-            await _create_index_ignore_conflict(client, collection_name, field_name, schema)
+        await cls._ensure_collection(
+            client,
+            collection_name,
+            models.VectorParams(size=1, distance=models.Distance.DOT),
+            payload_indexes=indexes,
+        )
         return cls(client, collection_name, payload_model)
 
     async def upsert(self, entities: list[Entity]) -> list[str]:
@@ -137,10 +101,10 @@ class QdrantEntityStore:
         if not entities:
             return []
         points = [
-            models.PointStruct(id=_point_id(e.entity_id), vector=[0.0], payload=_entity_to_payload(e)) for e in entities
+            models.PointStruct(id=self._point_id(e.entity_id), vector=[0.0], payload=_entity_to_payload(e))
+            for e in entities
         ]
-        for i in range(0, len(points), _UPSERT_BATCH):
-            await self._client.upsert(collection_name=self._collection_name, points=points[i : i + _UPSERT_BATCH])
+        await self._batched_upsert(points)
         return [e.entity_id for e in entities]
 
     async def delete(self, entity_ids: list[str]) -> None:
@@ -149,7 +113,7 @@ class QdrantEntityStore:
             return
         await self._client.delete(
             collection_name=self._collection_name,
-            points_selector=models.PointIdsList(points=[_point_id(eid) for eid in entity_ids]),
+            points_selector=models.PointIdsList(points=[self._point_id(eid) for eid in entity_ids]),
         )
 
     async def delete_by_source(self, source_id: str) -> None:
@@ -160,15 +124,16 @@ class QdrantEntityStore:
     async def list_source_ids(self) -> set[str]:
         """Return all distinct ``source_id`` values contributing to stored entities."""
         ids: set[str] = set()
-        async for payload in self._scroll(["source_ids"]):
-            for sid in payload.get("source_ids") or []:
-                ids.add(sid)
+        async for payload in self._scroll_payloads(["source_ids"]):
+            sids = payload.get("source_ids")
+            if isinstance(sids, list):
+                ids.update(sid for sid in sids if isinstance(sid, str))
         return ids
 
     async def list_entities(self) -> list[Entity]:
         """Return every stored canonical entity (rehydrated into ``Entity[payload_model]``)."""
         etype = self._entity_type()
-        return [etype.model_validate(payload) async for payload in self._scroll(True)]
+        return [etype.model_validate(payload) async for payload in self._scroll_payloads(True)]
 
     async def query(self, query: EntityQuery) -> list[Entity]:
         """Filter entities **server-side**: a date-interval overlap plus exact payload-field matches.
@@ -190,25 +155,8 @@ class QdrantEntityStore:
         scroll_filter = models.Filter(must=conditions) if conditions else None
         etype = self._entity_type()
         out: list[Entity] = []
-        async for payload in self._scroll(True, scroll_filter=scroll_filter):
+        async for payload in self._scroll_payloads(True, scroll_filter=scroll_filter):
             out.append(etype.model_validate(payload))
             if query.limit is not None and len(out) >= query.limit:
                 break
         return out
-
-    async def _scroll(self, with_payload, scroll_filter: models.Filter | None = None):
-        offset: str | int | None = None
-        while True:
-            results, next_offset = await self._client.scroll(
-                collection_name=self._collection_name,
-                scroll_filter=scroll_filter,
-                with_payload=with_payload,
-                with_vectors=False,
-                limit=_SCROLL_BATCH,
-                offset=offset,
-            )
-            for point in results:
-                yield point.payload or {}
-            if next_offset is None:
-                break
-            offset = next_offset  # type: ignore[assignment]

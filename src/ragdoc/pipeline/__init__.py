@@ -43,7 +43,16 @@ from ragdoc.pipeline.linear import DocumentPipeline, PipelineResult
 from ragdoc.pipeline.local_document_store import LocalDocumentStore
 from ragdoc.pipeline.splitter import TokenSplitter
 from ragdoc.pipeline.stores import DocumentStore, SourceState, VectorStore
-from ragdoc.pipeline.vectorstore import UpdateResult, VectorStorePipeline
+from ragdoc.pipeline.sync import (
+    SourceOutcome,
+    SourceSyncStore,
+    SyncEngine,
+    SyncPlanInput,
+    SyncSource,
+    UpdateResult,
+    file_hash,
+)
+from ragdoc.pipeline.vectorstore import VectorStorePipeline
 
 __all__ = [
     "ChangeSet",
@@ -57,11 +66,17 @@ __all__ = [
     "Parser",
     "PipelineResult",
     "SourceChange",
+    "SourceOutcome",
     "SourceState",
+    "SourceSyncStore",
+    "SyncEngine",
+    "SyncPlanInput",
+    "SyncSource",
     "TokenSplitter",
     "UpdateResult",
     "VectorStore",
     "VectorStorePipeline",
     "embedding_content_text",
+    "file_hash",
     "prompt_content_text",
 ]

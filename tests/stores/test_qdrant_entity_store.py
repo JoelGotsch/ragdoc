@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -14,7 +15,12 @@ from qdrant_client import models
 from ragdoc.extraction.dates import FuzzyDate
 from ragdoc.extraction.entity import Entity
 from ragdoc.extraction.query import DateRange, EntityQuery
-from ragdoc.integrations.entity_stores.qdrant import QdrantEntityStore, _point_id
+from ragdoc.integrations.entity_stores.qdrant import _NAMESPACE, QdrantEntityStore
+
+
+def _point_id(entity_id: str) -> str:
+    """Expected deterministic point id (UUID5 in the entity store's namespace)."""
+    return str(uuid.uuid5(_NAMESPACE, entity_id))
 
 
 class Event(BaseModel):

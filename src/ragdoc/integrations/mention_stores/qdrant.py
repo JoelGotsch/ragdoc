@@ -30,59 +30,18 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING
-
-try:
-    from qdrant_client import AsyncQdrantClient, models
-    from qdrant_client.http.exceptions import UnexpectedResponse
-except ImportError as _e:
-    raise ImportError(
-        "qdrant-client is not installed. "
-        "Install it with: uv add --optional qdrant qdrant-client  "
-        "or: pip install 'ragdoc[qdrant]'"
-    ) from _e
 
 from pydantic import BaseModel
 
 from ragdoc.extraction.mention import Mention
-
-if TYPE_CHECKING:
-    from ragdoc.pipeline.stores import SourceState
+from ragdoc.integrations._qdrant_base import AsyncQdrantClient, _QdrantCollectionStore, models
+from ragdoc.pipeline.stores import SourceState
 
 _NAMESPACE = uuid.UUID("a4e6c0d1-2b3f-4a5e-8c7d-9e0f1a2b3c4d")
-_SCROLL_BATCH = 1000
-_UPSERT_BATCH = 100
-_STATE_KEYS = ["source_id", "source_hash", "content_hash"]
 PayloadEmbedder = Callable[[list[BaseModel]], Awaitable[list[list[float]]]]
 
 
-def _point_id(mention_id: str) -> str:
-    """Deterministic Qdrant point id for *mention_id* (so upsert replaces in place)."""
-    return str(uuid.uuid5(_NAMESPACE, mention_id))
-
-
-def _source_id_filter(source_id: str) -> models.Filter:
-    return models.Filter(must=[models.FieldCondition(key="source_id", match=models.MatchValue(value=source_id))])
-
-
-async def _create_index_ignore_conflict(
-    client: AsyncQdrantClient, collection_name: str, field_name: str, field_schema: models.PayloadSchemaType
-) -> None:
-    """Create a payload index, ignoring 409 (index already exists).
-
-    Runs per index call so that an already-existing collection still gains any
-    missing payload indexes (a collection-level 409 must not skip indexing).
-    """
-    try:
-        await client.create_payload_index(
-            collection_name=collection_name, field_name=field_name, field_schema=field_schema
-        )
-    except UnexpectedResponse as exc:
-        if exc.status_code != 409:
-            raise
-
-
-class QdrantMentionStore:
+class QdrantMentionStore(_QdrantCollectionStore):
     """Async :class:`~ragdoc.extraction.stores.MentionStore` backed by Qdrant.
 
     Args:
@@ -94,6 +53,8 @@ class QdrantMentionStore:
             identity at upsert so the vector doubles as the resolution blocking index.
     """
 
+    _ID_NAMESPACE = _NAMESPACE
+
     def __init__(
         self,
         client: AsyncQdrantClient,
@@ -101,8 +62,7 @@ class QdrantMentionStore:
         payload_model: type[BaseModel],
         embedder: PayloadEmbedder,
     ) -> None:
-        self._client = client
-        self._collection_name = collection_name
+        super().__init__(client, collection_name)
         self._payload_model = payload_model
         self._embedder = embedder
 
@@ -121,15 +81,12 @@ class QdrantMentionStore:
         distance: models.Distance = models.Distance.COSINE,
     ) -> QdrantMentionStore:
         """Create the collection (idempotent) with a ``source_id`` payload index; return a store."""
-        try:
-            await client.create_collection(
-                collection_name=collection_name,
-                vectors_config=models.VectorParams(size=vector_size, distance=distance),
-            )
-        except UnexpectedResponse as exc:
-            if exc.status_code != 409:
-                raise
-        await _create_index_ignore_conflict(client, collection_name, "source_id", models.PayloadSchemaType.KEYWORD)
+        await cls._ensure_collection(
+            client,
+            collection_name,
+            models.VectorParams(size=vector_size, distance=distance),
+            payload_indexes={"source_id": models.PayloadSchemaType.KEYWORD},
+        )
         return cls(client, collection_name, payload_model, embedder)
 
     async def upsert(self, mentions: list[Mention]) -> list[str]:
@@ -138,42 +95,23 @@ class QdrantMentionStore:
             return []
         vectors = await self._embedder([m.payload for m in mentions])
         points = [
-            models.PointStruct(id=_point_id(m.mention_id), vector=vec, payload=m.model_dump(mode="json"))
+            models.PointStruct(id=self._point_id(m.mention_id), vector=vec, payload=m.model_dump(mode="json"))
             for m, vec in zip(mentions, vectors, strict=True)
         ]
-        for i in range(0, len(points), _UPSERT_BATCH):
-            await self._client.upsert(collection_name=self._collection_name, points=points[i : i + _UPSERT_BATCH])
+        await self._batched_upsert(points)
         return [m.mention_id for m in mentions]
 
     async def delete_by_source(self, source_id: str) -> None:
         """Delete all mentions whose ``source_id`` equals *source_id*."""
-        await self._client.delete(
-            collection_name=self._collection_name,
-            points_selector=_source_id_filter(source_id),
-        )
+        await self._delete_by_source_filter(source_id)
 
     async def list_source_ids(self) -> set[str]:
         """Return all distinct ``source_id`` values with mentions present (scroll-paginated)."""
-        source_ids: set[str] = set()
-        async for payload in self._scroll(["source_id"]):
-            sid = payload.get("source_id")
-            if sid is not None:
-                source_ids.add(sid)
-        return source_ids
+        return await self._collect_source_ids()
 
     async def list_source_state(self) -> dict[str, SourceState]:
         """Return ``source_id`` -> :class:`SourceState` (cheap: only the hash payload keys)."""
-        from ragdoc.pipeline.stores import SourceState
-
-        state: dict[str, SourceState] = {}
-        async for payload in self._scroll(_STATE_KEYS):
-            sid = payload.get("source_id")
-            if sid is not None and sid not in state:
-                state[sid] = SourceState(
-                    source_hash=payload.get("source_hash") or "",
-                    content_hash=payload.get("content_hash"),
-                )
-        return state
+        return await self._list_source_state()
 
     async def list_mentions(self, payload_type: type[BaseModel] | None = None) -> list[Mention]:
         """Return stored mentions, optionally filtered to those whose payload is *payload_type*.
@@ -186,24 +124,7 @@ class QdrantMentionStore:
         everything when the type matches and ``[]`` otherwise.
         """
         mtype = self._mention_type()
-        mentions = [mtype.model_validate(payload) async for payload in self._scroll(True)]
+        mentions = [mtype.model_validate(payload) async for payload in self._scroll_payloads(True)]
         if payload_type is None:
             return mentions
         return [m for m in mentions if isinstance(m.payload, payload_type)]
-
-    async def _scroll(self, with_payload):
-        offset: str | int | None = None
-        while True:
-            results, next_offset = await self._client.scroll(
-                collection_name=self._collection_name,
-                scroll_filter=None,
-                with_payload=with_payload,
-                with_vectors=False,
-                limit=_SCROLL_BATCH,
-                offset=offset,
-            )
-            for point in results:
-                yield point.payload or {}
-            if next_offset is None:
-                break
-            offset = next_offset  # type: ignore[assignment]

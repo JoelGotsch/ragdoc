@@ -15,12 +15,14 @@ Two modes, selected by whether a ``document_store`` is provided:
   Boundary-2 mode so a user running both a vector store and a knowledge graph over the same
   corpus shares the existing ``DocumentStore`` substrate without a new boundary.
 
-Shape mirrors the sync pipelines:
+Shape mirrors the sync pipelines (all compose the shared
+:class:`~ragdoc.pipeline.sync.SyncEngine`):
 
 * :meth:`run` — streaming, **per source**. Each source is atomic; a completed source stays
   durable if a later one fails.
 * :meth:`plan` / :meth:`apply` — the reviewable path, returning a serializable
-  :class:`~ragdoc.extraction.changeset.MentionChangeSet`.
+  :class:`~ragdoc.pipeline.changeset.ChangeSet` of mentions
+  (``ChangeSet[Mention[P]]``; load with ``ChangeSet[Mention[P]].load(path)``).
 
 A source's mentions share one ``content_hash`` (the parent Document's), stamped uniformly via
 :func:`~ragdoc.extraction.mention.finalize_mention`. This pipeline emits **mentions, not
@@ -33,12 +35,20 @@ import asyncio
 import logging
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, Generic, cast
 
-from ragdoc.extraction.changeset import MentionChangeSet, MentionSourceChange
 from ragdoc.extraction.mention import Mention, PayloadT, finalize_mention
-from ragdoc.pipeline.vectorstore import UpdateResult, _file_hash
-from ragdoc.processing._concurrency import _resolve_semaphore
+from ragdoc.pipeline.changeset import ChangeSet, SourceChange
+from ragdoc.pipeline.sync import (
+    SyncEngine,
+    SyncPlanInput,
+    SyncSource,
+    UpdateResult,
+    build_current_map,
+    content_hash_token,
+    file_hash,
+    source_hash_token,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +84,8 @@ class MentionStorePipeline(Generic[PayloadT]):
             the pipeline runs in Boundary-2 mode.
         splitter: ``Document -> list[Document]`` splitter run before extraction. ``None`` builds a
             default token splitter (``split_document`` with a Markdown prompt renderer).
-        hash_fn: ``Path -> str`` file-byte change-detection hash (default SHA-256 of bytes). Used
-            only in direct mode.
+        hash_fn: ``Path -> str`` file-byte change-detection hash (default
+            :func:`~ragdoc.pipeline.sync.file_hash`, SHA-256 of bytes). Used only in direct mode.
         concurrency: max sources processed concurrently.
 
     Raises:
@@ -90,7 +100,7 @@ class MentionStorePipeline(Generic[PayloadT]):
         mention_store: MentionStore,
         document_store: DocumentStore | None = None,
         splitter: Splitter | None = None,
-        hash_fn: Callable[[Path], str] = lambda p: _file_hash(p),
+        hash_fn: Callable[[Path], str] = file_hash,
         concurrency: int | asyncio.Semaphore = 10,
     ) -> None:
         if pipeline.has_custom_chunker:
@@ -119,6 +129,12 @@ class MentionStorePipeline(Generic[PayloadT]):
         self._splitter = splitter
         self._hash_fn = hash_fn
         self._concurrency = concurrency
+        self._engine: SyncEngine[Mention[PayloadT]] = SyncEngine(
+            store=mention_store,
+            producer=self._produce_from_doc_store if document_store is not None else self._produce_from_path,
+            token_of=content_hash_token if document_store is not None else source_hash_token,
+            concurrency=concurrency,
+        )
 
     @property
     def _source_id_fn(self) -> Callable[[Path], str]:
@@ -134,25 +150,6 @@ class MentionStorePipeline(Generic[PayloadT]):
         renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
         tokenizer = GPTTokenizer()
         return lambda document: split_document(document, renderer, tokenizer)
-
-    def _build_current_map(self, sources: Iterable[Path]) -> dict[str, tuple[Path, str]]:
-        """Map ``source_id -> (path, file_hash)``, raising on id collisions (as the sync pipelines do)."""
-        current: dict[str, tuple[Path, str]] = {}
-        collisions: dict[str, list[Path]] = {}
-        for path in sources:
-            sid = self._source_id_fn(path)
-            if sid in current:
-                collisions.setdefault(sid, [current[sid][0]]).append(path)
-            else:
-                current[sid] = (path, self._hash_fn(path))
-        if collisions:
-            lines = [f"  {sid!r}: {[str(p) for p in paths]}" for sid, paths in collisions.items()]
-            raise ValueError(
-                "source_id_fn produced duplicate source_ids for different paths.\n"
-                + "\n".join(lines)
-                + "\nConsider a relative-path strategy: lambda p: str(p.relative_to(base_dir))"
-            )
-        return current
 
     # ------------------------------------------------------------------
     # extraction primitives
@@ -188,14 +185,78 @@ class MentionStorePipeline(Generic[PayloadT]):
         """Parse → process → split → extract one source file."""
         parent: Document | None = await self._pipeline.parse_and_process(path)
         if parent is None:
-            logger.info("MentionStorePipeline: document filtered out: %s", path.name)
+            logger.info(f"MentionStorePipeline: document filtered out: {path.name}")
             return []
         parent.source_id = source_id
         parent.source_hash = file_hash
         return await self._extract_from_document(parent)
 
     # ------------------------------------------------------------------
-    # run (streaming, per source)
+    # producers (per-source production for the engine)
+    # ------------------------------------------------------------------
+
+    async def _produce_from_path(self, src: SyncSource) -> SourceChange[Mention[PayloadT]] | None:
+        """Direct mode: parse → process → split → extract one file into a mention change."""
+        if src.path is None:  # pragma: no cover - direct-mode resolution always sets it
+            raise AssertionError("direct-mode SyncSource without a path")
+        mentions = await self._extract_source(src.path, src.source_id, src.change_token)
+        return SourceChange(
+            source_id=src.source_id,
+            source_hash=src.change_token,
+            content_hash=mentions[0].content_hash if mentions else None,
+            items=mentions,
+        )
+
+    async def _produce_from_doc_store(self, src: SyncSource) -> SourceChange[Mention[PayloadT]] | None:
+        """Boundary-2 mode: split + extract a Document loaded from the DocumentStore."""
+        if self._document_store is None:  # pragma: no cover - wired only when set
+            raise AssertionError("_produce_from_doc_store called without a document_store")
+        doc = await self._document_store.get_document(src.source_id)
+        if doc is None:
+            return None  # vanished between list_source_state and get_document → engine warns + skips
+        mentions = await self._extract_from_document(doc)
+        return SourceChange(
+            source_id=src.source_id,
+            source_hash=doc.source_hash or "",
+            content_hash=mentions[0].content_hash if mentions else doc.content_hash(),
+            items=mentions,
+        )
+
+    # ------------------------------------------------------------------
+    # resolution (request → SyncPlanInput)
+    # ------------------------------------------------------------------
+
+    async def _resolve(self, sources: Iterable[Path] | Iterable[str] | None) -> SyncPlanInput:
+        """Resolve paths (direct) or source_ids (Boundary 2) into a :class:`SyncPlanInput`."""
+        if self._document_store is None:
+            if sources is None:
+                raise ValueError("Direct mode (no document_store) requires `sources` paths.")
+            current = await build_current_map(
+                cast("Iterable[Path]", sources), self._source_id_fn, self._hash_fn, self._concurrency
+            )
+            return SyncPlanInput(
+                sources=[
+                    SyncSource(source_id=sid, change_token=digest, path=path) for sid, (path, digest) in current.items()
+                ],
+                live_source_ids=frozenset(current),
+            )
+
+        doc_state = await self._document_store.list_source_state()
+        targets = [str(sid) for sid in sources] if sources is not None else list(doc_state)
+        resolved: list[SyncSource] = []
+        pre_skipped: list[str] = []
+        for sid in targets:
+            entry = doc_state.get(sid)
+            if entry is None:
+                logger.warning(f"sync: source_id {sid!r} not in document store; skipping")
+                pre_skipped.append(sid)
+                continue
+            resolved.append(SyncSource(source_id=sid, change_token=entry.content_hash or ""))
+        # Orphans are compared against the FULL document store (not the target subset).
+        return SyncPlanInput(sources=resolved, live_source_ids=frozenset(doc_state), pre_skipped=tuple(pre_skipped))
+
+    # ------------------------------------------------------------------
+    # public surface
     # ------------------------------------------------------------------
 
     async def run(
@@ -211,272 +272,29 @@ class MentionStorePipeline(Generic[PayloadT]):
           strings, or ``None`` for every document in the store. Unchanged Documents (by
           ``content_hash``) are skipped with no LLM call.
         """
-        if self._document_store is not None:
-            return await self._run_from_doc_store(sources, delete_orphans)  # type: ignore[arg-type]
-        if sources is None:
-            raise ValueError("Direct mode (no document_store) requires `sources` paths.")
-        return await self._run_from_paths(sources, delete_orphans)  # type: ignore[arg-type]
-
-    async def _run_from_paths(self, sources: Iterable[Path], delete_orphans: bool) -> UpdateResult:
-        current = self._build_current_map(sources)
-        store_state = await self._store.list_source_state()
-        logger.info("run(): %d sources, %d known in mention store", len(current), len(store_state))
-
-        result = UpdateResult()
-        sem = _resolve_semaphore(self._concurrency)
-
-        async def _process(sid: str, path: Path, file_hash: str) -> None:
-            async with sem:
-                try:
-                    existing = store_state.get(sid)
-                    if existing is not None and existing.source_hash == file_hash:
-                        result.skipped.append(sid)
-                        return
-                    mentions = await self._extract_source(path, sid, file_hash)
-                    if existing is not None:
-                        await self._store.delete_by_source(sid)
-                    if mentions:
-                        await self._store.upsert(mentions)
-                    result.processed.append(sid)
-                except asyncio.CancelledError:
-                    raise
-                except BaseException as exc:
-                    logger.error("run() failed for %s: %r", path.name, exc, exc_info=True)
-                    result.errors.append((sid, exc))
-
-        await asyncio.gather(*[_process(sid, p, h) for sid, (p, h) in current.items()])
-
-        if delete_orphans:
-            await self._delete_orphans([sid for sid in store_state if sid not in current], result)
-        logger.info(
-            "run complete: %d processed, %d skipped, %d deleted, %d errors",
-            len(result.processed),
-            len(result.skipped),
-            len(result.deleted),
-            len(result.errors),
-        )
-        return result
-
-    async def _run_from_doc_store(self, source_ids: Iterable[str] | None, delete_orphans: bool) -> UpdateResult:
-        assert self._document_store is not None
-        doc_state = await self._document_store.list_source_state()
-        store_state = await self._store.list_source_state()
-        targets = list(source_ids) if source_ids is not None else list(doc_state.keys())
-        logger.info("run(): %d doc-store sources, %d in mention store", len(targets), len(store_state))
-
-        result = UpdateResult()
-        sem = _resolve_semaphore(self._concurrency)
-
-        async def _process(sid: str) -> None:
-            async with sem:
-                try:
-                    doc_entry = doc_state.get(sid)
-                    if doc_entry is None:
-                        logger.warning("run(): source_id %r not in document store; skipping", sid)
-                        return
-                    existing = store_state.get(sid)
-                    # content_hash drives Boundary-2 detection; None stored ⇒ always changed.
-                    if (
-                        existing is not None
-                        and existing.content_hash is not None
-                        and existing.content_hash == doc_entry.content_hash
-                    ):
-                        result.skipped.append(sid)
-                        return
-                    doc = await self._document_store.get_document(sid)  # type: ignore[union-attr]
-                    if doc is None:
-                        return
-                    mentions = await self._extract_from_document(doc)
-                    if existing is not None:
-                        await self._store.delete_by_source(sid)
-                    if mentions:
-                        await self._store.upsert(mentions)
-                    result.processed.append(sid)
-                except asyncio.CancelledError:
-                    raise
-                except BaseException as exc:
-                    logger.error("run() failed for %s: %r", sid, exc, exc_info=True)
-                    result.errors.append((sid, exc))
-
-        await asyncio.gather(*[_process(sid) for sid in targets])
-
-        if delete_orphans:
-            # Orphans compared against the FULL document store (not the target subset).
-            await self._delete_orphans([sid for sid in store_state if sid not in doc_state], result)
-        logger.info(
-            "run complete: %d processed, %d skipped, %d deleted, %d errors",
-            len(result.processed),
-            len(result.skipped),
-            len(result.deleted),
-            len(result.errors),
-        )
-        return result
-
-    async def _delete_orphans(self, orphan_ids: list[str], result: UpdateResult) -> None:
-        for sid in orphan_ids:
-            try:
-                await self._store.delete_by_source(sid)
-                result.deleted.append(sid)
-            except asyncio.CancelledError:
-                raise
-            except BaseException as exc:
-                logger.error("run(): delete orphan %s failed: %r", sid, exc, exc_info=True)
-                result.errors.append((sid, exc))
-
-    # ------------------------------------------------------------------
-    # plan / apply (reviewable)
-    # ------------------------------------------------------------------
+        return await self._engine.run(await self._resolve(sources), delete_orphans)
 
     async def plan(
         self,
         sources: Iterable[Path] | Iterable[str] | None = None,
         delete_orphans: bool = False,
-    ) -> MentionChangeSet[PayloadT]:
+    ) -> ChangeSet[Mention[PayloadT]]:
         """Compute the mention change set without touching the mention store.
 
         * **Direct** (no ``document_store``): *sources* is an iterable of file ``Path``\\ s.
         * **Boundary-2** (``document_store`` given): *sources* is an iterable of ``source_id``
           strings, or ``None`` for every document in the store.
+
+        Returns:
+            A ``ChangeSet[Mention[P]]``; reload from disk with
+            ``ChangeSet[Mention[P]].load(path)`` (the concrete parametrization).
         """
-        changeset, _skipped, errors = await self._plan_internal(sources, delete_orphans)
-        if errors:
-            logger.warning("plan(): %d source(s) failed: %s", len(errors), [sid for sid, _ in errors])
-        return changeset
+        return await self._engine.plan(await self._resolve(sources), delete_orphans)
 
-    async def _plan_internal(
-        self,
-        sources: Iterable[Path] | Iterable[str] | None,
-        delete_orphans: bool,
-    ) -> tuple[MentionChangeSet[PayloadT], list[str], list[tuple[str, BaseException]]]:
-        if self._document_store is not None:
-            return await self._plan_from_doc_store(sources, delete_orphans)  # type: ignore[arg-type]
-        if sources is None:
-            raise ValueError("Direct mode (no document_store) requires `sources` paths.")
-        return await self._plan_from_paths(sources, delete_orphans)  # type: ignore[arg-type]
+    async def apply(self, changeset: ChangeSet[Mention[PayloadT]]) -> UpdateResult:
+        """Write *changeset* to the mention store (delete orphans, delete stale, then upsert).
 
-    async def _plan_from_paths(
-        self, sources: Iterable[Path], delete_orphans: bool
-    ) -> tuple[MentionChangeSet[PayloadT], list[str], list[tuple[str, BaseException]]]:
-        current = self._build_current_map(sources)
-        store_state = await self._store.list_source_state()
-
-        to_add: list[MentionSourceChange[PayloadT]] = []
-        to_update: list[MentionSourceChange[PayloadT]] = []
-        skipped: list[str] = []
-        errors: list[tuple[str, BaseException]] = []
-        sem = _resolve_semaphore(self._concurrency)
-
-        async def _process(sid: str, path: Path, file_hash: str) -> None:
-            async with sem:
-                try:
-                    existing = store_state.get(sid)
-                    if existing is not None and existing.source_hash == file_hash:
-                        skipped.append(sid)
-                        return
-                    mentions = await self._extract_source(path, sid, file_hash)
-                    content_hash = mentions[0].content_hash if mentions else None
-                    change: MentionSourceChange[PayloadT] = MentionSourceChange(
-                        source_id=sid, source_hash=file_hash, content_hash=content_hash, items=mentions
-                    )
-                    (to_add if existing is None else to_update).append(change)
-                except asyncio.CancelledError:
-                    raise
-                except BaseException as exc:
-                    logger.error("plan() failed for %s: %r", path.name, exc, exc_info=True)
-                    errors.append((sid, exc))
-
-        await asyncio.gather(*[_process(sid, p, h) for sid, (p, h) in current.items()])
-        to_delete = [sid for sid in store_state if sid not in current] if delete_orphans else []
-        return MentionChangeSet(to_add=to_add, to_update=to_update, to_delete=to_delete), skipped, errors
-
-    async def _plan_from_doc_store(
-        self, source_ids: Iterable[str] | None, delete_orphans: bool
-    ) -> tuple[MentionChangeSet[PayloadT], list[str], list[tuple[str, BaseException]]]:
-        assert self._document_store is not None
-        doc_state = await self._document_store.list_source_state()
-        store_state = await self._store.list_source_state()
-        targets = list(source_ids) if source_ids is not None else list(doc_state.keys())
-
-        to_add: list[MentionSourceChange[PayloadT]] = []
-        to_update: list[MentionSourceChange[PayloadT]] = []
-        skipped: list[str] = []
-        errors: list[tuple[str, BaseException]] = []
-        sem = _resolve_semaphore(self._concurrency)
-
-        async def _process(sid: str) -> None:
-            async with sem:
-                try:
-                    doc_entry = doc_state.get(sid)
-                    if doc_entry is None:
-                        return
-                    existing = store_state.get(sid)
-                    if (
-                        existing is not None
-                        and existing.content_hash is not None
-                        and existing.content_hash == doc_entry.content_hash
-                    ):
-                        skipped.append(sid)
-                        return
-                    doc = await self._document_store.get_document(sid)  # type: ignore[union-attr]
-                    if doc is None:
-                        return
-                    mentions = await self._extract_from_document(doc)
-                    content_hash = mentions[0].content_hash if mentions else doc.content_hash()
-                    change: MentionSourceChange[PayloadT] = MentionSourceChange(
-                        source_id=sid,
-                        source_hash=doc.source_hash or "",
-                        content_hash=content_hash,
-                        items=mentions,
-                    )
-                    (to_add if existing is None else to_update).append(change)
-                except asyncio.CancelledError:
-                    raise
-                except BaseException as exc:
-                    logger.error("plan() failed for %s: %r", sid, exc, exc_info=True)
-                    errors.append((sid, exc))
-
-        await asyncio.gather(*[_process(sid) for sid in targets])
-        to_delete = [sid for sid in store_state if sid not in doc_state] if delete_orphans else []
-        return MentionChangeSet(to_add=to_add, to_update=to_update, to_delete=to_delete), skipped, errors
-
-    async def apply(self, changeset: MentionChangeSet[PayloadT]) -> UpdateResult:
-        """Write *changeset* to the mention store (delete orphans, replace updates, upsert)."""
-        result = UpdateResult()
-
-        for sid in changeset.to_delete:
-            try:
-                await self._store.delete_by_source(sid)
-                result.deleted.append(sid)
-            except asyncio.CancelledError:
-                raise
-            except BaseException as exc:
-                logger.error("apply(): delete %s failed: %r", sid, exc, exc_info=True)
-                result.errors.append((sid, exc))
-
-        for sc in changeset.to_update:
-            try:
-                await self._store.delete_by_source(sc.source_id)
-            except asyncio.CancelledError:
-                raise
-            except BaseException as exc:
-                logger.error("apply(): delete stale %s failed: %r", sc.source_id, exc, exc_info=True)
-                result.errors.append((sc.source_id, exc))
-
-        for sc in list(changeset.to_add) + list(changeset.to_update):
-            try:
-                if sc.items:
-                    await self._store.upsert(sc.items)
-                result.processed.append(sc.source_id)
-            except asyncio.CancelledError:
-                raise
-            except BaseException as exc:
-                logger.error("apply(): upsert %s failed: %r", sc.source_id, exc, exc_info=True)
-                result.errors.append((sc.source_id, exc))
-
-        logger.info(
-            "apply(): %d processed, %d deleted, %d errors",
-            len(result.processed),
-            len(result.deleted),
-            len(result.errors),
-        )
-        return result
+        Updates go delete-then-upsert with per-source error isolation: a source whose
+        stale-delete failed is recorded in ``errors`` and **not** upserted (no old/new mixing).
+        """
+        return await self._engine.apply(changeset)

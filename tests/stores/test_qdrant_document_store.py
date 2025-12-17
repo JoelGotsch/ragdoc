@@ -18,8 +18,6 @@ from ragdoc.integrations.document_stores.qdrant import (
     _NAMESPACE,
     DocumentTooLargeError,
     QdrantDocumentStore,
-    _document_to_point,
-    _point_id,
 )
 from ragdoc.pipeline.stores import DocumentStore, SourceState
 
@@ -31,6 +29,11 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _point_id(source_id: str) -> str:
+    """Expected deterministic point id (UUID5 in the document store's namespace)."""
+    return str(uuid.uuid5(_NAMESPACE, source_id))
 
 
 def make_document(source_id: str, source_hash: str = "h", body: str = "Body.") -> Document:
@@ -83,15 +86,15 @@ def store(client: MagicMock) -> QdrantDocumentStore:
 # ---------------------------------------------------------------------------
 
 
-def test_point_id_is_deterministic_uuid5():
-    assert _point_id("a.pdf") == str(uuid.uuid5(_NAMESPACE, "a.pdf"))
-    assert _point_id("a.pdf") == _point_id("a.pdf")
-    assert _point_id("a.pdf") != _point_id("b.pdf")
+def test_point_id_is_deterministic_uuid5(store):
+    assert store._point_id("a.pdf") == str(uuid.uuid5(_NAMESPACE, "a.pdf"))
+    assert store._point_id("a.pdf") == store._point_id("a.pdf")
+    assert store._point_id("a.pdf") != store._point_id("b.pdf")
 
 
-def test_document_to_point_payload_and_vector():
+def test_document_to_point_payload_and_vector(store):
     doc = make_document("a.pdf", "hash-a", body="Distinctive.")
-    point = _document_to_point(doc)
+    point = store._document_to_point(doc)
     assert str(point.id) == _point_id("a.pdf")
     assert point.vector == [0.0]  # dummy, never queried
     assert point.payload["source_id"] == "a.pdf"

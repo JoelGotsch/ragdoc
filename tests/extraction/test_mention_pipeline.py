@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from ragdoc.extraction.changeset import MentionChangeSet
 from ragdoc.extraction.mention import Mention
 from ragdoc.extraction.pipeline import MentionStorePipeline
 from ragdoc.extraction.processor import StructuredExtractionProcessor
+from ragdoc.pipeline.changeset import ChangeSet
 from ragdoc.pipeline.linear import DocumentPipeline
 
 from .conftest import Event, MemoryMentionStore, make_event_client, make_extractor, make_parser
@@ -149,7 +149,7 @@ async def test_plan_apply_round_trip(make_files, mstore, tmp_path):
     # serialize → reload on the concrete type → apply
     cs_path = tmp_path / "cs.json"
     changeset.save(cs_path)
-    reloaded = MentionChangeSet[Event].load(cs_path)
+    reloaded = ChangeSet[Mention[Event]].load(cs_path)
     result = await pipeline.apply(reloaded)
 
     assert result.processed == ["a.txt"]

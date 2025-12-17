@@ -241,7 +241,8 @@ async def test_per_source_durability(docs):
 
 @pytest.mark.anyio
 async def test_plan_apply_round_trip(docs, mstore, tmp_path):
-    from ragdoc.extraction.changeset import MentionChangeSet
+    from ragdoc.extraction.mention import Mention
+    from ragdoc.pipeline.changeset import ChangeSet
 
     await _seed(docs, "a.pdf", "Alpha")
     pipeline = make_b2_pipeline(docs, make_extractor([Event(title="Ev")]), mstore)
@@ -252,7 +253,7 @@ async def test_plan_apply_round_trip(docs, mstore, tmp_path):
 
     cs_path = tmp_path / "cs.json"
     changeset.save(cs_path)
-    reloaded = MentionChangeSet[Event].load(cs_path)
+    reloaded = ChangeSet[Mention[Event]].load(cs_path)
     result = await pipeline.apply(reloaded)
 
     assert result.processed == ["a.pdf"]

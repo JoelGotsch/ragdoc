@@ -4,6 +4,54 @@ Pre-1.0: breaking changes land at will and are documented here.
 
 ## Unreleased
 
+### Added
+
+- **`ragdoc.pipeline.sync` — generic `SyncEngine[T]`** (Decision D2-A). One streaming
+  plan/apply/run core now drives all three sync pipelines (`VectorStorePipeline`,
+  `DocumentStorePipeline`, `MentionStorePipeline`), which became thin compositions owning only
+  constructor validation, source resolution, and a per-source producer. New public names in
+  `ragdoc.pipeline`: `SyncEngine`, `SourceSyncStore`, `SyncSource`, `SyncPlanInput`,
+  `SourceOutcome`, `file_hash` (the file-byte SHA-256 hash, now public; `_file_hash` removed).
+  Pointing the engine at a new sink is configuration: any store with
+  `upsert`/`delete_by_source`/`list_source_state` plus a producer coroutine.
+- Concurrent, threaded file hashing: the shared current-map builder
+  (`ragdoc.pipeline.sync.build_current_map`) fans hashing out via `asyncio.to_thread` under the
+  concurrency semaphore, and detects `source_id` collisions **before** any hashing.
+
+### Changed
+
+- **Unified sync semantics across all three pipelines** (formerly drifted per copy):
+  - A Boundary-2 target `source_id` missing from the DocumentStore, or a document that vanishes
+    between `list_source_state` and `get_document`, is **logged and skip-counted** everywhere
+    (previously uncounted; `MentionStorePipeline.plan()` was fully silent).
+  - A **filtered source** (processor returns `None`) yields an empty change: counted
+    `processed` and its stale stored artifacts are **deleted**. This fixes
+    `DocumentStorePipeline` leaving a stale stored Document behind forever when its source file
+    becomes filtered.
+  - `apply()` performs delete-then-upsert with per-source error isolation everywhere: a source
+    whose stale-delete failed is recorded in `errors` and **not** upserted (previously the
+    mention path could mix old and new mentions; the docstore path did no stale-delete).
+  - Error handling is `except Exception` at every per-source site (was `except BaseException`):
+    `asyncio.CancelledError`, `KeyboardInterrupt`, `SystemExit`, and custom `BaseException`
+    subclasses now always propagate. `UpdateResult.errors` is
+    `list[tuple[str, Exception]]` (was `BaseException`).
+- **`DocumentStorePipeline.run()` is now streaming** (was literally `apply(plan(...))`):
+  each source is written as soon as it is produced (per-source durability on abort); updates go
+  delete-then-upsert. Same end state.
+- `UpdateResult` moved to `ragdoc.pipeline.sync` (still re-exported from `ragdoc.pipeline`).
+- `MentionStorePipeline.plan()/apply()` payload type is now `ChangeSet[Mention[P]]`
+  (load with `ChangeSet[Mention[P]].load(path)`).
+- `ChangeSet`'s type parameter loosened from `TypeVar("T", Document, Chunk)` to
+  `TypeVar("T", bound=BaseModel)` — any Pydantic model payload.
+
+### Removed
+
+- **`VectorStore.get_source_hash`** (protocol + `QdrantVectorStore` implementation) — superseded
+  by the bulk `list_source_state`. `list_source_ids` stays (consumer-facing; the sync engine
+  does not use it).
+- **`ragdoc.extraction.changeset`** (`MentionChangeSet`, `MentionSourceChange`) — use
+  `ChangeSet[Mention[P]]` / `SourceChange[Mention[P]]` from `ragdoc.pipeline.changeset`.
+
 ## 0.1.0 — 2026-07-04
 
 ### Added

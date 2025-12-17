@@ -48,7 +48,7 @@ The canonical `Parser` base class lives in `ragdoc.parsing`.
 
 ## UpdateResult
 
-::: ragdoc.pipeline.vectorstore.UpdateResult
+::: ragdoc.pipeline.sync.UpdateResult
     options:
       show_root_heading: true
       show_source: true

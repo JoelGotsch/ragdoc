@@ -124,25 +124,6 @@ async def test_delete_empty_list_is_noop(store: QdrantVectorStore, client: Magic
 
 
 # ---------------------------------------------------------------------------
-# get_source_hash
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.anyio
-async def test_get_source_hash_found(store: QdrantVectorStore, client: MagicMock) -> None:
-    client.scroll = AsyncMock(return_value=([_make_point("doc-a", "abc123")], None))
-    result = await store.get_source_hash("doc-a")
-    assert result == "abc123"
-
-
-@pytest.mark.anyio
-async def test_get_source_hash_not_found(store: QdrantVectorStore, client: MagicMock) -> None:
-    client.scroll = AsyncMock(return_value=([], None))
-    result = await store.get_source_hash("doc-missing")
-    assert result is None
-
-
-# ---------------------------------------------------------------------------
 # delete_by_source
 # ---------------------------------------------------------------------------
 
