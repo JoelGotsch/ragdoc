@@ -15,7 +15,7 @@ document into sections that are:
 - Semantically coherent (bounded by headings)
 - Still structured `Document` objects (not plain text)
 
-Each resulting document carries [`ExternalRef`](../api/document.md#ExternalRef) entries
+Each resulting document carries [`ExternalRef`](../api/document.md#externalref) entries
 that record the parent-child relationship back to the source document.
 
 ## Split functions
@@ -97,7 +97,7 @@ splits = split_document(doc, renderer=renderer, max_tokens=5000)
 ordered = sorted(splits, key=lambda d: d.metadata["split_sequence"])
 ```
 
-Both keys propagate automatically to [`Chunk.metadata`](../api/chunking.md#Chunk)
+Both keys propagate automatically to [`Chunk.metadata`](../api/chunking.md#chunk)
 via the chunker's `metadata_fn`, so no extra work is needed after chunking.
 
 `split_total` makes each chunk self-describing: a retrieval client can determine

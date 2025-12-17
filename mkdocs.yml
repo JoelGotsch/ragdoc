@@ -85,21 +85,26 @@ nav:
       - Overview: guide/overview.md
       - Document Model: guide/document-model.md
       - Parsing: guide/parsing.md
+      - Processing: guide/processing.md
       - Merging: guide/merging.md
       - Rendering: guide/rendering.md
       - Splitting: guide/splitting.md
       - Chunking: guide/chunking.md
       - Pipeline: guide/pipeline.md
+      - Sync Engine: guide/sync-engine.md
+      - Extraction & Knowledge Graphs: guide/extraction.md
       - Custom Metadata: guide/custom-metadata.md
   - API Reference:
       - Document: api/document.md
       - Configuration: api/config.md
+      - LLM: api/llm.md
       - Parsing: api/parsing.md
       - Processing: api/processing.md
       - Rendering: api/rendering.md
       - Splitting: api/splitting.md
       - Chunking: api/chunking.md
       - Pipeline: api/pipeline.md
+      - Extraction: api/extraction.md
       - Metadata: api/metadata.md
       - Utilities: api/utils.md
       - Integrations: api/integrations.md

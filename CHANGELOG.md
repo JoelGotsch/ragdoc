@@ -4,6 +4,38 @@ Pre-1.0: breaking changes land at will and are documented here.
 
 ## Unreleased
 
+### Added (Phase 10 — documentation)
+
+- **Extraction/knowledge-graph docs** (the feature previously had zero docs presence):
+  `docs/guide/extraction.md` (the mention → entity → graph three-layer workflow on the
+  `Extractor` protocol, `MentionStorePipeline`, and the resolution pipelines),
+  `docs/api/extraction.md` (full API reference for the public `ragdoc.extraction` surface),
+  and `docs/notebooks/extraction.py` — a marimo notebook running the whole workflow with a
+  stub extractor and fake resolution collaborators (no API key), wrapped in
+  `tests/test_notebooks.py` and listed in `docs/tutorials.md`.
+- **`docs/guide/sync-engine.md`** — the shared `SyncEngine[T]` architecture (plan/apply/run,
+  two-hash change detection, `SourceSyncStore`, producers, error isolation, how the three
+  sync pipelines compose it), replacing per-pipeline duplicated prose.
+- **`docs/guide/processing.md`** — processor catalog, ordering guidance, `None`-to-drop
+  semantics, pre- vs post-split placement, and LLM-processor configuration.
+- **`docs/api/llm.md`** — the `ragdoc.llm` reliability layer got its own API page
+  (`api/config.md` now links to it instead of embedding the reference).
+- **API-reference completeness pass**: `api/pipeline.md` gains `DocumentStorePipeline`,
+  `SyncEngine` + `SourceSyncStore`/`SyncSource`/`SyncPlanInput`/`SourceOutcome`/`file_hash`,
+  `ChangeSet`/`SourceChange`, `DocumentStore`/`SourceState`/`LocalDocumentStore`, and the
+  embedders (`Embedder`/`EmbedderConfig`/`OpenAIEmbedder` + content selectors);
+  `api/integrations.md` gains `ServerSideVector`, `QdrantDocumentStore` +
+  `DocumentTooLargeError`, and the mention/entity/graph Qdrant stores; `api/processing.md`
+  gains the document/image summarizer surface; `api/splitting.md` gains `split_document`;
+  `api/rendering.md` gains `format_metadata_value`. New nav entries for all new pages.
+- CLAUDE.md final truth pass: `pdf_basic` in the parser list + `is_available()` resolution,
+  the extraction stage in the pipeline diagram, the `SyncEngine` architecture in the sync
+  section, the honest async statement (`to_thread` at orchestration points), and removal of
+  the stale `get_source_hash` claim.
+- Housekeeping: missing `Field(description=…)` added on `ChangeSet` and `ExcelConfig`
+  fields; completed plans moved to `plans/done/`, stray `DESIGN_*.md` files moved to
+  `designs/`, dormant plans marked `disregarded`.
+
 > **⚠ BREAKING — the pipeline is split at the sync boundaries (Phase 9).**
 > `DocumentPipeline` is now the composition of two new classes: `IngestPipeline`
 > (parser + processors + `source_id_fn`; Boundary 1) and `ChunkPipeline` (splitter +

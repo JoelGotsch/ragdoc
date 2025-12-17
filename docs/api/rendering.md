@@ -70,3 +70,11 @@ class handles format conversion (HTML → Markdown, plain text, etc.).
       show_root_heading: true
       show_source: true
       heading_level: 4
+
+### format_metadata_value
+
+::: ragdoc.rendering.elements.format_metadata_value
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4

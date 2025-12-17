@@ -21,16 +21,18 @@ class ExcelConfig(BaseModel):
     E.g. if you want to skip the first 10 rows and only read the first 33 rows, you can use:
     ExcelConfig(default_params={"skiprows": 10, "nrows": 33})
 
-    Args:
-        default_params (dict, optional): Default parameters for the pandas.read_excel function. Defaults to {}.
-        sheet_params (dict[str, dict], optional): Parameters for specific sheets. Defaults to {}.
-    The default_params are overruled by the sheet_params if the sheet name is present in the sheet_params dict.
-
-    If sheet_params are provided and no default_params, then only the sheets are loaded for which parameters are provided.
+    The ``default_params`` are overruled by the ``sheet_params`` if the sheet name is present
+    in the ``sheet_params`` dict. If ``sheet_params`` are provided and no ``default_params``,
+    then only the sheets are loaded for which parameters are provided.
     """
 
-    default_params: dict | None = Field(default=None)
-    sheet_params: dict[str, dict] = Field(default_factory=dict)
+    default_params: dict | None = Field(
+        default=None, description="Default keyword arguments for pandas.read_excel, applied to every sheet."
+    )
+    sheet_params: dict[str, dict] = Field(
+        default_factory=dict,
+        description="Per-sheet keyword arguments for pandas.read_excel, merged over (and winning against) default_params.",
+    )
 
 
 def generate_document(excel_file: pd.ExcelFile, config: ExcelConfig | None = None) -> Document:

@@ -35,5 +35,6 @@ marimo edit docs/notebooks/<notebook>.py
 | Notebook | Description |
 |---|---|
 | [Qdrant Sync Pipeline](../notebooks/qdrant_pipeline/) | Production incremental sync: MinerU + LLMChunker + QdrantVectorStore |
+| [Extraction & Knowledge Graphs](../notebooks/extraction/) | Mention → entity workflow end-to-end with a stub extractor (no API key) |
 | [Custom Elements](../notebooks/custom_elements/) | Define custom element types, parsers, and renderers |
 | [MinerU Example](../notebooks/mineru_example/) | Minimal MinerU parser usage |

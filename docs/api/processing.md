@@ -176,11 +176,75 @@ Processors transform `Document` objects. They run between parsing and splitting 
       show_source: true
       heading_level: 4
 
+### openai_image_summarizer
+
+::: ragdoc.processing.summary_image.openai_image_summarizer
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### ImageSummarizeFn
+
+::: ragdoc.processing.summary_image.ImageSummarizeFn
+    options:
+      show_root_heading: true
+      show_source: false
+      heading_level: 4
+
+### build_image_messages
+
+::: ragdoc.processing.summary_image.build_image_messages
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### DocumentSummarizerProcessor
+
+::: ragdoc.processing.summary_document.DocumentSummarizerProcessor
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### DocumentSummarizerSettings
+
+::: ragdoc.processing.summary_document.DocumentSummarizerSettings
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### build_summary_messages
+
+::: ragdoc.processing.summary_document.build_summary_messages
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### pack_summaries
+
+::: ragdoc.processing.summary_document.pack_summaries
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
 ## Summary Models
 
 ### ImageSummary
 
 ::: ragdoc.processing.summary_base.ImageSummary
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### DocumentSummary
+
+::: ragdoc.processing.summary_base.DocumentSummary
     options:
       show_root_heading: true
       show_source: true

@@ -91,10 +91,10 @@ class RagdocJsonParser(Parser):
     parsers, so ``.ragdoc.json`` files are always dispatched here by
     :func:`~ragdoc.parsing.load`.
 
-    Args:
-        provenance_mode: How to handle provenance fields after deserialization.
-            Defaults to :attr:`ProvenanceMode.ORIGINAL` (preserve the original
-            document's ``source_path``, ``parser``, and ``metadata["filename"]``).
+    ``provenance_mode`` controls how provenance fields are handled after
+    deserialization (see the field description); the default
+    :attr:`ProvenanceMode.ORIGINAL` preserves the original document's
+    ``source_path``, ``parser``, and ``metadata["filename"]``.
 
     Example:
         ```python

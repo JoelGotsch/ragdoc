@@ -3,12 +3,12 @@
 > Run interactively: `marimo edit docs/notebooks/chunking.py`
 
 Chunking is the final stage of the pipeline. It materializes a [`Document`](document-model.md)
-(or split section) into a [`Chunk`](../api/chunking.md#Chunk) — a
+(or split section) into a [`Chunk`](../api/chunking.md#chunk) — a
 flat, self-contained record ready to be loaded into a vector store.
 
 ## What is a Chunk?
 
-A [`Chunk`](../api/chunking.md#Chunk) is a Pydantic model with:
+A [`Chunk`](../api/chunking.md#chunk) is a Pydantic model with:
 
 | Field | Description |
 |-------|-------------|
@@ -25,7 +25,7 @@ For `SimpleChunker`, `embedding_content` equals `prompt_content`. Only `LLMChunk
 
 ## Creating chunks
 
-Combine the [`Renderer`](../api/rendering.md#Renderer) with `Chunk`:
+Combine the [`Renderer`](../api/rendering.md#renderer) with `Chunk`:
 
 ```python
 from ragdoc import Renderer, render_for_prompt, OutputFormat
@@ -88,7 +88,7 @@ document.metadata["year"] = 2024
 ## Loading into a vector store
 
 `Chunk` is designed to map directly to vector store document schemas. Use
-[`VectorStorePipeline`](../api/pipeline.md#VectorStorePipeline) to embed and
+[`VectorStorePipeline`](../api/pipeline.md#vectorstorepipeline) to embed and
 upsert chunks with incremental change detection.
 
 ## Prompt vs embedding content
