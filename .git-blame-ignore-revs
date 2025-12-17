@@ -5,3 +5,6 @@
 
 # style: reformat codebase with ruff (line-length 120)
 edae6ba5568e654d4ff861264cbe963d5b6cca2d
+
+# types: resolve all basedpyright (standard) errors -> 0 (bulk annotations/ignores)
+d11b628df2b0ac4695bf07949392a594bd4f36e7
