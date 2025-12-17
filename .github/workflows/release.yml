@@ -4,11 +4,6 @@ on:
   release:
     types: [published]
 
-# NOTE: ragdoc is proprietary-licensed (see pyproject.toml). This workflow
-# builds the distribution and attaches it to the GitHub release. It does NOT
-# publish to public PyPI. To publish to an internal index, uncomment and
-# configure the `publish` job below with the appropriate registry + secrets.
-
 jobs:
   build:
     name: Build distribution
@@ -37,17 +32,18 @@ jobs:
         with:
           files: dist/*
 
-  # publish:
-  #   name: Publish to internal index
-  #   needs: build
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Download dist artifact
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: dist
-  #         path: dist/
-  #     - name: Publish
-  #       run: uv publish --index <internal-index> dist/*
-  #       env:
-  #         UV_PUBLISH_TOKEN: ${{ secrets.INTERNAL_INDEX_TOKEN }}
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # PyPI trusted publishing (no token secret needed)
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

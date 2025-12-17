@@ -385,7 +385,7 @@ def handle_chart_block(
                         source_page=page,
                     )
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- malformed chart content degrades to skipped body
                 logger.warning(
                     "Could not convert chart markdown to HTML on page %d (%s: %s); "
                     "chart body skipped. Content prefix: %r",
@@ -431,7 +431,7 @@ def _load_image_bytes(path: Path) -> tuple[str, str, int, int] | None:
             img.save(buf, format=img.format or "PNG")
             data = base64.b64encode(buf.getvalue()).decode("utf-8")
             return data, fmt, width, height
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- any decode failure degrades to image-less block
         logger.warning("Could not load image %s: %s", path, exc)
         return None
 

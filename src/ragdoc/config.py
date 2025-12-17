@@ -51,7 +51,8 @@ class RagdocConfig(BaseModel):
     )
 
 
-_config: ContextVar[RagdocConfig] = ContextVar("ragdoc_config", default=RagdocConfig())
+_DEFAULT_CONFIG = RagdocConfig()
+_config: ContextVar[RagdocConfig | None] = ContextVar("ragdoc_config", default=None)
 
 
 class _ConfigContext:
@@ -98,4 +99,5 @@ def configure(config: RagdocConfig) -> _ConfigContext:
 
 def get_config() -> RagdocConfig:
     """Return the currently active RagdocConfig (or the library default)."""
-    return _config.get()
+    active = _config.get()
+    return active if active is not None else _DEFAULT_CONFIG

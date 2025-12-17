@@ -406,7 +406,7 @@ re-chunking when a stored Document is edited in the two-stage `DocumentStore` wo
 
 ---
 
-## Scenario D — two-stage with a `DocumentStore`
+## Scenario E — two-stage with a `DocumentStore`
 
 Parse once, chunk many ways. `DocumentStorePipeline` syncs parsed+processed `Document`s into a
 `DocumentStore` (Boundary 1); you can then edit them and re-chunk into the vector store

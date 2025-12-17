@@ -163,7 +163,7 @@ def compute_html_patch(
         if opcode == "equal":
             selected: list[str] = [
                 str(_select_tag(tags_a[idx_a], tags_b[idx_b], prefer_source, hier_a, hier_b))
-                for idx_a, idx_b in zip(range(i1, i2), range(j1, j2))
+                for idx_a, idx_b in zip(range(i1, i2), range(j1, j2), strict=True)
             ]
             operations.append(HtmlMergeOperation(opcode="equal", tags_a=ta_strs, tags_b=tb_strs, selected=selected))
 
@@ -175,7 +175,8 @@ def compute_html_patch(
             if ratio >= similarity_threshold or (ratio > 0 and i2 - i1 == j2 - j1 == 1):
                 if len(group_a) == len(group_b):
                     selected = [
-                        str(_select_tag(ta, tb, prefer_source, hier_a, hier_b)) for ta, tb in zip(group_a, group_b)
+                        str(_select_tag(ta, tb, prefer_source, hier_a, hier_b))
+                        for ta, tb in zip(group_a, group_b, strict=True)
                     ]
                 else:
                     score_a = sum(markup_richness_score(str(t)) for t in group_a)

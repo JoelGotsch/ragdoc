@@ -45,7 +45,7 @@ async def _process_file(
             orphan_count=len(orphans),
             orphan_numbers=sorted(f.number for f in orphans),
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 -- eval script collects per-file errors into results
         return FootnoteFileResult(
             path=path,
             total_footnotes=0,

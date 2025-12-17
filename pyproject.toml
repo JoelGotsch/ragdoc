@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 # Keep the wheel slim: only the library source ships. Tests, fixtures, docs,
@@ -47,7 +47,8 @@ name = "ragdoc"
 version = "0.1.0"
 description = "A library to assist with chunking and preprocessing of documents for usage in LLM usecases."
 readme = "README.md"
-license = {text = "Proprietary"}
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10,<3.13"
 authors = [
     { name = "Joel GOTSCH", email = "contact@joelgotsch.com" },
@@ -114,6 +115,7 @@ dev = [
     "python-docx>=1.2.0",
     "types-aiofiles>=25.1.0.20260409",
     "nest-asyncio>=1.6.0",
+    "pytest-timeout>=2.3.0",
     "ruff>=0.8.0",
     "basedpyright>=1.31.0",
 ]
@@ -153,12 +155,9 @@ testpaths = ["tests"]
 xfail_strict = true
 addopts = [
     "-ra",
-    "-v",
     "--tb=short",
-    "--cov=ragdoc",
-    "--cov-report=term-missing",
-    "--cov-report=xml",
 ]
+timeout = 300
 
 
 [tool.coverage.run]
@@ -185,7 +184,7 @@ target-version = "py310"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-extend-select = ["Q", "RUF", "C90", "UP", "I"]
+extend-select = ["Q", "RUF", "C90", "UP", "I", "B", "ASYNC", "BLE"]
 mccabe = { max-complexity = 18 }
 ignore = [
     # Ambiguous-unicode rules: this is a document-processing library that
@@ -205,10 +204,7 @@ ignore = [
 "__init__.py" = ["F401", "E402"]
 # Tests guard optional-dependency imports with pytest.importorskip(...), which
 # legitimately runs before the module-level imports it protects.
-"tests/**" = ["E402"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
+"tests/**" = ["E402", "ASYNC230", "ASYNC240"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
@@ -255,7 +251,7 @@ extras =
 deps =
     marimo>=0.23.0
 commands =
-    pytest {posargs}
+    pytest --cov=ragdoc --cov-report=xml --cov-report=term-missing {posargs}
 
 [testenv:py{310,311,312}-lowest]
 uv_resolution = lowest-direct

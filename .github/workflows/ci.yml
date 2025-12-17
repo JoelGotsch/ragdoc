@@ -11,6 +11,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
+  notebooks:
+    name: Notebook check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+      - name: marimo check
+        run: uv run --group docs marimo check docs/notebooks/*.py
   lint:
     name: Lint
     runs-on: ubuntu-latest

@@ -327,7 +327,7 @@ Guidelines:
                     logger.warning("LLMHeadingResolver: LLM refused to provide judgments")
                     raise ValueError("LLM refused to provide judgments")
                 return result.judgments
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- retry loop; shared LLM layer replaces this in Phase 7
                 logger.error(
                     f"LLMHeadingResolver: API call failed "
                     f"(attempt {attempt + 1}/{self.settings.max_retries + 1}): {exc}"

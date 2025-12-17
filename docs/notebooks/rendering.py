@@ -51,8 +51,8 @@ def _(mo):
 
 @app.cell
 def _():
-    from ragdoc.document import Document, Heading, Paragraph, Table
-    from ragdoc.rendering import Renderer, render_for_prompt, OutputFormat
+    from ragdoc.document import Document, Heading, Image, Paragraph, Table
+    from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
 
     # Build a minimal sample document
     sample_doc = Document(
@@ -76,7 +76,7 @@ def _():
     print("--- PROMPT ---")
     print(prompt_text)
     return (
-        Document, Heading, OutputFormat, Paragraph, Renderer, Table,
+        Document, Heading, Image, OutputFormat, Paragraph, Renderer, Table,
         prompt_renderer, prompt_text,
         render_for_prompt, sample_doc,
     )
@@ -138,14 +138,11 @@ def _(mo):
 
 
 @app.cell
-def _(OutputFormat, Renderer, prompt_renderer, sample_doc):
-    from ragdoc.document import Image
-
+def _(Document, Heading, Image, prompt_renderer):
     # Demonstrate text_representation on an Image element
     img = Image(alt="Chart")
     img.text_representation = "A simple bar chart showing quarterly revenue."
 
-    from ragdoc.document import Document, Heading
     img_doc = Document(elements=[
         Heading(innerhtml="Report", level=1),
         img,
@@ -153,7 +150,7 @@ def _(OutputFormat, Renderer, prompt_renderer, sample_doc):
 
     print("--- PROMPT (uses image.text_representation as fallback) ---")
     print(prompt_renderer.render(img_doc))
-    return (img,)
+    return (img, img_doc)
 
 
 @app.cell(hide_code=True)
@@ -196,9 +193,8 @@ def _(mo):
 
 
 @app.cell
-def _(render_for_prompt):
+def _(Image, render_for_prompt):
     from ragdoc.rendering.base import RenderContext
-    from ragdoc.document import Image
 
     @render_for_prompt.register(Image)
     def render_image_custom(element: Image, ctx: RenderContext, inline: bool = False) -> str:
@@ -206,7 +202,7 @@ def _(render_for_prompt):
         return f"<figure><img alt='{alt}'/></figure>"
 
     print("Custom Image renderer registered for render_for_prompt.")
-    return (Image, RenderContext, render_image_custom)
+    return (RenderContext, render_image_custom)
 
 
 @app.cell(hide_code=True)

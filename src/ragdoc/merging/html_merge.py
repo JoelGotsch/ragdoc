@@ -236,7 +236,7 @@ def merge_documents_html(
 
     for opcode, i1, i2, j1, j2 in matcher.get_opcodes():
         if opcode == "equal":
-            for idx_a, idx_b in zip(range(i1, i2), range(j1, j2)):
+            for idx_a, idx_b in zip(range(i1, i2), range(j1, j2), strict=True):
                 merged_tags.append(_select_tag(tags_a[idx_a], tags_b[idx_b], prefer_source, hier_a, hier_b))
 
         elif opcode == "replace":
@@ -250,7 +250,7 @@ def merge_documents_html(
             if ratio >= similarity_threshold or (ratio > 0 and i2 - i1 == j2 - j1 == 1):
                 # Similar enough — keep whichever is richer
                 if len(group_a) == len(group_b):
-                    for ta, tb in zip(group_a, group_b):
+                    for ta, tb in zip(group_a, group_b, strict=True):
                         merged_tags.append(_select_tag(ta, tb, prefer_source, hier_a, hier_b))
                 else:
                     # Different lengths: pick the side with higher total richness

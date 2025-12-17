@@ -32,6 +32,8 @@ def _(mo):
     | Field | Description |
     |-------|-------------|
     | `id` | Unique identifier (UUID string) |
+    | `source_id` | Sync identity key of the source document (required) |
+    | `source_hash` | SHA-256 of the source file bytes (required; chunkers fall back to `Document.content_hash()`) |
     | `prompt_content` | Full-fidelity text for LLM context windows and BM25 search |
     | `embedding_content` | Compact semantic text for dense vector search |
     | `metadata` | Key-value metadata from the source document |
@@ -82,7 +84,7 @@ def _(mo):
 
 @app.cell
 def _(sample_doc):
-    from ragdoc import Renderer, render_for_prompt, OutputFormat
+    from ragdoc import OutputFormat, Renderer, render_for_prompt
     from ragdoc.chunking import Chunk
     from ragdoc.splitting import split_by_headings
 
@@ -100,6 +102,10 @@ def _(sample_doc):
         Chunk(
             prompt_content=renderer.render(section),
             embedding_content=renderer.render(section),
+            # source_id / source_hash are required: DocumentPipeline stamps them from the
+            # source path; when building chunks by hand, fall back to document identity.
+            source_id="q3_report.docx",
+            source_hash=section.content_hash(),
             metadata=section.metadata,
         )
         for section in sections

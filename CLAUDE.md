@@ -24,7 +24,7 @@ uv run pytest-watcher tests/         # watch mode
 uv run ruff check src tests          # lint
 uv run ruff check src tests --fix    # lint + autofix
 uv run ruff format src tests         # format (black-compatible, line-length 120)
-uv run basedpyright                  # type check (strict)
+uv run basedpyright                  # type check (standard mode)
 ```
 These mirror the CI jobs; tox wraps them as `tox -e lint` and `tox -e type`.
 
@@ -84,7 +84,7 @@ The pipeline is **not strictly linear**:
 
 Cross-document relationships use `ExternalRef` (parent/child/related); within-document references (images, footnotes, tables embedded in text) use `InlineRef` with `<ref id='...'/>` placeholders in HTML. The `Renderer` resolves these placeholders during rendering.
 
-### Stage 1: Parsing (`src/ragdoc/parsing/`: `html/`, `pandoc/`, `xlsx/`, `azure_di/`, `textract/`, `mineru/`)
+### Stage 1: Parsing (`src/ragdoc/parsing/`: `html/`, `pandoc/`, `xlsx/`, `azure_di/`, `mineru/`, `ragdoc_json/`)
 
 Each parser converts a format → `Document`, sets `document.parser` (provenance string, e.g., `"mineru"`, `"azure_di"`), sets `document.source_path`, and writes `document.metadata["filename"] = path.name`. Processors check `document.parser` to adjust behavior.
 
@@ -135,10 +135,6 @@ Incremental synchronisation follows a **plan → apply** shape across two bounda
 
 **`ChangeSet[T]`** (`changeset.py`) — serializable plan artifact (`to_add`/`to_update`/`to_delete`); `save()`/`load()` (call `load` on the concrete type, e.g. `ChangeSet[Chunk].load(path)`). Edit it between `plan()` and `apply()` for human-in-the-loop review.
 
-### Refactor Status
-
-The codebase is mid-refactor (see `REFACTOR_TODO.md`). Phases 1–3 are complete. Phase 4 (updating parsers to set `document.parser` and store CSS) and Phase 5 (folder restructuring to `parsing/`, `splitting/`, `chunking/`) are in progress. `mineru/middleware/` is deprecated in favor of `processing/`.
-
 ## Collaboration Guidelines
 
 - **Drive work to completion autonomously.** When the user has authorized a task, do every step you have the means to do — run the tests, install missing deps, fix the venv, capture snapshot values, amend commits. Don't hand the user shell commands to run when you can run them yourself. Don't gate-keep with "want me to X?" prompts on follow-through. Reserve confirmation for actions you genuinely cannot reverse on your own (pushing to a shared remote when no credentials are available, sending messages, destructive ops). The devcontainer has `.venv-devcontainer/` (set via `UV_PROJECT_ENVIRONMENT`); use it. If a tool isn't installed, install it. If the environment legitimately blocks you (no GPU, no network, no creds), state that in one sentence and structure the hand-off as one clean recipe — not multiple round-trips.
@@ -178,7 +174,7 @@ async def test_pipeline_walkthrough():
     assert len(defs["chunks"]) > 0
 ```
 
-CI (`tests.yaml`) runs all four layers. See `/documentation-best-practices` for the full documentation workflow.
+CI (`ci.yml`) runs all four layers. See `/documentation-guidelines` for the full documentation workflow.
 
 ## Plan Guidelines
 
@@ -213,7 +209,7 @@ Once an option is chosen, create `plans/PLAN-<topic>.md` with:
 - **Type hints:** Strict — no `Any`, no `**kwargs`. Use `Callable` type aliases for injectable functions (e.g., `SizeToLevelMapper`).
 - **CSS extraction functions:** Always return `None` when a property is absent (not a default value).
 - **Naming:** Processors = `*Processor`, LLM-based async resolvers = `*Resolver`, Protocols describe capability, standalone functions = `verb_noun`.
-- **Formatter / linter:** ruff (line-length=120; lint + import-sort + format). Type checking: basedpyright (strict). Config lives in `pyproject.toml`.
+- **Formatter / linter:** ruff (line-length=120; lint + import-sort + format). Type checking: basedpyright (standard mode). Config lives in `pyproject.toml`.
 
 ### Async-only conventions
 
@@ -229,4 +225,4 @@ uv add <package>           # production
 uv add --dev <package>     # dev only
 ```
 
-Optional extras: `azure-di`, `pdf-mineru`, `qdrant`. Local dependency: `aa-utils` at `C:/DEV/aa-utils`.
+Optional extras: `azure-di`, `pdf-mineru`, `qdrant`, `extraction`.

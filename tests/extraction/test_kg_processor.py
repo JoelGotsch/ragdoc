@@ -13,7 +13,7 @@ from typing import Literal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from ragdoc.document import Document, Heading, Paragraph
 from ragdoc.extraction.kg_processor import (
@@ -270,7 +270,7 @@ async def test_duplicate_local_id_raises():
 async def test_discriminator_invalid_kind_validation_error():
     """A `kind` that isn't a registered variant should fail validation on the LLM-facing schema."""
     graph_batch_cls, _ = build_graph_batch_model(SCHEMA)
-    with pytest.raises(Exception):  # ValidationError
+    with pytest.raises(ValidationError):
         graph_batch_cls.model_validate(
             {
                 "node_mentions": [{"local_id": "n0", "node": {"kind": "Alien", "full_name": "x"}}],

@@ -541,12 +541,12 @@ class VectorStorePipeline(Generic[TMetadata]):
 
         results = await asyncio.gather(*(_run_one(name, cfg) for name, cfg in self._embedders.items()))
         for name, vectors in results:
-            for chunk, vec in zip(chunks, vectors):
+            for chunk, vec in zip(chunks, vectors, strict=True):
                 chunk.named_embeddings[name] = vec
 
     async def run_directory(self, directory: Path, glob: str = "**/*") -> UpdateResult:
         """Discover files matching *glob* under *directory*, then :meth:`run` them."""
-        sources = [p for p in directory.glob(glob) if p.is_file()]
+        sources = [p for p in directory.glob(glob) if p.is_file()]  # noqa: ASYNC240 -- threaded in Phase 8 (D9)
         return await self.run(sources)
 
 
