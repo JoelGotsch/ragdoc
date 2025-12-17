@@ -31,18 +31,22 @@ Quick start::
 
 from ragdoc.pipeline.embedders import Embedder, EmbedderConfig, embedding_content_text, prompt_content_text
 from ragdoc.pipeline.linear import DocumentPipeline, PipelineResult
+from ragdoc.pipeline.local_document_store import LocalDocumentStore
 from ragdoc.pipeline.parser import AutoParser, Parser
 from ragdoc.pipeline.splitter import TokenSplitter
-from ragdoc.pipeline.stores import VectorStore
+from ragdoc.pipeline.stores import DocumentStore, SourceState, VectorStore
 from ragdoc.pipeline.vectorstore import UpdateResult, VectorStorePipeline
 
 __all__ = [
     "AutoParser",
     "DocumentPipeline",
+    "DocumentStore",
     "Embedder",
     "EmbedderConfig",
+    "LocalDocumentStore",
     "Parser",
     "PipelineResult",
+    "SourceState",
     "TokenSplitter",
     "UpdateResult",
     "VectorStore",

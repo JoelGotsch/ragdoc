@@ -9,6 +9,7 @@ import pytest
 from ragdoc.chunking import Chunk
 from ragdoc.document import Document, Heading, Paragraph
 from ragdoc.parsing.parser import Parser
+from ragdoc.pipeline.stores import SourceState
 
 # ---------------------------------------------------------------------------
 # Document factories
@@ -92,6 +93,51 @@ class MemoryVectorStore:
 
     async def list_source_ids(self) -> set[str]:
         return {chunk.source_id for chunk in self.stored.values() if chunk.source_id is not None}
+
+    async def list_source_state(self) -> dict[str, SourceState]:
+        state: dict[str, SourceState] = {}
+        for chunk in self.stored.values():
+            if chunk.source_id is not None:
+                state[chunk.source_id] = SourceState(
+                    source_hash=chunk.source_hash,
+                    content_hash=chunk.content_hash,
+                )
+        return state
+
+
+class MemoryDocumentStore:
+    """In-memory DocumentStore for testing.
+
+    Stores one Document per source_id and computes content_hash on read for
+    list_source_state (cheap enough in tests).
+    """
+
+    def __init__(self) -> None:
+        self.stored: dict[str, Document] = {}
+
+    async def upsert(self, documents: list[Document]) -> list[str]:
+        written: list[str] = []
+        for doc in documents:
+            if not doc.source_id:
+                raise ValueError("MemoryDocumentStore.upsert requires document.source_id")
+            self.stored[doc.source_id] = doc
+            written.append(doc.source_id)
+        return written
+
+    async def delete_by_source(self, source_id: str) -> None:
+        self.stored.pop(source_id, None)
+
+    async def get_document(self, source_id: str) -> Document | None:
+        return self.stored.get(source_id)
+
+    async def list_source_ids(self) -> set[str]:
+        return set(self.stored.keys())
+
+    async def list_source_state(self) -> dict[str, SourceState]:
+        return {
+            sid: SourceState(source_hash=doc.source_hash or "", content_hash=doc.content_hash())
+            for sid, doc in self.stored.items()
+        }
 
 
 # ---------------------------------------------------------------------------
