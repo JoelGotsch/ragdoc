@@ -31,7 +31,13 @@ Quick start::
 
 from ragdoc.pipeline.changeset import ChangeSet, SourceChange
 from ragdoc.pipeline.document_store_pipeline import DocumentStorePipeline
-from ragdoc.pipeline.embedders import Embedder, EmbedderConfig, embedding_content_text, prompt_content_text
+from ragdoc.pipeline.embedders import (
+    Embedder,
+    EmbedderConfig,
+    OpenAIEmbedder,
+    embedding_content_text,
+    prompt_content_text,
+)
 from ragdoc.pipeline.linear import DocumentPipeline, PipelineResult
 from ragdoc.pipeline.local_document_store import LocalDocumentStore
 from ragdoc.pipeline.parser import AutoParser, Parser
@@ -48,6 +54,7 @@ __all__ = [
     "Embedder",
     "EmbedderConfig",
     "LocalDocumentStore",
+    "OpenAIEmbedder",
     "Parser",
     "PipelineResult",
     "SourceChange",

@@ -766,10 +766,19 @@ class FootnoteProcessor(DocumentProcessor):
         context_chars: Number of context characters for candidate analysis
         same_page_only: Whether to restrict candidate search to same page
         update_html: Whether to update element HTML with ref tags
-        only_orphaned: When True, skip footnotes that are already referenced
-            in the document (i.e. already have a ``<ref>`` tag somewhere).
-            Useful when re-running the processor or when the parser has already
-            resolved some footnotes.
+        only_orphaned: When True (the **default**), only resolve footnotes that are not
+            yet referenced (no ``<ref rel="footnote">`` for them anywhere). This makes
+            ``process`` **idempotent**: re-running it skips already-resolved footnotes, so
+            it never appends a duplicate/spurious ref. On a fresh document (no refs yet)
+            every footnote is orphaned, so behaviour is identical to processing all of them.
+            Set ``False`` for the legacy behaviour that re-resolves every footnote on each
+            call (non-idempotent — a second pass corrupts already-resolved footnotes).
+
+    Idempotency:
+        Resolution is destructive of its own anchor — it replaces the matched number with a
+        ``<ref>`` tag that the candidate search skips. Re-resolving an already-resolved
+        footnote therefore cannot re-find its anchor and instead mis-fires onto another number.
+        ``only_orphaned=True`` avoids this by never reconsidering resolved footnotes.
 
     Example:
         >>> resolver = SimpleFootnoteResolver()
@@ -783,7 +792,7 @@ class FootnoteProcessor(DocumentProcessor):
         context_chars: int = 50,
         same_page_only: bool = True,
         update_html: bool = True,
-        only_orphaned: bool = False,
+        only_orphaned: bool = True,
         concurrency: int | asyncio.Semaphore = 1,
     ):
         """
@@ -795,8 +804,9 @@ class FootnoteProcessor(DocumentProcessor):
             context_chars: Number of characters before/after reference for context
             same_page_only: Whether to only search on the same page as the footnote
             update_html: Whether to update element HTML with <ref> tags
-            only_orphaned: When True, skip footnotes that already have a ``<ref>``
-                tag in any element.  Defaults to False (process all footnotes).
+            only_orphaned: When True (**default**), only resolve footnotes that are not
+                yet referenced — makes ``process`` idempotent (see class docstring).
+                ``False`` re-resolves every footnote on each call (legacy, non-idempotent).
             concurrency: Maximum number of footnotes resolved concurrently.  Accepts
                 an ``int`` (private semaphore) or a shared ``asyncio.Semaphore``.
                 Defaults to ``1`` (sequential), which preserves the sequential
@@ -943,7 +953,7 @@ class SyncFootnoteProcessor(DocumentProcessor):
         context_chars: int = 50,
         same_page_only: bool = True,
         update_html: bool = True,
-        only_orphaned: bool = False,
+        only_orphaned: bool = True,
     ):
         """
         Initialize the sync footnote processor.
@@ -952,8 +962,9 @@ class SyncFootnoteProcessor(DocumentProcessor):
             context_chars: Number of characters before/after reference for context
             same_page_only: Whether to only search on the same page as the footnote
             update_html: Whether to update element HTML with <ref> tags
-            only_orphaned: When True, skip footnotes that already have a ``<ref>``
-                tag in any element.  Defaults to False (process all footnotes).
+            only_orphaned: When True (**default**), only resolve not-yet-referenced
+                footnotes — makes ``process`` idempotent (see :class:`FootnoteProcessor`).
+                ``False`` re-resolves every footnote on each call (legacy, non-idempotent).
         """
         self.context_chars = context_chars
         self.same_page_only = same_page_only

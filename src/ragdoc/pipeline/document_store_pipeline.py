@@ -33,13 +33,22 @@ if TYPE_CHECKING:
 class DocumentStorePipeline(Generic[TMetadata]):
     """Incremental file -> DocumentStore sync via plan/apply.
 
+    This boundary stores **whole Documents, one per source** (via ``parse_and_process``), so a
+    splitter or non-default chunker on the given :class:`DocumentPipeline` is not "ignored" — it
+    has nowhere to write its output (splits would collide on ``source_id``; chunks aren't
+    ``Document``\\ s) and is therefore rejected at construction. Split and chunk at Boundary 2
+    (:class:`~ragdoc.pipeline.vectorstore.VectorStorePipeline`) instead.
+
     Args:
         pipeline: :class:`~ragdoc.pipeline.linear.DocumentPipeline` providing the parser,
-            processors, and ``source_id_fn`` (single source of truth for identity).  Its
-            splitter/chunker are unused here — only ``parse_and_process`` is called.
+            processors, and ``source_id_fn`` (single source of truth for identity).  Must **not**
+            carry a splitter or a non-default chunker (raises ``ValueError`` otherwise).
         document_store: target :class:`~ragdoc.pipeline.stores.DocumentStore`.
         hash_fn: ``Path -> str`` file-byte change-detection hash (default SHA-256 of bytes).
         concurrency: max sources processed concurrently in :meth:`plan`.
+
+    Raises:
+        ValueError: If *pipeline* has a splitter or a non-default chunker configured.
     """
 
     def __init__(
@@ -49,6 +58,19 @@ class DocumentStorePipeline(Generic[TMetadata]):
         hash_fn: Callable[[Path], str] = lambda p: _file_hash(p),
         concurrency: int | asyncio.Semaphore = 10,
     ) -> None:
+        misplaced: list[str] = []
+        if pipeline.has_splitter:
+            misplaced.append("a splitter")
+        if pipeline.has_custom_chunker:
+            misplaced.append("a chunker")
+        if misplaced:
+            raise ValueError(
+                f"DocumentStorePipeline (Boundary 1) stores whole Documents, one per source, and "
+                f"cannot use {' or '.join(misplaced)} on its DocumentPipeline — splits would "
+                f"collide on source_id and chunks aren't Documents. Remove it and split/chunk at "
+                f"Boundary 2 (VectorStorePipeline with a document_store) instead."
+            )
+
         self._pipeline = pipeline
         self._document_store = document_store
         self._hash_fn = hash_fn

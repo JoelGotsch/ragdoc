@@ -18,7 +18,7 @@ Usage::
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
@@ -33,6 +33,71 @@ class Embedder(Protocol):
     async def embed(self, texts: list[str]) -> list[list[float]]:
         """Embed *texts* and return one vector per input, in order."""
         ...
+
+
+class _EmbeddingItem(Protocol):
+    """One embedding entry from an OpenAI-compatible response (structural)."""
+
+    index: int
+    embedding: list[float]
+
+
+class _EmbeddingResponse(Protocol):
+    """An OpenAI-compatible embeddings response (structural)."""
+
+    data: Sequence[_EmbeddingItem]
+
+
+class _EmbeddingsEndpoint(Protocol):
+    """The ``embeddings`` sub-client of an OpenAI-compatible client (structural)."""
+
+    async def create(self, *, model: str, input: list[str], dimensions: int | None = None) -> _EmbeddingResponse: ...
+
+
+class _EmbeddingsClient(Protocol):
+    """Minimal structural view of an ``AsyncOpenAI``-compatible client."""
+
+    embeddings: _EmbeddingsEndpoint
+
+
+class OpenAIEmbedder:
+    """Concrete :class:`Embedder` backed by an OpenAI-compatible embeddings endpoint.
+
+    Args:
+        client: An ``AsyncOpenAI``-compatible client — anything exposing
+            ``embeddings.create(model=..., input=...)`` (OpenAI, Azure OpenAI, or a compatible
+            gateway). The caller owns its lifecycle.
+        model: Embedding model name (e.g. ``"text-embedding-3-small"``).
+        dimensions: Optional output dimensionality for models that support truncation
+            (``text-embedding-3-*``). ``None`` uses the model's default size.
+
+    Example:
+        ```python
+        from openai import AsyncOpenAI
+        from ragdoc.pipeline import EmbedderConfig, OpenAIEmbedder
+
+        embedder = OpenAIEmbedder(AsyncOpenAI(), model="text-embedding-3-small")
+        config = EmbedderConfig(embedder)   # use in VectorStorePipeline(embedders={...})
+        ```
+    """
+
+    def __init__(
+        self, client: _EmbeddingsClient, model: str = "text-embedding-3-small", dimensions: int | None = None
+    ) -> None:
+        self._client = client
+        self._model = model
+        self._dimensions = dimensions
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        """Embed *texts* in one request; returns one vector per input, in input order."""
+        if not texts:
+            return []
+        if self._dimensions is not None:
+            response = await self._client.embeddings.create(model=self._model, input=texts, dimensions=self._dimensions)
+        else:
+            response = await self._client.embeddings.create(model=self._model, input=texts)
+        # OpenAI returns embeddings keyed by input index — sort to guarantee input order.
+        return [item.embedding for item in sorted(response.data, key=lambda d: d.index)]
 
 
 @dataclass
