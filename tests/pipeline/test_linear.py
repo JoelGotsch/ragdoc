@@ -4,7 +4,7 @@ Covers:
 - DocumentPipeline.run() — single file, error propagation, ID stability
 - DocumentPipeline.run_many() — multiple files, concurrency, on_error
 - DocumentPipeline.stream() — async iteration
-- AutoParser — unsupported extension raises
+- default parser (ragdoc.parsing.load) — unsupported extension raises
 
 See test_linear_integration.py for full parse → process → chunk coverage.
 """
@@ -141,13 +141,12 @@ async def test_pipeline_stream_empty_sources(simple_parser):
     assert batches == []
 
 
-# --- AutoParser ---
+# --- default parser (ragdoc.parsing.load) ---
 
 
 @pytest.mark.anyio
-async def test_auto_parser_unsupported_extension_raises():
-    from ragdoc.pipeline.parser import AutoParser
+async def test_default_parser_unsupported_extension_raises():
+    from ragdoc.parsing import load
 
-    parser = AutoParser()
     with pytest.raises(ValueError, match="No parser registered"):
-        await parser(Path("document.pdf2"))
+        await load(Path("document.pdf2"))

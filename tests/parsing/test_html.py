@@ -5,14 +5,13 @@ from pathlib import Path
 import pytest
 
 from ragdoc.document import Document
-from ragdoc.parsing import HTMLFile, load_file
+from ragdoc.parsing.html import load_html
 
 
 @pytest.fixture
 def html_document(html_file_path) -> Document:
     """Load HTML file into a single Document."""
-    html_file = HTMLFile(file_path=html_file_path)
-    return load_file(html_file)
+    return load_html(html_file_path)
 
 
 def test_document_headings(html_document: Document):
@@ -163,8 +162,7 @@ def test_image_content(html_document: Document):
 
 def test_stunted(html_data_path):
     """Test parsing HTML where paragraph appears before first heading."""
-    html_file = HTMLFile(file_path=str(html_data_path / "test_stunted.html"))
-    document = load_file(html_file)
+    document = load_html(html_data_path / "test_stunted.html")
 
     # Test there is content before the first heading
     # Check that paragraphs and headings both exist
@@ -174,8 +172,7 @@ def test_stunted(html_data_path):
 
 def test_description_list_parsing(description_list_file_path):
     """Test that HTML description lists (<dl>, <dt>, <dd>) are properly parsed."""
-    html_file = HTMLFile(file_path=str(description_list_file_path))
-    document = load_file(html_file)
+    document = load_html(description_list_file_path)
 
     assert document.title == "Description List Test"
 
@@ -192,8 +189,7 @@ def test_description_list_parsing(description_list_file_path):
 
 def test_description_list_simple_content(description_list_file_path):
     """Test parsing of simple description list content."""
-    html_file = HTMLFile(file_path=str(description_list_file_path))
-    document = load_file(html_file)
+    document = load_html(description_list_file_path)
 
     # Find the simple description list by content
     simple_dl = None
@@ -215,8 +211,7 @@ def test_description_list_simple_content(description_list_file_path):
 
 def test_description_list_nested_content(description_list_file_path):
     """Test parsing of nested description list content."""
-    html_file = HTMLFile(file_path=str(description_list_file_path))
-    document = load_file(html_file)
+    document = load_html(description_list_file_path)
 
     # Find the nested description list by content
     nested_dl = None
@@ -234,8 +229,7 @@ def test_description_list_nested_content(description_list_file_path):
 
 def test_description_list_multiple_definitions(description_list_file_path):
     """Test parsing of description list with multiple dd elements per dt."""
-    html_file = HTMLFile(file_path=str(description_list_file_path))
-    document = load_file(html_file)
+    document = load_html(description_list_file_path)
 
     # Find the multi-DD description list by content
     multi_dd_dl = None
@@ -260,7 +254,7 @@ expected_preface_table = "<table>\n<caption>Super amazing preface table</caption
 
 @pytest.fixture
 def preface_document(html_preface_file_path) -> Document:
-    return load_file(HTMLFile(file_path=html_preface_file_path))
+    return load_html(html_preface_file_path)
 
 
 def test_preface(preface_document: Document):

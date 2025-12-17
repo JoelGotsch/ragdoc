@@ -11,8 +11,8 @@ from ragdoc.parsing import load
 from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
 
 
-@click.group()
-def document_processing():
+@click.group(name="ragdoc")
+def cli():
     pass
 
 
@@ -34,18 +34,18 @@ def parse(files: tuple[Path, ...], output: Path) -> None:
         output.mkdir()
 
     ta = TypeAdapter(Document)
+    failed = 0
     for file in files:
         click.echo(f"Processing {file}")
         try:
             document = asyncio.run(load(file))
             with open(output / f"{file.stem}.document.json", "wb") as f:
                 f.write(ta.dump_json(document))
-        except ValueError as e:
-            click.echo(f"Error: {e}")
-            continue
-        except RuntimeError as e:
-            click.echo(f"Error: {e}")
-            continue
+        except (ValueError, RuntimeError) as e:
+            click.echo(f"Error: {e}", err=True)
+            failed += 1
+    if failed:
+        raise SystemExit(1)
 
 
 @click.command()
@@ -73,6 +73,7 @@ def chunk(files: tuple[Path, ...], output: Path, fmt: str) -> None:
         output.mkdir()
 
     renderer = Renderer(format=OutputFormat(fmt), element_renderer=render_for_prompt)
+    failed = 0
     for file in files:
         click.echo(f"Processing {file}")
         try:
@@ -80,17 +81,16 @@ def chunk(files: tuple[Path, ...], output: Path, fmt: str) -> None:
             rendered = renderer.render(document)
             out_file = output / f"{file.stem}.{fmt}"
             out_file.write_text(rendered, encoding="utf-8")
-        except ValueError as e:
-            click.echo(f"Error: {e}")
-            continue
-        except RuntimeError as e:
-            click.echo(f"Error: {e}")
-            continue
+        except (ValueError, RuntimeError) as e:
+            click.echo(f"Error: {e}", err=True)
+            failed += 1
+    if failed:
+        raise SystemExit(1)
 
 
-document_processing.add_command(parse)
-document_processing.add_command(chunk)
+cli.add_command(parse)
+cli.add_command(chunk)
 
 
 if __name__ == "__main__":
-    document_processing()
+    cli()

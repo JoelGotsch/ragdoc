@@ -56,7 +56,7 @@ def _(mo):
     ### Word documents (`.docx`, `.doc`)
 
     Uses [Pandoc](https://pandoc.org/) to convert Word documents to HTML, then parses the
-    HTML into a `Document`. `WordFile` is an alias for `PandocFile`.
+    HTML into a `Document`.
     """)
     return
 

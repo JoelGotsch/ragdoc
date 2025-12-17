@@ -83,6 +83,9 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/joelgotsch/ragdoc"
 
+[project.scripts]
+ragdoc = "ragdoc.cli:cli"
+
 # Extra names use the PEP 685 canonical (hyphenated) form. `pip install
 # ragdoc[azure_di]` still resolves (consumers normalize), and hyphens avoid a
 # tox-uv mismatch where an underscore request fails to match the normalized

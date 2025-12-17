@@ -84,29 +84,6 @@ Functions and source types for loading documents from files.
 
 ---
 
-## Legacy API
-
-!!! warning "Deprecated"
-    `load_document` and `from_path` are deprecated. Use [`load`](#load) instead.
-
-### load_document
-
-::: ragdoc.parsing.load_document
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
-
-### from_path
-
-::: ragdoc.parsing.from_path
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
-
----
-
 ## MinerU Parser
 
 See the [MinerU guide](../guide/parsing.md#mineru-_middle-json) for an overview of
@@ -287,54 +264,11 @@ handler swapping, image loading, and metadata propagation.
 
 ---
 
-## Source Types
-
-The following source types are used by the legacy `load_document` API and are still
-available for direct use.
-
-### HTMLSource
-
-::: ragdoc.parsing.html.HTMLSource
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
-
-### PandocFile
-
-::: ragdoc.parsing.pandoc.PandocFile
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
-
-### ExcelSource
-
-::: ragdoc.parsing.xlsx.ExcelSource
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
+## Parser Configuration
 
 ### ExcelConfig
 
 ::: ragdoc.parsing.xlsx.ExcelConfig
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
-
-### AzureJSONFile
-
-::: ragdoc.parsing.azure_di.AzureJSONFile
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
-
-### AzureAnalyzeRun
-
-::: ragdoc.parsing.azure_di.AzureAnalyzeRun
     options:
       show_root_heading: true
       show_source: true

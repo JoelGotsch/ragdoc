@@ -29,6 +29,7 @@ Quick start::
     result = await pipeline.run_many(paths, concurrency=4)
 """
 
+from ragdoc.parsing.parser import Parser
 from ragdoc.pipeline.changeset import ChangeSet, SourceChange
 from ragdoc.pipeline.document_store_pipeline import DocumentStorePipeline
 from ragdoc.pipeline.embedders import (
@@ -40,13 +41,11 @@ from ragdoc.pipeline.embedders import (
 )
 from ragdoc.pipeline.linear import DocumentPipeline, PipelineResult
 from ragdoc.pipeline.local_document_store import LocalDocumentStore
-from ragdoc.pipeline.parser import AutoParser, Parser
 from ragdoc.pipeline.splitter import TokenSplitter
 from ragdoc.pipeline.stores import DocumentStore, SourceState, VectorStore
 from ragdoc.pipeline.vectorstore import UpdateResult, VectorStorePipeline
 
 __all__ = [
-    "AutoParser",
     "ChangeSet",
     "DocumentPipeline",
     "DocumentStore",

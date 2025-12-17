@@ -85,7 +85,7 @@ class ExternalRefProvider(Protocol):
         # Or custom provider
         class DBProvider:
             def get(self, id: str) -> Document | None:
-                return db.load_document(id)
+                return db.get_document(id)
 
             def __getitem__(self, id: str) -> Document:
                 doc = self.get(id)

@@ -8,19 +8,12 @@ Public API
 .. autofunction:: get_parser
 .. autofunction:: get_registered_parsers
 .. autofunction:: describe_registry
-.. autofunction:: load_document
-.. autofunction:: from_path
 """
 
 import logging
 from pathlib import Path
-from typing import Union
 
 from ragdoc.document import Document
-from ragdoc.parsing.azure_di import AzureAnalyzeRun, AzureJSONFile
-from ragdoc.parsing.base import load_file
-from ragdoc.parsing.html import HTMLFile, HTMLSource
-from ragdoc.parsing.pandoc import PandocFile, WordFile
 from ragdoc.parsing.parser import Parser
 from ragdoc.parsing.registry import (
     ParserRegistration,
@@ -31,10 +24,7 @@ from ragdoc.parsing.registry import (
     register_parser,
     unregister_parser,
 )
-from ragdoc.parsing.xlsx import ExcelConfig, ExcelPackage, ExcelSource
-
-# Union of all concrete source types accepted by load_document / from_path
-DocumentSource = HTMLSource | PandocFile | WordFile | ExcelSource | AzureJSONFile | AzureAnalyzeRun
+from ragdoc.parsing.xlsx import ExcelConfig
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +55,7 @@ _register_builtin_parsers()
 
 
 # ---------------------------------------------------------------------------
-# New unified entry point
+# Unified entry point
 # ---------------------------------------------------------------------------
 
 
@@ -94,49 +84,3 @@ async def load(path: Path | str, parser: str | None = None) -> Document:
     doc = await resolved(path)
     logger.info(f"load: parsed {path.name} -> Document({len(doc.elements)} elements)")
     return doc
-
-
-# ---------------------------------------------------------------------------
-# Legacy API (kept for backwards compatibility)
-# ---------------------------------------------------------------------------
-
-
-def load_document(source: DocumentSource) -> Document:
-    """Load a Document from a typed DocumentSource.
-
-    .. deprecated::
-        Use :func:`load` instead.
-    """
-    return load_file(source)
-
-
-def from_path(path: Path | str) -> DocumentSource:
-    """Create the appropriate DocumentSource for a file path based on its extension.
-
-    Supported extensions: .html, .docx, .doc, .xlsx, .json (azure: *.azure.json)
-
-    .. deprecated::
-        Use :func:`load` instead.
-
-    Args:
-        path: Path to the source file
-
-    Returns:
-        A DocumentSource instance ready to pass to load_document()
-
-    Raises:
-        ValueError: If the file extension is not supported
-    """
-    path = Path(path)
-    suffixes = [s.lower() for s in path.suffixes]
-    match suffixes:
-        case [*_, ".azure", ".json"]:
-            return AzureJSONFile(file_path=path)
-        case [*_, ".html"]:
-            return HTMLSource(file_path=path)
-        case [*_, ".docx"] | [*_, ".doc"]:
-            return PandocFile(file_path=str(path))
-        case [*_, ".xlsx"]:
-            return ExcelSource(file_path=path)
-        case _:
-            raise ValueError(f"Unsupported file type: {''.join(path.suffixes)!r} for {path}")

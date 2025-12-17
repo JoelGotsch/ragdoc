@@ -1,20 +1,54 @@
 # Ragdoc
 
-A library for parsing common document formats (PDF, DOCX, HTML, XLSX), processing, rendering, and chunking for LLM use cases.
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
+Ragdoc is an **ingestion library** for retrieval-augmented generation. It parses common document formats (DOCX, HTML, XLSX, PDF) into structured `Document` objects, processes and splits them, and chunks them into dual-representation retrieval units. `DocumentPipeline` wires the stages together; `VectorStorePipeline` adds plan/apply **incremental sync** into a vector store (Qdrant supported out of the box), with typed metadata carried end-to-end. Ragdoc is ingestion-only — retrieval/query is out of scope; your retrieval code reads the documented payload fields.
 
 ## Installation
 
 ```bash
-uv sync --all-extras
+uv add ragdoc        # or: pip install ragdoc
 ```
 
-Optional extras:
+The first PyPI release is 0.1.0. Optional extras:
+
 - `azure-di` — Azure Document Intelligence PDF parsing
 - `pdf-mineru` — MinerU-based PDF parsing
+- `qdrant` — Qdrant vector-store integration
+- `extraction` — typed knowledge-graph / structured extraction
+
+Full documentation: <https://joelgotsch.github.io/ragdoc/>
+
+## Quickstart
+
+Sync a folder of HTML files into a local Qdrant collection. Requires `ragdoc[qdrant]`, the `openai` package, and an OpenAI API key in the environment.
+
+```python
+import asyncio
+from pathlib import Path
+
+from openai import AsyncOpenAI
+from qdrant_client import AsyncQdrantClient
+
+from ragdoc import DocumentPipeline, TokenSplitter, VectorStorePipeline
+from ragdoc.pipeline import EmbedderConfig, OpenAIEmbedder
+from ragdoc.integrations.vector_stores import QdrantVectorStore
+
+async def main() -> None:
+    store = await QdrantVectorStore.create(AsyncQdrantClient(url="http://localhost:6333"), "docs", vector_size=1536)
+    embedders = {"dense": EmbedderConfig(OpenAIEmbedder(AsyncOpenAI(), model="text-embedding-3-small"))}
+    sync = VectorStorePipeline(DocumentPipeline(splitter=TokenSplitter(max_tokens=4000)), store, embedders=embedders)
+    result = await sync.run(Path("corpus").glob("**/*.html"))   # re-run any time: unchanged files are skipped
+    print(f"synced={len(result.processed)} unchanged={len(result.skipped)}")
+
+asyncio.run(main())
+```
+
+Re-runs are cheap: ragdoc hashes each source file and skips unchanged ones (hash-based incremental sync).
 
 ## Core Philosophy
 
-The library is built around three fundamental ideas:
+The library is built around four fundamental ideas:
 
 **1. `Document` is the single source of truth.**
 Every stage operates on structured `Document` objects containing typed elements (`Heading`, `Paragraph`, `Table`, …). Raw formats are parsed into `Document` once; all subsequent work — enrichment, splitting, rendering — operates on this structured representation. Never pass rendered strings between stages.
@@ -29,6 +63,9 @@ Retrieval-augmented pipelines need two text representations per chunk: `prompt_c
 - **`LLMChunker`** — generates N distinct `embedding_content` strings (one per topic) via LLM, all sharing the same `prompt_content`.
 
 Rendering uses `render_for_prompt` (full-fidelity structured text) or `render_raw` (with base64 images). There is no separate embedding renderer.
+
+**4. Source provenance and metadata propagate through the entire pipeline.**
+Parsers set `Document.source_path` and write the bare filename into `document.metadata["filename"]`. Metadata carries both user-defined custom data and library-written informational fields; processors must not drop or overwrite it, splitters copy it to every split, and chunkers forward it into `Chunk` — anything you put in `document.metadata` arrives on the final chunks. Fields that drive library behavior (change detection, deletion) are first-class on `Chunk` instead (`source_id`, `source_hash`, `content_hash`), never metadata keys, and `VectorStorePipeline` never injects into `chunk.metadata`.
 
 ## Architecture
 
@@ -53,20 +90,19 @@ PARSING → PROCESSING ─┐
 Convert source files into `Document` objects. Each parser sets `document.parser` for provenance.
 
 ```python
-from ragdoc.parsing import load
+from ragdoc import load
 
 document = await load("report.docx")
 document = await load("page.html")
 document = await load("data.xlsx")
 ```
 
-Supported formats: `.html`, `.docx`/`.doc`, `.xlsx`, `.json` (Azure DI output), PDF via Azure DI.
+Supported formats: `.html`, `.docx`/`.doc`, `.xlsx`, `.json` (Azure DI output), PDF.
 
-For PDF files, configure Azure credentials first:
+PDF parsing currently requires the `azure-di` extra (plus Azure credentials) or the `pdf-mineru` extra — there is no zero-config PDF path yet; a local zero-config PDF parser is planned. With Azure DI:
 
 ```python
-from ragdoc.parsing import load
-from ragdoc.config import configure, RagdocConfig
+from ragdoc import RagdocConfig, configure, load
 
 async with configure(RagdocConfig(azure_key="...", azure_endpoint="...")):
     document = await load("report.pdf")
@@ -79,11 +115,11 @@ Chain processors with `ProcessingPipeline`.
 
 ```python
 from ragdoc.processing import (
-    ProcessingPipeline,
+    FootnoteProcessor,
     HeadingLevelProcessor,
+    ProcessingPipeline,
     TitleDetectionProcessor,
 )
-from ragdoc.processing.footnote import FootnoteProcessor
 
 pipeline = ProcessingPipeline([
     HeadingLevelProcessor(),
@@ -93,12 +129,7 @@ pipeline = ProcessingPipeline([
 document = await pipeline.process(document)
 ```
 
-LLM-based processors require an `AsyncOpenAI` client (or set `openai_client` in `RagdocConfig`):
-
-```python
-from ragdoc.processing.heading_llm import LLMHeadingResolver
-from ragdoc.processing.footnote import LLMFootnoteResolver
-```
+LLM-based processors (`LLMHeadingResolver`, `LLMFootnoteResolver`, …) require an `AsyncOpenAI` client (or set `openai_client` in `RagdocConfig`).
 
 ### Stage 3: Rendering
 
@@ -116,29 +147,38 @@ Output formats: `HTML`, `MARKDOWN` (`md`), `GFM`, `RST`, `PLAIN`.
 
 ### Stage 4: Splitting
 
-Split large documents by heading hierarchy or token count.
+Split large documents by heading hierarchy or token count. `split_document()` is the main entry point: it splits by heading hierarchy, then enforces a token budget.
 
 ```python
-from ragdoc.splitting import split_by_headings, split_hierarchical
+from ragdoc import split_document
+from ragdoc.rendering import Renderer
 
-# Split at each heading boundary
-sections = split_by_headings(document)
-
-# Hierarchical split respecting heading levels
-sections = split_hierarchical(document)
+sections = split_document(document, renderer=Renderer(), max_tokens=4000)
 ```
 
-Parent-child relationships between split documents are tracked via `ExternalRef`.
+`split_by_headings` and `split_hierarchical` (in `ragdoc.splitting`) expose the structural strategies directly. Parent-child relationships between split documents are tracked via `ExternalRef`.
 
 ### Stage 5: Chunking
 
 Create `Chunk` objects ready for vector store loading.
 
 ```python
-from ragdoc.chunking import Chunk
+from ragdoc import Chunk
 ```
 
-`Chunk` holds `id`, `prompt_content`, `embedding_content`, `filename`, `source_path`, and `metadata`.
+`Chunk` holds `id`, `source_path`, `source_id`, `source_hash`, `content_hash`, `prompt_content`, `embedding_content`, `named_embeddings`, and `metadata`.
+
+## Incremental Sync
+
+`VectorStorePipeline` (and `DocumentStorePipeline`) follow a **plan → apply** shape: `plan()` computes a reviewable `ChangeSet` without touching the store, `apply()` writes it, and `run()` does both.
+
+```python
+plan = await sync.plan(paths)       # ChangeSet: to_add / to_update / to_delete — no writes
+plan.save("changeset.json")         # optionally review or edit before applying
+result = await sync.apply(plan)     # embed, then per-source delete-and-upsert
+```
+
+Change detection uses two hashes: `source_hash` (SHA-256 of the raw file bytes) when syncing from files, and `content_hash` (renderer-stable `Document.content_hash()`) when syncing from a `DocumentStore`. Unchanged sources are skipped; changed ones are re-chunked, re-embedded, and replaced atomically per source. Orphan deletion is off by default (`delete_orphans=False`) — enable it only when you pass your complete corpus. The stored payload schema (the `Chunk` fields above plus your metadata) is documented at <https://joelgotsch.github.io/ragdoc/> for retrieval clients to read.
 
 ## Core Model
 
@@ -157,14 +197,14 @@ The `Document`-centric design, combined with chunkers owning the embedding strat
 
 - **Splits are still `Document` objects.** This is deliberate — it allows processors (e.g. a section summarizer, a topic classifier) to run after splitting on focused sub-documents, then chunking renders the enriched result. Processors do not need to know whether they are processing a full document or a split.
 
-- **Token-budget splitting must render first.** Because `simple_document_splitter()` measures prompt-content length in tokens, it internally invokes the prompt renderer. Splitting is therefore rendering-aware and belongs after the main processing pipeline, not before.
+- **Token-budget splitting must render first.** Because `split_document()` measures prompt-content length in tokens, it internally invokes the prompt renderer. Splitting is therefore rendering-aware and belongs after the main processing pipeline, not before.
 
 - **`Chunk` is the materialization point.** Keep everything in structured `Document` form for as long as possible. Only at the final chunking step are `prompt_content` and `embedding_content` strings produced. This maximizes reusability: the same `Document` can be re-chunked with different chunkers without reprocessing.
 
 ## Configuration
 
 ```python
-from ragdoc.config import configure, RagdocConfig
+from ragdoc import RagdocConfig, configure
 
 async with configure(RagdocConfig(
     azure_key="...",
@@ -179,12 +219,14 @@ async with configure(RagdocConfig(
 
 ## CLI
 
-```bash
-# Parse files to JSON
-uv run document_processing parse file.pdf report.docx --output ./out
+The `ragdoc` command wraps parsing and rendering:
 
-# Parse and render to text
-uv run document_processing chunk file.html --format md --output ./out
+```bash
+# Parse files to Document JSON
+ragdoc parse file.docx report.html --output ./out
+
+# Parse and render to text (formats: html, md, gfm, rst, plain)
+ragdoc chunk file.html --format md --output ./out
 ```
 
 ## Terminology

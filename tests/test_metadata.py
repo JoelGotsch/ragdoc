@@ -88,7 +88,7 @@ def test_metadata_json_schema_annotated_extras_ignored():
     assert "tagged" in schema.get("properties", {})
 
 
-def test_metadata_json_schema_exported_from_ragdoc():
-    import ragdoc
+def test_metadata_json_schema_exported_from_ragdoc_metadata():
+    import ragdoc.metadata
 
-    assert ragdoc.metadata_json_schema is metadata_json_schema
+    assert ragdoc.metadata.metadata_json_schema is metadata_json_schema

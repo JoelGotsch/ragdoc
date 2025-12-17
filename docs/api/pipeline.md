@@ -28,18 +28,9 @@ examples.
       show_source: true
       heading_level: 3
 
-## AutoParser
-
-::: ragdoc.pipeline.parser.AutoParser
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 3
-
 ## Parser
 
-The canonical `Parser` protocol lives in `ragdoc.parsing`. It is re-exported from
-`ragdoc.pipeline.parser` for compatibility, but new code should import from `ragdoc.parsing`.
+The canonical `Parser` base class lives in `ragdoc.parsing`.
 
 ::: ragdoc.parsing.parser.Parser
     options:

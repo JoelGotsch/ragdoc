@@ -416,22 +416,6 @@ across all parsers without parser-specific logic.
 
 ---
 
-## Legacy API
-
-`from_path()` and `load_document()` are still available but **deprecated**. Use `load()`
-instead:
-
-```python
-# Deprecated
-from ragdoc.parsing import from_path, load_document
-source = from_path("report.docx")
-document = load_document(source)
-
-# Preferred
-from ragdoc.parsing import load
-document = await load("report.docx")
-```
-
 ## See Also
 
 - [API Reference: Parsing](../api/parsing.md)
