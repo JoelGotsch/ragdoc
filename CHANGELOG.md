@@ -4,6 +4,20 @@
 
 ### Added
 
+- **`ragdoc.extraction` — typed knowledge-graph / structured extraction** _(new, `extraction`
+  extra)_. Multi-node-type + typed-relationship extraction from Documents:
+  - `FuzzyDate` (EDTF-backed arbitrary-precision dates), `Entity`, `Mention`, `GraphSchema`
+    (closed ontology of node/edge types + legal patterns).
+  - `StructuredExtractionProcessor` and `KnowledgeGraphProcessor` (single `.parse()` over a
+    built discriminated-union batch model, gleaning, and a recursive `_extract_with_halving`
+    fallback on LLM failures).
+  - `MentionStore`/`LocalMentionStore`, `EntityStore`/`LocalEntityStore`,
+    `GraphStore`/`LocalGraphStore`, `MentionStorePipeline` (plan/apply/run, Boundary-1 and
+    Boundary-2), and `EntityResolutionPipeline` / `KnowledgeGraphResolutionPipeline`.
+  - Qdrant adapters (`qdrant` extra): `QdrantMentionStore` (with a `payload_type` filter),
+    `QdrantEntityStore` (server-side date-range filtering), `QdrantGraphStore`.
+  - Env prefixes: `EXTRACTION_*` and `KG_MAX_UNION_SIZE`.
+
 - **`DocumentSummarizerProcessor`** — recursive map-reduce whole-document summarization into
   `document.metadata["summary"]`, with `DocumentSummarizerSettings` (env prefix
   `DOCUMENT_SUMMARIZER_`) and `DocumentSummary` result model.

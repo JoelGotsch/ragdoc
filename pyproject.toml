@@ -93,6 +93,10 @@ pdf-mineru = [
     "latex2mathml>=3.79.0",
 ]
 qdrant = ["qdrant-client>=1.12,<2"]  # 1.12+ has models.Document server-side inference
+extraction = [
+    "edtf>=5.0,<6",  # EDTF (Extended Date/Time Format) parsing for FuzzyDate
+    "pydantic-settings>=2.13.0",
+]
     
 
 [dependency-groups]
@@ -243,6 +247,7 @@ extras =
     azure-di
     pdf-mineru
     qdrant
+    extraction
 # marimo is needed by tests/test_notebooks.py (it imports and runs the marimo
 # notebooks under docs/notebooks/). It otherwise lives in the docs group.
 deps =
@@ -271,6 +276,7 @@ extras =
     azure-di
     pdf-mineru
     qdrant
+    extraction
 commands =
     basedpyright
 """
