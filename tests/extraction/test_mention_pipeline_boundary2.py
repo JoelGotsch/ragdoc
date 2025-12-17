@@ -136,13 +136,13 @@ async def test_unchanged_document_skipped_no_llm_call(docs, mstore):
     pipeline = make_b2_pipeline(docs, extractor, mstore)
 
     await pipeline.run()
-    calls_after_first = client.beta.chat.completions.parse.call_count
+    calls_after_first = client.chat.completions.parse.call_count
     assert calls_after_first >= 1
 
     result = await pipeline.run()  # nothing changed in the doc store
     assert result.skipped == ["a.pdf"] and result.processed == []
     # the content_hash gate prevented any further extraction call
-    assert client.beta.chat.completions.parse.call_count == calls_after_first
+    assert client.chat.completions.parse.call_count == calls_after_first
 
 
 @pytest.mark.anyio

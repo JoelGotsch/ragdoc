@@ -44,7 +44,7 @@ def _counting_client() -> MagicMock:
         )
 
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(side_effect=parse)
+    client.chat.completions.parse = AsyncMock(side_effect=parse)
     return client
 
 
@@ -65,7 +65,7 @@ async def test_summarizes_real_document_with_real_splitter(real_document: Docume
     assert isinstance(result.metadata["summary"], str)
 
     # The real splitter fanned out → more than a single LLM call (map + reduce).
-    assert client.beta.chat.completions.parse.call_count >= 2
+    assert client.chat.completions.parse.call_count >= 2
 
     # Original metadata preserved; no split-provenance leaked onto the document.
     assert original_keys <= set(result.metadata)

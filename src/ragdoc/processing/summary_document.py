@@ -51,13 +51,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Sequence
+from collections.abc import Awaitable
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from ragdoc.llm import ChatClient, call_structured, resolve_openai_client
 from ragdoc.processing._concurrency import _fan_out
 from ragdoc.processing.base import DocumentProcessor
 from ragdoc.processing.summary_base import DocumentSummary
@@ -71,67 +72,6 @@ if TYPE_CHECKING:
     from ragdoc.splitting.base import Splitter
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Structural LLM client (no ``Any``)
-# ---------------------------------------------------------------------------
-#
-# Mirrors ``pipeline.embedders._EmbeddingsClient``: the summarizer calls exactly
-# ``client.beta.chat.completions.parse(...)`` and reads ``response.choices[0].message.parsed``,
-# so we type only that surface structurally. Any ``AsyncOpenAI``-compatible client satisfies it.
-
-
-class _ParsedMessage(Protocol):
-    """The ``message`` of a parsed chat-completion choice (structural)."""
-
-    parsed: DocumentSummary | None
-
-
-class _ParsedChoice(Protocol):
-    """One choice of a parsed chat-completion response (structural)."""
-
-    message: _ParsedMessage
-
-
-class _ParsedResponse(Protocol):
-    """A parsed chat-completion response (structural)."""
-
-    choices: Sequence[_ParsedChoice]
-
-
-class _ChatCompletionsParseEndpoint(Protocol):
-    """The ``completions`` sub-client exposing structured-output ``parse`` (structural)."""
-
-    async def parse(
-        self,
-        *,
-        model: str,
-        messages: list[ChatCompletionMessageParam],
-        temperature: float,
-        response_format: type[DocumentSummary],
-    ) -> _ParsedResponse: ...
-
-
-class _ChatEndpoint(Protocol):
-    """The ``chat`` sub-client of an OpenAI-compatible beta client (structural)."""
-
-    completions: _ChatCompletionsParseEndpoint
-
-
-class _BetaEndpoint(Protocol):
-    """The ``beta`` sub-client of an OpenAI-compatible client (structural)."""
-
-    chat: _ChatEndpoint
-
-
-class _SummaryClient(Protocol):
-    """Minimal structural view of an ``AsyncOpenAI``-compatible client.
-
-    Exposes only ``beta.chat.completions.parse`` — the sole call the summarizer makes.
-    """
-
-    beta: _BetaEndpoint
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +150,10 @@ class DocumentSummarizerSettings(BaseSettings):
         default=None, description="Model to use; None falls back to get_config().default_llm_model."
     )
     temperature: float = Field(default=0.0, description="Sampling temperature (lower = more deterministic).")
-    max_retries: int = Field(default=2, description="Maximum retries on an LLM API failure.")
+    max_retries: int = Field(default=2, description="Maximum retries on retryable LLM transport failures.")
+    request_timeout: float | None = Field(
+        default=None, description="Per-request timeout in seconds (None uses the client default)."
+    )
     max_recursion_depth: int = Field(default=5, description="Hard cap on fold depth; exceeding it raises.")
 
     @model_validator(mode="after")
@@ -246,7 +189,7 @@ def build_summary_messages(
         user_message: Override the default user instruction.
 
     Returns:
-        A ``messages`` list suitable for ``client.beta.chat.completions.parse``.
+        A ``messages`` list suitable for ``client.chat.completions.parse``.
     """
     return [
         {"role": "system", "content": system_prompt},
@@ -325,7 +268,7 @@ class DocumentSummarizerProcessor(DocumentProcessor):
 
     def __init__(
         self,
-        client: _SummaryClient | None = None,
+        client: ChatClient | None = None,
         model: str | None = None,
         settings: DocumentSummarizerSettings | None = None,
         renderer: Renderer | None = None,
@@ -345,15 +288,8 @@ class DocumentSummarizerProcessor(DocumentProcessor):
         self.overwrite = overwrite
         self._concurrency = concurrency
 
-    def _get_client(self) -> _SummaryClient:
-        if self._client is not None:
-            return self._client
-        from ragdoc.config import get_config
-
-        client = get_config().openai_client
-        if client is None:
-            raise ValueError("No client provided and get_config().openai_client is None.")
-        return client
+    def _get_client(self) -> ChatClient:
+        return resolve_openai_client(self._client)
 
     def _get_model(self) -> str:
         if self._model is not None:
@@ -386,7 +322,7 @@ class DocumentSummarizerProcessor(DocumentProcessor):
         max_tokens = self.settings.max_input_tokens
         return lambda document: split_document(document, renderer, tokenizer, max_tokens=max_tokens)
 
-    async def process(self, document: Document) -> Document:  # noqa: C901  (recursive map/reduce fold with several closures)
+    async def process(self, document: Document) -> Document:
         if not self.overwrite and document.metadata.get(self.metadata_key):
             logger.debug("DocumentSummarizer: %s already set, skipping", self.metadata_key)
             return document
@@ -404,32 +340,21 @@ class DocumentSummarizerProcessor(DocumentProcessor):
         settings = self.settings
 
         async def call(text: str) -> str:
-            """One LLM summarization call with retries."""
+            """One LLM summarization call (library retry policy; exhaustion re-raises)."""
             # _resolve_and_validate always sets a non-None system_prompt before the processor runs.
             assert settings.system_prompt is not None
             messages = build_summary_messages(text, system_prompt=settings.system_prompt)
-            for attempt in range(settings.max_retries + 1):
-                try:
-                    response = await client.beta.chat.completions.parse(
-                        model=model,
-                        messages=messages,
-                        temperature=settings.temperature,
-                        response_format=DocumentSummary,
-                    )
-                    parsed = response.choices[0].message.parsed
-                    if parsed is None:
-                        raise ValueError("LLM returned no parsed summary")
-                    return parsed.summary
-                except Exception as exc:
-                    logger.error(
-                        "DocumentSummarizer: API call failed (attempt %d/%d): %s",
-                        attempt + 1,
-                        settings.max_retries + 1,
-                        exc,
-                    )
-                    if attempt == settings.max_retries:
-                        raise
-            raise RuntimeError("unreachable")  # pragma: no cover
+            parsed = await call_structured(
+                client,
+                model=model,
+                messages=messages,
+                response_format=DocumentSummary,
+                temperature=settings.temperature,
+                timeout=settings.request_timeout,
+                max_retries=settings.max_retries,
+                log_prefix="DocumentSummarizer",
+            )
+            return parsed.summary
 
         def _check_depth(depth: int) -> None:
             if depth > settings.max_recursion_depth:

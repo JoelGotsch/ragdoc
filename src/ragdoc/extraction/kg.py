@@ -41,7 +41,6 @@ from pydantic import BaseModel, Field, create_model
 from ragdoc.extraction._llm import (
     build_messages,
     parse_with_retry,
-    resolve_client,
     resolve_model,
     resolve_renderer,
     resolve_tokenizer,
@@ -55,6 +54,7 @@ from ragdoc.extraction.schema import (
     render_patterns_prompt,
 )
 from ragdoc.extraction.structured import ExtractionSettings
+from ragdoc.llm import ChatClient, resolve_openai_client
 from ragdoc.utils import Tokenizer
 
 if TYPE_CHECKING:
@@ -223,7 +223,7 @@ class KnowledgeGraphExtractor:
     def __init__(
         self,
         schema: GraphSchema,
-        client: Any | None = None,
+        client: ChatClient | None = None,
         model: str | None = None,
         settings: ExtractionSettings | None = None,
         renderer: Renderer | None = None,
@@ -285,7 +285,7 @@ class KnowledgeGraphExtractor:
     async def _extract_batch(
         self,
         text: str,
-        client: Any,
+        client: ChatClient,
         model: str,
         graph_batch_cls: type[BaseModel],
         *,
@@ -305,7 +305,7 @@ class KnowledgeGraphExtractor:
     async def _extract_with_halving(
         self,
         text: str,
-        client: Any,
+        client: ChatClient,
         model: str,
         graph_batch_cls: type[BaseModel],
         *,
@@ -386,7 +386,7 @@ class KnowledgeGraphExtractor:
             return []
 
         graph_batch_cls, _ = build_graph_batch_model(self._schema)
-        client = resolve_client(self._client)
+        client = resolve_openai_client(self._client)
         model = resolve_model(self._model, self.settings)
 
         primary = await self._extract_with_halving(rendered, client, model, graph_batch_cls)

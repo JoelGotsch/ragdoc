@@ -212,3 +212,47 @@ async def test_build_entity_embedder_composes():
     vectors = await embedder([Event(title="X")])
     assert seen["texts"] == ["title: X"]
     assert vectors == [[1.0, 0.0]]
+
+
+# ---------------------------------------------------------------------------
+# make_llm_reviewer degrade semantics (shared LLM layer)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_reviewer_refusal_returns_empty_reviewresult():
+    """Behavior pin: an LLM refusal degrades to ReviewResult() (no merge groups), never raises."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from ragdoc.extraction.resolution import ReviewResult, make_llm_reviewer
+
+    message = MagicMock()
+    message.parsed = None  # refusal
+    client = MagicMock()
+    client.chat.completions.parse = AsyncMock(return_value=MagicMock(choices=[MagicMock(message=message)]))
+
+    reviewer = make_llm_reviewer(client, model="test-model")
+    result = await reviewer(["Acme Corp", "ACME Corporation"])
+
+    assert isinstance(result, ReviewResult)
+    assert result.groups == []
+    client.chat.completions.parse.assert_awaited_once()  # refusal not retried
+
+
+@pytest.mark.anyio
+async def test_reviewer_returns_parsed_reviewresult():
+    """Happy path: the parsed ReviewResult passes through the shared layer unchanged."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from ragdoc.extraction.resolution import ReviewGroup, ReviewResult, make_llm_reviewer
+
+    parsed = ReviewResult(groups=[ReviewGroup(members=[0, 1], confidence=0.9)])
+    message = MagicMock()
+    message.parsed = parsed
+    client = MagicMock()
+    client.chat.completions.parse = AsyncMock(return_value=MagicMock(choices=[MagicMock(message=message)]))
+
+    reviewer = make_llm_reviewer(client, model="test-model")
+    result = await reviewer(["Acme Corp", "ACME Corporation"])
+
+    assert result is parsed

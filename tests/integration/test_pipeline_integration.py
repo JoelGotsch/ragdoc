@@ -202,7 +202,7 @@ def _make_heading_mock_client(response: HeadingResponse) -> MagicMock:
     mock_response.choices[0].message.parsed = response
     mock_response.choices[0].message.refusal = None
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(return_value=mock_response)
+    client.chat.completions.parse = AsyncMock(return_value=mock_response)
     return client
 
 
@@ -225,7 +225,7 @@ def _make_chunker_mock(summaries_per_call: int = 3) -> MagicMock:
         return resp
 
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(side_effect=_respond)
+    client.chat.completions.parse = AsyncMock(side_effect=_respond)
     return client
 
 

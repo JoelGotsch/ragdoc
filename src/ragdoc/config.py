@@ -22,12 +22,10 @@ Example::
 from __future__ import annotations
 
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-if TYPE_CHECKING:
-    pass
+from ragdoc.llm import LLMClient
 
 
 class RagdocConfig(BaseModel):
@@ -36,13 +34,16 @@ class RagdocConfig(BaseModel):
     azure_key: str | None = Field(default=None, description="Azure DI API key")
     azure_endpoint: str | None = Field(default=None, description="Azure DI endpoint URL")
     download_images: bool = Field(default=True, description="Download remote images in HTML parser")
-    openai_client: Any | None = Field(default=None, description="Default AsyncOpenAI client for LLM processors")
+    openai_client: LLMClient | None = Field(
+        default=None,
+        description="Default AsyncOpenAI-compatible client (chat + embeddings) for LLM features.",
+    )
     default_llm_model: str = Field(
-        default="gpt-4o-2024-08-06",
+        default="gpt-4.1",
         description="Default model name for LLM processors if not overridden",
     )
     default_image_llm_model: str = Field(
-        default="gpt-4o-2024-08-06",
+        default="gpt-4.1",
         description="Default model name for image LLM processors if not overridden. Must be a model that supports image inputs.",
     )
     parser_preferences: dict[str, str] = Field(

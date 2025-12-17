@@ -12,17 +12,76 @@ def _mock_client(summaries: list[str] | None) -> MagicMock:
     client = MagicMock()
     message = MagicMock()
     message.parsed = DocumentTopicSummaries(summaries=summaries) if summaries is not None else None
-    client.beta.chat.completions.parse = AsyncMock(return_value=MagicMock(choices=[MagicMock(message=message)]))
+    client.chat.completions.parse = AsyncMock(return_value=MagicMock(choices=[MagicMock(message=message)]))
     return client
 
 
 @pytest.mark.anyio
-async def test_llmchunker_refusal_raises_value_error():
-    """A refusal (message.parsed is None) must raise a clear ValueError, not AttributeError."""
-    chunker = LLMChunker(client=_mock_client(None), model="test")
+async def test_llmchunker_refusal_raises():
+    """A refusal (message.parsed is None) must raise LLMRefusalError, not AttributeError."""
+    from ragdoc.llm import LLMRefusalError
+
+    client = _mock_client(None)
+    chunker = LLMChunker(client=client, model="test")
     doc = Document(elements=[Paragraph(html="<p>hi</p>")])
-    with pytest.raises(ValueError, match="no parsed"):
+    with pytest.raises(LLMRefusalError, match="no parsed"):
         await chunker.chunk(doc)
+    client.chat.completions.parse.assert_awaited_once()  # refusals are never retried
+
+
+def test_llmchunker_init_fails_without_client():
+    """No explicit client and no configured client -> fail-loud at __init__, not chunk time."""
+    from ragdoc.config import RagdocConfig, configure
+    from ragdoc.llm import LLMNotConfiguredError
+
+    with configure(RagdocConfig()), pytest.raises(LLMNotConfiguredError):
+        LLMChunker(model="test")
+
+
+@pytest.mark.anyio
+async def test_llmchunker_max_prompt_tokens_truncates_with_warning(caplog):
+    """Over-budget documents: the LLM sees <= max_prompt_tokens tokens, chunks keep full text."""
+    import logging
+
+    from ragdoc.utils import GPTTokenizer
+
+    client = _mock_client(["topic a"])
+    tokenizer = GPTTokenizer()
+    chunker = LLMChunker(client=client, model="test", max_prompt_tokens=5, tokenizer=tokenizer)
+    long_text = "many different words appear in this deliberately overlong paragraph body"
+    doc = Document(elements=[Paragraph(html=f"<p>{long_text}</p>")])
+
+    with caplog.at_level(logging.WARNING):
+        chunks = await chunker.chunk(doc)
+
+    # The LLM input was truncated to the budget...
+    messages = client.chat.completions.parse.call_args.kwargs["messages"]
+    llm_text = messages[1]["content"][1]["text"]
+    full_rendered = chunks[0].prompt_content
+    assert llm_text != f"*Document to analyse:*\n\n{full_rendered}"
+    sent_document_part = llm_text.removeprefix("*Document to analyse:*\n\n")
+    assert tokenizer.count(sent_document_part) <= 5
+    # ...but the emitted chunks keep the full rendered text.
+    assert long_text in full_rendered
+    assert any("max_prompt_tokens" in r.message for r in caplog.records)
+
+
+@pytest.mark.anyio
+async def test_llmchunker_under_budget_not_truncated(caplog):
+    """A document within max_prompt_tokens passes through untouched, no warning."""
+    import logging
+
+    client = _mock_client(["topic a"])
+    chunker = LLMChunker(client=client, model="test", max_prompt_tokens=10_000)
+    doc = Document(elements=[Paragraph(html="<p>short</p>")])
+
+    with caplog.at_level(logging.WARNING):
+        chunks = await chunker.chunk(doc)
+
+    messages = client.chat.completions.parse.call_args.kwargs["messages"]
+    llm_text = messages[1]["content"][1]["text"]
+    assert llm_text == f"*Document to analyse:*\n\n{chunks[0].prompt_content}"
+    assert not any("max_prompt_tokens" in r.message for r in caplog.records)
 
 
 @pytest.mark.anyio

@@ -19,6 +19,7 @@ from ragdoc.document import (
     RawText,
     Table,
 )
+from ragdoc.llm import ChatClient, EmbeddingsClient, LLMClient
 from ragdoc.metadata import BaseMetadata
 from ragdoc.parsing import load
 from ragdoc.pipeline import (
@@ -35,17 +36,20 @@ __all__ = [
     "BaseElement",
     "BaseMetadata",
     "ChangeSet",
+    "ChatClient",
     "Chunk",
     "Document",
     "DocumentList",
     "DocumentPipeline",
     "DocumentStorePipeline",
+    "EmbeddingsClient",
     "ExternalRef",
     "Footnote",
     "Heading",
     "Image",
     "InlineRef",
     "LLMChunker",
+    "LLMClient",
     "Paragraph",
     "RagdocConfig",
     "RawText",

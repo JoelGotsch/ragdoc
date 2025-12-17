@@ -29,6 +29,7 @@ Quick start::
     result = await pipeline.run_many(paths, concurrency=4)
 """
 
+from ragdoc.llm import EmbeddingsClient
 from ragdoc.parsing.parser import Parser
 from ragdoc.pipeline.changeset import ChangeSet, SourceChange
 from ragdoc.pipeline.document_store_pipeline import DocumentStorePipeline
@@ -61,6 +62,7 @@ __all__ = [
     "DocumentStorePipeline",
     "Embedder",
     "EmbedderConfig",
+    "EmbeddingsClient",
     "LocalDocumentStore",
     "OpenAIEmbedder",
     "Parser",

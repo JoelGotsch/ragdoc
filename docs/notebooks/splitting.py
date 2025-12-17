@@ -142,8 +142,9 @@ def _(sample_doc, split_by_headings):
 
     # Example: run a processor on each section after splitting
     # from ragdoc.processing import ImageSummaryProcessor
+    # from ragdoc.processing.summary_image import openai_image_summarizer
     # from openai import AsyncOpenAI
-    # processor = ImageSummaryProcessor(client=AsyncOpenAI())
+    # processor = ImageSummaryProcessor(summarize=openai_image_summarizer(AsyncOpenAI()))
     # sections_3 = [await processor.process(s) for s in sections_3]
 
     print("Post-split processing: run any DocumentProcessor on each section before chunking.")

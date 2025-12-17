@@ -74,10 +74,11 @@ splitting. For example, enrich each section independently with any `DocumentProc
 ```python
 from ragdoc.splitting import split_by_headings
 from ragdoc.processing import ImageSummaryProcessor
+from ragdoc.processing.summary_image import openai_image_summarizer
 
 sections = split_by_headings(document)
 
-processor = ImageSummaryProcessor(client=openai_client)
+processor = ImageSummaryProcessor(summarize=openai_image_summarizer(openai_client))
 sections = [await processor.process(section) for section in sections]
 ```
 

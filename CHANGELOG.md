@@ -15,6 +15,77 @@ Pre-1.0: breaking changes land at will and are documented here.
 > once too. Phases 5 and 6 (canonical hash + element-model normalization) ship in **this one
 > release** so the corpus migrates a single time.
 
+### Added (Phase 7 — shared LLM reliability layer)
+
+- **`ragdoc.llm` — one module for every LLM call**: structural client protocols
+  (`ChatClient` for `chat.completions.parse`, `EmbeddingsClient` for `embeddings.create`, and
+  the `LLMClient` intersection that `RagdocConfig.openai_client` now holds — `AsyncOpenAI` /
+  `AsyncAzureOpenAI` satisfy all three structurally); `resolve_openai_client()` (the single
+  fallback policy: explicit → `get_config().openai_client` → `LLMNotConfiguredError`, fail-loud
+  at construction); `call_structured()` (one structured-output call on the **non-beta**
+  `client.chat.completions.parse`); and the generic retry engine `retry_llm()` (shared with
+  `OpenAIEmbedder`). `ChatClient`/`EmbeddingsClient`/`LLMClient` are exported from the `ragdoc`
+  root. The module never imports `openai` at module level (exception classes load lazily),
+  ready for the Phase 8 extras split.
+- **One retry policy everywhere** (transport errors only): 429 (honoring a parseable
+  `Retry-After` header), connection/timeout errors, and 5xx are retried with full-jitter
+  exponential backoff (`min(backoff_max, backoff_base * 2**attempt) * uniform(0.5, 1.5)`);
+  other 4xx, `pydantic.ValidationError`, and non-openai errors raise immediately. A model
+  refusal (`parsed is None` or empty `choices`) raises **`LLMRefusalError`** and is never
+  retried — a refusal is deterministic for a given input.
+- **`OpenAIEmbedder`** gains `timeout` and `max_retries` and runs `embeddings.create` under
+  `retry_llm` (previously no retry at all).
+- **`LLMChunker`** gains `request_timeout`, `max_prompt_tokens`, and `tokenizer` parameters:
+  when the rendered document exceeds `max_prompt_tokens`, the **LLM input** is truncated (one
+  WARNING per document) while the emitted chunks keep the full text as `prompt_content`.
+- **`request_timeout` settings** on `LLMHeadingResolverSettings` and
+  `DocumentSummarizerSettings` (both forwarded per request); `ExtractionSettings.request_timeout`
+  is now honored by *both* extractors.
+
+### Changed (Phase 7)
+
+- **All eight LLM call sites migrated off the deprecated `beta.chat.completions.parse`
+  namespace** onto `ragdoc.llm.call_structured` (footnote resolver, heading resolver, document
+  summarizer, image summarizer, `LLMChunker`, both extractors via `parse_with_retry`, and the
+  entity-resolution reviewer). Per-site degrade semantics are deliberately preserved: heading →
+  `[]`, image summary → skip-with-warning, footnote → `None`, reviewer → `ReviewResult()`;
+  summarizer/chunker/extraction raise.
+- **`RagdocConfig.openai_client` is now typed `LLMClient | None`** (was `Any | None`); invalid
+  objects fail validation at `configure()` time. There is no `client: Any` left in the library.
+- **Default models bumped**: `default_llm_model` / `default_image_llm_model` are now `gpt-4.1`
+  (were the two-year-old `gpt-4o-2024-08-06` snapshot). Kept within the gpt-4.x family because
+  every call site pins `temperature=0.0`, which reasoning-family models reject.
+- **`LLMFootnoteResolver`** moved from string-parsing (`"NONE"` / int-parse of free text) to a
+  structured `_FootnoteSelection` response model; its client is resolved fail-loud at
+  construction (`LLMNotConfiguredError` instead of a silent `None` that crashed at resolve
+  time), and `model=None` now falls back to `get_config().default_llm_model` (was a hard-coded
+  `gpt-4o-mini` default).
+- **`LLMChunker` fails loudly at `__init__`** when no client is resolvable (was: silent `None`,
+  `AttributeError` at chunk time); a refusal at chunk time raises `LLMRefusalError` (was
+  `ValueError`).
+- **`LLMHeadingResolver`** no longer retries deterministic 4xx errors (previously its manual
+  loop retried everything with no backoff); it still degrades to `[]` on final failure. The
+  settings-based client factory (base_url + api_key) survives as a documented layer above
+  `resolve_openai_client`; `from openai import AsyncOpenAI` is now a lazy import inside it.
+- **`ImageSummaryProcessor`** resolves a missing client fail-loud (`LLMNotConfiguredError`
+  instead of an unchecked `None`); per-image refusals skip with a WARNING (image keeps
+  `text_representation=None`).
+- **`make_llm_reviewer`** (entity resolution) gains retry it never had; refusal still degrades
+  to `ReviewResult()`.
+- **openai dependency floor raised to `>=1.92.0`** — the first release shipping the non-beta
+  `chat.completions.parse` namespace.
+
+### Removed (Phase 7)
+
+- The seven-protocol `_SummaryClient` stack in `processing/summary_document.py` and the
+  four-protocol `_EmbeddingsClient` stack in `pipeline/embedders.py` (replaced by the shared
+  `ragdoc.llm` protocols; `EmbeddingsClient` is re-exported from `ragdoc.pipeline`).
+- `ragdoc.extraction._llm.resolve_client` (superseded by `ragdoc.llm.resolve_openai_client`).
+- All four hand-rolled retry loops (heading resolver, document summarizer, and the extraction
+  `parse_with_retry` internals — its body is now a `call_structured` call) and every
+  `beta.chat.completions` reference in the library.
+- `LLMFootnoteResolver`'s `"NONE"`-string protocol and int-parsing block.
+
 ### Added (Phase 4 — first-class `Extractor` stage)
 
 - **`ragdoc.extraction.extractor` — the `Extractor[PayloadT]` protocol** (Decision D3-A):

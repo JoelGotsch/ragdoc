@@ -65,11 +65,12 @@ import re
 import uuid
 from collections.abc import Awaitable
 from html.parser import HTMLParser
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
 from ragdoc.document import Footnote
+from ragdoc.llm import ChatClient, call_structured, resolve_openai_client
 from ragdoc.processing._concurrency import _fan_out
 from ragdoc.processing.base import DocumentProcessor
 
@@ -620,6 +621,14 @@ class SimpleFootnoteResolver:
 # =============================================================================
 
 
+class _FootnoteSelection(BaseModel):
+    """Structured LLM output: which candidate location (if any) carries the footnote reference."""
+
+    selection: int | None = Field(
+        description="1-based candidate number of the best location, or null when no candidate is appropriate."
+    )
+
+
 class LLMFootnoteResolver:
     """
     LLM-based footnote reference resolver.
@@ -629,11 +638,12 @@ class LLMFootnoteResolver:
     complex documents where context matters.
 
     The resolver uses a system prompt explaining footnote patterns and asks
-    the LLM to select the most appropriate candidate.
+    the LLM for a structured :class:`_FootnoteSelection` (a 1-based candidate
+    number, or ``null`` when nothing fits).
 
     Attributes:
-        client: AsyncOpenAI-compatible client for LLM calls
-        model: Model name to use (default: gpt-4o-mini)
+        client: Chat-capable client for LLM calls (resolved fail-loud at construction)
+        model: Model name to use (``None`` resolves to ``get_config().default_llm_model``)
 
     Example:
         >>> from openai import AsyncOpenAI
@@ -643,7 +653,7 @@ class LLMFootnoteResolver:
     """
 
     SYSTEM_PROMPT = """You are analyzing document text to find footnote references.
-Given a footnote number and its content, plus several candidate locations where 
+Given a footnote number and its content, plus several candidate locations where
 the reference might appear, select the most appropriate location.
 
 A footnote reference typically appears:
@@ -651,25 +661,27 @@ A footnote reference typically appears:
 - Near terms, names, or concepts that the footnote explains or cites
 - In a context where the footnote would add relevant supplementary information
 
-Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate is appropriate."""
+Return the 1-based candidate number of the best location, or null if no candidate is appropriate."""
 
     def __init__(
         self,
-        client: Any | None = None,  # AsyncOpenAI-compatible client
-        model: str = "gpt-4o-mini",
+        client: ChatClient | None = None,
+        model: str | None = None,
     ):
         """
         Initialize the LLM resolver.
 
         Args:
-            client: AsyncOpenAI-compatible client for LLM calls.
-                    If None, falls back to ``get_config().openai_client``.
-            model: Model name to use for resolution
+            client: Chat-capable client for LLM calls. ``None`` falls back to
+                ``get_config().openai_client``; raises
+                :class:`~ragdoc.llm.LLMNotConfiguredError` when neither is available.
+            model: Model name to use for resolution. ``None`` falls back to
+                ``get_config().default_llm_model``.
         """
         from ragdoc.config import get_config
 
-        self.client: Any = client if client is not None else get_config().openai_client
-        self.model = model
+        self.client: ChatClient = resolve_openai_client(client)
+        self.model: str = model if model is not None else get_config().default_llm_model
 
     async def resolve(
         self,
@@ -707,43 +719,28 @@ Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate
         prompt = "\n".join(prompt_parts)
 
         try:
-            response = await self.client.chat.completions.create(
+            result = await call_structured(
+                self.client,
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self.SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
+                response_format=_FootnoteSelection,
                 temperature=0.0,
-                max_tokens=10,
+                log_prefix="LLMFootnoteResolver",
             )
-
-            content = response.choices[0].message.content
-            if content is None:
-                logger.warning(
-                    f"LLMFootnoteResolver: model returned empty content for footnote {footnote_number}; skipping."
-                )
-                return None
-            result = content.strip().upper()
-
-            if result == "NONE":
-                return None
-
-            # Try to parse the selection
-            try:
-                selection = int(result.replace(".", "").strip())
-                if 1 <= selection <= len(candidates):
-                    return candidates[selection - 1]
-            except ValueError:
-                pass
-
-            return None
-
-        except Exception as exc:  # noqa: BLE001 -- any LLM failure degrades to unresolved, never a wrong answer
+        except Exception as exc:  # noqa: BLE001 -- any LLM failure (incl. refusal) degrades to unresolved, never a wrong answer
             logger.warning(
                 f"LLMFootnoteResolver: LLM call failed for footnote {footnote_number} ({exc!r}); "
                 "leaving footnote unresolved."
             )
             return None
+
+        selection = result.selection
+        if selection is not None and 1 <= selection <= len(candidates):
+            return candidates[selection - 1]
+        return None
 
 
 # =============================================================================

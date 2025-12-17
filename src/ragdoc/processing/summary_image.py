@@ -26,12 +26,13 @@ import logging
 from collections.abc import Awaitable, Callable
 from functools import partial
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Literal, TypeAlias
+from typing import TYPE_CHECKING, Literal, TypeAlias
 
 from PIL import Image as PILModule
 from PIL.Image import Image as PILImage
 
 from ragdoc.document import Image
+from ragdoc.llm import ChatClient, LLMRefusalError, call_structured, resolve_openai_client
 from ragdoc.processing._concurrency import _fan_out
 from ragdoc.processing.base import DocumentProcessor
 from ragdoc.processing.summary_base import ImageSummary
@@ -127,7 +128,7 @@ def build_image_messages(
         image_detail: OpenAI vision detail level.
 
     Returns:
-        A ``messages`` list suitable for ``client.beta.chat.completions.parse``.
+        A ``messages`` list suitable for ``client.chat.completions.parse``.
     """
     user_content: list = [{"type": "text", "text": user_message}]
     if context:
@@ -156,7 +157,7 @@ ImageMessagesFn: TypeAlias = Callable[[str, str, "str | None"], "list[ChatComple
 
 
 def openai_image_summarizer(
-    client: Any,
+    client: ChatClient,
     model: str | None = None,
     create_messages: ImageMessagesFn = build_image_messages,
     transformations: list[Callable[[PILImage], PILImage]] | None = None,
@@ -195,16 +196,14 @@ def openai_image_summarizer(
             img_type = image.image_type
 
         messages = create_messages(b64, img_type, context)
-        comp = await client.beta.chat.completions.parse(
+        return await call_structured(
+            client,
             model=resolved_model,
             messages=messages,
-            temperature=0,
             response_format=ImageSummary,
+            temperature=0.0,
+            log_prefix="ImageSummary",
         )
-        parsed = comp.choices[0].message.parsed
-        if parsed is None:
-            raise ValueError(f"Image summary LLM ({resolved_model!r}) returned no parsed ImageSummary (refusal?)")
-        return parsed
 
     return _summarize
 
@@ -258,9 +257,9 @@ class ImageSummaryProcessor(DocumentProcessor):
     def _get_summarize(self) -> ImageSummarizeFn:
         if self._summarize is not None:
             return self._summarize
-        from ragdoc.config import get_config
-
-        return openai_image_summarizer(get_config().openai_client)
+        # Fail-loud when no client is configured (LLMNotConfiguredError instead of a
+        # None-attribute crash mid-document).
+        return openai_image_summarizer(resolve_openai_client(None))
 
     async def process(self, document: Document) -> Document:
         summarize = self._get_summarize()
@@ -293,6 +292,7 @@ class ImageSummaryProcessor(DocumentProcessor):
                 image.text_representation = result.text_representation or result.summary
         except (UnidentifiedImageError, OSError):
             logger.exception(f"Failed to summarize image {image.id}: image type {image.image_type!r} not supported")
-        except ValueError as exc:
-            # Contain per-image LLM refusals/schema failures — one bad image must not abort the document.
+        except (LLMRefusalError, ValueError) as exc:
+            # Contain per-image LLM refusals/schema failures — one bad image must not abort the
+            # document; the image keeps text_representation=None (skip-with-warning).
             logger.warning(f"Failed to summarize image {image.id}: {exc}")
