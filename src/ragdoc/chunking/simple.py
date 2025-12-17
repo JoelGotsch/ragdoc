@@ -51,8 +51,10 @@ class SimpleChunker(Chunker):
         metadata_fn: Called with the document to build the ``Chunk.metadata``
             dict.  Defaults to using the document's metadata.
         id_fn: Called with the document to produce the ``Chunk.id``.
-            Defaults to :meth:`~ragdoc.document.Document.content_hash` — the same
-            content always produces the same ID, making upserts idempotent.
+            Defaults to the document's :meth:`~ragdoc.document.Document.content_hash`
+            (computed once per :meth:`chunk` call and shared with the chunk's
+            ``content_hash`` field) — the same content always produces the same
+            ID, making upserts idempotent.
     """
 
     def __init__(
@@ -63,7 +65,7 @@ class SimpleChunker(Chunker):
     ) -> None:
         self._prompt_renderer = prompt_renderer
         self._metadata_fn: Callable[[Document], dict] = metadata_fn or (lambda doc: doc.metadata)
-        self._id_fn: Callable[[Document], str] = id_fn or (lambda doc: doc.content_hash())
+        self._id_fn: Callable[[Document], str] | None = id_fn
 
     def _get_prompt_renderer(self) -> Renderer:
         return self._prompt_renderer if self._prompt_renderer is not None else _default_prompt_renderer()
@@ -72,7 +74,7 @@ class SimpleChunker(Chunker):
         prompt_content = self._get_prompt_renderer().render(document)
         content_hash = document.content_hash()
         chunk = Chunk(
-            id=self._id_fn(document),
+            id=self._id_fn(document) if self._id_fn is not None else content_hash,
             source_path=document.source_path or None,
             source_id=document.source_id or document.source_path or document.id,
             source_hash=document.source_hash or content_hash,

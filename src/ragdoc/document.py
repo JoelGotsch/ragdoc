@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import re
 import uuid
 from enum import Enum
 from functools import reduce
 from operator import or_
-from typing import TYPE_CHECKING, Annotated, Generic, Literal, TypeVar
+from typing import Annotated, Generic, Literal, TypeVar
 
 from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify as md
@@ -15,9 +17,6 @@ from pypandoc import convert_text
 from typing_extensions import Self
 
 from ragdoc.metadata import MetadataDict, TMetadata, validate_metadata_dict
-
-if TYPE_CHECKING:
-    from ragdoc.rendering import Renderer
 
 logger = logging.getLogger(__name__)
 
@@ -507,6 +506,130 @@ ElementType = Annotated[
 ]
 
 
+# ---------------------------------------------------------------------------
+# Canonical content hashing (Document.content_hash)
+# ---------------------------------------------------------------------------
+
+_CONTENT_HASH_DOMAIN = b"ragdoc.content_hash.v1\x00"
+"""Domain-separation prefix for :meth:`Document.content_hash`.
+
+Any change to the canonical payload (field participation, normalization, JSON encoding) MUST
+bump this version tag. Each bump changes every stored ``content_hash`` once — i.e. one full
+corpus re-chunk/re-embed on the next Boundary-2 sync — and requires a CHANGELOG migration note.
+"""
+
+_REF_TAG_PATTERN = re.compile(r"<ref\b[^>]*/?>")
+_REF_ID_ATTR_PATTERN = re.compile(r"""(\bid\s*=\s*)(["'])(.*?)\2""")
+
+
+def normalize_ref_ids(html: str, ref_ordinals: dict[str, int]) -> str:
+    """Rewrite the ``id`` attribute of every ``<ref .../>`` tag to a parse-stable form.
+
+    Element ids are uuid4s minted per parse, and they are embedded inside stored HTML as
+    ``<ref id="{uuid}" rel="..."/>`` tags. Hashing the raw HTML would therefore make
+    :meth:`Document.content_hash` unstable across re-parses of an unchanged file. This function
+    replaces each ref's ``id`` value with the target element's document-order ordinal
+    (``"#3"``), or the literal ``"unresolved"`` for dangling refs (targets not in
+    *ref_ordinals*). The ``rel`` attribute is left untouched (it participates in the hash).
+    Only ``<ref>`` tags are rewritten — ``id`` attributes on any other tag are content and
+    pass through unchanged.
+
+    Args:
+        html: Element HTML possibly containing ``<ref id="..." rel="..."/>`` tags.
+        ref_ordinals: Map of element id -> document-order ordinal (position in
+            ``document.elements``), as built by :func:`document_content_payload`.
+
+    Returns:
+        The HTML with every ref-tag ``id`` normalized; all other content byte-identical.
+    """
+
+    def _rewrite_tag(tag_match: re.Match[str]) -> str:
+        def _rewrite_id(id_match: re.Match[str]) -> str:
+            ordinal = ref_ordinals.get(id_match.group(3))
+            normalized = f"#{ordinal}" if ordinal is not None else "unresolved"
+            quote = id_match.group(2)
+            return f"{id_match.group(1)}{quote}{normalized}{quote}"
+
+        return _REF_ID_ATTR_PATTERN.sub(_rewrite_id, tag_match.group(0))
+
+    return _REF_TAG_PATTERN.sub(_rewrite_tag, html)
+
+
+def element_content_payload(element: BaseElement, ref_ordinals: dict[str, int]) -> dict[str, str | int | None]:
+    """Canonical hash payload for one element (content fields only).
+
+    Exhaustive over the built-in element types; raises ``TypeError`` on any unknown
+    :class:`BaseElement` subclass — never silently skips a variant (an unhashed element would
+    silently break change detection).
+
+    Per-type payloads:
+
+    * ``Heading`` / ``Paragraph`` / ``Table`` / ``DocumentList`` / ``RawText`` —
+      ``{"t": <element_type>, "html": normalize_ref_ids(element.html, ...)}``. The element
+      type participates explicitly, so e.g. a ``RawText`` and a ``Paragraph`` with identical
+      inner text hash differently.
+    * ``Image`` — the six structured content fields (``image``, ``image_type``, ``alt``,
+      ``text_representation``, ``width``, ``height``).
+    * ``Footnote`` — ``number`` plus the normalized ``innerhtml``. Deliberately **not**
+      ``element.html``, which embeds the volatile ``id="footnote-{uuid}"`` attribute.
+
+    Excluded on every element: ``id``, ``metadata``, ``page``, ``bounding_box`` — identity,
+    layout, and per-element metadata do not participate; content fields do.
+
+    Args:
+        element: The element to build a payload for.
+        ref_ordinals: Element id -> document-order ordinal map for ref normalization.
+
+    Returns:
+        A JSON-serializable dict of the element's content fields.
+
+    Raises:
+        TypeError: If *element* is not one of the seven built-in element types.
+    """
+    if isinstance(element, Image):
+        return {
+            "t": element.element_type.value,
+            "image": element.image,
+            "image_type": element.image_type,
+            "alt": element.alt,
+            "text_representation": element.text_representation,
+            "width": element.width,
+            "height": element.height,
+        }
+    if isinstance(element, Footnote):
+        return {
+            "t": element.element_type.value,
+            "number": element.number,
+            "html": normalize_ref_ids(element.innerhtml, ref_ordinals),
+        }
+    if isinstance(element, (Heading, Paragraph, Table, DocumentList, RawText)):
+        return {
+            "t": element.element_type.value,
+            "html": normalize_ref_ids(element.html, ref_ordinals),
+        }
+    raise TypeError(f"unhandled element type {type(element).__name__} in content hash")
+
+
+def document_content_payload(document: Document) -> dict[str, object]:
+    """Canonical hash payload for a document: ``{"title": ..., "elements": [...]}``.
+
+    Only ``title`` and the ordered ``elements`` participate (see
+    :meth:`Document.content_hash` for the full field-participation rationale). The ref-ordinal
+    map is built once here from element document order.
+
+    Args:
+        document: The document to build a payload for.
+
+    Returns:
+        A JSON-serializable dict fed into the canonical-JSON hash.
+    """
+    ref_ordinals = {element.id: i for i, element in enumerate(document.elements)}
+    return {
+        "title": document.title,
+        "elements": [element_content_payload(element, ref_ordinals) for element in document.elements],
+    }
+
+
 class Document(BaseModel, Generic[TMetadata]):
     """A structured representation of a document containing various elements.
 
@@ -681,40 +804,49 @@ class Document(BaseModel, Generic[TMetadata]):
             referenced_ids.update(e.footnote_ids)
         return [f for f in self.footnotes if f.id not in referenced_ids]
 
-    def content_hash(self, renderer: Renderer | None = None) -> str:
-        """Content-stable SHA-256 hash of this document.
+    def content_hash(self) -> str:
+        """Content-stable SHA-256 hex digest of ``(title, elements)`` — pure Python, no rendering.
 
-        Uses the default prompt renderer (MARKDOWN + render_for_prompt) to produce
-        a canonical string, then returns its hex digest.  The same document content
-        always yields the same hash, making this safe as a chunk ID for idempotent
-        vector-store upserts.
+        SHA-256 of the version-tagged (``ragdoc.content_hash.v1``) canonical JSON of the
+        document's content: ``title`` plus the ordered element payloads built by
+        :func:`document_content_payload` / :func:`element_content_payload`. No pandoc, no
+        renderer — the hash is stable across pandoc releases and cheap enough to recompute
+        freely (no caching; a stale cache would be a silent change-detection bug).
 
-        Subclass Document and override this method to customise the hash strategy —
-        for example to incorporate file-path provenance or to switch to a different
-        renderer::
+        Field participation:
+
+        * ``title`` — **yes** (a title edit must re-chunk: ``prompt_content`` renders it).
+        * ``elements`` — **yes**, order-sensitive, per-type content payloads. Inline
+          ``<ref id=...>`` uuids are normalized to document-order ordinals
+          (:func:`normalize_ref_ids`), so a re-parse of an unchanged file — which mints fresh
+          element ids — yields the same hash.
+        * ``id``, ``source_path``, ``source_id``, ``source_hash``, ``parser``,
+          ``parser_version``, ``external_refs`` — **no** (provenance, not content;
+          ``source_hash`` is the *other* change token of the two-hash design).
+        * ``metadata`` — **no**, on the document and on every element. Metadata exists for
+          external consumers and would otherwise poison the hash with library-written keys
+          (``split_sequence``/``split_total``). **Consequence:** editing only ``metadata`` in a
+          stored Document does *not* trigger a re-chunk, so chunk metadata in a vector store can
+          go stale until content changes. Override in a subclass for metadata-sensitive
+          detection.
+        * element ``page`` / ``bounding_box`` — **no** (layout moving an unchanged element to
+          another page must not re-embed).
+
+        The same content always yields the same hash, making this safe as a chunk ID for
+        idempotent vector-store upserts. Subclass Document and override this method to customise
+        the strategy — compose over ``super().content_hash()``::
 
             class SourceDocument(Document):
-                source_path: str = ""
-
-                def content_hash(self, renderer=None) -> str:
-                    base = super().content_hash(renderer)
+                def content_hash(self) -> str:
+                    base = super().content_hash()
                     return hashlib.sha256(f"{self.source_path}:{base}".encode()).hexdigest()
-
-        Args:
-            renderer: Renderer to use for hashing. Defaults to
-                ``Renderer(OutputFormat.MARKDOWN, render_for_prompt)``.
 
         Returns:
             64-character lowercase hex string (SHA-256 digest).
         """
-        import hashlib
-
-        if renderer is None:
-            from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
-
-            renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
-        content = renderer.render(self)
-        return hashlib.sha256(content.encode()).hexdigest()
+        payload = document_content_payload(self)
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return hashlib.sha256(_CONTENT_HASH_DOMAIN + canonical.encode("utf-8")).hexdigest()
 
     def __or__(self, other: Self) -> Self:
         title = self.title or other.title

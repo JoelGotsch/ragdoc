@@ -34,7 +34,7 @@ class SourceState:
     Attributes:
         source_hash: SHA-256 of the original source file bytes (Boundary-1 /
             direct-path change detection).
-        content_hash: Renderer-stable Document content hash
+        content_hash: Canonical-content Document hash (pandoc-free)
             (``Document.content_hash()``) used for Boundary-2
             (DocumentStore -> VectorStore) change detection.  ``None`` is treated
             as "always changed".
