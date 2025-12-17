@@ -34,7 +34,7 @@ Consumer notes
 from __future__ import annotations
 
 import json
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 from typing_extensions import Required, TypedDict
@@ -47,7 +47,7 @@ from typing_extensions import Required, TypedDict
 # forward-reference resolution errors. The full recursive constraint
 # (list[MetadataValue] / dict[str, MetadataValue]) is enforced at runtime
 # by validate_metadata_dict via json.dumps().
-MetadataValue = Union[str, int, float, bool, None, list[Any], dict[str, Any], BaseModel]
+MetadataValue = str | int | float | bool | None | list[Any] | dict[str, Any] | BaseModel
 """
 Canonical type for a single metadata value.
 

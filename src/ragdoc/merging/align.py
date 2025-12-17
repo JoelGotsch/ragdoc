@@ -219,7 +219,7 @@ def _apply_heuristics(
     return elements_a, f"higher or equal markup richness in A (score_a={score_a} >= score_b={score_b})"
 
 
-def align_elements(
+def align_elements(  # noqa: C901  (inherently branchy alignment/merge algorithm)
     doc_a: Document,
     doc_b: Document,
     prefer_source: dict[ElementTypeEnum, Literal["a", "b"]] | None = None,

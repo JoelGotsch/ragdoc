@@ -154,7 +154,6 @@ def _(mo):
     | `.xlsx` | Excel | — |
     | `.azure.json` | Azure DI | 40 |
     | `.pdf` | Azure DI | 40 |
-    | `.textract.json` | Textract | — |
     | `_middle.json` | MinerU | 50 |
 
     Use `describe_registry()` to see all registered parsers:

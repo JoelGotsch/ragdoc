@@ -31,11 +31,10 @@ from ragdoc.parsing.registry import (
     register_parser,
     unregister_parser,
 )
-from ragdoc.parsing.textract import PDFFile, TextractJSONFile
 from ragdoc.parsing.xlsx import ExcelConfig, ExcelPackage, ExcelSource
 
 # Union of all concrete source types accepted by load_document / from_path
-DocumentSource = Union[HTMLSource, PandocFile, WordFile, ExcelSource, AzureJSONFile, AzureAnalyzeRun]
+DocumentSource = HTMLSource | PandocFile | WordFile | ExcelSource | AzureJSONFile | AzureAnalyzeRun
 
 logger = logging.getLogger(__name__)
 
@@ -52,14 +51,12 @@ def _register_builtin_parsers() -> None:
     from ragdoc.parsing.mineru import _register as _reg_mineru
     from ragdoc.parsing.pandoc import _register as _reg_pandoc
     from ragdoc.parsing.ragdoc_json import _register as _reg_ragdoc_json
-    from ragdoc.parsing.textract import _register as _reg_textract
     from ragdoc.parsing.xlsx import _register as _reg_xlsx
 
     _reg_html()
     _reg_pandoc()
     _reg_xlsx()
     _reg_azure_di()
-    _reg_textract()
     _reg_mineru()
     _reg_ragdoc_json()
 

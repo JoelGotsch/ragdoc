@@ -384,7 +384,7 @@ async def test_sync_collision_raises_before_processing(tmp_path, vstore):
     p2.write_text("B", encoding="utf-8")
 
     pipeline = make_vs_pipeline(vstore)
-    with pytest.raises(ValueError, match="summary.pdf"):
+    with pytest.raises(ValueError, match=r"summary\.pdf"):
         await pipeline.run([p1, p2])
 
     # No processing should have occurred

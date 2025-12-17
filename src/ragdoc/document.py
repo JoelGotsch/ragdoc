@@ -5,7 +5,7 @@ import uuid
 from enum import Enum
 from functools import reduce
 from operator import or_
-from typing import Annotated, Generic, Literal, TypeVar
+from typing import TYPE_CHECKING, Annotated, Generic, Literal, TypeVar
 
 from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify as md
@@ -14,6 +14,9 @@ from pypandoc import convert_text
 from typing_extensions import Self
 
 from ragdoc.metadata import MetadataDict, TMetadata, validate_metadata_dict
+
+if TYPE_CHECKING:
+    from ragdoc.rendering import Renderer
 
 
 class InlineRef(BaseModel):

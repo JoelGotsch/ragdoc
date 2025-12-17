@@ -1,5 +1,9 @@
 """Azure Document Intelligence SDK client — isolated so it can be mocked without importing automatic.py."""
 
+from pathlib import Path
+
+from ragdoc.config import get_config
+
 di_available = True
 
 try:
@@ -8,10 +12,6 @@ try:
     from azure.core.credentials import AzureKeyCredential
 except ImportError:
     di_available = False
-
-from pathlib import Path
-
-from ragdoc.config import get_config
 
 
 def get_analyze_result(file_path: Path) -> dict:

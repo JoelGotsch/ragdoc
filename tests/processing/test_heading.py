@@ -445,7 +445,7 @@ async def test_title_detection_respects_min_title_length():
 
 
 def _make_doc_with_heading_levels(levels: list[int]) -> Document:
-    return Document(elements=[Heading(innerhtml=f"H{l}", level=l) for l in levels])
+    return Document(elements=[Heading(innerhtml=f"H{lvl}", level=lvl) for lvl in levels])
 
 
 def test_normalize_heading_levels_no_gaps_unchanged():

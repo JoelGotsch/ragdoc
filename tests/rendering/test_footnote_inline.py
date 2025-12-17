@@ -111,7 +111,7 @@ def test_no_footnote_number_fixture_prompt_no_bare_numbers(prompt_html: Renderer
     result = prompt_html.render(fixture_document)
 
     # Keep only lines that are NOT standalone footnote blocks; those may contain [N].
-    lines = [l for l in result.splitlines() if 'id="footnote-' not in l]
+    lines = [ln for ln in result.splitlines() if 'id="footnote-' not in ln]
     bare_numbers = re.findall(r"\[\d+\]", "\n".join(lines))
     assert bare_numbers == [], f"Bare footnote numbers found inline: {bare_numbers}"
 

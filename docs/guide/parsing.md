@@ -36,7 +36,6 @@ highest-priority parser wins:
 | `.xlsx` | Excel | `xlsx` | — |
 | `.azure.json` | Azure DI (JSON) | `azure_json` | — |
 | `.pdf` | Azure DI (live) | `azure_di` | 40 |
-| `.textract.json` | Textract | `textract` | — |
 | `_middle.json` | MinerU | `mineru` | 50 |
 | `.ragdoc.json` | RagdocJson | `ragdoc_json` | 60 |
 
@@ -89,15 +88,6 @@ document = await load("result.azure.json")
 
 document = await load("report.pdf")   # invokes Azure DI directly
 # document.parser == "azure_di"       (parsed by the "azure_di" registry entry)
-```
-
-### AWS Textract (`.textract.json`)
-
-Parses the JSON output from AWS Textract into a `Document`.
-
-```python
-document = await load("result.textract.json")
-# document.parser == "textract"
 ```
 
 ### MinerU (`_middle.json`)
@@ -351,8 +341,8 @@ changing the registry globally:
 ```python
 from ragdoc.config import configure, RagdocConfig
 
-with configure(RagdocConfig(parser_preferences={".pdf": "textract"})):
-    document = await load("report.pdf")   # uses Textract, not Azure DI
+with configure(RagdocConfig(parser_preferences={".pdf": "my_custom_pdf_parser"})):
+    document = await load("report.pdf")   # uses your registered parser, not Azure DI
 ```
 
 ---

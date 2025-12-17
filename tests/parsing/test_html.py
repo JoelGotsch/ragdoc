@@ -269,4 +269,4 @@ def test_preface(preface_document: Document):
         for p in preface_document.paragraphs
     )
     assert any(t.html == expected_preface_table for t in preface_document.tables)
-    assert any(l.text == "Oh look a list!" for l in preface_document.lists)
+    assert any(lst.text == "Oh look a list!" for lst in preface_document.lists)

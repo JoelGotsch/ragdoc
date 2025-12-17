@@ -274,35 +274,3 @@ def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | No
     document.parser = "html"
     _reconstruct_footnote_refs(document)
     return document
-
-    n = 1
-    first_heading = None
-    for element in root.find_all(element_names | heading_tags, recursive=False):
-        if first_heading is not None and element == first_heading:
-            break
-        n, preface = handle_tag(element, preface, 0, n)
-
-    # Handle everything nested under headings
-    for n_document, heading in enumerate(headings, start=1):
-        name = heading.text.replace("\n", " ")
-        if heading.name == "p":
-            level = 6
-        else:
-            level = int(heading.name.replace("h", ""))
-        document_heading = Heading(innerhtml=name, level=level)
-        documents.append(Document(elements=[document_heading]))
-
-    for n_document, (heading, document) in enumerate(zip(headings, documents), start=1):
-        n_elem_in_document = 1
-        for element in heading.find_next_siblings():
-            if element.name == "p" and "class" in element.attrs and "heading" in element.attrs["class"]:
-                break
-            elif element.name in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-                break
-            elif element.name in ("p", "table", "ul", "ol", "dl", "img", "div"):
-                n_elem_in_document, document = handle_tag(element, document, n_document, n_elem_in_document)
-            else:
-                for nested_element in element.find_all():
-                    n_elem_in_document, document = handle_tag(nested_element, document, n_document, n_elem_in_document)
-
-    return documents, preface.elements

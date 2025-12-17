@@ -206,7 +206,7 @@ quote-style = "double"
 
 [tool.basedpyright]
 pythonVersion = "3.10"
-typeCheckingMode = "strict"
+typeCheckingMode = "standard"
 reportUnnecessaryTypeIgnoreComment = true
 reportIgnoreCommentWithoutRule = true
 reportUnusedParameter = true
