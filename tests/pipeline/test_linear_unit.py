@@ -59,17 +59,17 @@ async def test_simple_chunker_metadata_is_copied_per_chunk():
     assert "injected" not in doc.metadata
 
 
-# --- TestChunkDocument (DocumentPipeline.chunk_document: provenance + id minting) ---
+# --- TestChunkPipeline (ChunkPipeline.run: provenance + id minting) ---
 
 
 @pytest.mark.anyio
 async def test_chunk_document_stamps_uniform_provenance():
-    from ragdoc.pipeline import DocumentPipeline
+    from ragdoc.pipeline import ChunkPipeline
 
     doc = make_document(title="A", body="B")
     doc.source_id = "sync-id"
     doc.source_hash = "file-hash"
-    chunks = await DocumentPipeline().chunk_document(doc)
+    chunks = await ChunkPipeline().run(doc)
     assert chunks
     for chunk in chunks:
         assert chunk.source_id == "sync-id"
@@ -79,11 +79,11 @@ async def test_chunk_document_stamps_uniform_provenance():
 
 @pytest.mark.anyio
 async def test_chunk_document_source_hash_none_passthrough():
-    """chunk_document never fabricates a source_hash from the content hash."""
-    from ragdoc.pipeline import DocumentPipeline
+    """ChunkPipeline.run never fabricates a source_hash from the content hash."""
+    from ragdoc.pipeline import ChunkPipeline
 
     doc = make_document(title="A", body="B")
-    chunks = await DocumentPipeline().chunk_document(doc)
+    chunks = await ChunkPipeline().run(doc)
     assert chunks
     assert all(c.source_hash is None for c in chunks)
 
@@ -91,15 +91,15 @@ async def test_chunk_document_source_hash_none_passthrough():
 @pytest.mark.anyio
 async def test_chunk_document_identical_content_splits_get_distinct_ids():
     """The collision regression: two content-identical splits must yield two distinct ids."""
-    from ragdoc.pipeline import DocumentPipeline
+    from ragdoc.pipeline import ChunkPipeline
 
     doc = make_document(title="A", body="Same body.")
 
     def duplicate_splitter(document: Document) -> list[Document]:
         return [document.model_copy(), document.model_copy()]
 
-    pipeline = DocumentPipeline(splitter=duplicate_splitter)  # type: ignore[arg-type]  # Splitter protocol
-    chunks = await pipeline.chunk_document(doc)
+    pipeline = ChunkPipeline(splitter=duplicate_splitter)  # type: ignore[arg-type]  # Splitter protocol
+    chunks = await pipeline.run(doc)
     assert len(chunks) == 2
     assert chunks[0].id != chunks[1].id
     assert chunks[0].content_hash == chunks[1].content_hash
@@ -107,25 +107,25 @@ async def test_chunk_document_identical_content_splits_get_distinct_ids():
 
 @pytest.mark.anyio
 async def test_chunk_document_ids_stable_across_runs():
-    from ragdoc.pipeline import DocumentPipeline
+    from ragdoc.pipeline import ChunkPipeline
 
     doc1 = make_document(title="A", body="B")
     doc1.source_id = "stable-src"
     doc2 = make_document(title="A", body="B")
     doc2.source_id = "stable-src"
-    ids1 = [c.id for c in await DocumentPipeline().chunk_document(doc1)]
-    ids2 = [c.id for c in await DocumentPipeline().chunk_document(doc2)]
+    ids1 = [c.id for c in await ChunkPipeline().run(doc1)]
+    ids2 = [c.id for c in await ChunkPipeline().run(doc2)]
     assert ids1 == ids2
 
 
 @pytest.mark.anyio
 async def test_chunk_id_fn_override():
-    from ragdoc.pipeline import DocumentPipeline
+    from ragdoc.pipeline import ChunkPipeline
 
     doc = make_document(title="A", body="B")
     doc.source_id = "src"
-    pipeline = DocumentPipeline(chunk_id_fn=lambda sid, seq, ordinal, ch: f"{sid}:{seq}:{ordinal}")
-    chunks = await pipeline.chunk_document(doc)
+    pipeline = ChunkPipeline(chunk_id_fn=lambda sid, seq, ordinal, ch: f"{sid}:{seq}:{ordinal}")
+    chunks = await pipeline.run(doc)
     assert [c.id for c in chunks] == ["src:1:0"]
 
 

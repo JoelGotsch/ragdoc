@@ -2,8 +2,9 @@
 
 Parses and processes source files into :class:`~ragdoc.document.Document` objects and
 syncs them into a :class:`~ragdoc.pipeline.stores.DocumentStore`, so they can be edited
-and later re-chunked by a :class:`~ragdoc.pipeline.vectorstore.VectorStorePipeline`
-(Boundary 2) without re-parsing.
+and later re-chunked by a Boundary-2
+:meth:`~ragdoc.pipeline.vectorstore.VectorStorePipeline.from_document_store` pipeline
+without re-parsing.
 
 Same plan/apply/run shape as ``VectorStorePipeline`` (both compose the shared
 :class:`~ragdoc.pipeline.sync.SyncEngine`) but the payload is ``Document`` and there is
@@ -39,53 +40,38 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ragdoc.document import Document
-    from ragdoc.pipeline.linear import DocumentPipeline
+    from ragdoc.pipeline.linear import IngestPipeline
     from ragdoc.pipeline.stores import DocumentStore
 
 
 class DocumentStorePipeline(Generic[TMetadata]):
     """Incremental file -> DocumentStore sync via plan/apply/run.
 
-    This boundary stores **whole Documents, one per source** (via ``parse_and_process``), so a
-    splitter or non-default chunker on the given :class:`DocumentPipeline` is not "ignored" — it
-    has nowhere to write its output (splits would collide on ``source_id``; chunks aren't
-    ``Document``\\ s) and is therefore rejected at construction. Split and chunk at Boundary 2
-    (:class:`~ragdoc.pipeline.vectorstore.VectorStorePipeline`) instead.
+    This boundary stores **whole Documents, one per source**, so it takes an
+    :class:`~ragdoc.pipeline.linear.IngestPipeline` (parse → process) — the
+    boundary-appropriate type.  An ``IngestPipeline`` cannot carry a splitter or a
+    chunker (splits would collide on ``source_id``; chunks aren't ``Document``\\ s), so a
+    misplaced Boundary-2 stage is a ``TypeError`` at construction rather than a runtime
+    rejection.  Split and chunk at Boundary 2
+    (:meth:`~ragdoc.pipeline.vectorstore.VectorStorePipeline.from_document_store`) instead.
 
     Args:
-        pipeline: :class:`~ragdoc.pipeline.linear.DocumentPipeline` providing the parser,
-            processors, and ``source_id_fn`` (single source of truth for identity).  Must **not**
-            carry a splitter or a non-default chunker (raises ``ValueError`` otherwise).
+        ingest: :class:`~ragdoc.pipeline.linear.IngestPipeline` providing the parser,
+            processors, and ``source_id_fn`` (single source of truth for identity).
         document_store: target :class:`~ragdoc.pipeline.stores.DocumentStore`.
         hash_fn: ``Path -> str`` file-byte change-detection hash (default
             :func:`~ragdoc.pipeline.sync.file_hash`, SHA-256 of the bytes).
         concurrency: max sources processed concurrently.
-
-    Raises:
-        ValueError: If *pipeline* has a splitter or a non-default chunker configured.
     """
 
     def __init__(
         self,
-        pipeline: DocumentPipeline[TMetadata],
+        ingest: IngestPipeline[TMetadata],
         document_store: DocumentStore,
         hash_fn: Callable[[Path], str] = file_hash,
         concurrency: int | asyncio.Semaphore = 10,
     ) -> None:
-        misplaced: list[str] = []
-        if pipeline.has_splitter:
-            misplaced.append("a splitter")
-        if pipeline.has_custom_chunker:
-            misplaced.append("a chunker")
-        if misplaced:
-            raise ValueError(
-                f"DocumentStorePipeline (Boundary 1) stores whole Documents, one per source, and "
-                f"cannot use {' or '.join(misplaced)} on its DocumentPipeline — splits would "
-                f"collide on source_id and chunks aren't Documents. Remove it and split/chunk at "
-                f"Boundary 2 (VectorStorePipeline with a document_store) instead."
-            )
-
-        self._pipeline = pipeline
+        self._ingest = ingest
         self._document_store = document_store
         self._hash_fn = hash_fn
         self._concurrency = concurrency
@@ -98,13 +84,13 @@ class DocumentStorePipeline(Generic[TMetadata]):
 
     @property
     def _source_id_fn(self) -> Callable[[Path], str]:
-        return self._pipeline.source_id_fn
+        return self._ingest.source_id_fn
 
     async def _produce(self, src: SyncSource) -> SourceChange[Document] | None:
         """Parse + process one file into a single-Document change (empty when filtered)."""
         if src.path is None:  # pragma: no cover - resolution always sets it
             raise AssertionError("DocumentStorePipeline SyncSource without a path")
-        doc = await self._pipeline.parse_and_process(src.path)
+        doc = await self._ingest.run(src.path)
         if doc is None:
             logger.info(f"Document filtered out: {src.path.name}")
             # Empty change (NOT None): the source still exists, it just yields nothing —

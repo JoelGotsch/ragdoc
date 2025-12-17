@@ -11,14 +11,14 @@ from ragdoc.extraction.mention import Mention
 from ragdoc.extraction.pipeline import MentionStorePipeline
 from ragdoc.extraction.structured import StructuredExtractor
 from ragdoc.pipeline.changeset import ChangeSet
-from ragdoc.pipeline.linear import DocumentPipeline
+from ragdoc.pipeline.linear import IngestPipeline
 
 from .conftest import Event, MemoryMentionStore, make_event_client, make_extractor, make_parser
 
 
 def make_pipeline(extractor, store) -> MentionStorePipeline[Event]:
     return MentionStorePipeline(
-        pipeline=DocumentPipeline(parser=make_parser()),
+        ingest=IngestPipeline(parser=make_parser()),
         extractor=extractor,
         mention_store=store,
     )
@@ -128,15 +128,16 @@ async def test_per_source_durability(make_files):
     assert await store.list_source_ids() == {"good.txt"}
 
 
-@pytest.mark.anyio
-async def test_chunker_rejected_at_construction(mstore):
+def test_chunker_unexpressible_at_construction(mstore):
+    """MentionStorePipeline extracts mentions, not chunks — an IngestPipeline has no chunker
+    parameter, so the old runtime rejection is now a TypeError at construction."""
     from unittest.mock import MagicMock
 
     from ragdoc.chunking import LLMChunker
 
-    with pytest.raises(ValueError, match="not chunks"):
+    with pytest.raises(TypeError):
         MentionStorePipeline(
-            pipeline=DocumentPipeline(parser=make_parser(), chunker=LLMChunker(client=MagicMock())),
+            ingest=IngestPipeline(parser=make_parser(), chunker=LLMChunker(client=MagicMock())),  # type: ignore[call-arg]
             extractor=make_extractor([Event(title="Ev")]),
             mention_store=mstore,
         )
@@ -166,18 +167,18 @@ async def test_roundtrip_never_touches_document_metadata(make_files, mstore, mon
     """The Phase-4 headline regression: extraction is a typed channel — no 'mentions' key ever
     appears in the parent's or any split's metadata during a full pipeline run."""
     paths = make_files({"a.txt": "alpha body"})
-    doc_pipeline = DocumentPipeline(parser=make_parser())
+    ingest = IngestPipeline(parser=make_parser())
 
     captured_parents: list[Document] = []
-    original_parse_and_process = doc_pipeline.parse_and_process
+    original_ingest_run = ingest.run
 
-    async def spy_parse_and_process(path: Path) -> Document | None:
-        parent = await original_parse_and_process(path)
+    async def spy_ingest_run(path: Path) -> Document | None:
+        parent = await original_ingest_run(path)
         if parent is not None:
             captured_parents.append(parent)
         return parent
 
-    monkeypatch.setattr(doc_pipeline, "parse_and_process", spy_parse_and_process)
+    monkeypatch.setattr(ingest, "run", spy_ingest_run)
 
     captured_splits: list[Document] = []
 
@@ -187,7 +188,7 @@ async def test_roundtrip_never_touches_document_metadata(make_files, mstore, mon
         return splits
 
     pipeline = MentionStorePipeline(
-        pipeline=doc_pipeline,
+        ingest=ingest,
         extractor=make_extractor([Event(title="Ev")]),
         mention_store=mstore,
         splitter=spy_splitter,

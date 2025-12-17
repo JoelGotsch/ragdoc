@@ -1,19 +1,25 @@
 """MentionStorePipeline: incremental file-or-DocumentStore -> MentionStore sync.
 
-Two modes, selected by whether a ``document_store`` is provided:
+Two modes, one constructor each (so an illegal configuration is a ``TypeError`` at
+construction, not a runtime rejection):
 
-* **Direct mode** (no ``document_store``) — parses + processes source files, splits each into
-  context-sized sub-documents, runs the :class:`~ragdoc.extraction.extractor.Extractor` on every
-  split (a direct typed channel — ``extract()`` returns
-  :class:`~ragdoc.extraction.mention.Mention` objects; nothing rides on document metadata), and
-  syncs them into a :class:`~ragdoc.extraction.stores.MentionStore`. Change detection uses the
-  file-byte ``source_hash``: an unchanged file is **skipped with no LLM call**.
-* **Boundary-2 mode** (``document_store`` given) — reads already-parsed-and-processed Documents
-  from the DocumentStore by ``source_id``, splits + extracts (never re-runs the processor chain —
-  doing so on an already-processed document is destructive). Change detection uses the Document's
-  ``content_hash``. This mirrors :class:`~ragdoc.pipeline.vectorstore.VectorStorePipeline`'s
-  Boundary-2 mode so a user running both a vector store and a knowledge graph over the same
-  corpus shares the existing ``DocumentStore`` substrate without a new boundary.
+* **Direct mode** (``MentionStorePipeline(ingest=..., ...)``) — parses + processes source
+  files via an :class:`~ragdoc.pipeline.linear.IngestPipeline`, splits each into
+  context-sized sub-documents, runs the :class:`~ragdoc.extraction.extractor.Extractor` on
+  every split (a direct typed channel — ``extract()`` returns
+  :class:`~ragdoc.extraction.mention.Mention` objects; nothing rides on document metadata),
+  and syncs them into a :class:`~ragdoc.extraction.stores.MentionStore`. Change detection
+  uses the file-byte ``source_hash``: an unchanged file is **skipped with no LLM call**.
+  An ``IngestPipeline`` cannot carry a chunker (chunking is meaningless for mention
+  extraction), so that misconfiguration is unexpressible.
+* **Boundary-2 mode** (:meth:`MentionStorePipeline.from_document_store`) — reads
+  already-parsed-and-processed Documents from the DocumentStore by ``source_id``, splits +
+  extracts. There is no ingest parameter at all, so re-running the (destructive) processor
+  chain or a custom parser on stored documents is unexpressible. Change detection uses the
+  Document's ``content_hash``. This mirrors
+  :meth:`~ragdoc.pipeline.vectorstore.VectorStorePipeline.from_document_store` so a user
+  running both a vector store and a knowledge graph over the same corpus shares the existing
+  ``DocumentStore`` substrate without a new boundary.
 
 Shape mirrors the sync pipelines (all compose the shared
 :class:`~ragdoc.pipeline.sync.SyncEngine`):
@@ -56,7 +62,7 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from ragdoc.document import Document
     from ragdoc.extraction.stores import MentionStore
-    from ragdoc.pipeline.linear import DocumentPipeline
+    from ragdoc.pipeline.linear import IngestPipeline
     from ragdoc.pipeline.stores import DocumentStore
     from ragdoc.splitting.base import Splitter
 
@@ -64,70 +70,109 @@ if TYPE_CHECKING:
 class MentionStorePipeline(Generic[PayloadT]):
     """Incremental file-or-DocumentStore -> MentionStore sync for one payload type.
 
-    Two modes:
+    Two modes, one constructor each:
 
-    * **Direct** (no ``document_store``): parse + process + split + extract per file.
-      Change detection uses the file-byte ``source_hash``.
-    * **Boundary-2** (``document_store`` given): split + extract on Documents loaded from the
-      DocumentStore by ``source_id``. Processors and a custom parser are **rejected at
-      construction** — processing already happened at Boundary 1 (re-running it is destructive),
-      and the source is the store, not a file.
+    * **Direct** (``MentionStorePipeline(...)``): parse + process + split + extract per
+      file. Change detection uses the file-byte ``source_hash``.
+    * **Boundary-2** (:meth:`from_document_store`): split + extract on Documents loaded
+      from the DocumentStore by ``source_id``. Processors and a custom parser have no
+      parameter to arrive through — processing already happened at Boundary 1 (re-running
+      it is destructive), and the source is the store, not a file.
 
     Args:
-        pipeline: :class:`~ragdoc.pipeline.linear.DocumentPipeline` providing the parser,
-            pre-split processors, and ``source_id_fn`` (single source of truth for identity). A
-            non-default chunker is always rejected (chunking is meaningless for mention extraction).
-            In Boundary-2 mode, processors and a custom parser are rejected as well.
+        ingest: :class:`~ragdoc.pipeline.linear.IngestPipeline` providing the parser,
+            pre-split processors, and ``source_id_fn`` (single source of truth for
+            identity). An ``IngestPipeline`` cannot carry a chunker (chunking is
+            meaningless for mention extraction).
         extractor: the :class:`~ragdoc.extraction.extractor.Extractor` run on each split
             (e.g. ``StructuredExtractor`` or ``KnowledgeGraphExtractor``); its ``extract()``
             returns the typed mentions directly.
         mention_store: target :class:`MentionStore`.
-        document_store: optional :class:`~ragdoc.pipeline.stores.DocumentStore`. When given,
-            the pipeline runs in Boundary-2 mode.
         splitter: ``Document -> list[Document]`` splitter run before extraction. ``None`` builds a
             default token splitter (``split_document`` with a Markdown prompt renderer).
         hash_fn: ``Path -> str`` file-byte change-detection hash (default
-            :func:`~ragdoc.pipeline.sync.file_hash`, SHA-256 of bytes). Used only in direct mode.
+            :func:`~ragdoc.pipeline.sync.file_hash`, SHA-256 of bytes).
         concurrency: max sources processed concurrently.
 
     Raises:
         TypeError: if *extractor* does not implement the ``Extractor`` protocol.
-        ValueError: if *pipeline* carries a non-default chunker, or — in Boundary-2 mode — if it
-            carries processors or a custom parser.
     """
 
     def __init__(
         self,
-        pipeline: DocumentPipeline,
+        ingest: IngestPipeline,
         extractor: Extractor[PayloadT],
         mention_store: MentionStore,
-        document_store: DocumentStore | None = None,
         splitter: Splitter | None = None,
         hash_fn: Callable[[Path], str] = file_hash,
         concurrency: int | asyncio.Semaphore = 10,
     ) -> None:
+        self._wire(
+            ingest=ingest,
+            extractor=extractor,
+            mention_store=mention_store,
+            document_store=None,
+            splitter=splitter,
+            hash_fn=hash_fn,
+            concurrency=concurrency,
+        )
+
+    @classmethod
+    def from_document_store(
+        cls,
+        extractor: Extractor[PayloadT],
+        mention_store: MentionStore,
+        document_store: DocumentStore,
+        splitter: Splitter | None = None,
+        concurrency: int | asyncio.Semaphore = 10,
+    ) -> MentionStorePipeline[PayloadT]:
+        """Boundary-2 constructor: split + extract Documents read from *document_store*.
+
+        There is deliberately no ingest/parser/processors parameter: Documents in the store
+        were parsed and processed at Boundary 1
+        (:class:`~ragdoc.pipeline.document_store_pipeline.DocumentStorePipeline`), and
+        re-running the processor chain is destructive.
+
+        Args:
+            extractor: the :class:`~ragdoc.extraction.extractor.Extractor` run on each split.
+            mention_store: target :class:`MentionStore`.
+            document_store: source :class:`~ragdoc.pipeline.stores.DocumentStore` holding
+                already-parsed-and-processed Documents.
+            splitter: ``Document -> list[Document]`` splitter run before extraction
+                (``None`` builds the default token splitter).
+            concurrency: max sources processed concurrently.
+
+        Returns:
+            A Boundary-2 ``MentionStorePipeline``; its :meth:`plan` / :meth:`run` take
+            ``source_id`` strings (or ``None`` for every document in the store).
+        """
+        self = cls.__new__(cls)
+        self._wire(
+            ingest=None,
+            extractor=extractor,
+            mention_store=mention_store,
+            document_store=document_store,
+            splitter=splitter,
+            hash_fn=file_hash,
+            concurrency=concurrency,
+        )
+        return self
+
+    def _wire(
+        self,
+        *,
+        ingest: IngestPipeline | None,
+        extractor: Extractor[PayloadT],
+        mention_store: MentionStore,
+        document_store: DocumentStore | None,
+        splitter: Splitter | None,
+        hash_fn: Callable[[Path], str],
+        concurrency: int | asyncio.Semaphore,
+    ) -> None:
+        """Shared initialisation for both constructors."""
         if not isinstance(extractor, Extractor):
             raise TypeError("extractor must implement the Extractor protocol: async extract(document) -> list[Mention]")
-        if pipeline.has_custom_chunker:
-            raise ValueError(
-                "MentionStorePipeline extracts mentions, not chunks; its DocumentPipeline must not "
-                "carry a chunker. Configure chunking on a VectorStorePipeline instead."
-            )
-        if document_store is not None:
-            misplaced: list[str] = []
-            if pipeline.has_processors:
-                misplaced.append("processors (they ran once at Boundary 1; re-running is destructive)")
-            if pipeline.has_custom_parser:
-                misplaced.append("a custom parser (the source is the document_store, not a file)")
-            if misplaced:
-                raise ValueError(
-                    "A Boundary-2 MentionStorePipeline (document_store given) splits and extracts "
-                    "Documents loaded from the store; its DocumentPipeline must not carry "
-                    + " or ".join(misplaced)
-                    + ". Configure those on the DocumentStorePipeline (Boundary 1) instead."
-                )
-
-        self._pipeline = pipeline
+        self._ingest = ingest
         self._extractor = extractor
         self._store = mention_store
         self._document_store = document_store
@@ -143,7 +188,9 @@ class MentionStorePipeline(Generic[PayloadT]):
 
     @property
     def _source_id_fn(self) -> Callable[[Path], str]:
-        return self._pipeline.source_id_fn
+        if self._ingest is None:  # pragma: no cover - only read on the direct path
+            raise AssertionError("source_id_fn is a direct-mode concern; Boundary 2 has no paths")
+        return self._ingest.source_id_fn
 
     def _get_splitter(self) -> Splitter:
         if self._splitter is not None:
@@ -182,7 +229,9 @@ class MentionStorePipeline(Generic[PayloadT]):
 
     async def _extract_source(self, path: Path, source_id: str, file_hash: str) -> list[Mention[PayloadT]]:
         """Parse → process → split → extract one source file."""
-        parent: Document | None = await self._pipeline.parse_and_process(path)
+        if self._ingest is None:  # pragma: no cover - wired only in direct mode
+            raise AssertionError("_extract_source called without an IngestPipeline")
+        parent: Document | None = await self._ingest.run(path)
         if parent is None:
             logger.info(f"MentionStorePipeline: document filtered out: {path.name}")
             return []
@@ -265,11 +314,11 @@ class MentionStorePipeline(Generic[PayloadT]):
     ) -> UpdateResult:
         """Streaming, per-source sync.
 
-        * **Direct** (no ``document_store``): *sources* is an iterable of file ``Path``\\ s
-          (required). Unchanged files (by file-byte ``source_hash``) are skipped with no LLM call.
-        * **Boundary-2** (``document_store`` given): *sources* is an iterable of ``source_id``
-          strings, or ``None`` for every document in the store. Unchanged Documents (by
-          ``content_hash``) are skipped with no LLM call.
+        * **Direct**: *sources* is an iterable of file ``Path``\\ s (required). Unchanged
+          files (by file-byte ``source_hash``) are skipped with no LLM call.
+        * **Boundary-2** (:meth:`from_document_store`): *sources* is an iterable of
+          ``source_id`` strings, or ``None`` for every document in the store. Unchanged
+          Documents (by ``content_hash``) are skipped with no LLM call.
         """
         return await self._engine.run(await self._resolve(sources), delete_orphans)
 
@@ -280,9 +329,9 @@ class MentionStorePipeline(Generic[PayloadT]):
     ) -> ChangeSet[Mention[PayloadT]]:
         """Compute the mention change set without touching the mention store.
 
-        * **Direct** (no ``document_store``): *sources* is an iterable of file ``Path``\\ s.
-        * **Boundary-2** (``document_store`` given): *sources* is an iterable of ``source_id``
-          strings, or ``None`` for every document in the store.
+        * **Direct**: *sources* is an iterable of file ``Path``\\ s.
+        * **Boundary-2** (:meth:`from_document_store`): *sources* is an iterable of
+          ``source_id`` strings, or ``None`` for every document in the store.
 
         Returns:
             A ``ChangeSet[Mention[P]]``; reload from disk with

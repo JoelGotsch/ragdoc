@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from ragdoc.pipeline import DocumentPipeline, LocalDocumentStore, VectorStorePipeline
+from ragdoc.pipeline import ChunkPipeline, LocalDocumentStore, VectorStorePipeline
 
 from .conftest import MemoryVectorStore, make_document
 
@@ -27,8 +27,8 @@ async def test_plan_unchanged_corpus_invokes_no_pandoc(tmp_path: Path, monkeypat
         await doc_store.upsert([doc])
 
     vec = MemoryVectorStore()
-    pipeline = VectorStorePipeline(
-        pipeline=DocumentPipeline(processors=[]),
+    pipeline = VectorStorePipeline.from_document_store(
+        chunk=ChunkPipeline(),
         vector_store=vec,
         document_store=doc_store,
     )

@@ -24,8 +24,10 @@ from ragdoc.metadata import BaseMetadata
 from ragdoc.parsing import load
 from ragdoc.pipeline import (
     ChangeSet,
+    ChunkPipeline,
     DocumentPipeline,
     DocumentStorePipeline,
+    IngestPipeline,
     TokenSplitter,
     UpdateResult,
     VectorStorePipeline,
@@ -38,6 +40,7 @@ __all__ = [
     "ChangeSet",
     "ChatClient",
     "Chunk",
+    "ChunkPipeline",
     "Document",
     "DocumentList",
     "DocumentPipeline",
@@ -47,6 +50,7 @@ __all__ = [
     "Footnote",
     "Heading",
     "Image",
+    "IngestPipeline",
     "InlineRef",
     "LLMChunker",
     "LLMClient",

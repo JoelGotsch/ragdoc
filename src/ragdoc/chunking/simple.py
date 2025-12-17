@@ -48,10 +48,10 @@ class SimpleChunker(Chunker):
     distinct embedding content, use :class:`~ragdoc.chunking.llm.LLMChunker`.
 
     Chunk ids: chunkers leave ``Chunk.id`` at its uuid4 default —
-    :meth:`~ragdoc.pipeline.DocumentPipeline.chunk_document` is the single id
+    :meth:`~ragdoc.pipeline.ChunkPipeline.run` is the single id
     authority and mints deterministic ids via
     :func:`~ragdoc.chunking.provenance.mint_chunk_id` (override with
-    ``DocumentPipeline(chunk_id_fn=...)``).  Standalone chunker users get uuid4
+    ``ChunkPipeline(chunk_id_fn=...)``).  Standalone chunker users get uuid4
     ids and may assign their own afterwards.
 
     Args:

@@ -1,5 +1,9 @@
 """ragdoc.pipeline — high-level pipeline facade.
 
+The pipeline is split at the two sync boundaries: :class:`IngestPipeline`
+(parse → process; Boundary 1) and :class:`ChunkPipeline` (split → chunk;
+Boundary 2).  :class:`DocumentPipeline` composes both for the direct path.
+
 Scenario A: linear pipeline
     :class:`DocumentPipeline` composes parse → process → split → chunk into a
     single async call.
@@ -40,7 +44,7 @@ from ragdoc.pipeline.embedders import (
     embedding_content_text,
     prompt_content_text,
 )
-from ragdoc.pipeline.linear import DocumentPipeline, PipelineResult
+from ragdoc.pipeline.linear import ChunkPipeline, DocumentPipeline, IngestPipeline, PipelineResult
 from ragdoc.pipeline.local_document_store import LocalDocumentStore
 from ragdoc.pipeline.splitter import TokenSplitter
 from ragdoc.pipeline.stores import DocumentStore, SourceState, VectorStore
@@ -57,12 +61,14 @@ from ragdoc.pipeline.vectorstore import VectorStorePipeline
 
 __all__ = [
     "ChangeSet",
+    "ChunkPipeline",
     "DocumentPipeline",
     "DocumentStore",
     "DocumentStorePipeline",
     "Embedder",
     "EmbedderConfig",
     "EmbeddingsClient",
+    "IngestPipeline",
     "LocalDocumentStore",
     "OpenAIEmbedder",
     "Parser",

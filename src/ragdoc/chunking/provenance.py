@@ -1,8 +1,8 @@
 """Chunk provenance resolution and deterministic chunk-id minting.
 
 One fallback chain (:func:`resolve_chunk_provenance`) is shared by every chunker and by
-:meth:`~ragdoc.pipeline.DocumentPipeline.chunk_document`, so all chunks of one source carry
-identical provenance.  Chunk ids are minted **pipeline-side** by ``chunk_document`` over
+:meth:`~ragdoc.pipeline.ChunkPipeline.run`, so all chunks of one source carry
+identical provenance.  Chunk ids are minted **pipeline-side** by ``ChunkPipeline.run`` over
 ``(source_id, split_sequence, chunk_ordinal, content_hash)`` — a chunker cannot know its
 split's position, so id minting does not live in chunkers.
 
@@ -28,7 +28,7 @@ ChunkIdFn = Callable[[str, int, int, str], str]
 """``(source_id, split_sequence, chunk_ordinal, content_hash) -> chunk id``.
 
 ``split_sequence`` is the 1-based position of the split within its source document (from
-positional enumeration in ``chunk_document``); ``chunk_ordinal`` is the 0-based index of the
+positional enumeration in ``ChunkPipeline.run``); ``chunk_ordinal`` is the 0-based index of the
 chunk within its split (``LLMChunker`` emits several chunks per split).
 """
 

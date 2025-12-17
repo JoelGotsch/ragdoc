@@ -161,7 +161,7 @@ class LLMChunker(Chunker):
 
     Note:
         Chunkers leave ``Chunk.id`` at its uuid4 default —
-        :meth:`~ragdoc.pipeline.DocumentPipeline.chunk_document` mints
+        :meth:`~ragdoc.pipeline.ChunkPipeline.run` mints
         deterministic ids via :func:`~ragdoc.chunking.provenance.mint_chunk_id`.
         Ids are stable across runs only while the model returns the same number
         of summaries for the same content.

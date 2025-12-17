@@ -23,7 +23,6 @@ from ragdoc.extraction.kg import (
 from ragdoc.extraction.kg_resolution import KnowledgeGraphResolutionPipeline
 from ragdoc.extraction.pipeline import MentionStorePipeline
 from ragdoc.extraction.schema import EdgeRef, GraphSchema
-from ragdoc.pipeline.linear import DocumentPipeline
 from ragdoc.pipeline.stores import SourceState
 
 from .conftest import MemoryEntityStore, MemoryMentionStore, dict_embed, no_merge_reviewer
@@ -131,8 +130,7 @@ async def test_kg_extractor_composes_with_mention_store_pipeline():
     # The shipped MentionStorePipeline takes ONE extractor and ONE mention_store. Variant (a) makes
     # this work without modification.
     mention_store = MemoryMentionStore()
-    pipeline = MentionStorePipeline(
-        pipeline=DocumentPipeline(),
+    pipeline = MentionStorePipeline.from_document_store(
         extractor=kg_extractor,
         mention_store=mention_store,
         document_store=doc_store,

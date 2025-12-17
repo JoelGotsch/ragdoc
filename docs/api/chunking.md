@@ -14,7 +14,7 @@ record ready for loading into a vector store.
 ## Chunk provenance
 
 Chunk provenance is resolved uniformly (one fallback chain) and chunk ids are minted
-pipeline-side by `DocumentPipeline.chunk_document`.
+pipeline-side by `ChunkPipeline.run`.
 
 ### ChunkProvenance
 

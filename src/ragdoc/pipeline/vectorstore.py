@@ -1,13 +1,22 @@
 """VectorStorePipeline: incremental vector-store sync via plan() / apply() / run().
 
-:class:`VectorStorePipeline` composes a
-:class:`~ragdoc.pipeline.linear.DocumentPipeline` with a
+:class:`VectorStorePipeline` composes a pipeline with a
 :class:`~ragdoc.pipeline.stores.VectorStore` over the shared
-:class:`~ragdoc.pipeline.sync.SyncEngine`.
+:class:`~ragdoc.pipeline.sync.SyncEngine`.  It serves two boundaries through two
+constructors, so an illegal configuration is a ``TypeError`` at construction:
+
+* ``VectorStorePipeline(pipeline=DocumentPipeline(...), vector_store=...)`` — the **direct
+  path** (parse → process → split → chunk per file).
+* :meth:`VectorStorePipeline.from_document_store` — **Boundary 2**: takes a
+  :class:`~ragdoc.pipeline.linear.ChunkPipeline` (split → chunk only) and reads
+  already-parsed-and-processed Documents from a
+  :class:`~ragdoc.pipeline.stores.DocumentStore`.  A ``ChunkPipeline`` cannot carry
+  processors or a parser, so re-running the (destructive) processor chain on stored
+  documents is unexpressible.
 
 Two entry points:
 
-* :meth:`run` — the **standard** path. Syncs **per source** (parse → chunk → embed →
+* :meth:`run` — the **standard** path. Syncs **per source** (produce → embed →
   delete-then-upsert), writing each source as soon as it is ready. Each source is atomic
   (embed-first per source); the corpus is **not** all-or-nothing — a completed source stays
   durable even if a later one fails. Flat peak memory (one source's chunks at a time).
@@ -22,9 +31,9 @@ state, differing only in scheduling (per-source embed-and-write versus whole-cor
 embed-first). Use :meth:`plan` / :meth:`apply` when you need to review changes or want
 whole-corpus embed-first semantics.
 
-Provenance: each chunk carries ``source_id`` (from the ``DocumentPipeline``'s ``source_id_fn``)
-and ``source_hash`` (file-byte SHA-256, set here via ``hash_fn``).  ``chunk.metadata`` is never
-modified.
+Provenance: each chunk carries ``source_id`` (from the ``IngestPipeline``'s
+``source_id_fn``) and ``source_hash`` (file-byte SHA-256, set here via ``hash_fn``).
+``chunk.metadata`` is never modified.
 """
 
 from __future__ import annotations
@@ -53,19 +62,20 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from ragdoc.chunking.chunk import Chunk
     from ragdoc.pipeline.embedders import EmbedderConfig
-    from ragdoc.pipeline.linear import DocumentPipeline
+    from ragdoc.pipeline.linear import ChunkPipeline, DocumentPipeline
     from ragdoc.pipeline.stores import DocumentStore, VectorStore
 
 
 class VectorStorePipeline(Generic[TMetadata]):
     """Incremental vector-store synchronisation via plan/apply/run.
 
-    In **Boundary-2 mode** (a ``document_store`` is given), the pipeline loads already
-    parsed-and-processed Documents from the store and only splits + chunks them. Processors and a
-    custom parser are therefore meaningless here and are **rejected at construction** (not
-    silently ignored): processing already happened at Boundary 1 (re-running it is destructive),
-    and the source is the store, not a file. In **direct mode** (no ``document_store``) every
-    stage runs and no such restriction applies.
+    Two constructors, one per boundary:
+
+    * ``VectorStorePipeline(...)`` — **direct mode**: every stage runs per file
+      (parse → process → split → chunk → embed → write).  Change detection uses the
+      file-byte ``source_hash``.
+    * :meth:`from_document_store` — **Boundary-2 mode**: split + chunk Documents read
+      from a ``DocumentStore``.  Change detection uses the Document's ``content_hash``.
 
     Args:
         pipeline: :class:`~ragdoc.pipeline.linear.DocumentPipeline` for parsing,
@@ -74,9 +84,6 @@ class VectorStorePipeline(Generic[TMetadata]):
         vector_store: :class:`~ragdoc.pipeline.stores.VectorStore` implementation.
         embedders: Named embedder configs.  Each key becomes an entry in
             ``chunk.named_embeddings``.  Embedders run concurrently.
-        document_store: Optional :class:`~ragdoc.pipeline.stores.DocumentStore`. When set,
-            the pipeline runs in **Boundary-2 mode** (chunk Documents read from the store)
-            instead of the direct file path.
         hash_fn: ``Path -> str`` producing the file-byte change-detection hash.  Defaults to
             :func:`~ragdoc.pipeline.sync.file_hash` (SHA-256 of the raw bytes).  Override for
             custom filesystems (e.g. S3) where ``path.read_bytes()`` is unavailable.
@@ -89,25 +96,75 @@ class VectorStorePipeline(Generic[TMetadata]):
         pipeline: DocumentPipeline[TMetadata],
         vector_store: VectorStore,
         embedders: dict[str, EmbedderConfig] | None = None,
-        document_store: DocumentStore | None = None,
         hash_fn: Callable[[Path], str] = file_hash,
         concurrency: int | asyncio.Semaphore = 10,
     ) -> None:
-        if document_store is not None:
-            misplaced: list[str] = []
-            if pipeline.has_processors:
-                misplaced.append("processors (they ran once at Boundary 1; re-running is destructive)")
-            if pipeline.has_custom_parser:
-                misplaced.append("a custom parser (the source is the document_store, not a file)")
-            if misplaced:
-                raise ValueError(
-                    "A Boundary-2 VectorStorePipeline (document_store given) splits and chunks "
-                    "Documents loaded from the store; its DocumentPipeline must not carry "
-                    + " or ".join(misplaced)
-                    + ". Configure those on the DocumentStorePipeline (Boundary 1) instead."
-                )
+        self._wire(
+            pipeline=pipeline,
+            chunk=None,
+            vector_store=vector_store,
+            document_store=None,
+            embedders=embedders,
+            hash_fn=hash_fn,
+            concurrency=concurrency,
+        )
 
+    @classmethod
+    def from_document_store(
+        cls,
+        chunk: ChunkPipeline[TMetadata],
+        vector_store: VectorStore,
+        document_store: DocumentStore,
+        embedders: dict[str, EmbedderConfig] | None = None,
+        concurrency: int | asyncio.Semaphore = 10,
+    ) -> VectorStorePipeline[TMetadata]:
+        """Boundary-2 constructor: chunk + embed Documents read from *document_store*.
+
+        Takes a :class:`~ragdoc.pipeline.linear.ChunkPipeline` — the boundary-appropriate
+        type.  Processing already happened at Boundary 1
+        (:class:`~ragdoc.pipeline.document_store_pipeline.DocumentStorePipeline`) and a
+        ``ChunkPipeline`` cannot carry processors or a parser, so re-running them here is
+        unexpressible rather than merely rejected.
+
+        Args:
+            chunk: :class:`~ragdoc.pipeline.linear.ChunkPipeline` (splitter + chunker +
+                ``chunk_id_fn`` + ``metadata_type``).
+            vector_store: Target :class:`~ragdoc.pipeline.stores.VectorStore`.
+            document_store: Source :class:`~ragdoc.pipeline.stores.DocumentStore` holding
+                already-parsed-and-processed Documents.
+            embedders: Named embedder configs (see class docstring).
+            concurrency: Max sources processed concurrently.
+
+        Returns:
+            A Boundary-2 ``VectorStorePipeline``; its :meth:`plan` / :meth:`run` take
+            ``source_id`` strings (or ``None`` for every document in the store).
+        """
+        self = cls.__new__(cls)
+        self._wire(
+            pipeline=None,
+            chunk=chunk,
+            vector_store=vector_store,
+            document_store=document_store,
+            embedders=embedders,
+            hash_fn=file_hash,
+            concurrency=concurrency,
+        )
+        return self
+
+    def _wire(
+        self,
+        *,
+        pipeline: DocumentPipeline[TMetadata] | None,
+        chunk: ChunkPipeline[TMetadata] | None,
+        vector_store: VectorStore,
+        document_store: DocumentStore | None,
+        embedders: dict[str, EmbedderConfig] | None,
+        hash_fn: Callable[[Path], str],
+        concurrency: int | asyncio.Semaphore,
+    ) -> None:
+        """Shared initialisation for both constructors."""
         self._pipeline = pipeline
+        self._chunk = chunk
         self._vector_store = vector_store
         self._embedders = embedders or {}
         self._document_store = document_store
@@ -123,7 +180,9 @@ class VectorStorePipeline(Generic[TMetadata]):
 
     @property
     def _source_id_fn(self) -> Callable[[Path], str]:
-        # Single source of truth — the DocumentPipeline owns it.
+        # Single source of truth — the DocumentPipeline's IngestPipeline owns it.
+        if self._pipeline is None:  # pragma: no cover - only read on the direct path
+            raise AssertionError("source_id_fn is a direct-mode concern; Boundary 2 has no paths")
         return self._pipeline.source_id_fn
 
     # ------------------------------------------------------------------
@@ -134,8 +193,10 @@ class VectorStorePipeline(Generic[TMetadata]):
         """Direct mode: parse → process → split → chunk one file."""
         if src.path is None:  # pragma: no cover - direct-mode resolution always sets it
             raise AssertionError("direct-mode SyncSource without a path")
+        if self._pipeline is None:  # pragma: no cover - wired only in direct mode
+            raise AssertionError("_produce_from_path called without a DocumentPipeline")
         chunks = await self._pipeline.run(src.path)
-        # source_id is already stamped by chunk_document (via doc.source_id, same
+        # source_id is already stamped by the pipeline (via doc.source_id, same
         # source_id_fn). source_hash is a sync-only concern unknown at chunk time.
         for chunk in chunks:
             chunk.source_hash = src.change_token
@@ -148,13 +209,13 @@ class VectorStorePipeline(Generic[TMetadata]):
 
     async def _produce_from_doc_store(self, src: SyncSource) -> SourceChange[Chunk] | None:
         """Boundary-2 mode: split + chunk a Document loaded from the DocumentStore."""
-        if self._document_store is None:  # pragma: no cover - wired only when set
-            raise AssertionError("_produce_from_doc_store called without a document_store")
+        if self._document_store is None or self._chunk is None:  # pragma: no cover - wired only when set
+            raise AssertionError("_produce_from_doc_store called without a document_store/ChunkPipeline")
         doc = await self._document_store.get_document(src.source_id)
         if doc is None:
             return None  # vanished between list_source_state and get_document → engine warns + skips
         # Already processed at Boundary 1 — split/chunk only.
-        chunks = await self._pipeline.chunk_document(doc)
+        chunks = await self._chunk.run(doc)
         return SourceChange(
             source_id=src.source_id,
             source_hash=doc.source_hash or "",
@@ -205,14 +266,15 @@ class VectorStorePipeline(Generic[TMetadata]):
     ) -> ChangeSet[Chunk]:
         """Compute the change set without touching the vector store.
 
-        Two modes, selected by whether a ``document_store`` was configured:
+        Two modes, selected by which constructor built this pipeline:
 
-        * **Direct (no document_store):** *sources* is an iterable of file ``Path``\\ s
-          (required).  Files are hashed and compared via ``vector_store.list_source_state()``;
-          changed files are parsed/chunked.  ``source_hash`` (file bytes) is the change token.
-        * **From DocumentStore:** *sources* is an iterable of ``source_id`` strings, or
-          ``None`` for every document in the store.  Documents whose ``content_hash`` differs
-          from the vector store's are re-chunked.  ``content_hash`` is the change token.
+        * **Direct:** *sources* is an iterable of file ``Path``\\ s (required).  Files are
+          hashed and compared via ``vector_store.list_source_state()``; changed files are
+          parsed/chunked.  ``source_hash`` (file bytes) is the change token.
+        * **Boundary 2** (:meth:`from_document_store`): *sources* is an iterable of
+          ``source_id`` strings, or ``None`` for every document in the store.  Documents
+          whose ``content_hash`` differs from the vector store's are re-chunked.
+          ``content_hash`` is the change token.
 
         Args:
             sources: Paths (direct) or source_ids / ``None`` (from DocumentStore).
@@ -263,8 +325,8 @@ class VectorStorePipeline(Generic[TMetadata]):
         or a reviewable :class:`~ragdoc.pipeline.changeset.ChangeSet`.
 
         Args:
-            sources: Paths (direct mode) or source_ids / ``None`` for all (from a
-                DocumentStore). See :meth:`plan`.
+            sources: Paths (direct mode) or source_ids / ``None`` for all (Boundary-2
+                mode). See :meth:`plan`.
             delete_orphans: opt-in orphan removal (footgun in direct mode: pass the full
                 corpus).
 
