@@ -72,6 +72,8 @@ PARSING → PROCESSING ─┐
                Chunk
 ```
 
+The pipeline classes are split at the sync boundaries: **`IngestPipeline`** (parser + processors + `source_id_fn`; Boundary 1) and **`ChunkPipeline`** (splitter + chunker + `chunk_id_fn` + `metadata_type`; Boundary 2). **`DocumentPipeline`** composes both for the direct path (`pipeline.ingest` / `pipeline.chunk`); its flat kwargs (`DocumentPipeline(splitter=…)`) delegate into freshly built sub-pipelines. A stage on the wrong side is a `TypeError` at construction (there is no parameter for it) — do not add boundary-validation predicates or runtime rejections.
+
 The pipeline is **not strictly linear**:
 - Splitting uses rendering internally to measure token budgets → splitting is rendering-aware.
 - Post-split processors run after splitting on focused sub-documents, because splits are still `Document` objects.
@@ -95,7 +97,7 @@ Each parser converts a format → `Document` and sets parser-specific fields (e.
 
 Built-in processors: `HeadingLevelProcessor`, `TitleDetectionProcessor`, `LLMHeadingResolver`, `FootnoteProcessor`, `EmptyDocumentFilter`. Pluggable strategies use `Protocol` (e.g., `FootnoteResolver`).
 
-Processors may return `None` to drop a document. `ProcessingPipeline` short-circuits on `None`; `DocumentPipeline._process_one()` returns `[]` chunks for filtered documents.
+Processors may return `None` to drop a document. `ProcessingPipeline` short-circuits on `None`; `IngestPipeline.run()` returns `None` and `DocumentPipeline.run()` returns `[]` chunks for filtered documents.
 
 ### Stage 3: Rendering (`src/ragdoc/rendering/`)
 
@@ -115,15 +117,14 @@ Incremental synchronisation follows a **plan → apply** shape across two bounda
 - `source_hash` — SHA-256 of the **raw source-file bytes** (Boundary 1 / direct path).
 - `content_hash` — `Document.content_hash()`, a canonical-JSON hash over `(title, elements)` (pandoc-free, dependency-stable; Boundary 2). `None` ⇒ treated as "always changed".
 
-**Provenance ownership.** `DocumentPipeline` owns `source_id_fn` (`Path -> str`, default `p.name`); it stamps `document.source_id`, and `chunking/provenance.py` (`resolve_chunk_provenance`) is the single fallback chain stamping `source_id`/`source_hash`/`content_hash` onto every `Chunk`. `source_id` is never None (falls back `source_id → source_path → doc.id`); `source_hash` is **honestly optional** (`str | None`) — the file-byte hash from the sync pipelines' `hash_fn`, never faked from the content hash. **Chunk ids are minted by `DocumentPipeline.chunk_document`** (not by chunkers) via `mint_chunk_id` over `(source_id, split_sequence, chunk_ordinal, content_hash)` — deterministic and collision-free across identical-content splits; override with `DocumentPipeline(chunk_id_fn=…)`. The file-byte `hash_fn` is a sync concern living on the sync pipelines. **There is no `ProvenanceProcessor`** (do not add one).
+**Provenance ownership.** `IngestPipeline` owns `source_id_fn` (`Path -> str`, default `p.name`); it stamps `document.source_id`, and `chunking/provenance.py` (`resolve_chunk_provenance`) is the single fallback chain stamping `source_id`/`source_hash`/`content_hash` onto every `Chunk`. `source_id` is never None (falls back `source_id → source_path → doc.id`); `source_hash` is **honestly optional** (`str | None`) — the file-byte hash from the sync pipelines' `hash_fn`, never faked from the content hash. **Chunk ids are minted by `ChunkPipeline.run`** (not by chunkers) via `mint_chunk_id` over `(source_id, split_sequence, chunk_ordinal, content_hash)` — deterministic and collision-free across identical-content splits; override with `ChunkPipeline(chunk_id_fn=…)`. The file-byte `hash_fn` is a sync concern living on the sync pipelines. **There is no `ProvenanceProcessor`** (do not add one).
 
 `source_id_fn` strategies: `lambda p: p.name` (default), `str(p)` (full path), `str(p.relative_to(base_dir))` (portable). Duplicate source_ids raise `ValueError` before any processing.
 
-**Pipelines:**
-- `VectorStorePipeline(pipeline, vector_store, embedders=None, document_store=None, hash_fn=…, concurrency=10)`:
-  - **Direct mode** (no `document_store`): `plan(paths)` hashes files, compares `source_hash` via `vector_store.list_source_state()`, chunks changed files. `apply()` embeds **all** chunks first (non-destructive), then per source delete-then-upsert.
-  - **Mode 2** (`document_store` set): `plan(source_ids=None)` reads Documents from the store, compares `content_hash`, re-chunks changed ones via `DocumentPipeline.chunk_document` (no parser).
-- `DocumentStorePipeline(pipeline, document_store, …)` — Boundary 1: parses/processes files into Documents and syncs them into a `DocumentStore` (payload is `Document`, no embedding). Uses `DocumentPipeline.parse_and_process`.
+**Pipelines** (each takes the boundary-appropriate pipeline type, so a misplaced stage is a `TypeError` at construction — unconstructible, not runtime-rejected):
+- `VectorStorePipeline(pipeline: DocumentPipeline, vector_store, embedders=None, hash_fn=…, concurrency=10)` — **direct mode**: `plan(paths)` hashes files, compares `source_hash` via `vector_store.list_source_state()`, chunks changed files. `apply()` embeds **all** chunks first (non-destructive), then per source delete-then-upsert.
+- `VectorStorePipeline.from_document_store(chunk: ChunkPipeline, vector_store, document_store, embedders=None, concurrency=10)` — **Boundary 2**: `plan(source_ids=None)` reads Documents from the store, compares `content_hash`, re-chunks changed ones via `ChunkPipeline.run` (a `ChunkPipeline` cannot carry a parser or processors).
+- `DocumentStorePipeline(ingest: IngestPipeline, document_store, …)` — Boundary 1: parses/processes files into Documents and syncs them into a `DocumentStore` (payload is `Document`, no embedding; an `IngestPipeline` cannot carry a splitter or chunker). Uses `IngestPipeline.run`.
 
 `delete_orphans` defaults to **`False`** (footgun guard: in direct mode only pass your complete corpus). `UpdateResult` (`processed`/`skipped`/`deleted`/`errors`) is keyed on `source_id`.
 
@@ -143,7 +144,7 @@ Structured extraction is a **first-class typed stage**, not a processor. The `Ex
 - **`KnowledgeGraphExtractor(schema, ...)`** (`kg.py`) — multi-type node + edge extraction against a `GraphSchema`; rewrites chunk-local edge refs to real mention ids; recursive halving fallback on LLM failure; optional gleaning pass. **`GraphSchema.patterns` are enforced**: legal triples are injected into the system prompt (`render_patterns_prompt`) and every extracted edge is validated against `allowed_pattern_kinds(schema)` — violations drop (counted + warned) or raise per `ExtractionSettings.on_pattern_violation`. Every edge type must appear in ≥1 pattern (declaration-time rule); union sizes are checked at extractor construction against `settings.max_union_size`.
 - **`ExtractionSettings`** (env prefix `EXTRACTION_`) — `system_prompt` and `request_timeout` are honored by both extractors; the validator never injects a built-in default prompt (each extractor resolves its own fallback). KG knobs: `gleaning`, `max_union_size`, `halving_max_depth`, `halving_min_chars`, `on_pattern_violation`.
 - Shared extraction plumbing (`resolve_model`/`resolve_renderer`/`resolve_tokenizer`, `parse_with_retry`, `build_messages`) lives once in `extraction/_llm.py`; `parse_with_retry` is a thin adapter mapping `ExtractionSettings` onto `ragdoc.llm.call_structured` — do not inline retry loops in extractors.
-- **`MentionStorePipeline(pipeline, extractor, mention_store, ...)`** — the mention analogue of the sync pipelines (same `plan`/`apply`/`run`, direct + Boundary-2 modes); consumes `extract()` directly and rejects non-`Extractor` arguments with `TypeError`.
+- **`MentionStorePipeline(ingest: IngestPipeline, extractor, mention_store, ...)`** — the mention analogue of the sync pipelines (same `plan`/`apply`/`run`); Boundary-2 mode is the separate constructor `MentionStorePipeline.from_document_store(extractor, mention_store, document_store, ...)` (no ingest/parser/processors parameter exists there). Consumes `extract()` directly and rejects non-`Extractor` arguments with `TypeError`.
 
 ### LLM reliability layer (`src/ragdoc/llm.py`)
 

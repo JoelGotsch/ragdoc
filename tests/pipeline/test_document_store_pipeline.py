@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 from ragdoc.document import Document
-from ragdoc.pipeline import DocumentPipeline
+from ragdoc.pipeline import IngestPipeline
 from ragdoc.pipeline.document_store_pipeline import DocumentStorePipeline
 from ragdoc.processing.base import DocumentProcessor
 
@@ -49,7 +49,7 @@ def make_doc_pipeline(doc_store, processors=None, source_id_fn=None) -> Document
     if source_id_fn is not None:
         dp_kwargs["source_id_fn"] = source_id_fn
     return DocumentStorePipeline(
-        pipeline=DocumentPipeline(parser=_parse, processors=processors, **dp_kwargs),
+        ingest=IngestPipeline(parser=_parse, processors=processors, **dp_kwargs),
         document_store=doc_store,
     )
 

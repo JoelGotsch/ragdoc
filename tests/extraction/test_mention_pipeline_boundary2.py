@@ -13,7 +13,6 @@ import pytest
 from ragdoc.document import Document, Heading, Paragraph
 from ragdoc.extraction.pipeline import MentionStorePipeline
 from ragdoc.extraction.structured import StructuredExtractor
-from ragdoc.pipeline.linear import DocumentPipeline
 from ragdoc.pipeline.stores import SourceState
 from ragdoc.processing.base import DocumentProcessor
 
@@ -79,8 +78,8 @@ def make_b2_pipeline(
     extractor: StructuredExtractor[Event],
     mstore: MemoryMentionStore,
 ) -> MentionStorePipeline[Event]:
-    return MentionStorePipeline(
-        pipeline=DocumentPipeline(),  # no parser, no processors — Boundary 2
+    return MentionStorePipeline.from_document_store(
+        # no parser, no processors — Boundary 2 has no ingest parameter at all
         extractor=extractor,
         mention_store=mstore,
         document_store=docs,
@@ -185,28 +184,28 @@ class _SpyProcessor(DocumentProcessor):
         return document
 
 
-def test_boundary2_rejects_processors_on_pipeline(docs, mstore):
+def test_boundary2_processors_unexpressible(docs, mstore):
     """Documents loaded from the store were already processed at Boundary 1; re-running the
-    chain is destructive. Reject at construction."""
-    with pytest.raises(ValueError, match="must not carry"):
-        MentionStorePipeline(
-            pipeline=DocumentPipeline(processors=[_SpyProcessor()]),
+    chain is destructive. The Boundary-2 constructor has no processors parameter at all."""
+    with pytest.raises(TypeError):
+        MentionStorePipeline.from_document_store(
             extractor=make_extractor([Event(title="Ev")]),
             mention_store=mstore,
             document_store=docs,
+            processors=[_SpyProcessor()],  # type: ignore[call-arg]
         )
 
 
-def test_boundary2_rejects_custom_parser_on_pipeline(docs, mstore):
+def test_boundary2_custom_parser_unexpressible(docs, mstore):
     async def _custom_parser(path):  # pragma: no cover
         raise AssertionError("must not be used")
 
-    with pytest.raises(ValueError, match="custom parser"):
-        MentionStorePipeline(
-            pipeline=DocumentPipeline(parser=_custom_parser),
+    with pytest.raises(TypeError):
+        MentionStorePipeline.from_document_store(
             extractor=make_extractor([Event(title="Ev")]),
             mention_store=mstore,
             document_store=docs,
+            parser=_custom_parser,  # type: ignore[call-arg]
         )
 
 

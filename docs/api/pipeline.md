@@ -1,8 +1,26 @@
 # Pipeline API
 
 The `ragdoc.pipeline` module provides the high-level facade over all four
-pipeline stages.  See the [Pipeline Guide](../guide/pipeline.md) for usage
-examples.
+pipeline stages.  The pipeline is split at the two sync boundaries —
+`IngestPipeline` (parse → process) and `ChunkPipeline` (split → chunk) — with
+`DocumentPipeline` composing both for the direct path.  See the
+[Pipeline Guide](../guide/pipeline.md) for usage examples.
+
+## IngestPipeline
+
+::: ragdoc.pipeline.linear.IngestPipeline
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 3
+
+## ChunkPipeline
+
+::: ragdoc.pipeline.linear.ChunkPipeline
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 3
 
 ## DocumentPipeline
 

@@ -4,6 +4,52 @@ Pre-1.0: breaking changes land at will and are documented here.
 
 ## Unreleased
 
+> **⚠ BREAKING — the pipeline is split at the sync boundaries (Phase 9).**
+> `DocumentPipeline` is now the composition of two new classes: `IngestPipeline`
+> (parser + processors + `source_id_fn`; Boundary 1) and `ChunkPipeline` (splitter +
+> chunker + `chunk_id_fn` + `metadata_type`; Boundary 2), exposed as `pipeline.ingest` /
+> `pipeline.chunk`. Illegal configurations are now **unconstructible** (`TypeError` at
+> construction) instead of runtime-rejected prose `ValueError`s.
+
+### Added (Phase 9 — pipeline split by boundary)
+
+- **`IngestPipeline(parser=None, processors=None, source_id_fn=None)`** — parse → process →
+  stamp `source_id`; `run(path) -> Document | None`. Exported from `ragdoc` and
+  `ragdoc.pipeline`.
+- **`ChunkPipeline(splitter=None, chunker=None, chunk_id_fn=None, metadata_type=None)`** —
+  split → chunk → mint chunk ids; `run(document) -> list[Chunk]`. Exported from `ragdoc`
+  and `ragdoc.pipeline`.
+- **`VectorStorePipeline.from_document_store(chunk, vector_store, document_store, embedders=None, concurrency=10)`**
+  — the Boundary-2 constructor. Takes a `ChunkPipeline`, so processors/parsers on the
+  Boundary-2 path are unexpressible.
+- **`MentionStorePipeline.from_document_store(extractor, mention_store, document_store, splitter=None, concurrency=10)`**
+  — the Boundary-2 constructor for mention extraction (no ingest/parser/processors
+  parameter exists).
+
+### Changed (Phase 9)
+
+- **`DocumentPipeline`** now composes the two sub-pipelines: construct from
+  `ingest=`/`chunk=` or from the flat per-stage kwargs (which delegate into freshly built
+  sub-pipelines). Mixing a sub-pipeline with its own stages' flat kwargs is a `TypeError`.
+  `parse_and_process` → `pipeline.ingest.run`, `chunk_document` → `pipeline.chunk.run`.
+- **`DocumentStorePipeline(ingest: IngestPipeline, document_store, …)`** — takes the
+  Boundary-1 type directly (was `pipeline: DocumentPipeline`); a splitter/chunker has no
+  parameter to arrive through.
+- **`MentionStorePipeline(ingest: IngestPipeline, extractor, mention_store, …)`** — direct
+  mode takes the Boundary-1 type (was `pipeline: DocumentPipeline`); the `document_store`
+  constructor parameter moved to `from_document_store`.
+- **`VectorStorePipeline.__init__` no longer accepts `document_store`** — Boundary-2 mode
+  is `from_document_store` (see Added).
+
+### Removed (Phase 9)
+
+- The boundary-validation predicates `DocumentPipeline.has_splitter` /
+  `has_custom_chunker` / `has_processors` / `has_custom_parser` and the three
+  prose-rejection constructor blocks in the sync pipelines — the type split makes those
+  states unexpressible.
+- `DocumentPipeline.parse_and_process` and `DocumentPipeline.chunk_document` — use
+  `pipeline.ingest.run(path)` and `pipeline.chunk.run(document)`.
+
 > **⚠ MIGRATION — every stored `content_hash` and every chunk id changes once.**
 > `Document.content_hash()` is now a versioned canonical-JSON hash (`ragdoc.content_hash.v1`)
 > over `(title, elements)` — pure Python, pandoc-free. Its values differ from the old

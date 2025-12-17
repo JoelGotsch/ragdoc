@@ -107,13 +107,13 @@ async def test_llmchunker_chunks_do_not_share_metadata_dict():
 
 @pytest.mark.anyio
 async def test_llm_chunker_multi_chunk_ordinals_distinct():
-    """Through chunk_document, an N-summary response yields N distinct pipeline-minted ids."""
-    from ragdoc.pipeline import DocumentPipeline
+    """Through ChunkPipeline.run, an N-summary response yields N distinct pipeline-minted ids."""
+    from ragdoc.pipeline import ChunkPipeline
 
     chunker = LLMChunker(client=_mock_client(["t1", "t2", "t3"]), model="test")
     doc = Document(elements=[Paragraph(html="<p>hi</p>")])
     doc.source_id = "src"
-    chunks = await DocumentPipeline(chunker=chunker).chunk_document(doc)
+    chunks = await ChunkPipeline(chunker=chunker).run(doc)
     assert len(chunks) == 3
     assert len({c.id for c in chunks}) == 3
     assert {c.source_id for c in chunks} == {"src"}

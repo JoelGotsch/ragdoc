@@ -14,16 +14,16 @@ from __future__ import annotations
 import pytest
 
 from ragdoc.document import Document
-from ragdoc.pipeline import DocumentPipeline, VectorStorePipeline
+from ragdoc.pipeline import ChunkPipeline, VectorStorePipeline
 
 from .conftest import MemoryDocumentStore, MemoryVectorStore, make_document
 
 
 def make_mode2_pipeline(doc_store, vec_store) -> VectorStorePipeline:
-    # No parser needed — Mode 2 calls pipeline.chunk_document(doc). processors=[] (docs are
-    # already processed at Boundary 1).
-    return VectorStorePipeline(
-        pipeline=DocumentPipeline(processors=[]),
+    # No parser, no processors — Mode 2 takes a ChunkPipeline (docs are already
+    # processed at Boundary 1) and calls chunk.run(doc).
+    return VectorStorePipeline.from_document_store(
+        chunk=ChunkPipeline(),
         vector_store=vec_store,
         document_store=doc_store,
     )

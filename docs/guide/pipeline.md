@@ -30,6 +30,17 @@ pipeline = DocumentPipeline()
 chunks = await pipeline.run(Path("report.docx"))
 ```
 
+`DocumentPipeline` is the composition of two sub-pipelines, split at the sync boundaries:
+
+- **`IngestPipeline`** (`pipeline.ingest`) — parse → process → stamp `source_id`. Boundary 1.
+- **`ChunkPipeline`** (`pipeline.chunk`) — split → chunk → mint chunk ids. Boundary 2.
+
+Flat kwargs (`DocumentPipeline(splitter=..., processors=...)`) delegate into freshly built
+sub-pipelines; you can equivalently pass pre-built ones
+(`DocumentPipeline(ingest=IngestPipeline(...), chunk=ChunkPipeline(...))`). A stage on the
+wrong side is a `TypeError` at construction — an `IngestPipeline` has no splitter/chunker
+parameter, a `ChunkPipeline` has no parser/processors parameter.
+
 `DocumentPipeline` defaults:
 
 | Stage | Default |
@@ -109,7 +120,7 @@ pipeline = DocumentPipeline(parser=my_parser)
 
 ### Deterministic chunk IDs
 
-Chunk ids are minted by `DocumentPipeline.chunk_document` — the single id authority —
+Chunk ids are minted by `ChunkPipeline.run` — the single id authority —
 using `ragdoc.chunking.provenance.mint_chunk_id` over
 `(source_id, split_sequence, chunk_ordinal, content_hash)`.  The same file content always
 produces the same chunk IDs (idempotent vector-store upserts), and two identical-content
@@ -122,7 +133,8 @@ chunks2 = await pipeline.run(Path("report.docx"))
 assert chunks1[0].id == chunks2[0].id  # always True for the same content
 ```
 
-Override the scheme with `DocumentPipeline(chunk_id_fn=...)`
+Override the scheme with `ChunkPipeline(chunk_id_fn=...)` (or the delegating
+`DocumentPipeline(chunk_id_fn=...)`)
 (`(source_id, split_sequence, chunk_ordinal, content_hash) -> str`).  Chunkers used
 standalone (outside a pipeline) leave `Chunk.id` at its uuid4 default.
 
@@ -407,7 +419,7 @@ vs_pipeline = VectorStorePipeline(pipeline=doc_pipeline, vector_store=my_vector_
 
 A third field, `chunk.content_hash` (`Document.content_hash()`), is also set — it drives
 re-chunking when a stored Document is edited in the two-stage `DocumentStore` workflow
-(`DocumentStorePipeline` → editing → `VectorStorePipeline(document_store=...)`).
+(`DocumentStorePipeline` → editing → `VectorStorePipeline.from_document_store(...)`).
 
 ---
 
@@ -423,21 +435,33 @@ resolution).
 | `LocalDocumentStore` | one JSON file per source on disk | local dev, single machine, hand-editing | — |
 | `QdrantDocumentStore` | one Qdrant point per source | shared across workers/containers | `qdrant` |
 
+Each stage takes the boundary-appropriate pipeline type, so a misplaced stage is a
+`TypeError` at construction: `DocumentStorePipeline` takes an `IngestPipeline` (no
+splitter/chunker parameter exists), and the Boundary-2 vector sync is a separate
+constructor — `VectorStorePipeline.from_document_store` — taking a `ChunkPipeline`
+(no parser/processors parameter exists).
+
 ```python
-from ragdoc.pipeline import DocumentPipeline, DocumentStorePipeline, VectorStorePipeline
+from ragdoc.pipeline import ChunkPipeline, DocumentStorePipeline, IngestPipeline, VectorStorePipeline
 from ragdoc.integrations.document_stores import QdrantDocumentStore
 
 doc_store = await QdrantDocumentStore.create(client, "my_documents")
 
 # Stage 1: parse + process → DocumentStore (no chunking)
-await DocumentStorePipeline(pipeline=DocumentPipeline(...), document_store=doc_store).run(paths)
+await DocumentStorePipeline(
+    ingest=IngestPipeline(processors=[...]),
+    document_store=doc_store,
+).run(paths)
 
 # ... edit stored Documents (any worker) ...
 
 # Stage 2: chunk + embed only the documents whose content_hash changed
-vs = VectorStorePipeline(pipeline=DocumentPipeline(chunker=...), vector_store=store,
-                         document_store=doc_store)
-await vs.run(source_ids=None)   # None → all documents in the store
+vs = VectorStorePipeline.from_document_store(
+    chunk=ChunkPipeline(splitter=..., chunker=...),
+    vector_store=store,
+    document_store=doc_store,
+)
+await vs.run()   # sources=None → all documents in the store
 ```
 
 `QdrantDocumentStore` stores each Document as a single point with a **throwaway 1-dim vector**

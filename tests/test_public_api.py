@@ -22,6 +22,8 @@ EXPECTED_ALL = {
     # entry points
     "load",
     "DocumentPipeline",
+    "IngestPipeline",
+    "ChunkPipeline",
     "DocumentStorePipeline",
     "VectorStorePipeline",
     # stages

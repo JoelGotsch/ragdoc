@@ -37,7 +37,7 @@ from ragdoc.chunking import Chunk, SimpleChunker
 from ragdoc.document import Document
 from ragdoc.extraction.mention import Mention
 from ragdoc.extraction.pipeline import MentionStorePipeline
-from ragdoc.pipeline import DocumentPipeline, VectorStorePipeline
+from ragdoc.pipeline import ChunkPipeline, DocumentPipeline, IngestPipeline, VectorStorePipeline
 from ragdoc.pipeline.changeset import ChangeSet
 from ragdoc.pipeline.document_store_pipeline import DocumentStorePipeline
 from ragdoc.pipeline.stores import SourceState
@@ -367,8 +367,8 @@ class VectorB2Harness(_VectorSinkMixin, _B2Base):
     def __init__(self, tmp_path: Path) -> None:
         super().__init__()
         self.store = MemoryVectorStore()
-        self.pipeline = VectorStorePipeline(
-            pipeline=DocumentPipeline(chunker=_GateChunker(self)),
+        self.pipeline = VectorStorePipeline.from_document_store(
+            chunk=ChunkPipeline(chunker=_GateChunker(self)),
             vector_store=self.store,
             document_store=self.upstream,
         )
@@ -381,7 +381,7 @@ class DocStoreHarness(_DirectBase):
         super().__init__(tmp_path)
         self.store = MemoryDocumentStore()
         self.pipeline = DocumentStorePipeline(
-            pipeline=DocumentPipeline(parser=self._make_parser(), processors=[_GateProcessor(self.filtered)]),
+            ingest=IngestPipeline(parser=self._make_parser(), processors=[_GateProcessor(self.filtered)]),
             document_store=self.store,
         )
 
@@ -403,7 +403,7 @@ class MentionDirectHarness(_MentionSinkMixin, _DirectBase):
         super().__init__(tmp_path)
         self.store = MemoryMentionStore()
         self.pipeline = MentionStorePipeline(
-            pipeline=DocumentPipeline(parser=self._make_parser(), processors=[_GateProcessor(self.filtered)]),
+            ingest=IngestPipeline(parser=self._make_parser(), processors=[_GateProcessor(self.filtered)]),
             extractor=EchoExtractor(),  # type: ignore[arg-type]
             mention_store=self.store,
             splitter=_identity_splitter(self),
@@ -416,8 +416,7 @@ class MentionB2Harness(_MentionSinkMixin, _B2Base):
     def __init__(self, tmp_path: Path) -> None:
         super().__init__()
         self.store = MemoryMentionStore()
-        self.pipeline = MentionStorePipeline(
-            pipeline=DocumentPipeline(),
+        self.pipeline = MentionStorePipeline.from_document_store(
             extractor=EchoExtractor(),  # type: ignore[arg-type]
             mention_store=self.store,
             document_store=self.upstream,

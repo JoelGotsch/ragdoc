@@ -19,7 +19,7 @@ from ragdoc.extraction.kg import KnowledgeGraphExtractor
 from ragdoc.extraction.pipeline import MentionStorePipeline
 from ragdoc.extraction.schema import EdgeRef, GraphSchema
 from ragdoc.extraction.structured import StructuredExtractor
-from ragdoc.pipeline.linear import DocumentPipeline
+from ragdoc.pipeline.linear import IngestPipeline
 from ragdoc.processing.base import DocumentProcessor
 
 from .conftest import Event, MemoryMentionStore, make_event_client, make_extractor
@@ -68,7 +68,7 @@ def test_kg_extractor_satisfies_protocol():
 def test_pipeline_rejects_non_extractor():
     with pytest.raises(TypeError, match="Extractor protocol"):
         MentionStorePipeline(
-            pipeline=DocumentPipeline(),
+            ingest=IngestPipeline(),
             extractor=object(),  # type: ignore[arg-type]
             mention_store=MemoryMentionStore(),  # type: ignore[arg-type]
         )
