@@ -4,6 +4,91 @@ Pre-1.0: breaking changes land at will and are documented here.
 
 ## Unreleased
 
+> **⚠ MIGRATION — every stored `content_hash` changes once.** `Document.content_hash()` is now
+> a versioned canonical-JSON hash (`ragdoc.content_hash.v1`) over `(title, elements)` — pure
+> Python, pandoc-free. Its values differ from the old renderer-based hashes, so the **first
+> Boundary-2 sync after upgrading re-chunks and re-embeds the full corpus once**. Direct-path
+> syncs are unaffected for unchanged files (`source_hash`, the file-byte hash, short-circuits
+> before any content hashing). `SimpleChunker`'s default chunk ids (which *are* the content
+> hash) also change once. Ships together with Phase 6 (element-model normalization) so the
+> corpus migrates a single time.
+
+### Added (Phase 4 — first-class `Extractor` stage)
+
+- **`ragdoc.extraction.extractor` — the `Extractor[PayloadT]` protocol** (Decision D3-A):
+  `async extract(document) -> list[Mention[PayloadT]]` is the typed extraction channel.
+  Extraction results are **returned**, never written to `document.metadata`;
+  `MentionStorePipeline` consumes them directly (the serialize→`model_validate` round trip
+  through metadata is gone) and rejects non-conforming extractors with `TypeError` at
+  construction. `payload_model` remains a documented attribute on the concrete classes (store
+  queries, `ChangeSet[Mention[...]]` parametrization), deliberately outside the protocol.
+- **`as_processor(extractor, metadata_key="mentions", overwrite=False)`** — explicit, opt-in
+  adapter wrapping an `Extractor` into a `DocumentProcessor` that dumps serialized mentions into
+  `document.metadata` (the one legitimate document-dump use case, e.g. a DocumentStore payload).
+  Carries the old idempotency guard; with `overwrite=True` it strips the stale key *before*
+  extracting so a mention's metadata locator never embeds a previous mention list.
+- **`GraphSchema.patterns` are now enforced** (previously validated but never consumed), in two
+  layers: `render_patterns_prompt(schema)` appends the legal `(source)-[edge]->(target)` triples
+  to every KG system prompt, and each extracted edge's `(source_kind, edge_kind, target_kind)`
+  is validated against `allowed_pattern_kinds(schema)`. Violations follow
+  `ExtractionSettings.on_pattern_violation`: `"drop"` (default — edge withheld, counted, one
+  WARNING per document) or `"error"` (`ValueError` naming the illegal triple). New schema rule:
+  every edge type must appear in at least one pattern (dead configuration fails at declaration
+  time). New helpers exported from `ragdoc.extraction`: `kind_of`, `allowed_pattern_kinds`,
+  `render_patterns_prompt`.
+- **`ExtractionSettings` new fields** (all KG-facing knobs now reachable from settings):
+  `gleaning` (was an ad-hoc `EXTRACTION_GLEANING` env read), `max_union_size` (was env
+  `KG_MAX_UNION_SIZE`; now `EXTRACTION_MAX_UNION_SIZE` via the prefix), `halving_max_depth` /
+  `halving_min_chars` (were hard-coded method defaults), `on_pattern_violation`.
+
+### Changed (Phase 4)
+
+- **`StructuredExtractionProcessor` → `StructuredExtractor`** (module
+  `ragdoc.extraction.processor` → `ragdoc.extraction.structured`) and
+  **`KnowledgeGraphProcessor` → `KnowledgeGraphExtractor`** (`kg_processor` → `kg`). Both
+  classes no longer subclass `DocumentProcessor`: `process()`, `metadata_key`, `overwrite`, and
+  the `document.metadata` writes are gone — `extract()` is the only entry point. Both are now
+  exported from `ragdoc.extraction` (alongside `Extractor`, `as_processor`,
+  `ExtractionSettings`).
+- **`ExtractionSettings.system_prompt` and `request_timeout` are honored by both extractors**
+  (previously each honored a different one). The settings validator no longer injects the
+  generic built-in prompt when unset — `system_prompt` stays `None` and each extractor resolves
+  its own default (`EXTRACTION_SYSTEM_PROMPT` / `KG_EXTRACTION_SYSTEM_PROMPT`), so a user-set
+  prompt finally reaches the KG extractor.
+- `GraphSchema` validation is environment-independent: the union-size check moved from the model
+  validator (which read `KG_MAX_UNION_SIZE` from the environment) to
+  `KnowledgeGraphExtractor.__init__` against `settings.max_union_size`.
+- The duplicated client/model/renderer/tokenizer fallbacks and the structured-output retry loop
+  now live once in `ragdoc.extraction._llm` (`resolve_*`, `parse_with_retry`, `build_messages`);
+  `build_extraction_messages` / `build_kg_messages` remain as thin wrappers documenting the
+  per-extractor defaults.
+
+### Removed (Phase 4)
+
+- `KG_MAX_UNION_SIZE` environment variable (use `EXTRACTION_MAX_UNION_SIZE` /
+  `ExtractionSettings.max_union_size`), the internal gleaning env read, and the extractors'
+  `metadata_key` / `overwrite` constructor parameters (relocated to `as_processor`).
+
+### Changed (Phase 5 — canonical `content_hash`)
+
+- **`Document.content_hash()` is canonical-JSON and pandoc-free** (Decision D4-A):
+  `sha256("ragdoc.content_hash.v1" + canonical JSON of (title, elements))` with per-element-type
+  payload builders that **fail loudly** (`TypeError`) on unknown element types. Inline
+  `<ref id=...>` uuids are normalized to document-order ordinals (dangling refs →
+  `"unresolved"`), so a re-parse of an unchanged file hashes identically. Excluded, as before
+  but now documented: document/element `metadata` (metadata-only edits do **not** re-chunk),
+  provenance fields (`id`, `source_path`, `source_id`, `source_hash`, `parser`,
+  `parser_version`, `external_refs`), element `page`/`bounding_box`. Newly participating
+  (more-sensitive deltas): element type (a `RawText` vs `Paragraph` with identical text now
+  differ) and Image `image`/`image_type`/`width`/`height`. No caching — the hash is pure
+  Python and cheap; new standalone helpers `document_content_payload`,
+  `element_content_payload`, `normalize_ref_ids` in `ragdoc.document`.
+- **`content_hash()`'s `renderer` parameter is removed** (breaking). Customization is
+  subclass-and-override, composing over `super().content_hash()`. `ragdoc.document` no longer
+  imports from `ragdoc.rendering`.
+- `VectorStorePipeline.plan()` over an unchanged Boundary-2 corpus now makes **zero** pandoc
+  invocations (previously one pandoc subprocess per stored document per plan).
+
 ### Added
 
 - **`ragdoc.pipeline.sync` — generic `SyncEngine[T]`** (Decision D2-A). One streaming

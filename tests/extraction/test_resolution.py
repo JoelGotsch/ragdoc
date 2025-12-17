@@ -12,12 +12,12 @@ import datetime as dt
 import pytest
 
 from ragdoc.extraction.dates import FuzzyDate
-from ragdoc.extraction.processor import ExtractionSettings
 from ragdoc.extraction.resolution import (
     EntityResolutionPipeline,
     build_entity_embedder,
     default_identity_text,
 )
+from ragdoc.extraction.structured import ExtractionSettings
 
 from .conftest import (
     Event,

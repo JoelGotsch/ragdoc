@@ -1,8 +1,8 @@
-"""Integration test: KnowledgeGraphProcessor → MentionStorePipeline → KGResolutionPipeline.
+"""Integration test: KnowledgeGraphExtractor → MentionStorePipeline → KGResolutionPipeline.
 
-This is the test that proves variant (a) works: the merged-key KnowledgeGraphProcessor satisfies
-the StructuredExtractionProcessor interface, so the existing MentionStorePipeline composes with it
-unchanged, and the existing KnowledgeGraphResolutionPipeline reads the single store via
+This is the test that proves variant (a) works: the merged-list KnowledgeGraphExtractor satisfies
+the same Extractor protocol as StructuredExtractor, so the existing MentionStorePipeline composes
+with it unchanged, and the existing KnowledgeGraphResolutionPipeline reads the single store via
 list_mentions(payload_type=...). No new pipeline class needed.
 """
 
@@ -16,8 +16,8 @@ import pytest
 from pydantic import BaseModel
 
 from ragdoc.document import Document, Heading, Paragraph
-from ragdoc.extraction.kg_processor import (
-    KnowledgeGraphProcessor,
+from ragdoc.extraction.kg import (
+    KnowledgeGraphExtractor,
     build_graph_batch_model,
 )
 from ragdoc.extraction.kg_resolution import KnowledgeGraphResolutionPipeline
@@ -104,8 +104,8 @@ class MemoryDocumentStore:
 
 
 @pytest.mark.anyio
-async def test_kg_processor_composes_with_mention_store_pipeline():
-    """The smoking gun for variant (a): KnowledgeGraphProcessor is passed AS-IS to the existing
+async def test_kg_extractor_composes_with_mention_store_pipeline():
+    """The smoking gun for variant (a): KnowledgeGraphExtractor is passed AS-IS to the existing
     MentionStorePipeline's `extractor=` slot. No adapter, no parallel pipeline class.
     """
     # Seed a DocumentStore (Boundary-2 mode).
@@ -118,7 +118,7 @@ async def test_kg_processor_composes_with_mention_store_pipeline():
     doc.source_hash = "filehash"
     await doc_store.upsert([doc])
 
-    # KG processor with a fake LLM client.
+    # KG extractor with a fake LLM client.
     client = make_kg_client(
         [
             {"local_id": "n0", "node": {"kind": "Person", "full_name": "Alice"}},
@@ -126,14 +126,14 @@ async def test_kg_processor_composes_with_mention_store_pipeline():
         ],
         [{"kind": "Employment", "refs": {"source_mention_id": "n0", "target_mention_id": "n1"}}],
     )
-    kg_processor = KnowledgeGraphProcessor(SCHEMA, client=client, model="m")
+    kg_extractor = KnowledgeGraphExtractor(SCHEMA, client=client, model="m")
 
     # The shipped MentionStorePipeline takes ONE extractor and ONE mention_store. Variant (a) makes
     # this work without modification.
     mention_store = MemoryMentionStore()
     pipeline = MentionStorePipeline(
         pipeline=DocumentPipeline(),
-        extractor=kg_processor,
+        extractor=kg_extractor,
         mention_store=mention_store,
         document_store=doc_store,
     )

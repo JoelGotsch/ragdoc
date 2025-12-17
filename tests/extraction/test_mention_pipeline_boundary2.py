@@ -12,7 +12,7 @@ import pytest
 
 from ragdoc.document import Document, Heading, Paragraph
 from ragdoc.extraction.pipeline import MentionStorePipeline
-from ragdoc.extraction.processor import StructuredExtractionProcessor
+from ragdoc.extraction.structured import StructuredExtractor
 from ragdoc.pipeline.linear import DocumentPipeline
 from ragdoc.pipeline.stores import SourceState
 from ragdoc.processing.base import DocumentProcessor
@@ -76,7 +76,7 @@ async def _seed(docs: MemoryDocumentStore, sid: str, body: str) -> Document:
 
 def make_b2_pipeline(
     docs: MemoryDocumentStore,
-    extractor: StructuredExtractionProcessor[Event],
+    extractor: StructuredExtractor[Event],
     mstore: MemoryMentionStore,
 ) -> MentionStorePipeline[Event]:
     return MentionStorePipeline(
@@ -132,7 +132,7 @@ async def test_run_does_not_touch_files(docs, mstore, tmp_path):
 async def test_unchanged_document_skipped_no_llm_call(docs, mstore):
     await _seed(docs, "a.pdf", "Stable content")
     client = make_event_client([[Event(title="Ev")]])
-    extractor = StructuredExtractionProcessor(Event, client=client, model="m")
+    extractor = StructuredExtractor(Event, client=client, model="m")
     pipeline = make_b2_pipeline(docs, extractor, mstore)
 
     await pipeline.run()
@@ -149,7 +149,7 @@ async def test_unchanged_document_skipped_no_llm_call(docs, mstore):
 async def test_edited_document_is_reextracted(docs, mstore):
     await _seed(docs, "a.pdf", "Original")
     client = make_event_client([[Event(title="First")], [Event(title="Second")]])
-    extractor = StructuredExtractionProcessor(Event, client=client, model="m")
+    extractor = StructuredExtractor(Event, client=client, model="m")
     pipeline = make_b2_pipeline(docs, extractor, mstore)
 
     await pipeline.run()

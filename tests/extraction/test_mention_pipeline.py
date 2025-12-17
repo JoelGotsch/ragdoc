@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
+from ragdoc.document import Document
 from ragdoc.extraction.mention import Mention
 from ragdoc.extraction.pipeline import MentionStorePipeline
-from ragdoc.extraction.processor import StructuredExtractionProcessor
+from ragdoc.extraction.structured import StructuredExtractor
 from ragdoc.pipeline.changeset import ChangeSet
 from ragdoc.pipeline.linear import DocumentPipeline
 
@@ -36,7 +39,7 @@ async def test_run_extracts_and_stores_mentions(make_files, mstore):
 async def test_unchanged_source_skipped_no_llm_call(make_files, mstore):
     paths = make_files({"a.txt": "alpha"})
     client = make_event_client([[Event(title="Ev")]])
-    extractor = StructuredExtractionProcessor(Event, client=client, model="m")
+    extractor = StructuredExtractor(Event, client=client, model="m")
     pipeline = make_pipeline(extractor, mstore)
 
     await pipeline.run(paths)
@@ -55,7 +58,7 @@ async def test_changed_source_replaces_mentions(tmp_path, mstore):
     p.write_text("v1", encoding="utf-8")
     # first run yields one event; second run (file changed) yields a different one
     client = make_event_client([[Event(title="First")], [Event(title="Second")]])
-    extractor = StructuredExtractionProcessor(Event, client=client, model="m")
+    extractor = StructuredExtractor(Event, client=client, model="m")
     pipeline = make_pipeline(extractor, mstore)
 
     await pipeline.run([p])
@@ -154,3 +157,71 @@ async def test_plan_apply_round_trip(make_files, mstore, tmp_path):
 
     assert result.processed == ["a.txt"]
     assert {m.payload.title for m in await mstore.list_mentions()} == {"Ev"}
+
+
+@pytest.mark.anyio
+async def test_roundtrip_never_touches_document_metadata(make_files, mstore, monkeypatch):
+    """The Phase-4 headline regression: extraction is a typed channel — no 'mentions' key ever
+    appears in the parent's or any split's metadata during a full pipeline run."""
+    paths = make_files({"a.txt": "alpha body"})
+    doc_pipeline = DocumentPipeline(parser=make_parser())
+
+    captured_parents: list[Document] = []
+    original_parse_and_process = doc_pipeline.parse_and_process
+
+    async def spy_parse_and_process(path: Path) -> Document | None:
+        parent = await original_parse_and_process(path)
+        if parent is not None:
+            captured_parents.append(parent)
+        return parent
+
+    monkeypatch.setattr(doc_pipeline, "parse_and_process", spy_parse_and_process)
+
+    captured_splits: list[Document] = []
+
+    def spy_splitter(document: Document) -> list[Document]:
+        splits = [document]
+        captured_splits.extend(splits)
+        return splits
+
+    pipeline = MentionStorePipeline(
+        pipeline=doc_pipeline,
+        extractor=make_extractor([Event(title="Ev")]),
+        mention_store=mstore,
+        splitter=spy_splitter,
+    )
+    result = await pipeline.run(paths)
+    assert result.processed == ["a.txt"]
+    assert captured_parents and captured_splits
+
+    for doc in captured_parents + captured_splits:
+        assert "mentions" not in doc.metadata
+        assert "kg_mentions" not in doc.metadata
+
+
+@pytest.mark.anyio
+async def test_mentions_arrive_typed_without_revalidation(make_files, mstore):
+    """The store receives the same Mention objects the extractor returned — no
+    serialize→model_validate round trip in between."""
+    returned: list[Mention[Event]] = []
+
+    class TrackingExtractor:
+        payload_model = Event
+
+        async def extract(self, document: Document) -> list[Mention[Event]]:
+            mention = Mention[Event](
+                mention_id="pending",
+                source_id=document.source_id or "",
+                source_hash=document.source_hash or "",
+                payload=Event(title="Tracked"),
+            )
+            returned.append(mention)
+            return [mention]
+
+    paths = make_files({"a.txt": "alpha"})
+    result = await make_pipeline(TrackingExtractor(), mstore).run(paths)
+
+    assert result.processed == ["a.txt"]
+    stored = list(mstore.stored.values())
+    assert len(stored) == len(returned) == 1
+    assert stored[0] is returned[0]  # identity, not a re-validated copy

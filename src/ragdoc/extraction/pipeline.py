@@ -3,11 +3,11 @@
 Two modes, selected by whether a ``document_store`` is provided:
 
 * **Direct mode** (no ``document_store``) — parses + processes source files, splits each into
-  context-sized sub-documents, runs the
-  :class:`~ragdoc.extraction.processor.StructuredExtractionProcessor` on every split, and
-  syncs the harvested :class:`~ragdoc.extraction.mention.Mention`\\ s into a
-  :class:`~ragdoc.extraction.stores.MentionStore`. Change detection uses the file-byte
-  ``source_hash``: an unchanged file is **skipped with no LLM call**.
+  context-sized sub-documents, runs the :class:`~ragdoc.extraction.extractor.Extractor` on every
+  split (a direct typed channel — ``extract()`` returns
+  :class:`~ragdoc.extraction.mention.Mention` objects; nothing rides on document metadata), and
+  syncs them into a :class:`~ragdoc.extraction.stores.MentionStore`. Change detection uses the
+  file-byte ``source_hash``: an unchanged file is **skipped with no LLM call**.
 * **Boundary-2 mode** (``document_store`` given) — reads already-parsed-and-processed Documents
   from the DocumentStore by ``source_id``, splits + extracts (never re-runs the processor chain —
   doing so on an already-processed document is destructive). Change detection uses the Document's
@@ -37,6 +37,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, cast
 
+from ragdoc.extraction.extractor import Extractor
 from ragdoc.extraction.mention import Mention, PayloadT, finalize_mention
 from ragdoc.pipeline.changeset import ChangeSet, SourceChange
 from ragdoc.pipeline.sync import (
@@ -54,7 +55,6 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ragdoc.document import Document
-    from ragdoc.extraction.processor import StructuredExtractionProcessor
     from ragdoc.extraction.stores import MentionStore
     from ragdoc.pipeline.linear import DocumentPipeline
     from ragdoc.pipeline.stores import DocumentStore
@@ -78,7 +78,9 @@ class MentionStorePipeline(Generic[PayloadT]):
             pre-split processors, and ``source_id_fn`` (single source of truth for identity). A
             non-default chunker is always rejected (chunking is meaningless for mention extraction).
             In Boundary-2 mode, processors and a custom parser are rejected as well.
-        extractor: the :class:`StructuredExtractionProcessor` run on each split.
+        extractor: the :class:`~ragdoc.extraction.extractor.Extractor` run on each split
+            (e.g. ``StructuredExtractor`` or ``KnowledgeGraphExtractor``); its ``extract()``
+            returns the typed mentions directly.
         mention_store: target :class:`MentionStore`.
         document_store: optional :class:`~ragdoc.pipeline.stores.DocumentStore`. When given,
             the pipeline runs in Boundary-2 mode.
@@ -89,6 +91,7 @@ class MentionStorePipeline(Generic[PayloadT]):
         concurrency: max sources processed concurrently.
 
     Raises:
+        TypeError: if *extractor* does not implement the ``Extractor`` protocol.
         ValueError: if *pipeline* carries a non-default chunker, or — in Boundary-2 mode — if it
             carries processors or a custom parser.
     """
@@ -96,13 +99,15 @@ class MentionStorePipeline(Generic[PayloadT]):
     def __init__(
         self,
         pipeline: DocumentPipeline,
-        extractor: StructuredExtractionProcessor[PayloadT],
+        extractor: Extractor[PayloadT],
         mention_store: MentionStore,
         document_store: DocumentStore | None = None,
         splitter: Splitter | None = None,
         hash_fn: Callable[[Path], str] = file_hash,
         concurrency: int | asyncio.Semaphore = 10,
     ) -> None:
+        if not isinstance(extractor, Extractor):
+            raise TypeError("extractor must implement the Extractor protocol: async extract(document) -> list[Mention]")
         if pipeline.has_custom_chunker:
             raise ValueError(
                 "MentionStorePipeline extracts mentions, not chunks; its DocumentPipeline must not "
@@ -166,17 +171,11 @@ class MentionStorePipeline(Generic[PayloadT]):
         content_hash = parent.content_hash()
 
         splitter = self._get_splitter()
-        splits = splitter(parent)
-        payload_model = self._extractor.payload_model
-        mention_type = Mention[payload_model]
-
         out: list[Mention[PayloadT]] = []
-        for split in splits:
+        for split in splitter(parent):
             split.source_id = source_id
             split.source_hash = source_hash
-            processed = await self._extractor.process(split)
-            for raw in processed.metadata.get(self._extractor.metadata_key, []):
-                mention = mention_type.model_validate(raw)
+            for mention in await self._extractor.extract(split):
                 finalize_mention(mention, content_hash=content_hash, source_id=source_id, source_hash=source_hash)
                 out.append(mention)
         return out

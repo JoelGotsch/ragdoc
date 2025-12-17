@@ -13,20 +13,22 @@ types must additionally carry ``refs: EdgeRef`` — the chunk-local endpoint ref
 emits, rewritten to real ``mention_id``\\ s at envelope-wrap time and then to ``entity_id``\\ s
 after node resolution.
 
-Union sizes are bounded by the ``KG_MAX_UNION_SIZE`` environment variable (default ``10``).
-Above this, OpenAI strict-mode reliability dips and schema size pushes prompt tokens; the
-processor advises splitting into multiple processors with smaller schemas.
+Patterns are **load-bearing**: :class:`~ragdoc.extraction.kg.KnowledgeGraphExtractor` steers the
+LLM with :func:`render_patterns_prompt` and validates every extracted edge's
+``(source_kind, edge_kind, target_kind)`` triple against :func:`allowed_pattern_kinds`. An edge
+type that appears in no pattern is dead configuration and is rejected at declaration time.
+
+Union sizes are bounded by ``ExtractionSettings.max_union_size`` (env
+``EXTRACTION_MAX_UNION_SIZE``, default ``10``), checked at extractor construction — schema
+validation itself is environment-independent. Above the limit, OpenAI strict-mode reliability dips
+and schema size pushes prompt tokens; split into multiple extractors with smaller schemas.
 """
 
 from __future__ import annotations
 
-import os
 from typing import Annotated, Any, Union, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-# Default per the design — 10 variants per discriminated union for OpenAI strict-mode reliability.
-_DEFAULT_MAX_UNION_SIZE = 10
 
 
 class EdgeRef(BaseModel):
@@ -55,8 +57,8 @@ class GraphSchema(BaseModel):
 
     Raises:
         ValueError: on any registration mismatch — unknown pattern types, missing/wrongly-typed
-            ``kind`` discriminator, edge type without ``refs: EdgeRef``, union size above
-            ``KG_MAX_UNION_SIZE``.
+            ``kind`` discriminator, edge type without ``refs: EdgeRef``, or an edge type that
+            appears in no pattern (it could never survive pattern enforcement).
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -88,20 +90,6 @@ class GraphSchema(BaseModel):
 
     @model_validator(mode="after")
     def _validate_schema(self) -> GraphSchema:
-        max_size = _max_union_size()
-        if len(self.node_types) > max_size:
-            raise ValueError(
-                f"node_types has {len(self.node_types)} entries, above KG_MAX_UNION_SIZE={max_size}. "
-                f"OpenAI structured-output reliability drops with large discriminated unions; split "
-                f"this schema across multiple KnowledgeGraphProcessors, or raise the limit."
-            )
-        if len(self.edge_types) > max_size:
-            raise ValueError(
-                f"edge_types has {len(self.edge_types)} entries, above KG_MAX_UNION_SIZE={max_size}. "
-                f"OpenAI structured-output reliability drops with large discriminated unions; split "
-                f"this schema across multiple KnowledgeGraphProcessors, or raise the limit."
-            )
-
         for t in self.node_types:
             _assert_kind_discriminator_first(t)
         for t in self.edge_types:
@@ -123,6 +111,17 @@ class GraphSchema(BaseModel):
                 raise ValueError(
                     f"Pattern references unknown edge type {edge.__name__!r} (not in edge_types). "
                     f"Registered edge_types: {[t.__name__ for t in self.edge_types]}."
+                )
+
+        # Patterns are enforced (prompt + post-parse validation): an edge type with no legal
+        # (src, edge, tgt) triple could never be emitted — reject that dead configuration here.
+        edges_in_patterns = {edge for _, edge, _ in self.patterns}
+        for t in self.edge_types:
+            if t not in edges_in_patterns:
+                raise ValueError(
+                    f"Edge type {t.__name__!r} appears in edge_types but in no pattern; with "
+                    f"pattern enforcement it can never be emitted. Declare at least one "
+                    f"(source, {t.__name__}, target) pattern."
                 )
         return self
 
@@ -158,25 +157,56 @@ def build_edge_union(types: tuple[type[BaseModel], ...] | list[type[BaseModel]])
 
 
 # ---------------------------------------------------------------------------
-# Internal validators
+# Pattern enforcement helpers (consumed by KnowledgeGraphExtractor)
 # ---------------------------------------------------------------------------
 
 
-def _max_union_size() -> int:
-    """Read ``KG_MAX_UNION_SIZE`` env var (default ``10``).
+def kind_of(model: type[BaseModel]) -> str:
+    """Return the ``kind`` Literal value of a registered node/edge model.
 
-    Raises ``ValueError`` if the env var is not a positive integer.
+    Raises:
+        ValueError: if *model* has no ``kind`` field or its annotation is not a single-value
+            ``Literal`` (registered schema types always are — see ``GraphSchema`` validation).
     """
-    raw = os.environ.get("KG_MAX_UNION_SIZE")
-    if raw is None:
-        return _DEFAULT_MAX_UNION_SIZE
-    try:
-        v = int(raw)
-    except ValueError as exc:
-        raise ValueError(f"KG_MAX_UNION_SIZE must be a positive int, got {raw!r}.") from exc
-    if v < 1:
-        raise ValueError(f"KG_MAX_UNION_SIZE must be a positive int, got {raw!r}.")
-    return v
+    field = model.model_fields.get("kind")
+    if field is None:
+        raise ValueError(f"{model.__name__} has no `kind` field; cannot derive its kind literal.")
+    args = get_args(field.annotation)
+    if not args:
+        raise ValueError(
+            f"{model.__name__}.kind is not a Literal annotation ({field.annotation!r}); cannot derive its kind."
+        )
+    return str(args[0])
+
+
+def allowed_pattern_kinds(schema: GraphSchema) -> frozenset[tuple[str, str, str]]:
+    """Lower ``schema.patterns`` to the set of legal ``(source_kind, edge_kind, target_kind)`` strings.
+
+    Pure function of the schema; :class:`~ragdoc.extraction.kg.KnowledgeGraphExtractor` caches it
+    per schema for the post-parse edge validation.
+    """
+    return frozenset((kind_of(src), kind_of(edge), kind_of(tgt)) for src, edge, tgt in schema.patterns)
+
+
+def render_patterns_prompt(schema: GraphSchema) -> str:
+    """Render the schema's legal triples as a system-prompt section, keyed by each type's ``kind``.
+
+    Example output::
+
+        Legal relationship patterns (source)-[edge]->(target); emit ONLY these combinations:
+          (Person)-[Employment]->(Company)
+
+    Returns an empty string when the schema declares no patterns (i.e. no edge types).
+    """
+    if not schema.patterns:
+        return ""
+    lines = "\n".join(f"  ({kind_of(src)})-[{kind_of(edge)}]->({kind_of(tgt)})" for src, edge, tgt in schema.patterns)
+    return f"Legal relationship patterns (source)-[edge]->(target); emit ONLY these combinations:\n{lines}"
+
+
+# ---------------------------------------------------------------------------
+# Internal validators
+# ---------------------------------------------------------------------------
 
 
 def _assert_kind_discriminator_first(t: type[BaseModel]) -> None:

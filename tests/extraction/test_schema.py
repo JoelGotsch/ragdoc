@@ -1,10 +1,9 @@
-"""Tests for the typed-KG schema container (GraphSchema, EdgeRef, union helpers)."""
+"""Tests for the typed-KG schema container (GraphSchema, EdgeRef, union + pattern helpers)."""
 
 from __future__ import annotations
 
-import os
 from typing import Literal
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic import BaseModel, TypeAdapter, ValidationError
@@ -12,8 +11,11 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 from ragdoc.extraction.schema import (
     EdgeRef,
     GraphSchema,
+    allowed_pattern_kinds,
     build_edge_union,
     build_node_union,
+    kind_of,
+    render_patterns_prompt,
 )
 
 # ---------------------------------------------------------------------------
@@ -207,7 +209,8 @@ def test_build_edge_union_same_shape():
 
 
 # ---------------------------------------------------------------------------
-# 9-10. Union size limit
+# 9. Union size: schema validation is environment-independent; the size limit
+#    moved to KnowledgeGraphExtractor.__init__ (settings.max_union_size)
 # ---------------------------------------------------------------------------
 
 
@@ -222,53 +225,108 @@ def _make_node_type(name: str) -> type[BaseModel]:
     )
 
 
-def test_union_size_limit_default_10_rejects_eleven():
+def test_graphschema_validation_ignores_env(monkeypatch: pytest.MonkeyPatch):
+    """KG_MAX_UNION_SIZE (and any env) must not influence schema validation."""
+    monkeypatch.setenv("KG_MAX_UNION_SIZE", "1")
+    types = tuple(_make_node_type(f"N{i}") for i in range(5))
+    schema = GraphSchema(node_types=types, edge_types=(), patterns=())
+    assert len(schema.node_types) == 5
+
+
+def test_graphschema_accepts_large_unions():
+    """Size is an extractor concern now — an 11-type schema constructs fine."""
     types = tuple(_make_node_type(f"N{i}") for i in range(11))
-    # Ensure env var is unset for the default
-    with patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("KG_MAX_UNION_SIZE", None)
-        with pytest.raises(ValueError, match=r"KG_MAX_UNION_SIZE"):
-            GraphSchema(node_types=types, edge_types=(), patterns=())
+    schema = GraphSchema(node_types=types, edge_types=(), patterns=())
+    assert len(schema.node_types) == 11
 
 
-def test_union_size_limit_default_10_accepts_ten():
-    types = tuple(_make_node_type(f"N{i}") for i in range(10))
-    with patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("KG_MAX_UNION_SIZE", None)
-        schema = GraphSchema(node_types=types, edge_types=(), patterns=())
-        assert len(schema.node_types) == 10
+def test_kg_extractor_rejects_oversized_union():
+    from ragdoc.extraction.kg import KnowledgeGraphExtractor
+    from ragdoc.extraction.structured import ExtractionSettings
+
+    schema = GraphSchema(node_types=(Person, Company), edge_types=(), patterns=())
+    with pytest.raises(ValueError, match="max_union_size"):
+        KnowledgeGraphExtractor(schema, client=MagicMock(), model="m", settings=ExtractionSettings(max_union_size=1))
 
 
-def test_union_size_limit_env_var_override():
-    types = tuple(_make_node_type(f"N{i}") for i in range(15))
-    with patch.dict(os.environ, {"KG_MAX_UNION_SIZE": "20"}):
-        schema = GraphSchema(node_types=types, edge_types=(), patterns=())
-        assert len(schema.node_types) == 15
+def test_kg_extractor_accepts_union_at_limit():
+    from ragdoc.extraction.kg import KnowledgeGraphExtractor
+    from ragdoc.extraction.structured import ExtractionSettings
+
+    schema = GraphSchema(node_types=(Person, Company), edge_types=(), patterns=())
+    extractor = KnowledgeGraphExtractor(
+        schema, client=MagicMock(), model="m", settings=ExtractionSettings(max_union_size=2)
+    )
+    assert extractor.schema is schema
 
 
-def test_union_size_limit_invalid_env_raises():
-    with patch.dict(os.environ, {"KG_MAX_UNION_SIZE": "not-a-number"}):
-        with pytest.raises(ValueError, match="positive int"):
-            GraphSchema(node_types=(Person,), edge_types=(), patterns=())
-
-
-def _make_edge_type(name: str) -> type[BaseModel]:
+def test_kg_extractor_union_size_applies_to_edges_too():
     from pydantic import create_model
 
-    return create_model(
-        name,
-        kind=(Literal[name], name),  # type: ignore[valid-type]
-        refs=(EdgeRef, ...),
+    from ragdoc.extraction.kg import KnowledgeGraphExtractor
+    from ragdoc.extraction.structured import ExtractionSettings
+
+    def _make_edge_type(name: str) -> type[BaseModel]:
+        return create_model(
+            name,
+            kind=(Literal[name], name),  # type: ignore[valid-type]
+            refs=(EdgeRef, ...),
+        )
+
+    edge_types = tuple(_make_edge_type(f"E{i}") for i in range(3))
+    patterns = tuple((Person, e, Company) for e in edge_types)
+    schema = GraphSchema(node_types=(Person, Company), edge_types=edge_types, patterns=patterns)
+    with pytest.raises(ValueError, match=r"edge_types has 3 entries.*max_union_size"):
+        KnowledgeGraphExtractor(schema, client=MagicMock(), model="m", settings=ExtractionSettings(max_union_size=2))
+
+
+# ---------------------------------------------------------------------------
+# 10. Pattern rules + helpers (patterns are enforced, hence load-bearing)
+# ---------------------------------------------------------------------------
+
+
+def test_edge_type_without_pattern_rejected():
+    """An edge type in no pattern could never be emitted under enforcement — dead config."""
+    with pytest.raises(ValueError, match=r"Employment.*no pattern"):
+        GraphSchema(node_types=(Person, Company), edge_types=(Employment,), patterns=())
+
+
+def test_kind_of_returns_literal_value():
+    assert kind_of(Person) == "Person"
+    assert kind_of(Employment) == "Employment"
+
+
+def test_kind_of_rejects_model_without_kind():
+    class NoKind(BaseModel):
+        name: str
+
+    with pytest.raises(ValueError, match="kind"):
+        kind_of(NoKind)
+
+
+def test_allowed_pattern_kinds_lowers_triples():
+    schema = GraphSchema(
+        node_types=(Person, Company),
+        edge_types=(Employment,),
+        patterns=((Person, Employment, Company), (Company, Employment, Company)),
+    )
+    assert allowed_pattern_kinds(schema) == frozenset(
+        {("Person", "Employment", "Company"), ("Company", "Employment", "Company")}
     )
 
 
-def test_union_size_limit_applies_to_edges_too():
-    edge_types = tuple(_make_edge_type(f"E{i}") for i in range(11))
-    with patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("KG_MAX_UNION_SIZE", None)
-        with pytest.raises(ValueError, match=r"KG_MAX_UNION_SIZE"):
-            GraphSchema(
-                node_types=(Person, Company),
-                edge_types=edge_types,
-                patterns=(),
-            )
+def test_render_patterns_prompt_lists_triples():
+    schema = GraphSchema(
+        node_types=(Person, Company),
+        edge_types=(Employment,),
+        patterns=((Person, Employment, Company), (Company, Employment, Company)),
+    )
+    prompt = render_patterns_prompt(schema)
+    assert "(Person)-[Employment]->(Company)" in prompt
+    assert "(Company)-[Employment]->(Company)" in prompt
+    assert "ONLY these combinations" in prompt
+
+
+def test_render_patterns_prompt_empty_for_no_patterns():
+    schema = GraphSchema(node_types=(Person,), edge_types=(), patterns=())
+    assert render_patterns_prompt(schema) == ""

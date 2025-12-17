@@ -88,23 +88,21 @@ class Event(BaseModel):
 
 
 class EchoExtractor:
-    """Duck-typed stand-in for StructuredExtractionProcessor: no LLM, one deterministic
+    """Duck-typed stand-in for StructuredExtractor: no LLM, one deterministic
     ``Event`` per split whose title is derived from the split's renderer-stable content hash
     (so it changes with the content and is identical across re-parses of the same content)."""
 
-    metadata_key = "mentions"
     payload_model = Event
 
-    async def process(self, document: Document) -> Document:
-        out = document.model_copy(deep=True)
-        raw = Mention[Event](
-            mention_id="pending",
-            source_id=document.source_id or "",
-            source_hash=document.source_hash or "",
-            payload=Event(title=f"ev-{document.content_hash()[:16]}"),
-        ).model_dump(mode="json")
-        out.metadata = {**out.metadata, self.metadata_key: [raw]}
-        return out
+    async def extract(self, document: Document) -> list[Mention[Event]]:
+        return [
+            Mention[Event](
+                mention_id="pending",
+                source_id=document.source_id or "",
+                source_hash=document.source_hash or "",
+                payload=Event(title=f"ev-{document.content_hash()[:16]}"),
+            )
+        ]
 
 
 # ---------------------------------------------------------------------------

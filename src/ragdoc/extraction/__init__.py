@@ -3,17 +3,22 @@
 Two layers (see ``designs/DESIGN-structured-extraction.md``):
 
 * **Mentions** — raw, provenance-tagged extraction occurrences
-  (:class:`~ragdoc.extraction.mention.Mention`), produced by
-  :class:`~ragdoc.extraction.processor.StructuredExtractionProcessor` and synced per source.
+  (:class:`~ragdoc.extraction.mention.Mention`), returned directly by an
+  :class:`~ragdoc.extraction.extractor.Extractor` (``StructuredExtractor`` /
+  ``KnowledgeGraphExtractor``) and synced per source by ``MentionStorePipeline``. Extraction is a
+  typed channel: ``extract()`` returns ``Mention`` objects and never touches
+  ``document.metadata`` (the opt-in :func:`~ragdoc.extraction.extractor.as_processor` adapter
+  exists for callers who want a document dump).
 * **Entities** — canonical, deduplicated records produced by the resolution pass.
 
 :class:`~ragdoc.extraction.dates.FuzzyDate` is a reusable date type embeddable in any
-payload model. The processor/settings require the ``extraction`` extra (``edtf`` +
+payload model. The extractors/settings require the ``extraction`` extra (``edtf`` +
 ``pydantic-settings``); the data models do not, so they import unconditionally.
 """
 
 from ragdoc.extraction.dates import FuzzyDate, Precision
 from ragdoc.extraction.entity import Entity, EntityStore, LocalEntityStore
+from ragdoc.extraction.extractor import Extractor, as_processor
 from ragdoc.extraction.graph_store import GraphStore, LocalGraphStore
 from ragdoc.extraction.kg_resolution import (
     KGResolutionResult,
@@ -34,8 +39,11 @@ from ragdoc.extraction.resolution import (
 from ragdoc.extraction.schema import (
     EdgeRef,
     GraphSchema,
+    allowed_pattern_kinds,
     build_edge_union,
     build_node_union,
+    kind_of,
+    render_patterns_prompt,
 )
 from ragdoc.extraction.stores import LocalMentionStore, MentionStore
 
@@ -47,6 +55,8 @@ __all__ = [
     "EntityQuery",
     "EntityResolutionPipeline",
     "EntityStore",
+    # Layer 1 — the extraction stage
+    "Extractor",
     "FuzzyDate",
     # Layer 3 — typed knowledge graph schema + resolution
     "GraphSchema",
@@ -63,6 +73,8 @@ __all__ = [
     "ResolutionResult",
     "ReviewGroup",
     "ReviewResult",
+    "allowed_pattern_kinds",
+    "as_processor",
     "build_edge_union",
     "build_entity_embedder",
     "build_node_union",
@@ -70,21 +82,23 @@ __all__ = [
     "entity_matches",
     "filter_entities",
     "finalize_mention",
+    "kind_of",
     "make_llm_reviewer",
     "mint_mention_id",
+    "render_patterns_prompt",
 ]
 
 try:
-    from ragdoc.extraction.kg_processor import (
+    from ragdoc.extraction.kg import (
         KG_EXTRACTION_SYSTEM_PROMPT,
-        KnowledgeGraphProcessor,
+        KnowledgeGraphExtractor,
         build_graph_batch_model,
         build_kg_messages,
     )
-    from ragdoc.extraction.processor import (
+    from ragdoc.extraction.structured import (
         EXTRACTION_SYSTEM_PROMPT,
         ExtractionSettings,
-        StructuredExtractionProcessor,
+        StructuredExtractor,
         build_extraction_messages,
     )
 
@@ -93,8 +107,8 @@ try:
         "KG_EXTRACTION_SYSTEM_PROMPT",
         "ExtractionSettings",
         # KG layer
-        "KnowledgeGraphProcessor",
-        "StructuredExtractionProcessor",
+        "KnowledgeGraphExtractor",
+        "StructuredExtractor",
         "build_extraction_messages",
         "build_graph_batch_model",
         "build_kg_messages",
