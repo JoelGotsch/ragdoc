@@ -25,7 +25,7 @@ def test_document_has_no_filename_field():
 
 
 def test_chunk_has_no_filename_field():
-    chunk = Chunk(prompt_content="x", embedding_content="x")
+    chunk = Chunk(prompt_content="x", embedding_content="x", source_id="s", source_hash="h")
     assert not hasattr(chunk, "filename")
 
 

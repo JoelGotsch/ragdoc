@@ -450,7 +450,7 @@ async def test_sync_missing_hash_triggers_reprocess(tmp_path, vstore):
         prompt_content="old",
         embedding_content="old",
         source_id=p.name,
-        source_hash=None,
+        source_hash="old-hash",
     )
     await vstore.upsert([chunk])
 

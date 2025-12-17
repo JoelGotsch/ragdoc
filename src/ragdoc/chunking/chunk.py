@@ -27,20 +27,34 @@ class Chunk(BaseModel, Generic[TMetadata]):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique ID of this chunk")
     source_path: str | None = Field(default=None, description="Full path to the source file")
-    source_id: str | None = Field(
-        default=None,
+    source_id: str = Field(
+        ...,
         description=(
-            "Sync identity key for this chunk's source document. "
-            "Derived from the source Path by VectorStorePipeline.source_id_fn. "
-            "None when the chunk was not produced through a sync pipeline."
+            "Sync identity key for this chunk's source document. REQUIRED. "
+            "Derived from the source Path by DocumentPipeline.source_id_fn and propagated "
+            "through chunking. Chunkers synthesize a fallback "
+            "(doc.source_id or doc.source_path or doc.id) for documents produced outside a "
+            "sync pipeline, so this field is never None."
         ),
     )
-    source_hash: str | None = Field(
+    source_hash: str = Field(
+        ...,
+        description=(
+            "SHA-256 hex digest of the ORIGINAL SOURCE FILE bytes. REQUIRED. True file "
+            "provenance — always reflects the bytes on disk, never the rendered Document "
+            "content. Set by DocumentPipeline.hash_fn; chunkers fall back to "
+            "doc.content_hash() when no file hash is available. For document-content change "
+            "detection (Boundary 2), use `content_hash` instead."
+        ),
+    )
+    content_hash: str | None = Field(
         default=None,
         description=(
-            "SHA-256 hex digest of the source file bytes. "
-            "Set by VectorStorePipeline at sync time. "
-            "None when not produced through a sync pipeline."
+            "Renderer-stable hash of the Document this chunk derived from "
+            "(Document.content_hash()). Drives DocumentStore -> VectorStore change detection: "
+            "a stored chunk is re-generated when its source Document's content_hash changes "
+            "(e.g. a manual edit in the DocumentStore). Populated on the direct path too. "
+            "None is treated as 'always changed' by Boundary-2 detection."
         ),
     )
     prompt_content: str = Field(..., description="Content used as prompt context")

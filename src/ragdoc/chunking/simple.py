@@ -70,9 +70,13 @@ class SimpleChunker(Chunker):
 
     async def chunk(self, document: Document) -> list[Chunk]:
         prompt_content = self._get_prompt_renderer().render(document)
+        content_hash = document.content_hash()
         chunk = Chunk(
             id=self._id_fn(document),
             source_path=document.source_path or None,
+            source_id=document.source_id or document.source_path or document.id,
+            source_hash=document.source_hash or content_hash,
+            content_hash=content_hash,
             prompt_content=prompt_content,
             embedding_content=prompt_content,
             metadata=self._metadata_fn(document),  # type: ignore[reportArgumentType]  # metadata_fn returns MetadataDict
