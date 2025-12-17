@@ -107,32 +107,33 @@ Processors may return `None` to drop a document. `ProcessingPipeline` short-circ
 
 **Chunkers** (`src/ragdoc/chunking/`): `SimpleChunker` — pure rendering, one chunk per document (`embedding_content = prompt_content`). `LLMChunker` — calls LLM to produce N topic summaries, returns N chunks with the same `prompt_content` but distinct `embedding_content` per topic. Both implement the `Chunker` ABC.
 
-### Stage 6: Vector Store Update (`src/ragdoc/pipeline/`)
+### Stage 6: Sync (`src/ragdoc/pipeline/`)
 
-`VectorStorePipeline` wraps a `DocumentPipeline` with incremental updates. It sets two first-class `Chunk` fields before upsert:
+Incremental synchronisation follows a **plan → apply** shape across two boundaries plus a direct path. Every sync pipeline exposes `plan()` (compute a reviewable `ChangeSet`, no store writes), `apply()` (write it), and `run = apply(plan(...))`.
 
-- `chunk.source_id` — source identity key derived from the source `Path` via `source_id_fn` (default: `path.name`).
-- `chunk.source_hash` — SHA-256 hex digest of the raw file bytes.
+**Two change-detection hashes** (first-class, never in `chunk.metadata`):
+- `source_hash` — SHA-256 of the **raw source-file bytes** (Boundary 1 / direct path).
+- `content_hash` — `Document.content_hash()`, renderer-stable (Boundary 2). `None` ⇒ treated as "always changed".
 
-These are **not injected into `chunk.metadata`**. The `metadata` dict remains exclusively for user-defined data.
+**Provenance ownership.** `DocumentPipeline` owns `source_id_fn` (`Path -> str`, default `p.name`); it stamps `document.source_id` and chunkers propagate `source_id`/`source_hash`/`content_hash` onto every `Chunk` (with fallbacks, so the fields — required on `Chunk` — are never None). The file-byte `hash_fn` is a sync concern living on the sync pipelines. **There is no `ProvenanceProcessor`** (do not add one).
 
-**`source_id_fn` strategies** (passed to `VectorStorePipeline`):
+`source_id_fn` strategies: `lambda p: p.name` (default), `str(p)` (full path), `str(p.relative_to(base_dir))` (portable). Duplicate source_ids raise `ValueError` before any processing.
 
-| Strategy | Expression | Use case |
-|---|---|---|
-| Filename (default) | `lambda p: p.name` | Simple, flat folders |
-| Full path | `lambda p: str(p)` | Multi-dir, single machine |
-| Relative path | `lambda p: str(p.relative_to(base_dir))` | Portable multi-dir |
+**Pipelines:**
+- `VectorStorePipeline(pipeline, vector_store, embedders=None, document_store=None, hash_fn=…, concurrency=10)`:
+  - **Direct mode** (no `document_store`): `plan(paths)` hashes files, compares `source_hash` via `vector_store.list_source_state()`, chunks changed files. `apply()` embeds **all** chunks first (non-destructive), then per source delete-then-upsert.
+  - **Mode 2** (`document_store` set): `plan(source_ids=None)` reads Documents from the store, compares `content_hash`, re-chunks changed ones via `DocumentPipeline.chunk_document` (no parser).
+- `DocumentStorePipeline(pipeline, document_store, …)` — Boundary 1: parses/processes files into Documents and syncs them into a `DocumentStore` (payload is `Document`, no embedding). Uses `DocumentPipeline.parse_and_process`.
 
-If two `Path` objects map to the same `source_id`, `run()` raises `ValueError` **before any processing begins**.
+`delete_orphans` defaults to **`False`** (footgun guard: in direct mode only pass your complete corpus). `UpdateResult` (`processed`/`skipped`/`deleted`/`errors`) is keyed on `source_id`.
 
-**`VectorStore` protocol** (`src/ragdoc/pipeline/stores.py`) — typed, source-aware methods:
-- `upsert(chunks)` / `delete(ids)` — CRUD by chunk ID.
-- `get_source_hash(source_id) -> str | None` — returns stored hash, or `None` if source unknown.
-- `delete_by_source(source_id)` — removes all chunks for a source.
-- `list_source_ids() -> set[str]` — enumerates all known sources.
+**Stores** (`src/ragdoc/pipeline/stores.py`):
+- `VectorStore` protocol — `upsert` / `delete` / `delete_by_source` / `list_source_ids` / `list_source_state() -> {source_id: SourceState}`. (`get_source_hash` is retained but unused — superseded by the bulk `list_source_state`.) Index on `chunk.source_id`/`chunk.source_hash`, not metadata.
+- `DocumentStore` protocol — `upsert` / `delete_by_source` / `get_document` / `list_source_ids` / `list_source_state`.
+- `SourceState(source_hash, content_hash)` — bulk change-detection state.
+- `LocalDocumentStore` — filesystem-backed `DocumentStore` (one JSON file per source); index-free, so manual edits to stored documents are detected at Boundary 2.
 
-Implementations must index on `chunk.source_id` / `chunk.source_hash`, not `chunk.metadata`.
+**`ChangeSet[T]`** (`changeset.py`) — serializable plan artifact (`to_add`/`to_update`/`to_delete`); `save()`/`load()` (call `load` on the concrete type, e.g. `ChangeSet[Chunk].load(path)`). Edit it between `plan()` and `apply()` for human-in-the-loop review.
 
 ### Refactor Status
 

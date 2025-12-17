@@ -233,18 +233,34 @@ result = await vs_pipeline.run(paths)
 
 ### Handling modifications and deletions
 
-`VectorStorePipeline.run` handles all three cases automatically on every call:
+`VectorStorePipeline.run` handles new and modified files automatically on every call:
 
 | Case | What happens |
 |------|-------------|
-| **New file** | Parsed, chunked, upserted; `source_id` and `source_hash` set on each chunk. |
+| **New file** | Parsed, chunked, upserted; `source_id` / `source_hash` / `content_hash` set on each chunk. |
 | **Modified file** (byte hash changed) | Old chunks deleted by `source_id`, file re-processed, new chunks upserted. |
-| **Removed file** (path no longer in source list) | All chunks deleted by `source_id`. |
+| **Removed file** (path no longer in source list) | Kept by default; deleted only with `delete_orphans=True`. |
+
+Orphan deletion is **opt-in** and must be requested explicitly:
 
 ```python
-# Remove one file from the list — its chunks will be deleted automatically
-result = await vs_pipeline.run(paths[:-1])
+# ⚠ delete_orphans=True deletes every source NOT in `paths`. Only safe when `paths`
+# is your COMPLETE corpus — an incremental subset would wipe everything else.
+result = await vs_pipeline.run(all_paths, delete_orphans=True)
 print(result.deleted)  # ["old_report.docx"]  (source IDs, not paths)
+```
+
+### plan() / apply()
+
+`run()` is `apply(plan(...))`. Call them separately to review changes before they reach the
+store — `plan()` returns a serializable `ChangeSet` and does not touch the store:
+
+```python
+changeset = await vs_pipeline.plan(paths)
+changeset.save(Path("review/changes.json"))
+# ... inspect / edit the JSON ...
+approved = ChangeSet[Chunk].load(Path("review/changes.json"))
+result = await vs_pipeline.apply(approved)
 ```
 
 ### Running against a directory
@@ -319,7 +335,7 @@ into the user-facing `metadata` dict:
 ### Performance notes
 
 - `create()` adds a Qdrant payload index on `source_id`, turning filter operations
-  in `get_source_hash` and `delete_by_source` from O(n) scans into O(log n) lookups.
+  in `list_source_state` and `delete_by_source` from O(n) scans into O(log n) lookups.
 - `upsert()` batches points in groups of 100 to avoid gRPC message size limits.
 - `list_source_ids()` uses scroll pagination (1000 points per page) so it works
   correctly at any collection size.
@@ -346,11 +362,6 @@ class MyVectorStore:
         for id_ in ids:
             await self._db.remove(id_)
 
-    async def get_source_hash(self, source_id: str) -> str | None:
-        """Return the stored hash for source_id, or None if not present."""
-        row = await self._db.query_one(source_id=source_id)
-        return row.source_hash if row else None
-
     async def delete_by_source(self, source_id: str) -> None:
         """Delete all chunks whose source_id field equals source_id."""
         await self._db.delete(source_id=source_id)
@@ -358,6 +369,13 @@ class MyVectorStore:
     async def list_source_ids(self) -> set[str]:
         """Return all distinct source_id values stored in this vector store."""
         return await self._db.distinct_source_ids()
+
+    async def list_source_state(self) -> dict[str, SourceState]:
+        """Bulk-read each source's hashes in one round-trip (used by plan())."""
+        return {
+            row.source_id: SourceState(row.source_hash, row.content_hash)
+            for row in await self._db.distinct_sources()
+        }
 ```
 
 ### Provenance fields
@@ -370,15 +388,58 @@ before upsert — these are **not** injected into `chunk.metadata`:
 | `chunk.source_id` | `source_id_fn(path)` (default: `path.name`) | Groups chunks by source for cleanup |
 | `chunk.source_hash` | SHA-256 hex digest of file bytes | Detects whether the source has changed |
 
-To customise the source identity key, pass a `source_id_fn` to the constructor:
+To customise the source identity key, set `source_id_fn` on the **`DocumentPipeline`** (the
+single source of truth — the `VectorStorePipeline` reads it from there for collision/orphan
+checks):
 
 ```python
-vs_pipeline = VectorStorePipeline(
-    pipeline=pipeline,
-    vector_store=my_vector_store,
+doc_pipeline = DocumentPipeline(
+    splitter=TokenSplitter(),
     source_id_fn=lambda p: str(p.relative_to(base_dir)),  # portable multi-dir
 )
+vs_pipeline = VectorStorePipeline(pipeline=doc_pipeline, vector_store=my_vector_store)
 ```
+
+A third field, `chunk.content_hash` (`Document.content_hash()`), is also set — it drives
+re-chunking when a stored Document is edited in the two-stage `DocumentStore` workflow
+(`DocumentStorePipeline` → editing → `VectorStorePipeline(document_store=...)`).
+
+---
+
+## Scenario D — two-stage with a `DocumentStore`
+
+Parse once, chunk many ways. `DocumentStorePipeline` syncs parsed+processed `Document`s into a
+`DocumentStore` (Boundary 1); you can then edit them and re-chunk into the vector store
+(Boundary 2) without re-parsing — which matters when parsing is expensive (OCR, LLM heading
+resolution).
+
+| Implementation | Backing | Use case | Extra |
+|---|---|---|---|
+| `LocalDocumentStore` | one JSON file per source on disk | local dev, single machine, hand-editing | — |
+| `QdrantDocumentStore` | one Qdrant point per source | shared across workers/containers | `qdrant` |
+
+```python
+from ragdoc.pipeline import DocumentPipeline, DocumentStorePipeline, VectorStorePipeline
+from ragdoc.integrations.document_stores import QdrantDocumentStore
+
+doc_store = await QdrantDocumentStore.create(client, "my_documents")
+
+# Stage 1: parse + process → DocumentStore (no chunking)
+await DocumentStorePipeline(pipeline=DocumentPipeline(...), document_store=doc_store).run(paths)
+
+# ... edit stored Documents (any worker) ...
+
+# Stage 2: chunk + embed only the documents whose content_hash changed
+vs = VectorStorePipeline(pipeline=DocumentPipeline(chunker=...), vector_store=store,
+                         document_store=doc_store)
+await vs.run(source_ids=None)   # None → all documents in the store
+```
+
+`QdrantDocumentStore` stores each Document as a single point with a **throwaway 1-dim vector**
+(Documents aren't embedded) — the collection is a key-value store keyed on `source_id`, not
+semantically searchable. A Document whose payload exceeds Qdrant's size limit raises
+`DocumentTooLargeError` (carrying the `source_id` and byte size) rather than silently
+splitting or dropping image data.
 
 ---
 

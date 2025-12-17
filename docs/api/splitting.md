@@ -5,7 +5,7 @@ structure.
 
 ## split_by_headings
 
-::: ragdoc.splitting.split.split_by_headings
+::: ragdoc.splitting.base.split_by_headings
     options:
       show_root_heading: true
       show_source: true
@@ -13,7 +13,7 @@ structure.
 
 ## split_hierarchical
 
-::: ragdoc.splitting.split.split_hierarchical
+::: ragdoc.splitting.hierarchical.split_hierarchical
     options:
       show_root_heading: true
       show_source: true
