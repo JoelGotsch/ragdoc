@@ -1,4 +1,4 @@
-"""Contract test suite for the three sync pipelines (spec: plans/specs/SPEC-phase3-sync-engine.md §3a-0).
+"""Contract test suite for the three sync pipelines.
 
 One suite, parametrized over five harnesses:
 

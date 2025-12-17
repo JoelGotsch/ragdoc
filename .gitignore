@@ -218,8 +218,11 @@ scripts/.fixture_pdfs/
 backup/
 scripts/output/
 
-# Local-only working notes (designs/ and plans/ are tracked)
+# Design docs and implementation plans are local-only working notes
+plans/
+designs/
 feature-requests/
+fable-review.md
 
 
 # Auto-generated devcontainer feature lock (regenerates; pins the claude-code feature)
