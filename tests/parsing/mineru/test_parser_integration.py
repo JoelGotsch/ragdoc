@@ -159,7 +159,7 @@ def test_code_caption_precedes_code_body():
 def test_table_html_content_preserved():
     tables = [el for el in _RICH_PARSED.elements if isinstance(el, Table)]
     assert len(tables) == 1
-    assert "<th>A</th>" in tables[0].html_content
+    assert "<th>A</th>" in tables[0].html
 
 
 # ---------------------------------------------------------------------------
@@ -269,7 +269,9 @@ async def test_parser_field_set_to_mineru(tmp_path):
 
 @pytest.mark.anyio
 async def test_source_path_and_filename_set(tmp_path):
+    """Extractor sets only parser-specific fields; provenance is stamped by parsing.load()."""
     source = tmp_path / "report_middle.json"
     doc = await MinerUExtractor().parse(MinerUMiddleDocument(pdf_info=[]), source_path=source)
-    assert doc.metadata["filename"] == "report_middle.json"
-    assert doc.source_path == str(source)
+    assert doc.parser == "mineru"
+    assert doc.source_path == ""
+    assert "filename" not in doc.metadata

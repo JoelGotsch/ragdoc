@@ -112,7 +112,7 @@ async def test_kg_extractor_composes_with_mention_store_pipeline():
     doc_store = MemoryDocumentStore()
     doc = Document(
         title="bio",
-        elements=[Heading(innerhtml="bio", level=1), Paragraph(html_content="<p>Alice at Acme.</p>")],
+        elements=[Heading(html="<h1>bio</h1>"), Paragraph(html="<p>Alice at Acme.</p>")],
     )
     doc.source_id = "bio-1.txt"
     doc.source_hash = "filehash"

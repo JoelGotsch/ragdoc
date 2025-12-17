@@ -113,7 +113,7 @@ def _group_with_trailing(
             # Secondary element
             if current_anchor is None:
                 # Before first primary — create a dummy anchor
-                current_anchor = RawText(innerhtml="")
+                current_anchor = RawText(html="")
             current_trailing.append(element)
 
     if current_anchor is not None:
@@ -134,9 +134,11 @@ def _with_injected_markup(winner: ElementType, loser: ElementType) -> ElementTyp
     if new_html == winner.html:
         return winner
     if isinstance(winner, (Paragraph, Heading)):
-        # Both types store their full outer HTML in ``html_content``; ``innerhtml`` is a
-        # read-only property, so a model_copy update against it would be a silent no-op.
-        return winner.model_copy(update={"html_content": new_html})
+        # Copy-then-assign: assignment routes through the normalizing html field validator.
+        # Never model_copy(update={"html": ...}) — update= bypasses field validators.
+        updated = winner.model_copy()
+        updated.html = new_html
+        return updated
     return winner  # unsupported type — return as-is
 
 

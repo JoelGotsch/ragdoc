@@ -27,15 +27,16 @@ class AzureAnalyzeRun(BaseModel):
 
 
 def load_azure_json(file_obj: AzureJSONFile) -> Document:
-    """Parse an Azure DI JSON result file into a Document. Sets ``source_path`` and ``metadata["filename"]``."""
+    """Parse an Azure DI JSON result file into a Document.
+
+    Provenance (``source_path``, ``metadata["filename"]``) is stamped centrally by
+    :func:`ragdoc.parsing.load` — not here.
+    """
     file_path = Path(file_obj.file_path)
     bundle_source = Path(file_obj.source_path) if file_obj.source_path is not None else None
     with open(file_path) as fh:
         azure_bundle = AzureDIBundle(analyze_result=json.load(fh), source_path=bundle_source)
-    document = generate_document_azure_di(azure_bundle)
-    document.metadata["filename"] = file_path.name
-    document.source_path = str(file_path)
-    return document
+    return generate_document_azure_di(azure_bundle)
 
 
 def load_azure_analyze_result(analyze_run: AzureAnalyzeRun) -> Document:

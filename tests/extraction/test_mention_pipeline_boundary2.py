@@ -61,7 +61,7 @@ class MemoryDocumentStore:
 def _make_doc(sid: str, body: str) -> Document:
     doc = Document(
         title=sid,
-        elements=[Heading(innerhtml=sid, level=1), Paragraph(html_content=f"<p>{body}</p>")],
+        elements=[Heading(html=f"<h1>{sid}</h1>"), Paragraph(html=f"<p>{body}</p>")],
     )
     doc.source_id = sid
     doc.source_hash = f"filehash::{sid}"

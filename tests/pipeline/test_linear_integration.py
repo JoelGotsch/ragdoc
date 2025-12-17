@@ -23,14 +23,14 @@ async def _parse_structured_report(path: Path) -> Document:
     """
     return Document(
         elements=[
-            Heading(innerhtml="Quarterly Performance Report", level=1),
-            Paragraph(html_content="<p>This report covers Q2 2024 performance metrics.</p>"),
-            Heading(innerhtml="Revenue Analysis", level=3),  # gap: 1 → 3
-            Paragraph(html_content="<p>Total revenue reached $4.2M, up 15% year-over-year.</p>"),
-            Heading(innerhtml="By Region", level=5),  # gap: 3 → 5
-            Paragraph(html_content="<p>EMEA contributed 42%, APAC 38%, Americas 20%.</p>"),
-            Heading(innerhtml="Operating Costs", level=3),
-            Paragraph(html_content="<p>Operating margin held at 23% despite inflationary pressure.</p>"),
+            Heading(html="<h1>Quarterly Performance Report</h1>"),
+            Paragraph(html="<p>This report covers Q2 2024 performance metrics.</p>"),
+            Heading(html="<h3>Revenue Analysis</h3>"),  # gap: 1 → 3
+            Paragraph(html="<p>Total revenue reached $4.2M, up 15% year-over-year.</p>"),
+            Heading(html="<h5>By Region</h5>"),  # gap: 3 → 5
+            Paragraph(html="<p>EMEA contributed 42%, APAC 38%, Americas 20%.</p>"),
+            Heading(html="<h3>Operating Costs</h3>"),
+            Paragraph(html="<p>Operating margin held at 23% despite inflationary pressure.</p>"),
         ],
     )
 

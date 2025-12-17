@@ -18,45 +18,8 @@ from ragdoc.pipeline import TokenSplitter
 
 from .conftest import make_document
 
-# --- TestSimpleChunkerContentHash ---
-
-
-@pytest.mark.anyio
-async def test_simple_chunker_default_id_is_content_hash():
-    doc = make_document(title="Stable", body="Same content.")
-    chunker = SimpleChunker()
-    chunks1 = await chunker.chunk(doc)
-    chunks2 = await chunker.chunk(doc)
-    assert chunks1[0].id == chunks2[0].id
-
-
-@pytest.mark.anyio
-async def test_simple_chunker_default_id_matches_content_hash():
-    doc = make_document(title="Stable", body="Same content.")
-    chunker = SimpleChunker()
-    chunks = await chunker.chunk(doc)
-    assert chunks[0].id == doc.content_hash()
-
-
-@pytest.mark.anyio
-async def test_simple_chunker_different_docs_different_chunk_ids():
-    doc1 = make_document(title="A")
-    doc2 = make_document(title="B")
-    chunker = SimpleChunker()
-    id1 = (await chunker.chunk(doc1))[0].id
-    id2 = (await chunker.chunk(doc2))[0].id
-    assert id1 != id2
-
-
-@pytest.mark.anyio
-async def test_simple_chunker_custom_id_fn_overrides_default():
-    doc = make_document()
-    chunker = SimpleChunker(id_fn=lambda _: "fixed-id")
-    assert (await chunker.chunk(doc))[0].id == "fixed-id"
-
-
-# --- TestChunkerProvenanceFallbacks (Phase 1: Option A) ---
-# source_id/source_hash are required on Chunk; chunkers must always supply them.
+# --- TestChunkerProvenance ---
+# Chunkers resolve provenance via resolve_chunk_provenance; ids are minted pipeline-side.
 
 
 @pytest.mark.anyio
@@ -71,13 +34,13 @@ async def test_simple_chunker_forwards_document_provenance():
 
 
 @pytest.mark.anyio
-async def test_simple_chunker_falls_back_to_source_path_then_content_hash():
-    """Bare document (no source_id/source_hash) still produces a valid Chunk."""
+async def test_simple_chunker_source_hash_none_when_document_has_none():
+    """No file hash means source_hash is None — never the content hash (no masquerade)."""
     doc = make_document(title="A", body="B")
     doc.source_path = "folder/report.pdf"
     chunk = (await SimpleChunker().chunk(doc))[0]
     assert chunk.source_id == "folder/report.pdf"  # source_path fallback
-    assert chunk.source_hash == doc.content_hash()  # content_hash fallback
+    assert chunk.source_hash is None
     assert chunk.content_hash == doc.content_hash()
 
 
@@ -88,7 +51,15 @@ async def test_simple_chunker_falls_back_to_doc_id_when_no_source_path():
     assert chunk.source_id == doc.id  # last-resort fallback, never None
 
 
-# --- TestChunkDocument (Phase 3: DocumentPipeline.chunk_document + source_id_fn) ---
+@pytest.mark.anyio
+async def test_simple_chunker_metadata_is_copied_per_chunk():
+    doc = make_document(title="A", body="B")
+    chunk = (await SimpleChunker().chunk(doc))[0]
+    chunk.metadata["injected"] = True
+    assert "injected" not in doc.metadata
+
+
+# --- TestChunkDocument (DocumentPipeline.chunk_document: provenance + id minting) ---
 
 
 @pytest.mark.anyio
@@ -104,6 +75,58 @@ async def test_chunk_document_stamps_uniform_provenance():
         assert chunk.source_id == "sync-id"
         assert chunk.source_hash == "file-hash"
         assert chunk.content_hash == doc.content_hash()
+
+
+@pytest.mark.anyio
+async def test_chunk_document_source_hash_none_passthrough():
+    """chunk_document never fabricates a source_hash from the content hash."""
+    from ragdoc.pipeline import DocumentPipeline
+
+    doc = make_document(title="A", body="B")
+    chunks = await DocumentPipeline().chunk_document(doc)
+    assert chunks
+    assert all(c.source_hash is None for c in chunks)
+
+
+@pytest.mark.anyio
+async def test_chunk_document_identical_content_splits_get_distinct_ids():
+    """The collision regression: two content-identical splits must yield two distinct ids."""
+    from ragdoc.pipeline import DocumentPipeline
+
+    doc = make_document(title="A", body="Same body.")
+
+    def duplicate_splitter(document: Document) -> list[Document]:
+        return [document.model_copy(), document.model_copy()]
+
+    pipeline = DocumentPipeline(splitter=duplicate_splitter)  # type: ignore[arg-type]  # Splitter protocol
+    chunks = await pipeline.chunk_document(doc)
+    assert len(chunks) == 2
+    assert chunks[0].id != chunks[1].id
+    assert chunks[0].content_hash == chunks[1].content_hash
+
+
+@pytest.mark.anyio
+async def test_chunk_document_ids_stable_across_runs():
+    from ragdoc.pipeline import DocumentPipeline
+
+    doc1 = make_document(title="A", body="B")
+    doc1.source_id = "stable-src"
+    doc2 = make_document(title="A", body="B")
+    doc2.source_id = "stable-src"
+    ids1 = [c.id for c in await DocumentPipeline().chunk_document(doc1)]
+    ids2 = [c.id for c in await DocumentPipeline().chunk_document(doc2)]
+    assert ids1 == ids2
+
+
+@pytest.mark.anyio
+async def test_chunk_id_fn_override():
+    from ragdoc.pipeline import DocumentPipeline
+
+    doc = make_document(title="A", body="B")
+    doc.source_id = "src"
+    pipeline = DocumentPipeline(chunk_id_fn=lambda sid, seq, ordinal, ch: f"{sid}:{seq}:{ordinal}")
+    chunks = await pipeline.chunk_document(doc)
+    assert [c.id for c in chunks] == ["src:1:0"]
 
 
 @pytest.mark.anyio
@@ -124,7 +147,9 @@ def test_token_splitter_small_document_is_not_split():
     splitter = TokenSplitter(max_tokens=7000)
     splits = splitter(doc)
     assert len(splits) == 1
-    assert splits[0] is doc
+    # no-split path returns a shallow copy (fresh metadata dict); elements are shared
+    assert splits[0].elements == doc.elements
+    assert "split_sequence" not in doc.metadata
 
 
 def test_token_splitter_large_document_is_split():
@@ -132,8 +157,8 @@ def test_token_splitter_large_document_is_split():
     doc = Document(
         title="Long doc",
         elements=[
-            Heading(innerhtml="Long doc", level=1),
-            Paragraph(html_content=f"<p>{body}</p>"),
+            Heading(html="<h1>Long doc</h1>"),
+            Paragraph(html=f"<p>{body}</p>"),
         ],
     )
     splitter = TokenSplitter(max_tokens=200, overlap_tokens=20)
@@ -146,8 +171,8 @@ def test_token_splitter_respects_max_tokens_param():
     doc = Document(
         title="T",
         elements=[
-            Heading(innerhtml="T", level=1),
-            Paragraph(html_content=f"<p>{body}</p>"),
+            Heading(html="<h1>T</h1>"),
+            Paragraph(html=f"<p>{body}</p>"),
         ],
     )
     splitter_tight = TokenSplitter(max_tokens=150, overlap_tokens=20)

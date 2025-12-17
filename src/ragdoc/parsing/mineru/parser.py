@@ -174,9 +174,9 @@ class MinerUExtractor:
                 parent directory is stored in ``context.metadata["source_dir"]``
                 so that image handlers can resolve relative image paths.
 
-        After all middlewares run, ``document.metadata`` contains only
-        ``"filename"`` (when *source_path* is provided).  Parsers must not
-        inject any other keys into document metadata; if discarded content
+        After all middlewares run, ``document.metadata`` is empty —
+        ``metadata["filename"]`` is stamped centrally by :func:`ragdoc.parsing.load`.
+        Parsers must not inject any other keys into document metadata; if discarded content
         (headers, footers, …) should be preserved it must be emitted as
         :class:`~ragdoc.document.BaseElement` objects via a custom handler.
         """
@@ -185,15 +185,13 @@ class MinerUExtractor:
             context.metadata["source_dir"] = source_path.parent
 
         context = await self._run_middlewares(context)
-        doc = Document(
+        # Provenance (source_path, metadata["filename"]) is stamped centrally by
+        # ragdoc.parsing.load(); only the parser-specific `parser` field is set here.
+        return Document(
             elements=[parsed.element for parsed in context.elements],
             title=context.document_title,
             parser="mineru",
         )
-        if source_path is not None:
-            doc.metadata["filename"] = source_path.name
-            doc.source_path = str(source_path)
-        return doc
 
     async def _run_middlewares(self, context: ParseContext) -> ParseContext:
         def create_chain(index: int) -> AsyncCallNext:

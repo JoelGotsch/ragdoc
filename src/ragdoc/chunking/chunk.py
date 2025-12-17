@@ -31,20 +31,18 @@ class Chunk(BaseModel, Generic[TMetadata]):
         ...,
         description=(
             "Sync identity key for this chunk's source document. REQUIRED. "
-            "Derived from the source Path by DocumentPipeline.source_id_fn and propagated "
-            "through chunking. Chunkers synthesize a fallback "
-            "(doc.source_id or doc.source_path or doc.id) for documents produced outside a "
-            "sync pipeline, so this field is never None."
+            "Derived from the source Path by DocumentPipeline.source_id_fn and resolved "
+            "uniformly via chunking.provenance.resolve_chunk_provenance "
+            "(doc.source_id or doc.source_path or doc.id), so this field is never None."
         ),
     )
-    source_hash: str = Field(
-        ...,
+    source_hash: str | None = Field(
+        default=None,
         description=(
-            "SHA-256 hex digest of the ORIGINAL SOURCE FILE bytes. REQUIRED. True file "
-            "provenance — always reflects the bytes on disk, never the rendered Document "
-            "content. Set by DocumentPipeline.hash_fn; chunkers fall back to "
-            "doc.content_hash() when no file hash is available. For document-content change "
-            "detection (Boundary 2), use `content_hash` instead."
+            "SHA-256 hex digest of the ORIGINAL SOURCE FILE bytes, set by the sync pipelines' "
+            "hash_fn. True file provenance only — None when the chunk was produced outside a "
+            "sync pipeline (no fabricated fallback). For content change detection use "
+            "`content_hash` instead."
         ),
     )
     content_hash: str | None = Field(

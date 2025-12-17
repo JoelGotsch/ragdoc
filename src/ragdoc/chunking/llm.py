@@ -28,7 +28,6 @@ Customising the prompt::
 from __future__ import annotations
 
 import logging
-import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -36,6 +35,7 @@ from pydantic import BaseModel, Field
 
 from ragdoc.chunking.base import Chunker
 from ragdoc.chunking.chunk import Chunk
+from ragdoc.chunking.provenance import resolve_chunk_provenance
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -140,11 +140,15 @@ class LLMChunker(Chunker):
             rendered text.  Signature: ``(rendered_text: str) -> list``.
             Defaults to :func:`build_topic_summary_messages`.
         metadata_fn: Called with the document to build ``Chunk.metadata``.
-            Defaults to using the document's metadata.
-        id_fn: Called with the document and topic index to produce each
-            ``Chunk.id``.  Defaults to a new UUID per chunk.  For stable chunk
-            IDs across re-runs, provide a custom ``id_fn`` or use
-            :class:`SimpleChunker`.
+            Defaults to using the document's metadata (copied per chunk — the
+            N chunks never share one metadata dict object).
+
+    Note:
+        Chunkers leave ``Chunk.id`` at its uuid4 default —
+        :meth:`~ragdoc.pipeline.DocumentPipeline.chunk_document` mints
+        deterministic ids via :func:`~ragdoc.chunking.provenance.mint_chunk_id`.
+        Ids are stable across runs only while the model returns the same number
+        of summaries for the same content.
     """
 
     def __init__(
@@ -154,7 +158,6 @@ class LLMChunker(Chunker):
         prompt_renderer: Renderer | None = None,
         create_messages: Callable[[str], list[ChatCompletionMessageParam]] = build_topic_summary_messages,
         metadata_fn: Callable[[Document], dict] | None = None,
-        id_fn: Callable[[Document, int], str] | None = None,
     ) -> None:
         from ragdoc.config import get_config
 
@@ -164,7 +167,6 @@ class LLMChunker(Chunker):
         self._prompt_renderer = prompt_renderer
         self._create_messages = create_messages
         self._metadata_fn: Callable[[Document], dict] = metadata_fn or (lambda doc: doc.metadata)
-        self._id_fn: Callable[[Document, int], str] = id_fn or (lambda _doc, _i: str(uuid.uuid4()))
 
     def _get_prompt_renderer(self) -> Renderer:
         if self._prompt_renderer is not None:
@@ -200,21 +202,18 @@ class LLMChunker(Chunker):
         )
 
         metadata = self._metadata_fn(document)
-        content_hash = document.content_hash()
-        source_id = document.source_id or document.source_path or document.id
-        source_hash = document.source_hash or content_hash
+        prov = resolve_chunk_provenance(document)
         chunks = [
             Chunk(
-                id=self._id_fn(document, i),
                 source_path=document.source_path or None,
-                source_id=source_id,
-                source_hash=source_hash,
-                content_hash=content_hash,
+                source_id=prov.source_id,
+                source_hash=prov.source_hash,
+                content_hash=prov.content_hash,
                 prompt_content=rendered,
                 embedding_content=summary,
-                metadata=metadata,  # type: ignore[reportArgumentType]  # metadata_fn returns MetadataDict
+                metadata=dict(metadata),  # type: ignore[reportArgumentType]  # fresh dict per chunk
             )
-            for i, summary in enumerate(topic_summaries.summaries)
+            for summary in topic_summaries.summaries
         ]
         logger.info(f"LLMChunker: {doc_label} -> {len(topic_summaries.summaries)} embedding contents")
         logger.debug(f"LLMChunker: {doc_label} topics: {[s[:80] for s in topic_summaries.summaries]}")

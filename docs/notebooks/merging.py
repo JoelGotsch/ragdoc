@@ -49,9 +49,9 @@ def _():
 
     doc_a = Document(
         elements=[
-            Heading(innerhtml="Introduction", level=1),
-            Paragraph(html_content="<p>Revenue <em>grew</em> significantly.</p>"),
-            Table(html_content="<table><tr><th>Year</th><th>Revenue</th></tr><tr><td>2024</td><td>$11M</td></tr></table>"),
+            Heading(html="<h1>Introduction</h1>"),
+            Paragraph(html="<p>Revenue <em>grew</em> significantly.</p>"),
+            Table(html="<table><tr><th>Year</th><th>Revenue</th></tr><tr><td>2024</td><td>$11M</td></tr></table>"),
         ],
         metadata={"source": "report_mineru"},
         parser="mineru",
@@ -59,9 +59,9 @@ def _():
 
     doc_b = Document(
         elements=[
-            Heading(innerhtml="Introduction", level=1),
-            Paragraph(html_content="<p>Revenue grew <strong>significantly</strong> in Q3.</p>"),
-            Table(html_content="<table><tr><th>Year</th><th>Revenue</th></tr><tr><td>2024</td><td>$11.2M</td></tr></table>"),
+            Heading(html="<h1>Introduction</h1>"),
+            Paragraph(html="<p>Revenue grew <strong>significantly</strong> in Q3.</p>"),
+            Table(html="<table><tr><th>Year</th><th>Revenue</th></tr><tr><td>2024</td><td>$11.2M</td></tr></table>"),
         ],
         metadata={"source": "report_azure_di"},
         parser="azure_di",
@@ -177,7 +177,7 @@ def _(doc_a, doc_b):
 @app.cell
 def _(patch_a):
     # Optionally override a decision before applying
-    # patch_a.operations[2].resolved_elements = [Paragraph(html_content="<p>Custom</p>")]
+    # patch_a.operations[2].resolved_elements = [Paragraph(html="<p>Custom</p>")]
 
     merged_from_patch = patch_a.apply()
     print(f"Applied patch: {len(merged_from_patch.elements)} elements, parser={merged_from_patch.parser!r}")

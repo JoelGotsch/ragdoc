@@ -22,7 +22,7 @@ def _doc_with_title() -> Document:
 def _doc_with_styled_heading() -> Document:
     return Document(
         elements=[
-            Heading(html_content='<h2 style="font-size: 14pt; text-align: center;">Centered Heading</h2>'),
+            Heading(html='<h2 style="font-size: 14pt; text-align: center;">Centered Heading</h2>'),
             Paragraph(html="<p>Body text.</p>"),
         ]
     )
@@ -36,7 +36,7 @@ def test_renderer_render_simple_document():
     """Renderer can render a simple document."""
     doc = Document(
         elements=[
-            Heading(innerhtml="Title", level=1),
+            Heading(html="<h1>Title</h1>"),
             Paragraph(html="<p>Content here.</p>"),
         ]
     )
@@ -113,7 +113,7 @@ def test_renderer_render_to_markdown():
     """Renderer can convert to markdown."""
     doc = Document(
         elements=[
-            Heading(innerhtml="Title", level=1),
+            Heading(html="<h1>Title</h1>"),
             Paragraph(html="<p>Content</p>"),
         ]
     )
@@ -128,7 +128,7 @@ def test_renderer_render_to_plain_text():
     """Renderer can convert to plain text."""
     doc = Document(
         elements=[
-            Heading(innerhtml="Title", level=1),
+            Heading(html="<h1>Title</h1>"),
             Paragraph(html="<p>Content here.</p>"),
         ]
     )
@@ -347,3 +347,27 @@ def test_metadata_rendering_markdown_yaml_frontmatter_with_int():
     assert "---" in result
     assert "My Doc" in result
     assert "2024" in result
+
+
+# --- Escape site #3: metadata header -> pandoc <head> (title + meta tags) ---
+
+
+def test_metadata_head_escapes_title_and_meta():
+    """Title/metadata containing < and " must be escaped in the synthesized <head> (escape site #3)."""
+    doc = Document(
+        title='Q<1> "Report"',
+        elements=[Paragraph(html="<p>body</p>")],
+        metadata={'ke"y': 'va<l>ue "quoted"'},
+    )
+    renderer = Renderer(
+        format=OutputFormat.MARKDOWN,
+        element_renderer=render_for_prompt,
+        metadata_keys=['ke"y'],
+    )
+    result = renderer.render(doc)
+    # pandoc --standalone emits YAML frontmatter from the escaped <head>. Without the
+    # html.escape fix the raw `<`/`"` would be parsed as markup and the content dropped
+    # or the meta tag broken. pandoc backslash-escapes specials in YAML; strip those.
+    unescaped = result.replace("\\", "")
+    assert "Q<1>" in unescaped  # title content survives intact
+    assert "va<l>ue" in unescaped  # meta value content survives intact

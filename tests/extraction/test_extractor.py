@@ -35,7 +35,7 @@ class Event(BaseModel):
 def make_doc(*, source_id: str | None = None, source_hash: str | None = None, **metadata) -> Document:
     doc = Document(
         title="Report",
-        elements=[Heading(innerhtml="Report", level=1), Paragraph(html_content="<p>Body text.</p>")],
+        elements=[Heading(html="<h1>Report</h1>"), Paragraph(html="<p>Body text.</p>")],
         metadata=metadata,
     )
     doc.source_id = source_id

@@ -27,13 +27,12 @@ from ragdoc.document import Document, Heading, Paragraph
 
 doc = Document(
     title="Annual Report",
-    filename="annual_report.docx",
     source_path="/data/annual_report.docx",
     elements=[
-        Heading(innerhtml="Introduction", level=1),
-        Paragraph(html_content="<p>This report covers...</p>"),
+        Heading(html="<h1>Introduction</h1>"),
+        Paragraph(html="<p>This report covers...</p>"),
     ],
-    metadata={"year": 2024},
+    metadata={"year": 2024, "filename": "annual_report.docx"},
 )
 ```
 
@@ -43,7 +42,7 @@ All elements inherit from [`BaseElement`](../api/document.md#BaseElement):
 
 | Type | Description |
 |------|-------------|
-| [`Heading`](../api/document.md#Heading) | Section heading with `level` (1–6) and `innerhtml` |
+| [`Heading`](../api/document.md#Heading) | Section heading; stored `html` carries the outer `<h1>`–`<h6>` tag (`level` is derived) |
 | [`Paragraph`](../api/document.md#Paragraph) | Body text with HTML content |
 | [`Table`](../api/document.md#Table) | Table with HTML content (`<table>...</table>`) |
 | [`Image`](../api/document.md#Image) | Image with base64 data, alt text, and optional `text_representation` |
@@ -75,7 +74,7 @@ and inline tables are represented.
 ```python
 # A paragraph referencing an image inline:
 para = Paragraph(
-    html_content='<p>As shown in <ref id="fig-1" rel="image"/>, revenue grew...</p>'
+    html='<p>As shown in <ref id="fig-1" rel="image"/>, revenue grew...</p>'
 )
 # The renderer resolves <ref> tags to the rendered content of the referenced element.
 ```

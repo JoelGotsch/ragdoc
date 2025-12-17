@@ -17,7 +17,7 @@ from ragdoc.utils.evaluate_footnotes import evaluate_footnotes
 def _doc_all_resolved() -> Document:
     return Document(
         elements=[
-            Paragraph(html_content='<p>See <ref id="fn-1" rel="footnote"/>.</p>'),
+            Paragraph(html='<p>See <ref id="fn-1" rel="footnote"/>.</p>'),
             Footnote(id="fn-1", number=1, innerhtml="Referenced footnote."),
         ]
     )
@@ -26,7 +26,7 @@ def _doc_all_resolved() -> Document:
 def _doc_with_orphans() -> Document:
     return Document(
         elements=[
-            Paragraph(html_content='<p>See <ref id="fn-1" rel="footnote"/>.</p>'),
+            Paragraph(html='<p>See <ref id="fn-1" rel="footnote"/>.</p>'),
             Footnote(id="fn-1", number=1, innerhtml="Referenced footnote."),
             Footnote(id="fn-2", number=2, innerhtml="Orphaned footnote."),
             Footnote(id="fn-3", number=3, innerhtml="Also orphaned."),

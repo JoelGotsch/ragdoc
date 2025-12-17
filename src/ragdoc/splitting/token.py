@@ -50,7 +50,7 @@ from typing import cast
 from bs4 import BeautifulSoup, Tag
 
 from ragdoc.document import BaseElement, Document, ElementType, ExternalRef, Heading, RawText
-from ragdoc.metadata import BaseMetadata
+from ragdoc.metadata import BaseMetadata, copy_metadata
 from ragdoc.rendering import Renderer
 from ragdoc.splitting.groups import ElementGroup, build_element_groups
 from ragdoc.splitting.hierarchical import split_hierarchical
@@ -136,7 +136,7 @@ def split_at_sentences(
                 elements=full_elements,
                 title=doc_title,
                 source_path=doc_source_path,
-                metadata=doc_metadata,
+                metadata=copy_metadata(doc_metadata),
                 external_refs=[parent_ref],
             )
         ]
@@ -154,10 +154,10 @@ def split_at_sentences(
 
     def make_chunk(text: str) -> Document:
         return Document(
-            elements=[*heading_ctx, RawText(innerhtml=text)],
+            elements=[*heading_ctx, RawText(html=text)],
             title=doc_title,
             source_path=doc_source_path,
-            metadata=doc_metadata,
+            metadata=copy_metadata(doc_metadata),
             external_refs=[parent_ref],
         )
 
@@ -240,12 +240,12 @@ def split_at_html_tags(
         return f"<{outer_tag}>{inner}</{outer_tag}>"
 
     def _make_doc(child_htmls: list[str], extra_els: list[BaseElement]) -> Document:
-        raw = RawText(innerhtml=_wrap(child_htmls))
+        raw = RawText(html=_wrap(child_htmls))
         return Document(
             elements=cast("list[ElementType]", [*heading_ctx, raw, *extra_els]),
             title=doc_title,
             source_path=doc_source_path,
-            metadata=doc_metadata,
+            metadata=copy_metadata(doc_metadata),
             external_refs=[parent_ref],
         )
 
@@ -272,7 +272,7 @@ def split_at_html_tags(
 
         # Sub-chunk still too big: try tier 2 (sentence split on rendered)
         sub = split_at_sentences(
-            elements=[RawText(innerhtml=_wrap(children_html)), *extra],
+            elements=[RawText(html=_wrap(children_html)), *extra],
             heading_ctx=heading_ctx,
             renderer=renderer,
             tokenizer=tokenizer,
@@ -364,10 +364,10 @@ def _token_slice(
 
     def make_chunk(text: str) -> Document:
         return Document(
-            elements=[*heading_ctx, RawText(innerhtml=text)],
+            elements=[*heading_ctx, RawText(html=text)],
             title=doc_title,
             source_path=doc_source_path,
-            metadata=doc_metadata,
+            metadata=copy_metadata(doc_metadata),
             external_refs=[parent_ref],
         )
 
@@ -449,7 +449,7 @@ def split_oversized_element(
         Document(
             elements=cast("list[ElementType]", heading_ctx),
             title=document.title,
-            metadata=document.metadata,
+            metadata=copy_metadata(document.metadata),
         ),
         renderer,
         tokenizer,
@@ -500,7 +500,7 @@ def split_oversized_element(
         elements=cast("list[ElementType]", heading_ctx + group.all_elements),
         title=document.title,
         source_path=document.source_path,
-        metadata=document.metadata,
+        metadata=copy_metadata(document.metadata),
     )
     return _token_slice(
         chunk_doc=full_doc,
@@ -602,7 +602,7 @@ def split_by_elements(
                     elements=cast("list[ElementType]", list(current)),
                     title=document.title,
                     source_path=document.source_path,
-                    metadata=document.metadata,
+                    metadata=copy_metadata(document.metadata),
                     external_refs=[parent_ref],
                 )
             )
@@ -632,7 +632,7 @@ def split_by_elements(
                 elements=cast("list[ElementType]", ctx + item.all_elements),
                 title=document.title,
                 source_path=document.source_path,
-                metadata=document.metadata,
+                metadata=copy_metadata(document.metadata),
             )
             sub_splits = split_oversized_element(
                 oversized_doc,
@@ -702,9 +702,10 @@ def split_document(
 
     if tokenizer.count(renderer.render(document)) <= max_tokens:
         logger.debug(f"split_document: {doc_label} fits within {max_tokens} tokens, no split needed")
-        document.metadata["split_sequence"] = 1
-        document.metadata["split_total"] = 1
-        return [document]
+        # Never mutate the input document: return a shallow copy owning a fresh metadata dict.
+        # Elements stay shared by reference — consistent with split behavior generally.
+        doc = document.model_copy(update={"metadata": {**document.metadata, "split_sequence": 1, "split_total": 1}})
+        return [doc]
 
     splits = split_hierarchical(document)
 
@@ -720,12 +721,12 @@ def split_document(
 
     # Write reading-order provenance into metadata. Only split_document does this —
     # individual splitters leave split_sequence/split_total absent so the outermost
-    # call owns the numbering.  Create a new metadata dict per doc because splitters
-    # propagate metadata by reference (all splits share the parent's dict object); in-place
-    # mutation would leave every split with the last iteration's value.
+    # call owns the numbering. Each split owns its metadata dict (copied at construction),
+    # so in-place stamping is safe.
     if len(result) > 1:
         total = len(result)
         for i, doc in enumerate(result):
-            doc.metadata = {**doc.metadata, "split_sequence": i + 1, "split_total": total}
+            doc.metadata["split_sequence"] = i + 1
+            doc.metadata["split_total"] = total
 
     return result

@@ -134,7 +134,7 @@ def select_heading(
     winning_inner = h_b.innerhtml if score_b > score_a else h_a.innerhtml
 
     # Build result: apply winning level to winning innerhtml
-    result = Heading(html_content=f"<h{winning_level}>{winning_inner}</h{winning_level}>")
+    result = Heading(html=f"<h{winning_level}>{winning_inner}</h{winning_level}>")
     return result
 
 

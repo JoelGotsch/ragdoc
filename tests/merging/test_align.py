@@ -17,7 +17,7 @@ from ragdoc.merging.patch import PatchOperationType
 
 
 def test_alignment_key_paragraph_returns_normalized_text():
-    p = Paragraph(html_content="<p>Hello World</p>")
+    p = Paragraph(html="<p>Hello World</p>")
     key = alignment_key(p)
     assert "hello world" in key  # lowercased via _normalize_text
 
@@ -37,8 +37,8 @@ def test_alignment_key_footnote_returns_number_sentinel():
 
 def test_alignment_key_unicode_normalization():
     # SF6 and SF6 should produce the same key
-    p_sub = Paragraph(html_content="<p>SF\u2086</p>")
-    p_plain = Paragraph(html_content="<p>SF6</p>")
+    p_sub = Paragraph(html="<p>SF\u2086</p>")
+    p_plain = Paragraph(html="<p>SF6</p>")
     assert alignment_key(p_sub) == alignment_key(p_plain)
 
 
@@ -48,20 +48,20 @@ def test_alignment_key_unicode_normalization():
 
 
 def test_align_basic_identical_docs_all_keep_a():
-    para = Paragraph(html_content="<p>Same content</p>")
+    para = Paragraph(html="<p>Same content</p>")
     doc_a = Document(elements=[para])
-    doc_b = Document(elements=[Paragraph(html_content="<p>Same content</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>Same content</p>")])
 
     ops = align_elements(doc_a, doc_b)
     assert all(op.op in (PatchOperationType.KEEP_A, PatchOperationType.KEEP_B) for op in ops)
 
 
 def test_align_basic_extra_paragraph_in_b_becomes_insert_b():
-    doc_a = Document(elements=[Paragraph(html_content="<p>Shared</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Shared</p>")])
     doc_b = Document(
         elements=[
-            Paragraph(html_content="<p>Shared</p>"),
-            Paragraph(html_content="<p>Only in B</p>"),
+            Paragraph(html="<p>Shared</p>"),
+            Paragraph(html="<p>Only in B</p>"),
         ]
     )
     ops = align_elements(doc_a, doc_b, allow_insertions_from_b=True)
@@ -70,11 +70,11 @@ def test_align_basic_extra_paragraph_in_b_becomes_insert_b():
 
 
 def test_align_basic_insert_b_skipped_when_insertions_disabled():
-    doc_a = Document(elements=[Paragraph(html_content="<p>Shared</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Shared</p>")])
     doc_b = Document(
         elements=[
-            Paragraph(html_content="<p>Shared</p>"),
-            Paragraph(html_content="<p>Only in B</p>"),
+            Paragraph(html="<p>Shared</p>"),
+            Paragraph(html="<p>Only in B</p>"),
         ]
     )
     ops = align_elements(doc_a, doc_b, allow_insertions_from_b=False)
@@ -85,19 +85,19 @@ def test_align_basic_insert_b_skipped_when_insertions_disabled():
 def test_align_basic_paragraph_only_in_a_becomes_delete_a():
     doc_a = Document(
         elements=[
-            Paragraph(html_content="<p>Only in A</p>"),
-            Paragraph(html_content="<p>Shared</p>"),
+            Paragraph(html="<p>Only in A</p>"),
+            Paragraph(html="<p>Shared</p>"),
         ]
     )
-    doc_b = Document(elements=[Paragraph(html_content="<p>Shared</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>Shared</p>")])
     ops = align_elements(doc_a, doc_b)
     op_types = [op.op for op in ops]
     assert PatchOperationType.DELETE_A in op_types
 
 
 def test_align_basic_different_content_becomes_merge():
-    doc_a = Document(elements=[Paragraph(html_content="<p>Plain text here</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p><em>Italic text here</em></p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Plain text here</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p><em>Italic text here</em></p>")])
     ops = align_elements(doc_a, doc_b)
     assert any(op.op == PatchOperationType.MERGE for op in ops)
 
@@ -113,8 +113,8 @@ def test_align_basic_empty_docs_produce_no_ops():
 
 
 def test_prefer_source_b_for_headings_equal_text():
-    h_a = Heading(html_content="<h2>Introduction</h2>")
-    h_b = Heading(html_content="<h3>Introduction</h3>")
+    h_a = Heading(html="<h2>Introduction</h2>")
+    h_b = Heading(html="<h3>Introduction</h3>")
     doc_a = Document(elements=[h_a])
     doc_b = Document(elements=[h_b])
 
@@ -124,8 +124,8 @@ def test_prefer_source_b_for_headings_equal_text():
 
 
 def test_prefer_source_a_for_headings_produces_keep_a():
-    h_a = Heading(html_content="<h2>Introduction</h2>")
-    h_b = Heading(html_content="<h3>Introduction</h3>")
+    h_a = Heading(html="<h2>Introduction</h2>")
+    h_b = Heading(html="<h3>Introduction</h3>")
     doc_a = Document(elements=[h_a])
     doc_b = Document(elements=[h_b])
 
@@ -140,12 +140,12 @@ def test_prefer_source_a_for_headings_produces_keep_a():
 
 def test_allow_only_footnote_insertions():
     """INSERT_B only allowed for Footnote, not Paragraph."""
-    doc_a = Document(elements=[Paragraph(html_content="<p>Shared paragraph</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Shared paragraph</p>")])
     fn = Footnote(number=1, innerhtml="New footnote in B.")
     doc_b = Document(
         elements=[
-            Paragraph(html_content="<p>Shared paragraph</p>"),
-            Paragraph(html_content="<p>New paragraph only in B</p>"),
+            Paragraph(html="<p>Shared paragraph</p>"),
+            Paragraph(html="<p>New paragraph only in B</p>"),
             fn,
         ]
     )
@@ -170,12 +170,12 @@ def test_allow_only_footnote_insertions():
 def test_mn_boundary_one_paragraph_vs_three_produces_merge():
     """1 paragraph in A aligns with 3 paragraphs in B (same combined text)."""
     combined = "First sentence. Second sentence. Third sentence."
-    doc_a = Document(elements=[Paragraph(html_content=f"<p>{combined}</p>")])
+    doc_a = Document(elements=[Paragraph(html=f"<p>{combined}</p>")])
     doc_b = Document(
         elements=[
-            Paragraph(html_content="<p>First sentence.</p>"),
-            Paragraph(html_content="<p>Second sentence.</p>"),
-            Paragraph(html_content="<p>Third sentence.</p>"),
+            Paragraph(html="<p>First sentence.</p>"),
+            Paragraph(html="<p>Second sentence.</p>"),
+            Paragraph(html="<p>Third sentence.</p>"),
         ]
     )
     ops = align_elements(doc_a, doc_b)
@@ -195,8 +195,8 @@ def test_mn_boundary_one_paragraph_vs_three_produces_merge():
 
 def test_mn_boundary_unicode_normalization_aligns_across_parsers():
     """SF6 in A aligns to SF6 in B."""
-    doc_a = Document(elements=[Paragraph(html_content="<p>Concentration of SF\u2086 gas</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>Concentration of SF6 gas</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Concentration of SF\u2086 gas</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>Concentration of SF6 gas</p>")])
     ops = align_elements(doc_a, doc_b)
     # Should not produce DELETE_A + INSERT_B (which would mean no alignment)
     op_types = {op.op for op in ops}
@@ -211,14 +211,14 @@ def test_mn_boundary_unicode_normalization_aligns_across_parsers():
 def test_resolved_populated_all_ops_have_resolved_elements_or_are_delete():
     doc_a = Document(
         elements=[
-            Heading(html_content="<h2>Title</h2>"),
-            Paragraph(html_content="<p>Body text here.</p>"),
+            Heading(html="<h2>Title</h2>"),
+            Paragraph(html="<p>Body text here.</p>"),
         ]
     )
     doc_b = Document(
         elements=[
-            Heading(html_content="<h1>Title</h1>"),
-            Paragraph(html_content="<p><em>Body</em> text here.</p>"),
+            Heading(html="<h1>Title</h1>"),
+            Paragraph(html="<p><em>Body</em> text here.</p>"),
         ]
     )
     ops = align_elements(doc_a, doc_b)
@@ -235,8 +235,8 @@ def test_with_injected_markup_heading_carries_markup():
     """
     from ragdoc.merging.align import _with_injected_markup
 
-    loser = Heading(html_content="<h2><strong>Q4</strong> results</h2>")
-    winner = Heading(html_content="<h2>Q4 results</h2>")
+    loser = Heading(html="<h2><strong>Q4</strong> results</h2>")
+    winner = Heading(html="<h2>Q4 results</h2>")
     result = _with_injected_markup(winner, loser)
     assert "<strong>" in result.html, "injected markup must survive into the returned Heading"
     assert result.text == winner.text

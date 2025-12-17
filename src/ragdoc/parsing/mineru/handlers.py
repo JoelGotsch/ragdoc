@@ -147,7 +147,7 @@ def handle_title_block(block: TitleBlock, page: PageInfo, context: ParseContext)
         return []
     level: int = context.metadata.get("_default_heading_level", 1)
     heading = Heading(
-        html_content=build_heading_html(text, block, page, level),
+        html=build_heading_html(text, block, page, level),
         bounding_box=_get_bounding_box(block),
         page=page.page_idx + 1,
     )
@@ -179,8 +179,8 @@ def handle_text_block(
     text = extract_text_from_lines(block.lines).strip()
     if not text:
         return []
-    paragraph = Paragraph.from_html(
-        build_text_html(text, block, page),
+    paragraph = Paragraph(
+        html=build_text_html(text, block, page),
         bounding_box=_get_bounding_box(block),
         page=page.page_idx + 1,
     )
@@ -202,8 +202,8 @@ def handle_list_block(
     all_lines = [line for item in block.blocks for line in item.lines]
     css = _css_from_block(block, page, all_lines)
     style_attr = f' style="{css}"' if css else ""
-    doc_list = DocumentList.from_html(
-        f"<ul{style_attr}>{''.join(items)}</ul>",
+    doc_list = DocumentList(
+        html=f"<ul{style_attr}>{''.join(items)}</ul>",
         bounding_box=_get_bounding_box(block),
         page=page.page_idx + 1,
     )
@@ -229,8 +229,8 @@ def handle_code_block(
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph.from_html(
-                        f"<p>{caption_text}</p>",
+                    element=Paragraph(
+                        html=f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(block.code_caption),
                         page=page_number,
                     ),
@@ -245,7 +245,7 @@ def handle_code_block(
             results.append(
                 ParsedElement(
                     element=RawText(
-                        innerhtml=code_text,
+                        html=code_text,
                         bounding_box=_get_bounding_box(block),
                         page=page_number,
                     ),
@@ -277,8 +277,8 @@ def handle_table_block(
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph.from_html(
-                        f"<p>{caption_text}</p>",
+                    element=Paragraph(
+                        html=f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(table_caption),
                         page=page_number,
                     ),
@@ -297,7 +297,7 @@ def handle_table_block(
             results.append(
                 ParsedElement(
                     element=Table(
-                        html_content=table_span.html.strip(),
+                        html=table_span.html.strip(),
                         bounding_box=_get_bounding_box(block),
                         page=page_number,
                     ),
@@ -313,7 +313,7 @@ def handle_table_block(
             results.append(
                 ParsedElement(
                     element=RawText(
-                        innerhtml=fn_text,
+                        html=fn_text,
                         bounding_box=_get_bounding_box(table_footnote),
                         page=page_number,
                     ),
@@ -355,8 +355,8 @@ def handle_chart_block(
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph.from_html(
-                        f"<p>{caption_text}</p>",
+                    element=Paragraph(
+                        html=f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(chart_caption),
                         page=page_number,
                     ),
@@ -373,11 +373,11 @@ def handle_chart_block(
         )
         if chart_span is not None and chart_span.content.strip():
             try:
-                html_content = _pandoc_convert(chart_span.content, to="html", format="markdown")
+                chart_html = _pandoc_convert(chart_span.content, to="html", format="markdown")
                 results.append(
                     ParsedElement(
                         element=Table(
-                            html_content=html_content.strip(),
+                            html=chart_html.strip(),
                             bounding_box=_get_bounding_box(block),
                             page=page_number,
                         ),
@@ -402,7 +402,7 @@ def handle_chart_block(
             results.append(
                 ParsedElement(
                     element=RawText(
-                        innerhtml=fn_text,
+                        html=fn_text,
                         bounding_box=_get_bounding_box(chart_footnote),
                         page=page_number,
                     ),
@@ -502,8 +502,8 @@ def handle_image_block(block: ImageBlock, page: PageInfo, context: ParseContext)
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph.from_html(
-                        f"<p>{caption_text}</p>",
+                    element=Paragraph(
+                        html=f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(caption),
                         page=page_number,
                     ),
@@ -606,7 +606,7 @@ def handle_discarded_as_raw_text(
     return [
         ParsedElement(
             element=RawText(
-                innerhtml=text,
+                html=text,
                 bounding_box=_get_bounding_box(block),
                 page=page.page_idx + 1,
             ),

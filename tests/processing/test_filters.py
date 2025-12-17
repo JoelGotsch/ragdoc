@@ -24,7 +24,7 @@ async def test_empty_document_filter_returns_none_for_zero_elements():
 
 @pytest.mark.anyio
 async def test_empty_document_filter_passes_non_empty_document():
-    doc = Document(elements=[Paragraph(html_content="<p>hello</p>")])
+    doc = Document(elements=[Paragraph(html="<p>hello</p>")])
     result = await EmptyDocumentFilter().process(doc)
     assert result is doc
 
@@ -72,7 +72,7 @@ async def test_pipeline_returns_none_when_filter_drops():
 
 @pytest.mark.anyio
 async def test_pipeline_returns_document_when_filter_passes():
-    doc = Document(elements=[Paragraph(html_content="<p>text</p>")])
+    doc = Document(elements=[Paragraph(html="<p>text</p>")])
     pipeline = ProcessingPipeline([EmptyDocumentFilter()])
     result = await pipeline.process(doc)
     assert result is doc
@@ -121,7 +121,7 @@ async def test_document_pipeline_returns_chunks_when_document_passes_filter(
     fixture.write_text("content")
 
     async def content_parser(path: Path) -> Document:
-        return Document(elements=[Paragraph(html_content="<p>Content here.</p>")])
+        return Document(elements=[Paragraph(html="<p>Content here.</p>")])
 
     pipeline = DocumentPipeline(
         parser=content_parser,  # type: ignore[arg-type]

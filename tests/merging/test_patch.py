@@ -19,7 +19,7 @@ def _make_patch(*ops: PatchOperation) -> DocumentPatch:
 
 
 def test_patch_apply_keep_a_uses_elements_a():
-    para = Paragraph(html_content="<p>Hello</p>")
+    para = Paragraph(html="<p>Hello</p>")
     op = PatchOperation(
         op=PatchOperationType.KEEP_A,
         elements_a=[para],
@@ -31,7 +31,7 @@ def test_patch_apply_keep_a_uses_elements_a():
 
 
 def test_patch_apply_keep_b_uses_elements_b():
-    para = Paragraph(html_content="<p>From B</p>")
+    para = Paragraph(html="<p>From B</p>")
     op = PatchOperation(
         op=PatchOperationType.KEEP_B,
         elements_b=[para],
@@ -43,7 +43,7 @@ def test_patch_apply_keep_b_uses_elements_b():
 
 
 def test_patch_apply_insert_b_adds_element():
-    para = Paragraph(html_content="<p>New in B</p>")
+    para = Paragraph(html="<p>New in B</p>")
     op = PatchOperation(
         op=PatchOperationType.INSERT_B,
         elements_b=[para],
@@ -54,7 +54,7 @@ def test_patch_apply_insert_b_adds_element():
 
 
 def test_patch_apply_delete_a_drops_elements():
-    para = Paragraph(html_content="<p>Only in A</p>")
+    para = Paragraph(html="<p>Only in A</p>")
     op = PatchOperation(
         op=PatchOperationType.DELETE_A,
         elements_a=[para],
@@ -65,8 +65,8 @@ def test_patch_apply_delete_a_drops_elements():
 
 
 def test_patch_apply_merge_uses_resolved_elements():
-    p_a = Paragraph(html_content="<p>plain</p>")
-    p_b = Paragraph(html_content="<p><em>rich</em></p>")
+    p_a = Paragraph(html="<p>plain</p>")
+    p_b = Paragraph(html="<p><em>rich</em></p>")
     op = PatchOperation(
         op=PatchOperationType.MERGE,
         elements_a=[p_a],
@@ -78,8 +78,8 @@ def test_patch_apply_merge_uses_resolved_elements():
 
 
 def test_patch_apply_merge_empty_resolved_raises():
-    p_a = Paragraph(html_content="<p>A</p>")
-    p_b = Paragraph(html_content="<p>B</p>")
+    p_a = Paragraph(html="<p>A</p>")
+    p_b = Paragraph(html="<p>B</p>")
     op = PatchOperation(
         op=PatchOperationType.MERGE,
         elements_a=[p_a],
@@ -91,8 +91,8 @@ def test_patch_apply_merge_empty_resolved_raises():
 
 
 def test_patch_apply_multiple_ops_concatenates_in_order():
-    h = Heading(html_content="<h1>Title</h1>")
-    p = Paragraph(html_content="<p>Body</p>")
+    h = Heading(html="<h1>Title</h1>")
+    p = Paragraph(html="<p>Body</p>")
     op1 = PatchOperation(op=PatchOperationType.KEEP_A, elements_a=[h], resolved_elements=[h])
     op2 = PatchOperation(op=PatchOperationType.KEEP_B, elements_b=[p], resolved_elements=[p])
     doc = _make_patch(op1, op2).apply()
@@ -102,9 +102,9 @@ def test_patch_apply_multiple_ops_concatenates_in_order():
 
 
 def test_patch_apply_manual_override_honored():
-    p_a = Paragraph(html_content="<p>plain</p>")
-    p_b = Paragraph(html_content="<p><em>rich</em></p>")
-    p_custom = Paragraph(html_content="<p>custom override</p>")
+    p_a = Paragraph(html="<p>plain</p>")
+    p_b = Paragraph(html="<p><em>rich</em></p>")
+    p_custom = Paragraph(html="<p>custom override</p>")
     op = PatchOperation(
         op=PatchOperationType.MERGE,
         elements_a=[p_a],
@@ -120,7 +120,7 @@ def test_patch_apply_manual_override_honored():
 
 def test_patch_apply_deduplicates_by_id():
     """Same element ID appearing in two KEEP_A ops -> appears once in output."""
-    para = Paragraph(html_content="<p>Shared</p>")
+    para = Paragraph(html="<p>Shared</p>")
     op1 = PatchOperation(op=PatchOperationType.KEEP_A, elements_a=[para], resolved_elements=[para])
     op2 = PatchOperation(op=PatchOperationType.KEEP_A, elements_a=[para], resolved_elements=[para])
     doc = _make_patch(op1, op2).apply()
@@ -130,8 +130,8 @@ def test_patch_apply_deduplicates_by_id():
 def test_patch_apply_sets_parser_merged():
     op = PatchOperation(
         op=PatchOperationType.KEEP_A,
-        elements_a=[Paragraph(html_content="<p>x</p>")],
-        resolved_elements=[Paragraph(html_content="<p>x</p>")],
+        elements_a=[Paragraph(html="<p>x</p>")],
+        resolved_elements=[Paragraph(html="<p>x</p>")],
     )
     patch = DocumentPatch(
         source_parser_a="mineru",
@@ -149,26 +149,26 @@ def test_patch_apply_sets_parser_merged():
 
 def test_validate_inline_refs_clean_document_returns_empty():
     img = Image(image=None, image_type="png", alt="chart")
-    para = Paragraph(html_content=f'<p>See <ref id="{img.id}" rel="image"/> here.</p>')
+    para = Paragraph(html=f'<p>See <ref id="{img.id}" rel="image"/> here.</p>')
     doc = Document(elements=[para, img])
     assert validate_inline_refs(doc) == []
 
 
 def test_validate_inline_refs_broken_ref_returns_id():
-    para = Paragraph(html_content='<p>See <ref id="nonexistent-id" rel="image"/> here.</p>')
+    para = Paragraph(html='<p>See <ref id="nonexistent-id" rel="image"/> here.</p>')
     doc = Document(elements=[para])
     broken = validate_inline_refs(doc)
     assert "nonexistent-id" in broken
 
 
 def test_validate_inline_refs_no_refs_returns_empty():
-    para = Paragraph(html_content="<p>Plain text, no refs.</p>")
+    para = Paragraph(html="<p>Plain text, no refs.</p>")
     doc = Document(elements=[para])
     assert validate_inline_refs(doc) == []
 
 
 def test_validate_inline_refs_multiple_broken_refs_all_returned():
-    para = Paragraph(html_content='<p><ref id="bad-1" rel="image"/> and <ref id="bad-2" rel="footnote"/></p>')
+    para = Paragraph(html='<p><ref id="bad-1" rel="image"/> and <ref id="bad-2" rel="footnote"/></p>')
     doc = Document(elements=[para])
     broken = validate_inline_refs(doc)
     assert "bad-1" in broken
@@ -177,6 +177,6 @@ def test_validate_inline_refs_multiple_broken_refs_all_returned():
 
 def test_validate_inline_refs_footnote_ref_resolved():
     fn = Footnote(number=1, innerhtml="Footnote text.")
-    para = Paragraph(html_content=f'<p>See<ref id="{fn.id}" rel="footnote"/>.</p>')
+    para = Paragraph(html=f'<p>See<ref id="{fn.id}" rel="footnote"/>.</p>')
     doc = Document(elements=[para, fn])
     assert validate_inline_refs(doc) == []

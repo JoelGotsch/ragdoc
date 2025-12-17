@@ -39,7 +39,7 @@ def _point_id(source_id: str) -> str:
 def make_document(source_id: str, source_hash: str = "h", body: str = "Body.") -> Document:
     doc = Document(
         title=source_id,
-        elements=[Heading(innerhtml=source_id, level=1), Paragraph(html_content=f"<p>{body}</p>")],  # type: ignore[call-arg]  # Heading innerhtml/level consumed by validator
+        elements=[Heading(html=f"<h1>{source_id}</h1>"), Paragraph(html=f"<p>{body}</p>")],  # type: ignore[call-arg]  # Heading innerhtml/level consumed by validator
     )
     doc.source_id = source_id
     doc.source_hash = source_hash
@@ -118,7 +118,7 @@ async def test_upsert_calls_client_and_returns_source_ids(store, client):
 
 @pytest.mark.anyio
 async def test_upsert_requires_source_id(store):
-    doc = Document(elements=[Paragraph(html_content="<p>x</p>")])  # no source_id
+    doc = Document(elements=[Paragraph(html="<p>x</p>")])  # no source_id
     with pytest.raises(ValueError, match="source_id"):
         await store.upsert([doc])
 

@@ -48,9 +48,9 @@ def build_full_document(
     return Document(
         title="Golden Fixture",
         elements=[
-            Heading(html_content='<h1 style="font-size:24px">Golden Fixture</h1>'),
+            Heading(html='<h1 style="font-size:24px">Golden Fixture</h1>'),
             Paragraph(
-                html_content=(
+                html=(
                     '<p style="text-align:left">See <ref id="'
                     + img_id
                     + '" rel="image"/> and note<ref id="'
@@ -60,8 +60,8 @@ def build_full_document(
                     + '" rel="figure"/>.</p>'
                 )
             ),
-            Table(html_content="<table><tr><td>cell</td></tr></table>"),
-            DocumentList(html_content="<ul><li>item one</li></ul>"),
+            Table(html="<table><tr><td>cell</td></tr></table>"),
+            DocumentList(html="<ul><li>item one</li></ul>"),
             Image(
                 id=img_id,
                 image="aGVsbG8=",
@@ -71,7 +71,7 @@ def build_full_document(
                 alt="A chart",
                 text_representation="<table><tr><td>42</td></tr></table>",
             ),
-            RawText(innerhtml="raw <i>text</i>"),
+            RawText(html="raw <i>text</i>"),
             Footnote(id=fn_id, number=1, innerhtml="Footnote text with <b>bold</b>."),
         ],
     )
@@ -191,13 +191,13 @@ def test_title_change_changes_hash():
 def test_element_text_edit_changes_hash():
     doc_a = build_full_document()
     doc_b = build_full_document()
-    doc_b.elements[2] = Table(html_content="<table><tr><td>edited</td></tr></table>")
+    doc_b.elements[2] = Table(html="<table><tr><td>edited</td></tr></table>")
     assert doc_a.content_hash() != doc_b.content_hash()
 
 
 def test_element_reorder_changes_hash():
-    para_a = Paragraph(html_content="<p>Alpha</p>")
-    para_b = Paragraph(html_content="<p>Beta</p>")
+    para_a = Paragraph(html="<p>Alpha</p>")
+    para_b = Paragraph(html="<p>Beta</p>")
     doc_ab = Document(elements=[para_a, para_b])
     doc_ba = Document(elements=[para_b, para_a])
     assert doc_ab.content_hash() != doc_ba.content_hash()
@@ -205,8 +205,8 @@ def test_element_reorder_changes_hash():
 
 def test_element_type_change_changes_hash():
     """Same html string, different element type -> different hash (structure sensitivity)."""
-    raw = RawText(innerhtml="x")  # html == "<div>x</div>"
-    para = Paragraph(html_content="<div>x</div>")
+    raw = RawText(html="x")  # html == "<div>x</div>"
+    para = Paragraph(html="<div>x</div>")
     assert raw.html == para.html
     assert Document(elements=[raw]).content_hash() != Document(elements=[para]).content_hash()
 
@@ -249,7 +249,7 @@ def test_ref_rel_type_participates():
 
     def doc_with_rel(rel: str) -> Document:
         img = Image(id="img-1", image="aGVsbG8=")
-        para = Paragraph(html_content=f'<p>See <ref id="img-1" rel="{rel}"/>.</p>')
+        para = Paragraph(html=f'<p>See <ref id="img-1" rel="{rel}"/>.</p>')
         return Document(elements=[para, img])
 
     assert doc_with_rel("image").content_hash() != doc_with_rel("footnote").content_hash()

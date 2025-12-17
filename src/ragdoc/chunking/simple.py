@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 
 from ragdoc.chunking.base import Chunker
 from ragdoc.chunking.chunk import Chunk
+from ragdoc.chunking.provenance import resolve_chunk_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -45,43 +46,42 @@ class SimpleChunker(Chunker):
     ``embedding_content`` is always identical to ``prompt_content``.  For
     distinct embedding content, use :class:`~ragdoc.chunking.llm.LLMChunker`.
 
+    Chunk ids: chunkers leave ``Chunk.id`` at its uuid4 default —
+    :meth:`~ragdoc.pipeline.DocumentPipeline.chunk_document` is the single id
+    authority and mints deterministic ids via
+    :func:`~ragdoc.chunking.provenance.mint_chunk_id` (override with
+    ``DocumentPipeline(chunk_id_fn=...)``).  Standalone chunker users get uuid4
+    ids and may assign their own afterwards.
+
     Args:
         prompt_renderer: Renders ``prompt_content`` (LLM context).
             Defaults to MARKDOWN with ``render_for_prompt``.
         metadata_fn: Called with the document to build the ``Chunk.metadata``
-            dict.  Defaults to using the document's metadata.
-        id_fn: Called with the document to produce the ``Chunk.id``.
-            Defaults to the document's :meth:`~ragdoc.document.Document.content_hash`
-            (computed once per :meth:`chunk` call and shared with the chunk's
-            ``content_hash`` field) — the same content always produces the same
-            ID, making upserts idempotent.
+            dict.  Defaults to using the document's metadata (copied per chunk).
     """
 
     def __init__(
         self,
         prompt_renderer: Renderer | None = None,
         metadata_fn: Callable[[Document], dict] | None = None,
-        id_fn: Callable[[Document], str] | None = None,
     ) -> None:
         self._prompt_renderer = prompt_renderer
         self._metadata_fn: Callable[[Document], dict] = metadata_fn or (lambda doc: doc.metadata)
-        self._id_fn: Callable[[Document], str] | None = id_fn
 
     def _get_prompt_renderer(self) -> Renderer:
         return self._prompt_renderer if self._prompt_renderer is not None else _default_prompt_renderer()
 
     async def chunk(self, document: Document) -> list[Chunk]:
         prompt_content = self._get_prompt_renderer().render(document)
-        content_hash = document.content_hash()
+        prov = resolve_chunk_provenance(document)
         chunk = Chunk(
-            id=self._id_fn(document) if self._id_fn is not None else content_hash,
             source_path=document.source_path or None,
-            source_id=document.source_id or document.source_path or document.id,
-            source_hash=document.source_hash or content_hash,
-            content_hash=content_hash,
+            source_id=prov.source_id,
+            source_hash=prov.source_hash,
+            content_hash=prov.content_hash,
             prompt_content=prompt_content,
             embedding_content=prompt_content,
-            metadata=self._metadata_fn(document),  # type: ignore[reportArgumentType]  # metadata_fn returns MetadataDict
+            metadata=dict(self._metadata_fn(document)),  # type: ignore[reportArgumentType]  # metadata_fn returns MetadataDict
         )
         chunk_label = f"{chunk.source_path} ({chunk.id})" if chunk.source_path else chunk.id
         logger.debug(f"SimpleChunker: produced chunk {chunk_label} ({len(prompt_content)} chars)")

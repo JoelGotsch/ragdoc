@@ -158,7 +158,7 @@ def test_footnote_text_content(doc: Document, snippet: str, insertion_point: str
 )
 def test_footnote_inline_refs_resolved(doc: Document) -> None:
     """Body paragraph should have <ref> placeholders, not raw <a href='#fn1'> anchors."""
-    para_htmls = [p.html_content for p in doc.paragraphs]
+    para_htmls = [p.html for p in doc.paragraphs]
     raw_anchor_in_body = any("footnote-ref" in h or "fnref" in h for h in para_htmls)
     assert not raw_anchor_in_body
 
@@ -217,9 +217,9 @@ def test_bullet_list_content_present(doc: Document) -> None:
 def test_bullet_list_is_nested(doc: Document) -> None:
     """The bullet list must be a single nested DocumentList with ilvl > 0 for sub-items."""
     # A nested list HTML would have <ul><li>...<ul><li>...</li></ul></li></ul>
-    bullet_lists = [lst for lst in doc.lists if "<ul" in lst.html_content]
+    bullet_lists = [lst for lst in doc.lists if "<ul" in lst.html]
     assert len(bullet_lists) == 1
-    html = bullet_lists[0].html_content
+    html = bullet_lists[0].html
     assert html.count("<ul") > 1, "Expected nested <ul> inside the bullet list"
 
 

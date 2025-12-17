@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
+from ragdoc.chunking.provenance import resolve_chunk_provenance
 from ragdoc.metadata import TMetadata
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable
 
     from ragdoc.chunking import Chunk, Chunker
+    from ragdoc.chunking.provenance import ChunkIdFn
     from ragdoc.document import Document
     from ragdoc.pipeline.splitter import TokenSplitter
     from ragdoc.processing.base import DocumentProcessor, ProcessingPipeline
@@ -87,6 +89,12 @@ class DocumentPipeline(Generic[TMetadata]):
         chunker: Converts a :class:`~ragdoc.document.Document` to
             :class:`~ragdoc.chunking.Chunk` (s).  Defaults to
             :class:`~ragdoc.chunking.SimpleChunker`.
+        source_id_fn: ``Path -> source_id`` identity function stamped onto every
+            parsed document (default: ``p.name``).
+        chunk_id_fn: ``(source_id, split_sequence, chunk_ordinal, content_hash) -> id``
+            minted onto every chunk by :meth:`chunk_document`.  Defaults to
+            :func:`~ragdoc.chunking.provenance.mint_chunk_id` (deterministic,
+            collision-free across splits).
         concurrency: Max files processed in parallel by :meth:`run_many` and
             :meth:`stream` (default ``1`` — sequential).
         on_error: ``"raise"`` (default) re-raises exceptions immediately.
@@ -101,11 +109,13 @@ class DocumentPipeline(Generic[TMetadata]):
         splitter: TokenSplitter | None = None,
         chunker: Chunker | None = None,
         source_id_fn: Callable[[Path], str] = lambda p: p.name,
+        chunk_id_fn: ChunkIdFn | None = None,
         concurrency: int = 1,
         on_error: Literal["raise", "skip"] = "raise",
         metadata_type: type[TMetadata] | None = None,
     ) -> None:
         from ragdoc.chunking import SimpleChunker
+        from ragdoc.chunking.provenance import mint_chunk_id
         from ragdoc.processing.base import ProcessingPipeline as PP
 
         self._parser: Callable[[Path], Awaitable[Document]]
@@ -120,6 +130,7 @@ class DocumentPipeline(Generic[TMetadata]):
         self._splitter = splitter
         self._chunker: Chunker = chunker or SimpleChunker()
         self._source_id_fn = source_id_fn
+        self._chunk_id_fn: ChunkIdFn = chunk_id_fn or mint_chunk_id
         self._concurrency = concurrency
         self._on_error = on_error
         self._metadata_type = metadata_type
@@ -319,10 +330,20 @@ class DocumentPipeline(Generic[TMetadata]):
         most elements; ``FootnoteProcessor`` re-resolves already-anchored footnotes onto the
         wrong numerals, inserting duplicate refs).
 
-        Provenance is materialized **uniformly** here: ``content_hash`` is computed once
-        from *document* and stamped on every chunk, and ``source_id`` / ``source_hash`` are
-        propagated to each split so a multi-split source produces chunks that share one
-        ``content_hash`` (required for Boundary-2 change detection).
+        Provenance is materialized **uniformly** here via
+        :func:`~ragdoc.chunking.provenance.resolve_chunk_provenance`: ``content_hash`` is
+        computed once from *document* and stamped on every chunk, and ``source_id`` /
+        ``source_hash`` are propagated to each split so a multi-split source produces chunks
+        that share one ``content_hash`` (required for Boundary-2 change detection).
+        ``source_hash`` may be ``None`` — it is never faked from the content hash.
+
+        **Chunk ids are minted here** (single id authority), by ``chunk_id_fn`` (default
+        :func:`~ragdoc.chunking.provenance.mint_chunk_id`) over ``(source_id,
+        split_sequence, chunk_ordinal, content_hash)``.  ``split_sequence`` comes from
+        positional enumeration of the splitter output (1-based — equal to
+        ``metadata["split_sequence"]`` whenever the splitter is ``split_document``, and
+        defined for any custom splitter); ``chunk_ordinal`` is the 0-based chunk index
+        within a split.  Identical-content splits of one source therefore get distinct ids.
 
         Args:
             document: A parsed, processed, and (optionally) provenance-stamped Document.
@@ -342,20 +363,21 @@ class DocumentPipeline(Generic[TMetadata]):
                 )
 
         # Source-level provenance (uniform across all of this document's chunks).
-        content_hash = doc.content_hash()
-        source_id = doc.source_id or doc.source_path or doc.id
-        source_hash = doc.source_hash or content_hash
+        prov = resolve_chunk_provenance(doc)
 
         typed_doc: Document[TMetadata] = cast("Document[TMetadata]", doc)
 
         splits = self._splitter(typed_doc) if self._splitter else [typed_doc]
         logger.debug(f"Split into {len(splits)} sub-documents")
-        for split in splits:
-            split.source_id = source_id
-            split.source_hash = source_hash
 
-        chunks: list[Chunk[TMetadata]] = [c for split in splits for c in await self._chunker.chunk(split)]
-        for chunk in chunks:
-            chunk.content_hash = content_hash
-        logger.info(f"Chunked document {source_id}: {len(chunks)} chunks produced")
+        chunks: list[Chunk[TMetadata]] = []
+        for seq, split in enumerate(splits, 1):
+            split.source_id = prov.source_id
+            split.source_hash = prov.source_hash
+            split_chunks = await self._chunker.chunk(split)
+            for ordinal, chunk in enumerate(split_chunks):
+                chunk.content_hash = prov.content_hash
+                chunk.id = self._chunk_id_fn(prov.source_id, seq, ordinal, prov.content_hash)
+            chunks.extend(cast("list[Chunk[TMetadata]]", split_chunks))
+        logger.info(f"Chunked document {prov.source_id}: {len(chunks)} chunks produced")
         return chunks

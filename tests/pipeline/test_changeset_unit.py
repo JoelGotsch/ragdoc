@@ -52,7 +52,7 @@ def test_changeset_chunk_round_trip_preserves_id_and_created_at(tmp_path: Path):
 
 
 def test_changeset_document_round_trip(tmp_path: Path):
-    doc = Document(elements=[Paragraph(html_content="<p>hi</p>")], source_id="d.pdf")
+    doc = Document(elements=[Paragraph(html="<p>hi</p>")], source_id="d.pdf")
     cs: ChangeSet[Document] = ChangeSet(to_update=[SourceChange(source_id="d.pdf", source_hash="h", items=[doc])])
     p = tmp_path / "cs.json"
     cs.save(p)

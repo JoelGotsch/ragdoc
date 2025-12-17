@@ -67,10 +67,11 @@ def test_xlsx_load_all(xlsx_file_path: Path):
 
 
 def test_xlsx_metadata(xlsx_file_path: Path):
-    """Test document source fields are correctly set."""
+    """load_excel sets only parser-specific fields; provenance is stamped by parsing.load()."""
     document = load_excel(xlsx_file_path)
-    assert document.metadata["filename"] == "test.xlsx"
-    assert Path(document.source_path).match("*/tests/data/test.xlsx")
+    assert document.parser == "xlsx"
+    assert document.source_path == ""
+    assert "filename" not in document.metadata
 
 
 def test_sheet_params_override_truthy_default_params(monkeypatch):
@@ -90,3 +91,18 @@ def test_sheet_params_override_truthy_default_params(monkeypatch):
     config = ExcelConfig(default_params={"skiprows": 1}, sheet_params={"Sheet1": {"skiprows": 5, "nrows": 2}})
     xlsx_generate_document(fake_file, config)  # type: ignore[arg-type]
     assert captured["Sheet1"] == {"skiprows": 5, "nrows": 2}
+
+
+def test_xlsx_sheet_name_escaped(tmp_path: Path):
+    """A sheet named with markup characters yields escaped heading html and intact text (escape site #4)."""
+    import pandas as pd
+
+    target = tmp_path / "evil.xlsx"
+    with pd.ExcelWriter(target) as writer:
+        pd.DataFrame({"a": [1]}).to_excel(writer, sheet_name='A<B&"C"', index=False)
+
+    document = load_excel(target)
+    heading = document.headings[0]
+    assert heading.text == 'A<B&"C"'
+    assert "<B" not in heading.html  # markup never lands raw in the heading html
+    assert "&lt;B&amp;" in heading.html

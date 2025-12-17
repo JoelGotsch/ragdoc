@@ -34,7 +34,7 @@ Consumer notes
 from __future__ import annotations
 
 import json
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel
 from typing_extensions import Required, TypedDict
@@ -117,6 +117,22 @@ Used to parametrise ``Chunk[TMetadata]``, ``Document[TMetadata]``,
 ``DocumentPipeline[TMetadata]``, and ``VectorStorePipeline[TMetadata]``
 so that metadata keys are typed end-to-end.
 """
+
+
+def copy_metadata(metadata: TMetadata) -> TMetadata:
+    """Shallow-copy a metadata dict, preserving its TypedDict type.
+
+    Splitters copy the parent document's metadata into every output split at construction
+    (mutation isolation); a plain ``dict(...)`` widens the static type to ``dict[str, object]``,
+    so this helper carries the ``TMetadata`` type through the copy.
+
+    Args:
+        metadata: The metadata mapping to copy.
+
+    Returns:
+        A new dict with the same (shallow) contents and the same static type.
+    """
+    return cast("TMetadata", dict(metadata))
 
 
 # ---------------------------------------------------------------------------

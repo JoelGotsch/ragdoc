@@ -21,8 +21,8 @@ def make_document(title: str = "Doc", body: str = "Content.") -> Document:
     return Document(
         title=title,
         elements=[
-            Heading(innerhtml=title, level=1),
-            Paragraph(html_content=f"<p>{body}</p>"),
+            Heading(html=f"<h1>{title}</h1>"),
+            Paragraph(html=f"<p>{body}</p>"),
         ],
     )
 

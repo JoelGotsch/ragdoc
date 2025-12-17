@@ -109,10 +109,11 @@ pipeline = DocumentPipeline(parser=my_parser)
 
 ### Deterministic chunk IDs
 
-`SimpleChunker` now uses
-[`Document.content_hash()`](../api/document.md#Document.content_hash) as the
-default chunk ID.  The same file content always produces the same chunk IDs,
-making vector-store upserts idempotent:
+Chunk ids are minted by `DocumentPipeline.chunk_document` — the single id authority —
+using `ragdoc.chunking.provenance.mint_chunk_id` over
+`(source_id, split_sequence, chunk_ordinal, content_hash)`.  The same file content always
+produces the same chunk IDs (idempotent vector-store upserts), and two identical-content
+splits of one source still get distinct ids:
 
 ```python
 chunks1 = await pipeline.run(Path("report.docx"))
@@ -120,6 +121,10 @@ chunks2 = await pipeline.run(Path("report.docx"))
 
 assert chunks1[0].id == chunks2[0].id  # always True for the same content
 ```
+
+Override the scheme with `DocumentPipeline(chunk_id_fn=...)`
+(`(source_id, split_sequence, chunk_ordinal, content_hash) -> str`).  Chunkers used
+standalone (outside a pipeline) leave `Chunk.id` at its uuid4 default.
 
 ---
 

@@ -46,7 +46,7 @@ def _make_doc_with_footnotes(n: int) -> Document:
     footnotes: list[Footnote] = []
     for i in range(1, n + 1):
         # Page must match footnote.page for same_page_only=True to find them.
-        elements.append(Paragraph(html_content=f"<p>Text reference{i}.</p>", page=1))
+        elements.append(Paragraph(html=f"<p>Text reference{i}.</p>", page=1))
         footnotes.append(Footnote(number=i, innerhtml=f"<p>Footnote {i}</p>", page=1))
     elements.extend(footnotes)
     return Document(elements=elements)

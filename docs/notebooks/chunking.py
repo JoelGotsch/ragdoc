@@ -53,10 +53,10 @@ def _():
     sample_doc = Document(
         title="Q3 Report",
         elements=[
-            Heading(innerhtml="Q3 Report", level=1),
-            Paragraph(html_content="<p>Revenue increased by 12% year-over-year.</p>"),
-            Heading(innerhtml="Financial Summary", level=2),
-            Table(html_content=(
+            Heading(html="<h1>Q3 Report</h1>"),
+            Paragraph(html="<p>Revenue increased by 12% year-over-year.</p>"),
+            Heading(html="<h2>Financial Summary</h2>"),
+            Table(html=(
                 "<table>"
                 "<tr><th>Metric</th><th>Q3 2023</th><th>Q3 2024</th></tr>"
                 "<tr><td>Revenue</td><td>$10M</td><td>$11.2M</td></tr>"

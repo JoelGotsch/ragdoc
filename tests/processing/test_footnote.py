@@ -26,20 +26,20 @@ def sample_document() -> Document:
     """Create a sample document with paragraphs and footnotes."""
     return Document(
         elements=[
-            Heading(innerhtml="Introduction", level=1, page=1),
+            Heading(html="<h1>Introduction</h1>", page=1),
             Paragraph(
                 id="para-1",
-                html_content="<p>This is the first paragraph with a reference 1 to a study.</p>",
+                html="<p>This is the first paragraph with a reference 1 to a study.</p>",
                 page=1,
             ),
             Paragraph(
                 id="para-2",
-                html_content="<p>Another paragraph mentions topic 2 for more details.</p>",
+                html="<p>Another paragraph mentions topic 2 for more details.</p>",
                 page=1,
             ),
             Paragraph(
                 id="para-3",
-                html_content="<p>Third paragraph on page 2 with reference 1 again.</p>",
+                html="<p>Third paragraph on page 2 with reference 1 again.</p>",
                 page=2,
             ),
             Footnote(
@@ -63,10 +63,10 @@ def document_no_footnotes() -> Document:
     """Create a document without any footnotes."""
     return Document(
         elements=[
-            Heading(innerhtml="Simple Document", level=1, page=1),
+            Heading(html="<h1>Simple Document</h1>", page=1),
             Paragraph(
                 id="para-1",
-                html_content="<p>Just a simple paragraph with no references.</p>",
+                html="<p>Just a simple paragraph with no references.</p>",
                 page=1,
             ),
         ]
@@ -80,12 +80,12 @@ def document_multiple_candidates() -> Document:
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>In section 1, we discuss topic 1 from the original paper on page 1.</p>",
+                html="<p>In section 1, we discuss topic 1 from the original paper on page 1.</p>",
                 page=1,
             ),
             Paragraph(
                 id="para-2",
-                html_content="<p>The experiment showed result 1 which was significant.</p>",
+                html="<p>The experiment showed result 1 which was significant.</p>",
                 page=1,
             ),
             Footnote(
@@ -176,7 +176,7 @@ def test_find_footnote_candidates_finds_reference_in_document_list():
         elements=[
             DocumentList(
                 id="list-1",
-                html_content="<ul><li>As previously reported,2 the auditor confirmed the findings.</li></ul>",
+                html="<ul><li>As previously reported,2 the auditor confirmed the findings.</li></ul>",
                 page=1,
             ),
             Footnote(id="fn-2", number=2, innerhtml="Internal Bulletin 2024-17, para. 2.", page=1),
@@ -194,8 +194,7 @@ def test_find_footnote_candidates_finds_reference_in_heading():
         elements=[
             Heading(
                 id="heading-1",
-                innerhtml="System Implementation3",
-                level=1,
+                html="<h1>System Implementation3</h1>",
                 page=1,
             ),
             Footnote(id="fn-3", number=3, innerhtml="See annex.", page=1),
@@ -214,7 +213,7 @@ def test_find_footnote_candidates_skips_footnote_whose_number_matches():
             Footnote(id="fn-1", number=1, innerhtml="Smith et al., 2023. See also footnote 1.", page=1),
             Paragraph(
                 id="para-1",
-                html_content="<p>As shown in reference 1 above.</p>",
+                html="<p>As shown in reference 1 above.</p>",
                 page=1,
             ),
         ]
@@ -233,7 +232,7 @@ def test_find_footnote_candidates_finds_number_glued_to_word():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>The Service Agreement6 remains in force.</p>",
+                html="<p>The Service Agreement6 remains in force.</p>",
                 page=1,
             ),
             Footnote(id="fn-6", number=6, innerhtml="Memo MR-214.", page=1),
@@ -251,7 +250,7 @@ def test_find_footnote_candidates_finds_number_after_comma_no_space():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>See previous reports,3 which detail the findings.</p>",
+                html="<p>See previous reports,3 which detail the findings.</p>",
                 page=1,
             ),
             Footnote(id="fn-3", number=3, innerhtml="Compliance Report 2024-10.", page=1),
@@ -269,7 +268,7 @@ def test_find_footnote_candidates_finds_number_after_period_no_space():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>This was confirmed by the Director of Operations.5</p>",
+                html="<p>This was confirmed by the Director of Operations.5</p>",
                 page=1,
             ),
             Footnote(id="fn-5", number=5, innerhtml="Compliance Report 2024-51, para. 13.", page=1),
@@ -291,7 +290,7 @@ def test_find_footnote_candidates_matches_number_at_end_of_larger_number():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>In 1956 and 2016 the policy was established.</p>",
+                html="<p>In 1956 and 2016 the policy was established.</p>",
                 page=1,
             ),
             Footnote(id="fn-6", number=6, innerhtml="Memo MR-214.", page=1),
@@ -308,7 +307,7 @@ def test_find_footnote_candidates_finds_ocr_split_multi_digit_number():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>Sensor reading DEV1 1 was flagged in the audit log.</p>",
+                html="<p>Sensor reading DEV1 1 was flagged in the audit log.</p>",
                 page=1,
             ),
             Footnote(
@@ -328,7 +327,7 @@ def test_find_footnote_candidates_does_not_match_ocr_split_within_longer_sequenc
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>Items 1 1 1 were reviewed.</p>",
+                html="<p>Items 1 1 1 were reviewed.</p>",
                 page=1,
             ),
             Footnote(id="fn-11", number=11, innerhtml="Definition.", page=1),
@@ -719,7 +718,7 @@ def test_apply_ref_patches_single_patch_replaces_number_in_html():
     """A single patch replaces the footnote number with a ref tag."""
     element = Paragraph(
         id="para-1",
-        html_content="<p>See the Service Agreement 1 for details.</p>",
+        html="<p>See the Service Agreement 1 for details.</p>",
         page=1,
     )
     # "1" is at position 28 in the text node "See the Service Agreement 1 for details."
@@ -733,7 +732,7 @@ def test_apply_ref_patches_single_patch_replaces_number_in_html():
 def test_apply_ref_patches_no_patches_leaves_html_unchanged():
     """apply_ref_patches with empty patch list does not modify the element."""
     original = "<p>No references here.</p>"
-    element = Paragraph(id="para-1", html_content=original, page=1)
+    element = Paragraph(id="para-1", html=original, page=1)
     apply_ref_patches(element, [])
     assert element.html == original
 
@@ -753,7 +752,7 @@ def test_apply_ref_patches_sequential_footnotes_same_text_node():
     """
     text_node = "executed under the Joint Operating Procedures (the Service Agreement1).2 confirms this."
     html = f"<p>{text_node}</p>"
-    element = Paragraph(id="para-1", html_content=html, page=1)
+    element = Paragraph(id="para-1", html=html, page=1)
 
     pos1 = text_node.index("1")  # immediately after "Agreement"
     pos2 = text_node.index("2")  # immediately after ")."
@@ -776,7 +775,7 @@ def test_apply_ref_patches_patches_across_multiple_text_nodes():
     """Patches targeting different text nodes are each applied correctly."""
     # A list with two items, footnote ref in each
     html = "<ul><li>First item1 here.</li><li>Second item2 here.</li></ul>"
-    element = Paragraph(id="para-1", html_content=html, page=1)
+    element = Paragraph(id="para-1", html=html, page=1)
 
     # Text node 0: "First item1 here."  → "1" at index 10
     # Text node 1: "Second item2 here." → "2" at index 11
@@ -807,8 +806,8 @@ def test_apply_ref_patches_patch_order_independence():
     ]
     patches_rl = list(reversed(patches_lr))
 
-    el1 = Paragraph(id="p1", html_content=html, page=1)
-    el2 = Paragraph(id="p2", html_content=html, page=1)
+    el1 = Paragraph(id="p1", html=html, page=1)
+    el2 = Paragraph(id="p2", html=html, page=1)
     apply_ref_patches(el1, patches_lr)
     apply_ref_patches(el2, patches_rl)
 
@@ -821,7 +820,7 @@ def test_apply_ref_patches_only_specified_occurrence_is_replaced():
     """A patch at position N replaces only that occurrence, not others."""
     text_node = "result 1 confirms finding 1 again."
     html = f"<p>{text_node}</p>"
-    element = Paragraph(id="p", html_content=html, page=1)
+    element = Paragraph(id="p", html=html, page=1)
 
     # Patch only the SECOND occurrence of "1"
     second_pos = text_node.rindex("1")
@@ -837,7 +836,7 @@ def test_apply_ref_patches_only_specified_occurrence_is_replaced():
 def test_apply_ref_patches_out_of_bounds_text_node_idx_silently_skipped():
     """A patch referencing a non-existent text node index is silently ignored."""
     original = "<p>Simple text.</p>"
-    element = Paragraph(id="p", html_content=original, page=1)
+    element = Paragraph(id="p", html=original, page=1)
     apply_ref_patches(element, [(99, 0, 1, '<sup><ref id="fn-1"/>[1]</sup>')])
     assert element.html == original
 
@@ -851,7 +850,7 @@ def test_find_footnote_candidates_ignores_html_attribute_values():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content='<p style="margin: 2px">No footnote ref here.</p>',
+                html='<p style="margin: 2px">No footnote ref here.</p>',
                 page=1,
             ),
             Footnote(id="fn-2", number=2, innerhtml="Some note.", page=1),
@@ -867,7 +866,7 @@ def test_find_footnote_candidates_returns_all_occurrences_in_same_text_node():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>First 1 middle 1 last 1 end.</p>",
+                html="<p>First 1 middle 1 last 1 end.</p>",
                 page=1,
             ),
             Footnote(id="fn-1", number=1, innerhtml="Note.", page=1),
@@ -884,7 +883,7 @@ def test_find_footnote_candidates_does_not_match_inside_existing_ref_tag():
     already_processed_html = '<p>See reference <sup><ref id="fn-1">[1]</ref></sup> for details.</p>'
     doc = Document(
         elements=[
-            Paragraph(id="para-1", html_content=already_processed_html, page=1),
+            Paragraph(id="para-1", html=already_processed_html, page=1),
             Footnote(id="fn-1", number=1, innerhtml="Smith 2023.", page=1),
         ]
     )
@@ -1008,12 +1007,12 @@ def _make_only_orphaned_doc() -> Document:
         elements=[
             Paragraph(
                 id="para-1",
-                html_content='<p>See note.<ref id="fn-1" rel="footnote"/> Also item 1 here.</p>',
+                html='<p>See note.<ref id="fn-1" rel="footnote"/> Also item 1 here.</p>',
                 page=1,
             ),
             Paragraph(
                 id="para-2",
-                html_content="<p>Another paragraph with 2 references.</p>",
+                html="<p>Another paragraph with 2 references.</p>",
                 page=1,
             ),
             Footnote(id="fn-1", number=1, innerhtml="Already resolved footnote.", page=1),
@@ -1053,7 +1052,7 @@ async def test_only_orphaned_true_processes_all_when_none_prereferred():
         elements=[
             Paragraph(
                 id="para-1",
-                html_content="<p>Reference to study1 in detail.</p>",
+                html="<p>Reference to study1 in detail.</p>",
                 page=1,
             ),
             Footnote(id="fn-1", number=1, innerhtml="A study.", page=1),

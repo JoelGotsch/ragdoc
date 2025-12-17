@@ -209,7 +209,7 @@ for op in patch.operations:
 
 # Override a specific decision before applying
 from ragdoc.document import Paragraph
-patch.operations[2].resolved_elements = [Paragraph(html_content="<p>Custom</p>")]
+patch.operations[2].resolved_elements = [Paragraph(html="<p>Custom</p>")]
 
 merged = patch.apply()
 ```

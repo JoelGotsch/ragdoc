@@ -201,7 +201,7 @@ async def test_filtered_document_clears_stale_stored_entry(tmp_path, doc_store):
 
     class DropV2(DocumentProcessor):
         async def process(self, document):
-            if any("v2" in getattr(el, "html_content", "") for el in document.elements):
+            if any("v2" in getattr(el, "html", "") for el in document.elements):
                 return None
             return document
 

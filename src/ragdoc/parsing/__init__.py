@@ -22,6 +22,7 @@ from ragdoc.parsing.registry import (
     get_parser,
     get_registered_parsers,
     register_parser,
+    stamp_provenance,
     unregister_parser,
 )
 from ragdoc.parsing.xlsx import ExcelConfig
@@ -82,5 +83,6 @@ async def load(path: Path | str, parser: str | None = None) -> Document:
     resolved = _resolve_parser(path, parser_name=parser)
     logger.debug(f"load: using parser {resolved.name!r} for {path.name}")
     doc = await resolved(path)
+    stamp_provenance(doc, path, resolved.name)
     logger.info(f"load: parsed {path.name} -> Document({len(doc.elements)} elements)")
     return doc

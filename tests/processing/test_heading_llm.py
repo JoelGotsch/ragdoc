@@ -62,8 +62,8 @@ async def test_heading_resolver_process_with_headings():
     """Processor calls LLM for headings and applies judgments."""
     doc = Document(
         elements=[
-            Heading(innerhtml="Title", level=1),
-            Heading(innerhtml="Section", level=1),
+            Heading(html="<h1>Title</h1>"),
+            Heading(html="<h1>Section</h1>"),
         ]
     )
 
@@ -94,8 +94,8 @@ async def test_heading_resolver_handles_none_response():
 
     doc = Document(
         elements=[
-            Heading(innerhtml="12-March-2024", level=1),  # Metadata
-            Heading(innerhtml="Real Title", level=1),
+            Heading(html="<h1>12-March-2024</h1>"),  # Metadata
+            Heading(html="<h1>Real Title</h1>"),
         ]
     )
 
@@ -120,8 +120,8 @@ async def test_heading_resolver_handles_uncertain_response():
     """Processor leaves heading level unchanged when LLM omits the heading (uncertain)."""
     doc = Document(
         elements=[
-            Heading(innerhtml="Ambiguous Heading", level=2),
-            Heading(innerhtml="Clear Section", level=1),
+            Heading(html="<h2>Ambiguous Heading</h2>"),
+            Heading(html="<h1>Clear Section</h1>"),
         ]
     )
 
@@ -145,7 +145,7 @@ async def test_heading_resolver_handles_api_failure():
     """Processor handles LLM API failures gracefully."""
     doc = Document(
         elements=[
-            Heading(innerhtml="Title", level=1),
+            Heading(html="<h1>Title</h1>"),
         ]
     )
 

@@ -58,10 +58,21 @@ def test_paragraphs_content(html_document: Document):
     assert "And checking how it looks if certain text" in combined_text
 
 
-def test_document_metadata(html_document: Document, html_file_path: Path):
-    """Test document source fields are correctly set."""
-    assert Path(html_document.source_path).match("*/tests/data/test.html")
-    assert html_document.metadata["filename"] == "test.html"
+def test_document_metadata(html_document: Document):
+    """load_html sets only parser-specific fields; provenance is stamped by parsing.load()."""
+    assert html_document.parser == "html"
+    assert html_document.source_path == ""
+    assert "filename" not in html_document.metadata
+
+
+@pytest.mark.anyio
+async def test_document_metadata_via_load(html_file_path: Path):
+    """parsing.load() stamps source_path and metadata['filename'] centrally."""
+    from ragdoc.parsing import load
+
+    document = await load(html_file_path)
+    assert Path(document.source_path).match("*/tests/data/test.html")
+    assert document.metadata["filename"] == "test.html"
 
 
 expected_table = """

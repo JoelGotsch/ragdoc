@@ -43,7 +43,8 @@ def tok() -> CharTokenizer:
 
 
 def h(level: int, text: str = "") -> Heading:
-    return Heading(innerhtml=text or f"H{level}", level=level)
+    inner = text or f"H{level}"
+    return Heading(html=f"<h{level}>{inner}</h{level}>")
 
 
 def p(text: str) -> Paragraph:
@@ -60,12 +61,14 @@ def make_doc(*elements) -> Document:
 
 
 def test_no_split_sets_sequence_1():
-    """Document that fits the budget is returned with split_sequence=1, split_total=1."""
+    """Document that fits the budget is returned (as a copy) with split_sequence=1, split_total=1."""
     doc = make_doc(h(1, "Title"), p("Short"))
     result = split_document(doc, renderer=rdr(), tokenizer=tok(), max_tokens=10_000)
-    assert result == [doc]
+    assert len(result) == 1
+    assert result[0].elements == doc.elements
     assert result[0].metadata["split_sequence"] == 1
     assert result[0].metadata["split_total"] == 1
+    assert "split_sequence" not in doc.metadata  # input untouched
 
 
 def test_single_level_split_assigns_contiguous_sequence():

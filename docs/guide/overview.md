@@ -43,7 +43,7 @@ ragdoc provides two element renderers: `render_for_prompt` (the primary renderer
 
 ## CSS-in-HTML convention
 
-Document elements store content as `innerhtml` (HTML string) with visual properties stored as
+Document elements store content as `html` (full HTML including the outer tag) with visual properties stored as
 **inline CSS** — for example `font-size`, `font-weight`, `text-align`. This convention enables
 processors to work uniformly across all parsers without parser-specific fields.
 

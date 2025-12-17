@@ -65,10 +65,10 @@ def test_recovered_heading_information(azure_test_pdf_json_file_path: Path, data
 
 
 def test_azure_json_metadata(azure_test_pdf_json_file_path: Path):
-    """Test document source fields are correctly set from AzureJSONFile."""
+    """load_azure_json sets only parser-specific fields; provenance is stamped by parsing.load()."""
     document = load_azure_json(AzureJSONFile(file_path=azure_test_pdf_json_file_path))
-    assert document.metadata["filename"] == "test_pdf_azure_di.json"
-    assert Path(document.source_path).match("*/tests/data/test_pdf_azure_di.json")
+    assert document.source_path == ""
+    assert "filename" not in document.metadata
 
 
 def test_azure_analyze_run_metadata(azure_test_pdf_json_file_path: Path, data_path: Path):
