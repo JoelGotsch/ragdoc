@@ -143,7 +143,7 @@ class BaseElement(BaseModel):
             rel_type = rel_attr[0] if isinstance(rel_attr, list) else rel_attr
             if ref_id and rel_type:
                 try:
-                    refs.append(InlineRef(target_id=ref_id, rel_type=rel_type))
+                    refs.append(InlineRef(target_id=str(ref_id), rel_type=str(rel_type)))  # type: ignore[arg-type]  # rel_type validated by pydantic
                 except Exception:
                     pass  # skip unknown rel_type values
         return refs
@@ -184,7 +184,7 @@ class BaseElement(BaseModel):
             setattr(self, k, v)
 
     @classmethod
-    def _fields_from_html(cls, html: str) -> dict:
+    def _fields_from_html(cls, html: str) -> dict:  # pyright: ignore[reportUnusedParameter]  # overridden by subclasses
         """Parse HTML and return a dict of field values for construction.
         Subclasses should override this to enable from_html / from_markdown construction."""
         raise NotImplementedError(f"{cls.__name__} does not support construction from HTML")
@@ -209,7 +209,7 @@ class BaseElement(BaseModel):
     @classmethod
     def from_html(cls, html: str, **kwargs) -> Self:
         """Create an element from an HTML string."""
-        return cls(html=html, **kwargs)
+        return cls(html=html, **kwargs)  # type: ignore[call-arg]  # 'html' consumed by _parse_html_input validator
 
     @classmethod
     def from_markdown(cls, markdown_text: str, page: int = 0, **kwargs) -> Self:
@@ -218,7 +218,7 @@ class BaseElement(BaseModel):
         Embedded footnotes are expected in markdown format (e.g. [^footnote-<footnote-id>]).
         """
         html = convert_text(markdown_text, "html", format="md").strip()
-        return cls(html=html, page=page, **kwargs)
+        return cls(html=html, page=page, **kwargs)  # type: ignore[call-arg]  # 'html' consumed by _parse_html_input validator
 
     @property
     def footnote_ids(self) -> list[str]:
@@ -239,7 +239,7 @@ class BaseElement(BaseModel):
     def html_tag(self) -> Tag:
         """BeautifulSoup Tag representation of the element. Parses the html property."""
         tag = BeautifulSoup(self.html, "html.parser")
-        return tag.contents[0] if tag.contents else Tag(name="div")
+        return tag.contents[0] if tag.contents else Tag(name="div")  # type: ignore[return-value]  # first content is a Tag
 
     @property
     def markdown(self) -> str:
@@ -251,7 +251,7 @@ E = TypeVar("E", bound=BaseElement)
 
 
 class Heading(BaseElement):
-    element_type: Literal[ElementTypeEnum.HEADING] = Field(default=ElementTypeEnum.HEADING)
+    element_type: Literal[ElementTypeEnum.HEADING] = Field(default=ElementTypeEnum.HEADING)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     html_content: str = Field(..., description="Full HTML of the heading element including the outer <hN> tag")
 
     @model_validator(mode="before")
@@ -284,7 +284,7 @@ class Heading(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
     @property
     def level(self) -> int:
@@ -310,7 +310,7 @@ class Heading(BaseElement):
 
 
 class Paragraph(BaseElement):
-    element_type: Literal[ElementTypeEnum.PARAGRAPH] = Field(default=ElementTypeEnum.PARAGRAPH)
+    element_type: Literal[ElementTypeEnum.PARAGRAPH] = Field(default=ElementTypeEnum.PARAGRAPH)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     html_content: str = ""
 
     @classmethod
@@ -323,11 +323,11 @@ class Paragraph(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
 
 class DocumentList(BaseElement):
-    element_type: Literal[ElementTypeEnum.DOCUMENT_LIST] = Field(default=ElementTypeEnum.DOCUMENT_LIST)
+    element_type: Literal[ElementTypeEnum.DOCUMENT_LIST] = Field(default=ElementTypeEnum.DOCUMENT_LIST)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     html_content: str = Field(..., description="HTML content of the list. Should be a <ul>, <ol>, or <dl> element.")
 
     @classmethod
@@ -341,11 +341,11 @@ class DocumentList(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
 
 class Table(BaseElement):
-    element_type: Literal[ElementTypeEnum.TABLE] = Field(default=ElementTypeEnum.TABLE)
+    element_type: Literal[ElementTypeEnum.TABLE] = Field(default=ElementTypeEnum.TABLE)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     html_content: str = Field(..., description="HTML content of the table. Should be a <table> element.")
 
     @classmethod
@@ -358,11 +358,11 @@ class Table(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
 
 class Image(BaseElement):
-    element_type: Literal[ElementTypeEnum.IMAGE] = Field(default=ElementTypeEnum.IMAGE)
+    element_type: Literal[ElementTypeEnum.IMAGE] = Field(default=ElementTypeEnum.IMAGE)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     image: str | None = Field(
         default=None,
         description="Base64 representation of this image. None when no image data is available.",
@@ -410,7 +410,7 @@ class Image(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
     @classmethod
     def _fields_from_html(cls, html: str) -> dict:
@@ -420,21 +420,23 @@ class Image(BaseElement):
             return {}
         src = img_tag.get("src", "")
         data_pattern = re.compile(r"data:image/(?P<image_type>[^;]+);base64,(?P<image_data>.+)")
-        data_match = data_pattern.match(src)
+        data_match = data_pattern.match(src)  # type: ignore[arg-type]  # src is the str 'src' attribute
         data = {}
         if data_match:
+            width = img_tag.get("width")
+            height = img_tag.get("height")
             data = {
                 "image": data_match.group("image_data"),
                 "image_type": data_match.group("image_type"),
                 "alt": img_tag.get("alt", None),
-                "width": int(img_tag.get("width")) if img_tag.get("width") else None,
-                "height": int(img_tag.get("height")) if img_tag.get("height") else None,
+                "width": int(width) if width else None,  # type: ignore[arg-type]  # width attr is str
+                "height": int(height) if height else None,  # type: ignore[arg-type]  # height attr is str
             }
         return {k: v for k, v in data.items() if v is not None}
 
 
 class RawText(BaseElement):
-    element_type: Literal[ElementTypeEnum.RAW_TEXT] = Field(default=ElementTypeEnum.RAW_TEXT)
+    element_type: Literal[ElementTypeEnum.RAW_TEXT] = Field(default=ElementTypeEnum.RAW_TEXT)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     innerhtml: str = Field(default="", description="Inner HTML content of the element (without outer tag)")
 
     @classmethod
@@ -452,13 +454,13 @@ class RawText(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
 
 class Footnote(BaseElement):
     """Represents a footnote definition in the document."""
 
-    element_type: Literal[ElementTypeEnum.FOOTNOTE] = Field(default=ElementTypeEnum.FOOTNOTE)
+    element_type: Literal[ElementTypeEnum.FOOTNOTE] = Field(default=ElementTypeEnum.FOOTNOTE)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     number: int = Field(..., description="The footnote number as it appears in the document")
     innerhtml: str = Field(..., description="The footnote text content (without number prefix)")
 
@@ -468,7 +470,7 @@ class Footnote(BaseElement):
         aside = soup.find("aside", class_="footnote")
         if aside:
             try:
-                number = int(aside.get("data-number", 0))
+                number = int(aside.get("data-number", 0))  # type: ignore[union-attr,arg-type]  # find yields a Tag; attr is str
             except (ValueError, TypeError):
                 number = 0
             return {"number": number, "innerhtml": aside.decode_contents().strip()}
@@ -490,7 +492,7 @@ class Footnote(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
     @property
     def text(self) -> str:
@@ -697,7 +699,7 @@ class Document(BaseModel, Generic[TMetadata]):
     def __or__(self, other: Self) -> Self:
         title = self.title or other.title
         if self.title and other.title:
-            new_heading = [Heading(innerhtml=other.title, level=1)]
+            new_heading = [Heading(innerhtml=other.title, level=1)]  # type: ignore[call-arg]  # consumed by _from_innerhtml_level validator
         else:
             new_heading = []
         return Document(  # type: ignore[return-value]

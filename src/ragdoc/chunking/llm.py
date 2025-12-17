@@ -159,7 +159,7 @@ class LLMChunker(Chunker):
         from ragdoc.config import get_config
 
         config = get_config()
-        self._client = client if client is not None else config.openai_client
+        self._client: Any = client if client is not None else config.openai_client
         self._model = model if model is not None else config.default_llm_model
         self._prompt_renderer = prompt_renderer
         self._create_messages = create_messages
@@ -200,7 +200,7 @@ class LLMChunker(Chunker):
                 source_path=document.source_path or None,
                 prompt_content=rendered,
                 embedding_content=summary,
-                metadata=metadata,
+                metadata=metadata,  # type: ignore[reportArgumentType]  # metadata_fn returns MetadataDict
             )
             for i, summary in enumerate(topic_summaries.summaries)
         ]

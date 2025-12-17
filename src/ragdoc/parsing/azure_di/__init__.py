@@ -27,8 +27,9 @@ class AzureAnalyzeRun(BaseModel):
 def load_azure_json(file_obj: AzureJSONFile) -> Document:
     """Parse an Azure DI JSON result file into a Document. Sets ``source_path`` and ``metadata["filename"]``."""
     file_path = Path(file_obj.file_path)
+    bundle_source = Path(file_obj.source_path) if file_obj.source_path is not None else None
     with open(file_path) as fh:
-        azure_bundle = AzureDIBundle(analyze_result=json.load(fh), source_path=file_obj.source_path)
+        azure_bundle = AzureDIBundle(analyze_result=json.load(fh), source_path=bundle_source)
     document = generate_document_azure_di(azure_bundle)
     document.metadata["filename"] = file_path.name
     document.source_path = str(file_path)
@@ -38,9 +39,9 @@ def load_azure_json(file_obj: AzureJSONFile) -> Document:
 @load_file.register
 def load_azure_analyze_result(analyze_run: AzureAnalyzeRun) -> Document:
     """Parse an in-memory Azure DI analyze result into a Document. Sets ``source_path`` and ``metadata["filename"]`` from ``source_path``."""
-    azure_bundle = AzureDIBundle(analyze_result=analyze_run.analyze_dict, source_path=analyze_run.source_path)
-    document = generate_document_azure_di(azure_bundle)
     source_path = Path(analyze_run.source_path) if analyze_run.source_path is not None else None
+    azure_bundle = AzureDIBundle(analyze_result=analyze_run.analyze_dict, source_path=source_path)
+    document = generate_document_azure_di(azure_bundle)
     if source_path:
         document.metadata["filename"] = source_path.name
         document.source_path = str(source_path)

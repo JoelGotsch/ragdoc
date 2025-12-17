@@ -6,17 +6,13 @@ import transformers
 
 @runtime_checkable
 class Tokenizer(Protocol):
-    def __call__(self, text: str) -> list[int]:
-        pass
+    def __call__(self, text: str) -> list[int]: ...
 
-    def decode(self, tokens: list[int]) -> str:
-        pass
+    def decode(self, tokens: list[int]) -> str: ...
 
-    def truncate(self, text: str, max_tokens: int) -> str:
-        pass
+    def truncate(self, text: str, max_tokens: int) -> str: ...
 
-    def count(self, text: str) -> int:
-        pass
+    def count(self, text: str) -> int: ...
 
 
 class GPTTokenizer:

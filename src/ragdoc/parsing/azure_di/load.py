@@ -27,7 +27,7 @@ class FigureExtractor:
         x_values, y_values = zip(*polygon)
         return min(y_values), max(y_values), min(x_values), max(x_values)
 
-    def extract_document_image(self, page: int, polygon: list[tuple[float, float]]) -> tuple[tuple[int, int], str]:
+    def extract_document_image(self, page: int, polygon: list[tuple[float, float]]) -> tuple[tuple[int, int], bytes]:
         pdf_page: pymupdf.Page = self.doc[page - 1]
         top, bottom, left, right = self._rectangular_hull(polygon)
         clip_rectangle = pymupdf.Rect(left, top, right, bottom)
@@ -35,7 +35,7 @@ class FigureExtractor:
         return (image.width, image.height), base64.b64encode(image.tobytes())
 
 
-def _get_figure_information(figure: dict) -> tuple[int, list[tuple[float, float]]]:
+def _get_figure_information(figure: dict) -> tuple[int | None, list[tuple[float, float]]]:
     if (
         "boundingRegions" not in figure
         or not isinstance(figure["boundingRegions"], list)
@@ -79,7 +79,11 @@ def replace_figure_tags(soup: BeautifulSoup, azure_bundle) -> BeautifulSoup:
             continue
 
         img_tag = soup.new_tag(
-            "img", src=f"data:image/png;base64,{b64_image.decode()}", width=width, height=height, alt=html_figure.text
+            "img",
+            src=f"data:image/png;base64,{b64_image.decode()}",
+            width=str(width),
+            height=str(height),
+            alt=html_figure.text,
         )
         html_figure.replace_with(img_tag)
     return soup

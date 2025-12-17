@@ -33,7 +33,7 @@ def generate_document(excel_file: pd.ExcelFile, config: ExcelConfig | None = Non
             continue
         params = config.default_params or {} | config.sheet_params.get(sheet_name, {})
         df = pd.read_excel(excel_file, sheet_name=sheet_name, **params)
-        document_heading = Heading(innerhtml=sheet_name, level=2, page=i)
+        document_heading = Heading(html_content=f"<h2>{sheet_name}</h2>", page=i)
         document_table = Table(html_content=df.to_html(), page=i)
         document.elements.append(document_heading)
         document.elements.append(document_table)

@@ -64,7 +64,7 @@ def extract_font_size(html: str) -> float | None:
     soup = BeautifulSoup(html, "html.parser")
 
     for tag in soup.find_all(style=True):
-        style = tag.get("style", "")
+        style = str(tag.get("style", ""))
 
         match = re.search(r"font-size:\s*([\d.]+)(pt|px|em|rem)", style)
         if match:
@@ -101,7 +101,7 @@ def is_centered(html: str) -> bool:
     soup = BeautifulSoup(html, "html.parser")
 
     for tag in soup.find_all(style=True):
-        style = tag.get("style", "")
+        style = str(tag.get("style", ""))
         if "text-align: center" in style or "text-align:center" in style:
             return True
 
@@ -137,7 +137,7 @@ def is_bold(html: str) -> bool:
 
     # Check for font-weight in style
     for tag in soup.find_all(style=True):
-        style = tag.get("style", "")
+        style = str(tag.get("style", ""))
         if "font-weight: bold" in style or "font-weight:bold" in style:
             return True
         # font-weight: 600+ is typically bold
@@ -452,7 +452,7 @@ class TitleDetectionProcessor(DocumentProcessor):
         # Select the best candidate
         best_idx, best_heading = self._select_best_candidate(candidates)
 
-        if best_heading is None:
+        if best_idx is None or best_heading is None:
             return document
 
         # Set document title

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -207,9 +208,10 @@ Guidelines:
         self.settings = settings or LLMHeadingResolverSettings()
         config = get_config()
         self.settings.model_name = model_name or self.settings.model_name or config.default_llm_model
-        self.client = client or self._create_client_from_settings() or config.openai_client
-        if self.client is None:
+        resolved_client = client or self._create_client_from_settings() or config.openai_client
+        if resolved_client is None:
             raise ValueError("No client provided and could not create one from settings or config.")
+        self.client: AsyncOpenAI = resolved_client
         self.remove_title_from_elements = remove_title_from_elements
         self.remove_elements_before_title = remove_elements_before_title
         self._concurrency = concurrency
@@ -261,7 +263,7 @@ Guidelines:
             font_size = None
             soup = BeautifulSoup(element.html, "html.parser")
             for tag in soup.find_all(style=True):
-                style = tag.get("style", "")
+                style = str(tag.get("style", ""))
                 match = re.search(r"font-size:\s*([\d.]+)(pt|px)", style)
                 if match:
                     font_size = float(match.group(1))
@@ -329,6 +331,7 @@ Guidelines:
     async def _process_in_batches(self, heading_infos: list[HeadingInfo]) -> list[HeadingJudgment]:
         """Process headings in batches, with bounded concurrency across batches."""
         batch_size = self.settings.batch_size
+        assert batch_size is not None  # guaranteed by the caller's `if self.settings.batch_size` check
         # Pre-compute (id_offset, batch) so offsets are stable even under parallel execution.
         batches = [(i, heading_infos[i : i + batch_size]) for i in range(0, len(heading_infos), batch_size)]
 
@@ -340,7 +343,9 @@ Guidelines:
             # Re-map IDs from batch-local (1-based) to global (1-based)
             results[batch_idx] = [HeadingJudgment(id=j.id + id_offset, level=j.level) for j in batch_judgments]
 
-        coros = [_process_batch(idx, offset, batch) for idx, (offset, batch) in enumerate(batches)]
+        coros: list[Awaitable[None]] = [
+            _process_batch(idx, offset, batch) for idx, (offset, batch) in enumerate(batches)
+        ]
         await _fan_out(coros, self._concurrency)
 
         return [j for r in results for j in r]

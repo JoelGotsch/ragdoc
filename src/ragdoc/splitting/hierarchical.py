@@ -1,4 +1,6 @@
-from ragdoc.document import Document, ExternalRef, Heading
+from typing import cast
+
+from ragdoc.document import BaseElement, Document, ElementType, ExternalRef, Heading
 from ragdoc.splitting.groups import ElementGroup, build_element_groups
 
 
@@ -75,7 +77,7 @@ def split_hierarchical(document: Document) -> list[Document]:
     current_ctx_snapshot: list[Heading] = []
     raw_chunks: list[tuple[list, list[Heading]]] = []
 
-    for item in build_element_groups(document.elements):
+    for item in build_element_groups(cast("list[BaseElement]", document.elements)):
         if isinstance(item, Heading):
             if item.level == split_level:
                 if current_chunk is not None:
@@ -114,7 +116,10 @@ def split_hierarchical(document: Document) -> list[Document]:
         prefix = preamble_extras if i == 0 else []
         all_elements = ctx + prefix + elements
         doc = Document(
-            elements=all_elements, title=document.title, source_path=document.source_path, metadata=document.metadata
+            elements=cast("list[ElementType]", all_elements),
+            title=document.title,
+            source_path=document.source_path,
+            metadata=document.metadata,
         )
         split_docs.append(doc)
 

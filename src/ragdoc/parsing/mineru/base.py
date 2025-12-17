@@ -770,7 +770,9 @@ class MinerUMiddleDocument(BaseModel):
 
         for page in self.pdf_info:
             for block in page.para_blocks:
-                if block.type == block_type.value:
+                if block.type == block_type.value and isinstance(
+                    block, (TextBlock, TitleBlock, ListBlock, CodeBlock, ImageBlock, TableBlock)
+                ):
                     blocks.append(block)
 
         return blocks
@@ -862,7 +864,7 @@ def parse_middle_json_file(path: Path | str) -> MinerUMiddleDocument:
         A MinerUMiddleDocument instance.
 
     """
-    path: Path = Path(path)
+    path = Path(path)
     if path.is_file() and path.name.endswith("_middle.json"):
         json_path = path
     else:
@@ -1146,13 +1148,13 @@ class BaseMiddleware(ABC):
         return await call_next(context)
 
 
-class PreProcessingMiddleware(BaseMiddleware):
+class PreProcessingMiddleware(BaseMiddleware, ABC):
     """Middleware that runs before the main extraction."""
 
     pass
 
 
-class PostProcessingMiddleware(BaseMiddleware):
+class PostProcessingMiddleware(BaseMiddleware, ABC):
     """Middleware that runs after the main extraction."""
 
     pass

@@ -183,6 +183,8 @@ def openai_image_summarizer(
     _transforms = DEFAULT_TRANSFORMATIONS if transformations is None else transformations
 
     async def _summarize(image: Image, context: str | None) -> ImageSummary:
+        if image.image is None:
+            raise ValueError("Image has no base64 content to summarize.")
         image_bytes = base64.b64decode(image.image)
         if _transforms:
             pil = apply_image_transformations(image_bytes, _transforms)
@@ -267,7 +269,7 @@ class ImageSummaryProcessor(DocumentProcessor):
                 f"ImageSummaryProcessor: {len(images)} images to summarize"
                 + (f" ({skipped} skipped: already summarized)" if skipped else "")
             )
-        coros = [self._process_one(summarize, img, document) for img in images]
+        coros: list[Awaitable[None]] = [self._process_one(summarize, img, document) for img in images]
         await _fan_out(coros, self._concurrency)
         return document
 

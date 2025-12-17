@@ -7,7 +7,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 import requests
-from bs4 import BeautifulSoup, NavigableString, Tag
+from bs4 import BeautifulSoup, Tag
+from bs4.element import NavigableString
 
 # from funcy import rcompose
 from pydantic import BaseModel
@@ -139,8 +140,7 @@ def generate_image(image: Tag) -> Image | None:
         _, content = image_src.split(",", maxsplit=1)
         image_type = match.group("image_type")
         kwargs = extract_image_attributes(image)
-        image = Image(image=content, image_type=image_type, **kwargs)
-        return image
+        return Image(image=content, image_type=image_type, **kwargs)
     elif download_images and (image_src.startswith("https://") or image_src.startswith("http://")):
         try:
             response = requests.get(image_src)
@@ -195,13 +195,14 @@ def handle_tag(element: Tag, document: Document) -> None:
                 document.elements.append(document_image)
         case "aside":
             if "footnote" in (element.get("class") or []):
-                number = int(element.get("data-number") or 0)
+                number = int(element.get("data-number") or 0)  # type: ignore[arg-type]  # bs4 attr value is str at runtime
                 innerhtml = element.decode_contents().strip()
-                aside_id = element.get("id", "")
+                aside_id = str(element.get("id", ""))
                 fn_id = aside_id.removeprefix("footnote-") if aside_id.startswith("footnote-") else None
-                document.elements.append(
-                    Footnote(number=number, innerhtml=innerhtml, **({"id": fn_id} if fn_id else {}))
-                )
+                if fn_id:
+                    document.elements.append(Footnote(number=number, innerhtml=innerhtml, id=fn_id))
+                else:
+                    document.elements.append(Footnote(number=number, innerhtml=innerhtml))
 
 
 def _reconstruct_footnote_refs(document: Document) -> None:
@@ -216,10 +217,10 @@ def _reconstruct_footnote_refs(document: Document) -> None:
     for element in document.elements:
         if not hasattr(element, "html_content"):
             continue
-        soup = BeautifulSoup(element.html_content, "html.parser")
+        soup = BeautifulSoup(getattr(element, "html_content"), "html.parser")
         changed = False
         for a in soup.find_all("a", href=True):
-            href = a.get("href", "")
+            href = str(a.get("href", ""))
             if href.startswith("#footnote-"):
                 fn_id = href.removeprefix("#footnote-")
                 fn = id_to_fn.get(fn_id)
@@ -227,7 +228,7 @@ def _reconstruct_footnote_refs(document: Document) -> None:
                     a.replace_with(BeautifulSoup(fn.placeholder_html, "html.parser"))
                     changed = True
         if changed:
-            element.html_content = str(soup)
+            setattr(element, "html_content", str(soup))
 
 
 def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | None = None) -> Document:
@@ -268,7 +269,10 @@ def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | No
         ):
             heading_innerhtml = element.decode_contents(formatter="html")
             heading_level = int("6" if element.name == "p" else element.name.replace("h", ""))
-            document.elements.append(Heading(innerhtml=heading_innerhtml, level=heading_level))
+            # Heading accepts innerhtml/level via a pydantic model_validator(mode="before") (see document.py).
+            document.elements.append(
+                Heading(innerhtml=heading_innerhtml, level=heading_level)  # type: ignore[call-arg]
+            )
         else:
             handle_tag(element, document)
     document.parser = "html"

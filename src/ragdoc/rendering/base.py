@@ -183,6 +183,8 @@ class RenderContext:
         Returns:
             List of sibling documents (may be empty)
         """
+        from ragdoc.document import Document as _Document
+
         siblings: list[Document] = []
         for parent_id in document.parent_ids:
             parent = self.get_external(parent_id)
@@ -192,7 +194,7 @@ class RenderContext:
             for child_id in getattr(parent, "child_ids", []):
                 if child_id != document.id:
                     child = self.get_external(child_id)
-                    if child is not None:
+                    if isinstance(child, _Document):
                         siblings.append(child)
         return siblings
 
@@ -387,7 +389,7 @@ class Renderer:
         self,
         html: str,
         inline_rendered: dict[str, str],
-        fallback_rendered: dict[str, str],
+        fallback_rendered: dict[str, str],  # pyright: ignore[reportUnusedParameter] # documented fallback slot
     ) -> str:
         """
         Replace <ref id="..."/> tags with rendered element content.
@@ -408,7 +410,7 @@ class Renderer:
 
         for ref_tag in soup.find_all("ref"):
             ref_id = ref_tag.get("id")
-            if not ref_id:
+            if not ref_id or not isinstance(ref_id, str):
                 ref_tag.replace_with("[invalid ref: no id]")
                 continue
 

@@ -6,7 +6,7 @@
 # of ragdoc works without the extra dependency installed.
 
 try:
-    import llama_index
+    import llama_index  # type: ignore[reportMissingImports]  # optional, untyped integration dependency
 
     _llama_index_available = True
 except ImportError:
@@ -40,13 +40,8 @@ def node_dict_to_document_fragment(node_dict: dict, content_replacement_key: str
         prompt_content = metadata[content_replacement_key]
         del metadata[content_replacement_key]
 
-    embedding_metadata_keys = [k for k in metadata.keys() if k not in node_dict.get("excluded_embed_metadata_keys", [])]
-    prompt_metadata_keys = [k for k in metadata.keys() if k not in node_dict.get("excluded_llm_metadata_keys", [])]
-
     return Chunk(
         id=node_dict["id_"],
-        embedding_metadata_keys=embedding_metadata_keys,
-        prompt_metadata_keys=prompt_metadata_keys,
         embedding_content=embedding_content,
         prompt_content=prompt_content,
         metadata=metadata,
@@ -71,12 +66,11 @@ def document_fragment_to_node_dict(fragment: Chunk, content_replacement_key: str
     if content_replacement_key not in metadata:
         metadata[content_replacement_key] = fragment.prompt_content
 
-    excluded_embed_metadata_keys = [
-        k for k in fragment.metadata.keys() if k not in fragment.embedding_metadata_keys
-    ] + [content_replacement_key]
-    excluded_llm_metadata_keys = [k for k in fragment.metadata.keys() if k not in fragment.prompt_metadata_keys] + [
-        content_replacement_key
-    ]
+    # Chunk no longer stores per-key embed/prompt inclusion lists (removed in the
+    # chunking refactor), so include all metadata in both representations and
+    # exclude only the internal key that carries the prompt content.
+    excluded_embed_metadata_keys = [content_replacement_key]
+    excluded_llm_metadata_keys = [content_replacement_key]
     return dict(
         id_=fragment.id,
         text=text,

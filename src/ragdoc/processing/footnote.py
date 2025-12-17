@@ -63,6 +63,7 @@ import asyncio
 import logging
 import re
 import uuid
+from collections.abc import Awaitable
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -599,8 +600,8 @@ class SimpleFootnoteResolver:
     async def resolve(
         self,
         candidates: list[FootnoteCandidate],
-        footnote_number: int,
-        footnote_text: str,
+        footnote_number: int,  # pyright: ignore[reportUnusedParameter] # part of FootnoteResolver protocol
+        footnote_text: str,  # pyright: ignore[reportUnusedParameter] # part of FootnoteResolver protocol
         min_element_idx: int | None = None,
     ) -> FootnoteCandidate | None:
         """Select the best candidate using structural/positional heuristics."""
@@ -667,7 +668,7 @@ Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate
         """
         from ragdoc.config import get_config
 
-        self.client = client if client is not None else get_config().openai_client
+        self.client: Any = client if client is not None else get_config().openai_client
         self.model = model
 
     async def resolve(
@@ -901,7 +902,7 @@ class FootnoteProcessor(DocumentProcessor):
             async def _resolve_one(idx: int, footnote: Footnote) -> None:
                 results[idx] = await self._resolve_footnote(document, footnote, None)
 
-            coros = [_resolve_one(i, f) for i, f in enumerate(sorted_footnotes)]
+            coros: list[Awaitable[None]] = [_resolve_one(i, f) for i, f in enumerate(sorted_footnotes)]
             await _fan_out(coros, self._concurrency)
 
             for footnote, best in zip(sorted_footnotes, results):

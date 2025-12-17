@@ -34,7 +34,10 @@ async def _process_file(
 ) -> FootnoteFileResult:
     try:
         document = await load(path)
-        document = await pipeline.process(document)
+        processed = await pipeline.process(document)
+        if processed is None:
+            raise ValueError("Processing pipeline dropped the document")
+        document = processed
         orphans = document.orphaned_footnotes
         return FootnoteFileResult(
             path=path,

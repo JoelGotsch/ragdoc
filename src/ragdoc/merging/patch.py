@@ -13,6 +13,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 from ragdoc.document import Document, ElementType
+from ragdoc.metadata import MetadataDict
 
 
 class PatchOperationType(str, Enum):
@@ -113,13 +114,14 @@ class DocumentPatch(BaseModel):
                     seen_ids.add(element.id)
                     merged.append(element)
 
+        metadata: MetadataDict = {
+            "source_parser_a": self.source_parser_a,
+            "source_parser_b": self.source_parser_b,
+        }
         return Document(
             elements=merged,
             parser="merged",
-            metadata={
-                "source_parser_a": self.source_parser_a,
-                "source_parser_b": self.source_parser_b,
-            },
+            metadata=metadata,  # type: ignore[reportArgumentType]  # user keys outside BaseMetadata; runtime is MetadataDict
         )
 
 

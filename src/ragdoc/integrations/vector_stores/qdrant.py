@@ -408,7 +408,7 @@ class QdrantVectorStore:
             return
         await self._client.delete(
             collection_name=self._collection_name,
-            points_selector=models.PointIdsList(points=ids),
+            points_selector=models.PointIdsList(points=list(ids)),
         )
 
     async def get_source_hash(self, source_id: str) -> str | None:
@@ -467,5 +467,5 @@ class QdrantVectorStore:
                     source_ids.add(sid)
             if next_offset is None:
                 break
-            offset = next_offset
+            offset = next_offset  # type: ignore[reportAssignmentType]  # qdrant PointId is str | int at runtime
         return source_ids

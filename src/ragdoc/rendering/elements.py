@@ -107,7 +107,11 @@ def render_for_prompt(element: BaseElement, ctx: RenderContext, inline: bool = F
 
 
 @render_for_prompt.register(Heading)
-def _render_heading_prompt(element: Heading, ctx: RenderContext, inline: bool = False) -> str:
+def _render_heading_prompt(
+    element: Heading,
+    ctx: RenderContext,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+    inline: bool = False,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+) -> str:
     """Prompt heading renderer - strips inline CSS (e.g. text-align, font-size from MinerU).
 
     CSS visual properties are noise for LLMs. The heading tag and level are preserved.
@@ -164,7 +168,11 @@ def _render_footnote_prompt(element: Footnote, ctx: RenderContext, inline: bool 
 
 @add_unregister
 @singledispatch
-def render_raw(element: BaseElement, ctx: RenderContext, inline: bool = False) -> str:
+def render_raw(
+    element: BaseElement,
+    ctx: RenderContext,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+    inline: bool = False,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+) -> str:
     """
     Render element with full fidelity.
 
@@ -187,7 +195,11 @@ def render_raw(element: BaseElement, ctx: RenderContext, inline: bool = False) -
 
 
 @render_raw.register(Footnote)
-def _render_footnote_raw(element: Footnote, ctx: RenderContext, inline: bool = False) -> str:
+def _render_footnote_raw(
+    element: Footnote,
+    ctx: RenderContext,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+    inline: bool = False,
+) -> str:
     """Raw footnote renderer - compact when inline."""
     if inline:
         return f'<a href="#footnote-{element.id}">[{element.number}]</a>'  # f"<span class=\"footnote-inline\">[{element.number}: {element.innerhtml}]</span>"
@@ -246,6 +258,10 @@ def _metadata_to_html(data: DocumentMetadata) -> str:
 
 @render_for_prompt.register(DocumentMetadata)
 @render_raw.register(DocumentMetadata)
-def _render_metadata_block(element: DocumentMetadata, ctx: RenderContext, inline: bool = False) -> str:
+def _render_metadata_block(
+    element: DocumentMetadata,
+    ctx: RenderContext,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+    inline: bool = False,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+) -> str:
     """Render document metadata as a semantic HTML header block."""
     return _metadata_to_html(element)

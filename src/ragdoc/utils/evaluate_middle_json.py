@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from tabulate import tabulate
 
 from ragdoc.parsing.mineru.base import MinerUMiddleDocument
-from ragdoc.parsing.mineru.parser import MinerUParser
+from ragdoc.parsing.mineru.parser import MinerUExtractor
 
 
 class MiddleJsonFileResult(BaseModel):
@@ -23,10 +23,10 @@ class MiddleJsonFileResult(BaseModel):
     error: str | None = Field(default=None, description="Error message if processing failed.")
 
 
-async def _process_file(path: Path, parser: MinerUParser) -> MiddleJsonFileResult:
+async def _process_file(path: Path, extractor: MinerUExtractor) -> MiddleJsonFileResult:
     try:
         source = MinerUMiddleDocument.from_json_path(path)
-        document = await parser.parse(source)
+        document = await extractor.parse(source)
         return MiddleJsonFileResult(
             path=path,
             page_count=source.num_pages,
@@ -60,10 +60,10 @@ async def evaluate_middle_jsons(folder: Path | str) -> list[MiddleJsonFileResult
     """
     folder = Path(folder)
     paths = sorted(folder.glob("*_middle.json"))
-    parser = MinerUParser()
+    extractor = MinerUExtractor()
     results = []
     for p in paths:
-        results.append(await _process_file(p, parser))
+        results.append(await _process_file(p, extractor))
     return results
 
 

@@ -165,7 +165,11 @@ def build_text_html(text: str, block: TextBlock, page: PageInfo) -> str:
     return f"<p{style_attr}>{text}</p>"
 
 
-def handle_text_block(block: TextBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+def handle_text_block(
+    block: TextBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
     """Convert a :class:`TextBlock` to a :class:`Paragraph` element.
 
     The ``<p>`` tag receives inline CSS via :func:`build_text_html`:
@@ -175,15 +179,19 @@ def handle_text_block(block: TextBlock, page: PageInfo, context: ParseContext) -
     text = extract_text_from_lines(block.lines).strip()
     if not text:
         return []
-    paragraph = Paragraph(
-        html=build_text_html(text, block, page),
+    paragraph = Paragraph.from_html(
+        build_text_html(text, block, page),
         bounding_box=_get_bounding_box(block),
         page=page.page_idx + 1,
     )
     return [ParsedElement(element=paragraph, source_block=block, source_page=page)]
 
 
-def handle_list_block(block: ListBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+def handle_list_block(
+    block: ListBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
     """Convert a :class:`ListBlock` to a :class:`DocumentList` element.
 
     The ``<ul>`` tag receives inline CSS: ``font-size`` derived from the
@@ -194,15 +202,19 @@ def handle_list_block(block: ListBlock, page: PageInfo, context: ParseContext) -
     all_lines = [line for item in block.blocks for line in item.lines]
     css = _css_from_block(block, page, all_lines)
     style_attr = f' style="{css}"' if css else ""
-    doc_list = DocumentList(
-        html=f"<ul{style_attr}>{''.join(items)}</ul>",
+    doc_list = DocumentList.from_html(
+        f"<ul{style_attr}>{''.join(items)}</ul>",
         bounding_box=_get_bounding_box(block),
         page=page.page_idx + 1,
     )
     return [ParsedElement(element=doc_list, source_block=block, source_page=page)]
 
 
-def handle_code_block(block: CodeBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+def handle_code_block(
+    block: CodeBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
     """
     Convert a :class:`CodeBlock` to zero or more elements.
 
@@ -217,8 +229,8 @@ def handle_code_block(block: CodeBlock, page: PageInfo, context: ParseContext) -
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph(
-                        html=f"<p>{caption_text}</p>",
+                    element=Paragraph.from_html(
+                        f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(block.code_caption),
                         page=page_number,
                     ),
@@ -245,7 +257,11 @@ def handle_code_block(block: CodeBlock, page: PageInfo, context: ParseContext) -
     return results
 
 
-def handle_table_block(block: TableBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+def handle_table_block(
+    block: TableBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
     """
     Convert a :class:`TableBlock` to zero or more elements.
 
@@ -261,8 +277,8 @@ def handle_table_block(block: TableBlock, page: PageInfo, context: ParseContext)
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph(
-                        html=f"<p>{caption_text}</p>",
+                    element=Paragraph.from_html(
+                        f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(table_caption),
                         page=page_number,
                     ),
@@ -309,7 +325,11 @@ def handle_table_block(block: TableBlock, page: PageInfo, context: ParseContext)
     return results
 
 
-def handle_chart_block(block: ChartBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+def handle_chart_block(
+    block: ChartBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
     """
     Convert a :class:`ChartBlock` to zero or more elements.
 
@@ -335,8 +355,8 @@ def handle_chart_block(block: ChartBlock, page: PageInfo, context: ParseContext)
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph(
-                        html=f"<p>{caption_text}</p>",
+                    element=Paragraph.from_html(
+                        f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(chart_caption),
                         page=page_number,
                     ),
@@ -482,8 +502,8 @@ def handle_image_block(block: ImageBlock, page: PageInfo, context: ParseContext)
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph(
-                        html=f"<p>{caption_text}</p>",
+                    element=Paragraph.from_html(
+                        f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(caption),
                         page=page_number,
                     ),
@@ -574,7 +594,11 @@ def handle_discarded_as_footnote(block: DiscardedBlock, page: PageInfo, context:
     return []
 
 
-def handle_discarded_as_raw_text(block: DiscardedBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+def handle_discarded_as_raw_text(
+    block: DiscardedBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
     """Wrap a discarded block's text in a :class:`RawText` element."""
     text = extract_text_from_lines(block.lines).strip()
     if not text:
@@ -613,7 +637,11 @@ def handle_discarded_as_metadata(block: DiscardedBlock, page: PageInfo, context:
     return []
 
 
-def handle_discarded_drop(block: DiscardedBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+def handle_discarded_drop(
+    block: DiscardedBlock,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+    page: PageInfo,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
     """Suppress a discarded block — always returns an empty list."""
     return []
 

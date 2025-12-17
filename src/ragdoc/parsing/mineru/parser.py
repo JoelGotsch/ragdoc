@@ -69,7 +69,11 @@ class CoreExtractionMiddleware(BaseMiddleware):
                     # interline_equation blocks have the same shape as a
                     # TextBlock — a flat list of lines — so reuse the text
                     # handler. They become Paragraph elements in the Document.
-                    results = self.config.handle_text(block, page, context)
+                    results = self.config.handle_text(
+                        block,  # type: ignore[arg-type]  # RefTextBlock/InterlineEquationBlock are structurally TextBlock (flat .lines)
+                        page,
+                        context,
+                    )
                 else:
                     results = []
                 context.elements.extend(results)

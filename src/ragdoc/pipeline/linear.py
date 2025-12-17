@@ -107,7 +107,7 @@ class DocumentPipeline(Generic[TMetadata]):
         from ragdoc.pipeline.parser import AutoParser
         from ragdoc.processing.base import ProcessingPipeline as PP
 
-        self._parser: Parser = parser or AutoParser()
+        self._parser: Parser | AutoParser = parser or AutoParser()
         self._splitter = splitter
         self._chunker: Chunker = chunker or SimpleChunker()
         self._concurrency = concurrency
@@ -250,10 +250,6 @@ class DocumentPipeline(Generic[TMetadata]):
         splits = self._splitter(typed_doc) if self._splitter else [typed_doc]
         logger.debug(f"Split {source.name} into {len(splits)} sub-documents")
 
-        chunks: list[Chunk[TMetadata]] = [
-            c
-            for split in splits
-            for c in await self._chunker.chunk(split)  # type: ignore[misc]
-        ]
+        chunks: list[Chunk[TMetadata]] = [c for split in splits for c in await self._chunker.chunk(split)]
         logger.info(f"Completed {source.name}: {len(chunks)} chunks produced")
         return chunks

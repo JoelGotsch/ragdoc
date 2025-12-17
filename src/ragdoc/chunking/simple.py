@@ -75,7 +75,7 @@ class SimpleChunker(Chunker):
             source_path=document.source_path or None,
             prompt_content=prompt_content,
             embedding_content=prompt_content,
-            metadata=self._metadata_fn(document),
+            metadata=self._metadata_fn(document),  # type: ignore[reportArgumentType]  # metadata_fn returns MetadataDict
         )
         chunk_label = f"{chunk.source_path} ({chunk.id})" if chunk.source_path else chunk.id
         logger.debug(f"SimpleChunker: produced chunk {chunk_label} ({len(prompt_content)} chars)")

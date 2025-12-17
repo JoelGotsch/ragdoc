@@ -12,8 +12,7 @@ logger = logging.getLogger(__name__)
 class Splitter(Protocol):
     """Protocol for document splitters."""
 
-    def __call__(self, document: Document) -> list[Document]:
-        pass
+    def __call__(self, document: Document) -> list[Document]: ...
 
 
 def split_by_headings(document: Document) -> list[Document]:
