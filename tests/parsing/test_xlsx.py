@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from ragdoc.parsing import ExcelConfig, ExcelPackage, load_file
+from ragdoc.parsing import ExcelConfig
+from ragdoc.parsing.xlsx import load_excel
 
 
 def test_xlsx(xlsx_file_path: Path):
@@ -13,8 +14,7 @@ def test_xlsx(xlsx_file_path: Path):
             "Example": {"skiprows": 3},
         }
     )
-    excel_file = ExcelPackage(file_path=xlsx_file_path, config=config)
-    document = load_file(excel_file)
+    document = load_excel(xlsx_file_path, config)
     assert len(document.headings) == 2
     assert [h.text for h in document.headings] == [
         "Sheet1",
@@ -30,8 +30,7 @@ def test_xlsx_heading(xlsx_file_path: Path):
             "Example": {"header": 3, "index_col": 0},
         }
     )
-    excel_file = ExcelPackage(file_path=xlsx_file_path, config=config)
-    document = load_file(excel_file)
+    document = load_excel(xlsx_file_path, config)
     df = pd.read_html(StringIO(document.tables[0].html), header=0, index_col=0)[0]
     assert df.columns.tolist() == ["a", "b", "c"]
     assert df.index.tolist() == ["row1", "row2", "row3"]
@@ -43,8 +42,7 @@ def test_xlsx_multiline(xlsx_file_path: Path):
             "multiline_header": {"header": [0, 1], "index_col": 0},
         }
     )
-    excel_file = ExcelPackage(file_path=xlsx_file_path, config=config)
-    document = load_file(excel_file)
+    document = load_excel(xlsx_file_path, config)
     df = pd.read_html(StringIO(document.tables[0].html), header=[0, 1], index_col=0)[0]
     assert df.index.tolist() == ["row1", "row2"]
     assert df.columns.tolist() == [
@@ -56,8 +54,7 @@ def test_xlsx_multiline(xlsx_file_path: Path):
 
 
 def test_xlsx_load_all(xlsx_file_path: Path):
-    excel_file = ExcelPackage(file_path=xlsx_file_path)
-    document = load_file(excel_file)
+    document = load_excel(xlsx_file_path)
     assert len(document.tables) == 4
     assert len(document.headings) == 4
     document_titles = [h.text for h in document.headings]
@@ -71,8 +68,7 @@ def test_xlsx_load_all(xlsx_file_path: Path):
 
 def test_xlsx_metadata(xlsx_file_path: Path):
     """Test document source fields are correctly set."""
-    excel_file = ExcelPackage(file_path=xlsx_file_path)
-    document = load_file(excel_file)
+    document = load_excel(xlsx_file_path)
     assert document.metadata["filename"] == "test.xlsx"
     assert Path(document.source_path).match("*/tests/data/test.xlsx")
 

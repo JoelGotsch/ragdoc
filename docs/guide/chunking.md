@@ -87,14 +87,9 @@ document.metadata["year"] = 2024
 
 ## Loading into a vector store
 
-`Chunk` is designed to map directly to vector store document schemas.
-For LlamaIndex, use the integration helper:
-
-```python
-from ragdoc.integrations.llama_index import document_fragment_to_node_dict
-
-node_dicts = [document_fragment_to_node_dict(f) for f in chunks]
-```
+`Chunk` is designed to map directly to vector store document schemas. Use
+[`VectorStorePipeline`](../api/pipeline.md#VectorStorePipeline) to embed and
+upsert chunks with incremental change detection.
 
 ## Prompt vs embedding content
 
@@ -111,6 +106,6 @@ but shared `prompt_content`.
 ## See Also
 
 - [API Reference: Chunking](../api/chunking.md)
-- [API Reference: Integrations](../api/integrations.md) — LlamaIndex helpers
+- [API Reference: Integrations](../api/integrations.md) — vector store integrations
 - [Rendering Guide](rendering.md) — understanding the rendering system
 - [Splitting Guide](splitting.md) — preparing documents before chunking

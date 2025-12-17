@@ -41,9 +41,10 @@ from ragdoc.metadata import TMetadata
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
+
     from ragdoc.chunking import Chunk, Chunker
     from ragdoc.document import Document
-    from ragdoc.pipeline.parser import Parser
     from ragdoc.pipeline.splitter import TokenSplitter
     from ragdoc.processing.base import DocumentProcessor, ProcessingPipeline
 
@@ -73,9 +74,9 @@ class DocumentPipeline(Generic[TMetadata]):
     completes.
 
     Args:
-        parser: Converts a :class:`~pathlib.Path` to a
+        parser: Async callable converting a :class:`~pathlib.Path` to a
             :class:`~ragdoc.document.Document`.  Defaults to
-            :class:`~ragdoc.pipeline.parser.AutoParser`.
+            :func:`~ragdoc.parsing.load` (registry-based parser selection).
         processors: List of processors **or** a
             :class:`~ragdoc.processing.ProcessingPipeline`.  Optional — omit
             when no processing is needed.
@@ -95,7 +96,7 @@ class DocumentPipeline(Generic[TMetadata]):
 
     def __init__(
         self,
-        parser: Parser | None = None,
+        parser: Callable[[Path], Awaitable[Document]] | None = None,
         processors: list[DocumentProcessor] | ProcessingPipeline | None = None,
         splitter: TokenSplitter | None = None,
         chunker: Chunker | None = None,
@@ -105,10 +106,17 @@ class DocumentPipeline(Generic[TMetadata]):
         metadata_type: type[TMetadata] | None = None,
     ) -> None:
         from ragdoc.chunking import SimpleChunker
-        from ragdoc.pipeline.parser import AutoParser
         from ragdoc.processing.base import ProcessingPipeline as PP
 
-        self._parser: Parser | AutoParser = parser or AutoParser()
+        self._parser: Callable[[Path], Awaitable[Document]]
+        if parser is None:
+            from ragdoc.parsing import load
+
+            self._parser = load
+            self._parser_is_default = True
+        else:
+            self._parser = parser
+            self._parser_is_default = False
         self._splitter = splitter
         self._chunker: Chunker = chunker or SimpleChunker()
         self._source_id_fn = source_id_fn
@@ -161,11 +169,9 @@ class DocumentPipeline(Generic[TMetadata]):
 
     @property
     def has_custom_parser(self) -> bool:
-        """True if the parser is not the default :class:`AutoParser` (Boundary 2 forbids one —
-        its source is the document store, not a file)."""
-        from ragdoc.pipeline.parser import AutoParser
-
-        return not isinstance(self._parser, AutoParser)
+        """True if the parser is not the default :func:`~ragdoc.parsing.load` (Boundary 2 forbids
+        one — its source is the document store, not a file)."""
+        return not self._parser_is_default
 
     async def run(self, source: Path) -> list[Chunk[TMetadata]]:
         """Parse, process, split, and chunk a single file.

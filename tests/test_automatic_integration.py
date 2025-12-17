@@ -1,7 +1,4 @@
-"""Integration tests for the registry-based load() entry point.
-
-Replaces the old test_automatic_integration.py that tested automatic_load_file().
-"""
+"""Integration tests for the registry-based load() entry point."""
 
 import json
 from pathlib import Path

@@ -48,6 +48,6 @@ Some parsers require system tools:
 
 ```python
 import ragdoc
-from ragdoc import Document, load_document, from_path
+from ragdoc import Document, DocumentPipeline, load
 print("ragdoc installed successfully")
 ```

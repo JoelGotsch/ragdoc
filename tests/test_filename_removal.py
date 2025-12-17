@@ -36,12 +36,12 @@ def test_chunk_has_no_filename_field():
 
 def test_html_parser_sets_metadata_filename(tmp_path: Path):
     import ragdoc.parsing  # noqa: F401 — ensure parsers registered
-    from ragdoc.parsing.html import HTMLSource, load_html
+    from ragdoc.parsing.html import load_html
 
     html_file = tmp_path / "report.html"
     html_file.write_text("<html><body><h1>Hello</h1></body></html>", encoding="utf-8")
 
-    doc = load_html(HTMLSource(file_path=html_file))
+    doc = load_html(html_file)
     assert "filename" in doc.metadata
     assert doc.metadata["filename"] == "report.html"
 

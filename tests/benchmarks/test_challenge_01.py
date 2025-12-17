@@ -17,7 +17,7 @@ import pytest
 from bs4 import BeautifulSoup
 
 from ragdoc.document import Document
-from ragdoc.parsing import PandocFile, load_file
+from ragdoc.parsing.pandoc import load_pandoc
 
 DOCX_PATH = Path(__file__).parent / "fixtures" / "slice_d" / "challenge_01.docx"
 
@@ -26,7 +26,7 @@ DOCX_PATH = Path(__file__).parent / "fixtures" / "slice_d" / "challenge_01.docx"
 
 @pytest.fixture(scope="module")
 def doc() -> Document:
-    return load_file(PandocFile(file_path=str(DOCX_PATH)))
+    return load_pandoc(DOCX_PATH)
 
 
 def _table_text(doc: Document) -> str:

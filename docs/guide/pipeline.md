@@ -34,7 +34,7 @@ chunks = await pipeline.run(Path("report.docx"))
 
 | Stage | Default |
 |-------|---------|
-| Parser | `AutoParser` — picks parser from file extension |
+| Parser | [`load`](../api/parsing.md#load) — picks parser from file extension via the registry |
 | Processors | none (identity pass-through) |
 | Splitter | none — whole document → one chunk |
 | Chunker | `SimpleChunker` — one chunk per document |

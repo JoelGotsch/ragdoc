@@ -84,8 +84,8 @@ def _(mo):
 
 @app.cell
 def _(sample_doc):
-    from ragdoc import OutputFormat, Renderer, render_for_prompt
     from ragdoc.chunking import Chunk
+    from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
     from ragdoc.splitting import split_by_headings
 
     sections = split_by_headings(sample_doc)
@@ -166,15 +166,14 @@ def _(mo):
     mo.md(r"""
     ## Loading into a vector store
 
-    `Chunk` is designed to map directly to vector store document schemas. For LlamaIndex:
+    `Chunk` is designed to map directly to vector store document schemas. Use
+    `VectorStorePipeline` to embed and upsert chunks with incremental change detection.
     """)
     return
 
 
 @app.cell
 def _(chunks):
-    # from ragdoc.integrations.llama_index import document_fragment_to_node_dict
-    # node_dicts = [document_fragment_to_node_dict(c) for c in chunks]
     print(f"Chunks ready for upsert: {len(chunks)}")
     print(f"First chunk id: {chunks[0].id}")
     return
@@ -186,7 +185,7 @@ def _(mo):
     ## See Also
 
     - [API Reference: Chunking][ragdoc.chunking]
-    - [API Reference: Integrations][ragdoc.integrations] — LlamaIndex helpers
+    - [API Reference: Integrations][ragdoc.integrations] — vector store integrations
     - [Rendering notebook](rendering.py) — understanding the two rendering paths
     - [Splitting notebook](splitting.py) — preparing documents before chunking
     """)

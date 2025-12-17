@@ -5,11 +5,12 @@ from pydantic import BaseModel, Field
 
 from ragdoc.document import Document
 from ragdoc.parsing.azure_di.load import AzureDIBundle, generate_document_azure_di
-from ragdoc.parsing.base import load_file
 from ragdoc.parsing.parser import Parser
 
 
 class AzureJSONFile(BaseModel):
+    """Internal model describing an Azure DI JSON result file on disk (not part of the public API)."""
+
     file_path: str | Path
     source_path: str | Path | None = Field(
         default=None, description="Path to the source pdf file which lead to this json being produced"
@@ -17,13 +18,14 @@ class AzureJSONFile(BaseModel):
 
 
 class AzureAnalyzeRun(BaseModel):
+    """Internal model carrying an in-memory Azure DI analyze payload (not part of the public API)."""
+
     analyze_dict: dict
     source_path: str | Path | None = Field(
         default=None, description="Path to the source pdf file which lead to this json being produced"
     )
 
 
-@load_file.register
 def load_azure_json(file_obj: AzureJSONFile) -> Document:
     """Parse an Azure DI JSON result file into a Document. Sets ``source_path`` and ``metadata["filename"]``."""
     file_path = Path(file_obj.file_path)
@@ -36,7 +38,6 @@ def load_azure_json(file_obj: AzureJSONFile) -> Document:
     return document
 
 
-@load_file.register
 def load_azure_analyze_result(analyze_run: AzureAnalyzeRun) -> Document:
     """Parse an in-memory Azure DI analyze result into a Document. Sets ``source_path`` and ``metadata["filename"]`` from ``source_path``."""
     source_path = Path(analyze_run.source_path) if analyze_run.source_path is not None else None

@@ -1,7 +1,7 @@
 """Unit tests for HTML parsing functions (generate_document, unwrap_structural, etc.).
 
 These tests call generate_document directly with test HTML files rather than
-going through load_file, making them lower-level unit tests.
+going through load(), making them lower-level unit tests.
 """
 
 from ragdoc.parsing.html.load import HTML, generate_document, unwrap_structural
