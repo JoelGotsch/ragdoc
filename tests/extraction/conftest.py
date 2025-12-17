@@ -13,8 +13,8 @@ from ragdoc.document import Document, Heading, Paragraph
 from ragdoc.extraction.dates import FuzzyDate
 from ragdoc.extraction.entity import Entity
 from ragdoc.extraction.mention import Mention
-from ragdoc.extraction.processor import StructuredExtractionProcessor, _batch_model
 from ragdoc.extraction.resolution import ReviewGroup, ReviewResult
+from ragdoc.extraction.structured import StructuredExtractor, _batch_model
 from ragdoc.pipeline.stores import SourceState
 
 
@@ -44,9 +44,9 @@ def make_event_client(events_per_call: list[list[Event]]) -> MagicMock:
     return client
 
 
-def make_extractor(events: list[Event]) -> StructuredExtractionProcessor[Event]:
+def make_extractor(events: list[Event]) -> StructuredExtractor[Event]:
     """An extractor whose every split yields *events* (mock client)."""
-    return StructuredExtractionProcessor(Event, client=make_event_client([events]), model="test-model")
+    return StructuredExtractor(Event, client=make_event_client([events]), model="test-model")
 
 
 class MemoryMentionStore:

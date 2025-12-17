@@ -45,9 +45,9 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ragdoc.extraction.entity import EntityStore
-    from ragdoc.extraction.processor import ExtractionSettings
     from ragdoc.extraction.resolution import Embed, Reviewer
     from ragdoc.extraction.stores import MentionStore
+    from ragdoc.extraction.structured import ExtractionSettings
 
 
 @dataclass
@@ -103,7 +103,7 @@ class KnowledgeGraphResolutionPipeline:
         edge_identity_text_fns: dict[type[BaseModel], IdentityTextFn] | None = None,
         settings: ExtractionSettings | None = None,
     ) -> None:
-        from ragdoc.extraction.processor import ExtractionSettings
+        from ragdoc.extraction.structured import ExtractionSettings
 
         self._schema = schema
         self._mention_store = mention_store

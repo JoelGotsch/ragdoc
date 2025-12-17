@@ -113,7 +113,7 @@ Incremental synchronisation follows a **plan → apply** shape across two bounda
 
 **Two change-detection hashes** (first-class, never in `chunk.metadata`):
 - `source_hash` — SHA-256 of the **raw source-file bytes** (Boundary 1 / direct path).
-- `content_hash` — `Document.content_hash()`, renderer-stable (Boundary 2). `None` ⇒ treated as "always changed".
+- `content_hash` — `Document.content_hash()`, a canonical-JSON hash over `(title, elements)` (pandoc-free, dependency-stable; Boundary 2). `None` ⇒ treated as "always changed".
 
 **Provenance ownership.** `DocumentPipeline` owns `source_id_fn` (`Path -> str`, default `p.name`); it stamps `document.source_id` and chunkers propagate `source_id`/`source_hash`/`content_hash` onto every `Chunk` (with fallbacks, so the fields — required on `Chunk` — are never None). The file-byte `hash_fn` is a sync concern living on the sync pipelines. **There is no `ProvenanceProcessor`** (do not add one).
 
@@ -134,6 +134,16 @@ Incremental synchronisation follows a **plan → apply** shape across two bounda
 - `LocalDocumentStore` — filesystem-backed `DocumentStore` (one JSON file per source); index-free, so manual edits to stored documents are detected at Boundary 2.
 
 **`ChangeSet[T]`** (`changeset.py`) — serializable plan artifact (`to_add`/`to_update`/`to_delete`); `save()`/`load()` (call `load` on the concrete type, e.g. `ChangeSet[Chunk].load(path)`). Edit it between `plan()` and `apply()` for human-in-the-loop review.
+
+### Extraction (`src/ragdoc/extraction/`)
+
+Structured extraction is a **first-class typed stage**, not a processor. The `Extractor[PayloadT]` protocol (`extractor.py`) is `async extract(document) -> list[Mention[PayloadT]]` — extractors **return** mentions and never read or write `document.metadata` keys of their own (each mention's locator *copies* the document metadata). Do not route extraction results through metadata; the explicit opt-in `as_processor(extractor, metadata_key=...)` adapter exists solely for document-dump consumers.
+
+- **`StructuredExtractor(payload_model, ...)`** (`structured.py`) — extracts one caller-supplied Pydantic model; the model's docstring + `Field` descriptions are the LLM schema.
+- **`KnowledgeGraphExtractor(schema, ...)`** (`kg.py`) — multi-type node + edge extraction against a `GraphSchema`; rewrites chunk-local edge refs to real mention ids; recursive halving fallback on LLM failure; optional gleaning pass. **`GraphSchema.patterns` are enforced**: legal triples are injected into the system prompt (`render_patterns_prompt`) and every extracted edge is validated against `allowed_pattern_kinds(schema)` — violations drop (counted + warned) or raise per `ExtractionSettings.on_pattern_violation`. Every edge type must appear in ≥1 pattern (declaration-time rule); union sizes are checked at extractor construction against `settings.max_union_size`.
+- **`ExtractionSettings`** (env prefix `EXTRACTION_`) — `system_prompt` and `request_timeout` are honored by both extractors; the validator never injects a built-in default prompt (each extractor resolves its own fallback). KG knobs: `gleaning`, `max_union_size`, `halving_max_depth`, `halving_min_chars`, `on_pattern_violation`.
+- Shared LLM plumbing (`resolve_client`/`resolve_model`/`resolve_renderer`/`resolve_tokenizer`, `parse_with_retry`, `build_messages`) lives once in `extraction/_llm.py` — do not inline retry loops in extractors (`parse_with_retry` is the single function the shared `ragdoc.llm` layer will later replace).
+- **`MentionStorePipeline(pipeline, extractor, mention_store, ...)`** — the mention analogue of the sync pipelines (same `plan`/`apply`/`run`, direct + Boundary-2 modes); consumes `extract()` directly and rejects non-`Extractor` arguments with `TypeError`.
 
 ## Collaboration Guidelines
 

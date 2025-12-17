@@ -119,7 +119,7 @@ class QdrantMentionStore(_QdrantCollectionStore):
         Filtering uses ``isinstance(mention.payload, payload_type)`` after rehydration, mirroring
         the :class:`~ragdoc.extraction.stores.MentionStore` Protocol contract and the
         in-memory :class:`LocalMentionStore` implementation. A heterogeneous store (e.g. one
-        carrying the merged ``KnowledgeGraphProcessor`` node + edge union) returns only the
+        carrying the merged ``KnowledgeGraphExtractor`` node + edge union) returns only the
         node or edge mentions of the requested concrete type; a single-type store returns
         everything when the type matches and ``[]`` otherwise.
         """

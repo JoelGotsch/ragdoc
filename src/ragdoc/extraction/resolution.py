@@ -39,8 +39,8 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ragdoc.extraction.entity import EntityStore
-    from ragdoc.extraction.processor import ExtractionSettings
     from ragdoc.extraction.stores import MentionStore
+    from ragdoc.extraction.structured import ExtractionSettings
 
 # Injected collaborators.
 Embed = Callable[[list[str]], Awaitable[list[list[float]]]]
@@ -173,7 +173,7 @@ class EntityResolutionPipeline(Generic[PayloadT]):
         canonicalizer: Callable[[list[BaseModel]], Awaitable[BaseModel]] | None = None,
         settings: ExtractionSettings | None = None,
     ) -> None:
-        from ragdoc.extraction.processor import ExtractionSettings
+        from ragdoc.extraction.structured import ExtractionSettings
 
         self._mention_store = mention_store
         self._entity_store = entity_store

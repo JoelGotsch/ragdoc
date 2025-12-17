@@ -1,27 +1,33 @@
-"""KnowledgeGraphProcessor: multi-type extraction → typed node + edge mentions.
+"""KnowledgeGraphExtractor: multi-type extraction → typed node + edge mentions.
 
-Mirrors :class:`~ragdoc.extraction.processor.StructuredExtractionProcessor` and **satisfies
-the same interface** (``metadata_key`` + ``payload_model`` + ``process()``) so it composes with the
-existing :class:`~ragdoc.extraction.pipeline.MentionStorePipeline` unchanged. One
-``.parse()`` call per chunk returns both node mentions (discriminated union over the schema's node
-types, each carrying a chunk-local ``local_id``) and edge mentions (discriminated union over the
-schema's edge types, each carrying ``refs: EdgeRef`` whose ``source_mention_id`` /
-``target_mention_id`` are also chunk-local ids).
+Implements the same :class:`~ragdoc.extraction.extractor.Extractor` protocol as
+:class:`~ragdoc.extraction.structured.StructuredExtractor`, so it drops into
+:class:`~ragdoc.extraction.pipeline.MentionStorePipeline` unchanged. One ``.parse()`` call per
+chunk returns both node mentions (discriminated union over the schema's node types, each carrying
+a chunk-local ``local_id``) and edge mentions (discriminated union over the schema's edge types,
+each carrying ``refs: EdgeRef`` whose ``source_mention_id`` / ``target_mention_id`` are also
+chunk-local ids).
 
-The processor then performs the **chunk-local-id → mention-id rewrite**: mints a real
+The extractor then performs the **chunk-local-id → mention-id rewrite**: mints a real
 ``mention_id`` for each extracted node, builds a ``local_id → mention_id`` map, and rewrites each
 edge's two endpoint references through it. Edges that reference a non-existent ``local_id`` raise
 ``ValueError`` — silent drops would corrupt the graph.
 
-Final output is **one merged list** written to ``document.metadata[metadata_key]`` — nodes first,
-then edges, with contiguous ordinals. The downstream :class:`MentionStorePipeline` validates each
-entry against ``payload_model`` (the discriminated union over node + edge types), so node and
-edge mentions live in one heterogeneous store and the resolution pipeline slices them by type via
-``mention_store.list_mentions(Person)`` / ``list_mentions(Employment)``.
+``GraphSchema.patterns`` are **enforced** in two layers: the legal
+``(source)-[edge]->(target)`` triples are appended to the system prompt
+(:func:`~ragdoc.extraction.schema.render_patterns_prompt`), and every extracted edge's
+``(source_kind, edge_kind, target_kind)`` is validated against
+:func:`~ragdoc.extraction.schema.allowed_pattern_kinds`. A violating edge is dropped (counted,
+one WARNING per document) or raises, per ``ExtractionSettings.on_pattern_violation``.
+
+The result is **one merged, returned list** — nodes first, then edges, with contiguous ordinals —
+so node and edge mentions live in one heterogeneous store and the resolution pipeline slices them
+by type via ``mention_store.list_mentions(Person)`` / ``list_mentions(Employment)``.
 
 Optional **gleaning** runs one additional ``.parse()`` call asking the LLM for any entities it
 missed; results are merged with offset chunk-local ids to avoid collision. Gleaning is gated by
-``EXTRACTION_GLEANING`` env var (default off) or the constructor's ``gleaning=`` flag.
+``ExtractionSettings.gleaning`` (env ``EXTRACTION_GLEANING``, default off) or the constructor's
+``gleaning=`` override.
 """
 
 from __future__ import annotations
@@ -32,14 +38,23 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field, create_model
 
+from ragdoc.extraction._llm import (
+    build_messages,
+    parse_with_retry,
+    resolve_client,
+    resolve_model,
+    resolve_renderer,
+    resolve_tokenizer,
+)
 from ragdoc.extraction.mention import Mention, mint_mention_id
-from ragdoc.extraction.processor import ExtractionSettings
 from ragdoc.extraction.schema import (
     GraphSchema,
+    allowed_pattern_kinds,
     build_edge_union,
     build_node_union,
+    render_patterns_prompt,
 )
-from ragdoc.processing.base import DocumentProcessor
+from ragdoc.extraction.structured import ExtractionSettings
 from ragdoc.utils import Tokenizer
 
 if TYPE_CHECKING:
@@ -88,7 +103,7 @@ KG_GLEANING_MESSAGE = (
 
 
 # ---------------------------------------------------------------------------
-# Runtime schema (lru-cached per GraphSchema)
+# Runtime schema (cached per GraphSchema)
 # ---------------------------------------------------------------------------
 
 
@@ -104,14 +119,14 @@ def build_graph_batch_model(schema: GraphSchema) -> tuple[type[BaseModel], type[
 
 
 class _SchemaKey:
-    """Hashable wrapper for lru_cache (GraphSchema itself is a BaseModel — hashable but the
-    cache key wants something simple). Identity on ``(node_types, edge_types)``."""
+    """Hashable wrapper for the caches (GraphSchema itself is a BaseModel — hashable but the
+    cache key wants something simple). Identity on ``(node_types, edge_types, patterns)``."""
 
     __slots__ = ("_key", "_schema")
 
     def __init__(self, schema: GraphSchema) -> None:
         self._schema = schema
-        self._key = (schema.node_types, schema.edge_types)
+        self._key = (schema.node_types, schema.edge_types, schema.patterns)
 
     def __hash__(self) -> int:
         return hash(self._key)
@@ -154,6 +169,12 @@ def _build_graph_batch_model(key: _SchemaKey) -> tuple[type[BaseModel], type[Bas
     return graph_batch, node_with_local_id
 
 
+@cache
+def _allowed_pattern_kinds(key: _SchemaKey) -> frozenset[tuple[str, str, str]]:
+    """Cached :func:`~ragdoc.extraction.schema.allowed_pattern_kinds` per schema."""
+    return allowed_pattern_kinds(key._schema)
+
+
 # ---------------------------------------------------------------------------
 # Prompt construction
 # ---------------------------------------------------------------------------
@@ -165,46 +186,38 @@ def build_kg_messages(
     system_prompt: str = KG_EXTRACTION_SYSTEM_PROMPT,
     user_message: str = KG_USER_MESSAGE,
 ) -> list[ChatCompletionMessageParam]:
-    """Build the ``messages`` list for a KG extraction LLM call."""
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"{user_message}\n\n{text}"},
-    ]
+    """Build the ``messages`` list for a KG extraction LLM call (documents the per-extractor defaults)."""
+    return build_messages(text, system_prompt=system_prompt, user_message=user_message)
 
 
 # ---------------------------------------------------------------------------
-# Processor
+# Extractor
 # ---------------------------------------------------------------------------
 
 
-class KnowledgeGraphProcessor(DocumentProcessor):
-    """Extracts typed nodes and typed edges into a single merged metadata key.
+class KnowledgeGraphExtractor:
+    """Extracts typed nodes and typed edges as a single merged, returned mention list.
 
-    Satisfies the same interface as
-    :class:`~ragdoc.extraction.processor.StructuredExtractionProcessor`
-    (``metadata_key`` + ``payload_model`` + ``process()``) so it drops into the existing
-    :class:`~ragdoc.extraction.pipeline.MentionStorePipeline` unchanged. The merged list
-    holds node mentions first (in extraction order), then edge mentions, both with the same
-    ``Mention`` envelope shape; downstream code distinguishes them by ``payload.kind`` (the
-    discriminator on every node and edge model).
-
-    Idempotent by default: if ``metadata_key`` is already set (non-empty) and ``overwrite`` is
-    False, :meth:`process` returns unchanged without an LLM call.
+    Implements the :class:`~ragdoc.extraction.extractor.Extractor` protocol
+    (``Extractor[BaseModel]``): :meth:`extract` returns node mentions first (in extraction
+    order), then edge mentions, both with the same ``Mention`` envelope shape; downstream code
+    distinguishes them by ``payload.kind`` (the discriminator on every node and edge model). It
+    never reads or writes ``document.metadata`` keys of its own.
 
     Args:
         schema: :class:`~ragdoc.extraction.schema.GraphSchema` declaring node types,
-            edge types, and legal patterns.
+            edge types, and legal patterns (enforced — see the module docstring).
         client: Async OpenAI-compatible client; ``None`` falls back to ``get_config().openai_client``.
         model: Model name; ``None`` falls back to ``settings.model_name`` then config default.
-        settings: :class:`~ragdoc.extraction.processor.ExtractionSettings`; ``None`` reads
+        settings: :class:`~ragdoc.extraction.structured.ExtractionSettings`; ``None`` reads
             env (``EXTRACTION_*``).
         renderer: Renderer for document → text. ``None`` uses ``Renderer(MARKDOWN, render_for_prompt)``.
         tokenizer: Tokenizer for the ``min_tokens`` decision. ``None`` uses ``GPTTokenizer``.
         gleaning: When True, runs one additional ``.parse()`` after the first call asking the
-            LLM for any missed entities. ``None`` reads ``EXTRACTION_GLEANING`` (default off).
-        metadata_key: Single metadata key to write (default ``"kg_mentions"``); the merged
-            node + edge mention list.
-        overwrite: When False (default), skip documents that already have the key set.
+            LLM for any missed entities. ``None`` reads ``settings.gleaning`` (default off).
+
+    Raises:
+        ValueError: when the schema's node or edge union exceeds ``settings.max_union_size``.
     """
 
     def __init__(
@@ -216,18 +229,29 @@ class KnowledgeGraphProcessor(DocumentProcessor):
         renderer: Renderer | None = None,
         tokenizer: Tokenizer | None = None,
         gleaning: bool | None = None,
-        metadata_key: str = "kg_mentions",
-        overwrite: bool = False,
     ) -> None:
-        self._schema = schema
         self.settings = settings or ExtractionSettings()
+        max_size = self.settings.max_union_size
+        if len(schema.node_types) > max_size:
+            raise ValueError(
+                f"node_types has {len(schema.node_types)} entries, above "
+                f"ExtractionSettings.max_union_size={max_size}. OpenAI structured-output "
+                f"reliability drops with large discriminated unions; split this schema across "
+                f"multiple KnowledgeGraphExtractors, or raise the limit."
+            )
+        if len(schema.edge_types) > max_size:
+            raise ValueError(
+                f"edge_types has {len(schema.edge_types)} entries, above "
+                f"ExtractionSettings.max_union_size={max_size}. OpenAI structured-output "
+                f"reliability drops with large discriminated unions; split this schema across "
+                f"multiple KnowledgeGraphExtractors, or raise the limit."
+            )
+        self._schema = schema
         self._client = client
         self._model = model
         self._renderer = renderer
         self._tokenizer = tokenizer
-        self._gleaning = gleaning if gleaning is not None else _read_gleaning_env()
-        self.metadata_key = metadata_key
-        self.overwrite = overwrite
+        self._gleaning = gleaning if gleaning is not None else self.settings.gleaning
 
     @property
     def schema(self) -> GraphSchema:
@@ -237,9 +261,10 @@ class KnowledgeGraphProcessor(DocumentProcessor):
     def payload_model(self) -> Any:
         """The discriminated union over node + edge types — the merged payload model.
 
-        Read by :class:`~ragdoc.extraction.pipeline.MentionStorePipeline` to build the
-        ``Mention[payload_model]`` validator. Cached on first read because building a
-        discriminated union over the schema's types is pure and the schema is immutable.
+        Kept as a documented public attribute (parametrizes store queries and
+        ``ChangeSet[Mention[...]]``); the union alias is not a ``type[BaseModel]``, hence ``Any``.
+        Cached on first read because building a discriminated union over the schema's types is
+        pure and the schema is immutable.
         """
         if not hasattr(self, "_payload_model_cache"):
             self._payload_model_cache = build_node_union(
@@ -248,45 +273,14 @@ class KnowledgeGraphProcessor(DocumentProcessor):
         return self._payload_model_cache
 
     # ------------------------------------------------------------------
-    # fallbacks (mirror StructuredExtractionProcessor)
+    # extraction internals
     # ------------------------------------------------------------------
 
-    def _get_client(self) -> Any:
-        if self._client is not None:
-            return self._client
-        from ragdoc.config import get_config
-
-        client = get_config().openai_client
-        if client is None:
-            raise ValueError("No client provided and get_config().openai_client is None.")
-        return client
-
-    def _get_model(self) -> str:
-        if self._model is not None:
-            return self._model
-        if self.settings.model_name:
-            return self.settings.model_name
-        from ragdoc.config import get_config
-
-        return get_config().default_llm_model
-
-    def _get_renderer(self) -> Renderer:
-        if self._renderer is not None:
-            return self._renderer
-        from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
-
-        return Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
-
-    def _get_tokenizer(self) -> Tokenizer:
-        if self._tokenizer is not None:
-            return self._tokenizer
-        from ragdoc.utils import GPTTokenizer
-
-        return GPTTokenizer()
-
-    # ------------------------------------------------------------------
-    # extraction
-    # ------------------------------------------------------------------
+    def _system_prompt(self) -> str:
+        """The resolved system prompt: user setting or KG default, plus the patterns section."""
+        base = self.settings.system_prompt or KG_EXTRACTION_SYSTEM_PROMPT
+        patterns_section = render_patterns_prompt(self._schema)
+        return f"{base}\n\n{patterns_section}" if patterns_section else base
 
     async def _extract_batch(
         self,
@@ -295,38 +289,18 @@ class KnowledgeGraphProcessor(DocumentProcessor):
         model: str,
         graph_batch_cls: type[BaseModel],
         *,
-        system_prompt: str = KG_EXTRACTION_SYSTEM_PROMPT,
         user_message: str = KG_USER_MESSAGE,
     ) -> BaseModel:
-        """One structured ``.parse()`` call with retries; returns the GraphBatch instance."""
-        settings = self.settings
-        messages = build_kg_messages(text, system_prompt=system_prompt, user_message=user_message)
-        parse_kwargs: dict[str, Any] = {}
-        if settings.request_timeout is not None:
-            parse_kwargs["timeout"] = settings.request_timeout
-        for attempt in range(settings.max_retries + 1):
-            try:
-                response = await client.beta.chat.completions.parse(
-                    model=model,
-                    messages=messages,
-                    temperature=settings.temperature,
-                    response_format=graph_batch_cls,
-                    **parse_kwargs,
-                )
-                parsed = response.choices[0].message.parsed
-                if parsed is None:
-                    raise ValueError("LLM returned no parsed extraction")
-                return parsed
-            except Exception as exc:
-                logger.error(
-                    "KnowledgeGraphProcessor: API call failed (attempt %d/%d): %s",
-                    attempt + 1,
-                    settings.max_retries + 1,
-                    exc,
-                )
-                if attempt == settings.max_retries:
-                    raise
-        raise RuntimeError("unreachable")  # pragma: no cover
+        """One structured ``.parse()`` call (shared retry loop); returns the GraphBatch instance."""
+        messages = build_kg_messages(text, system_prompt=self._system_prompt(), user_message=user_message)
+        return await parse_with_retry(
+            client,
+            model=model,
+            messages=messages,
+            response_format=graph_batch_cls,
+            settings=self.settings,
+            log_prefix="KnowledgeGraphExtractor",
+        )
 
     async def _extract_with_halving(
         self,
@@ -336,8 +310,6 @@ class KnowledgeGraphProcessor(DocumentProcessor):
         graph_batch_cls: type[BaseModel],
         *,
         depth: int = 0,
-        max_depth: int = 3,
-        min_chars: int = 1000,
     ) -> BaseModel:
         """Extract from *text* with reactive halving on failure.
 
@@ -350,19 +322,24 @@ class KnowledgeGraphProcessor(DocumentProcessor):
         still attributes to the parent split that the agent can retrieve via
         ``get_document_part(name, split_sequence)``.
 
+        ``settings.halving_max_depth`` / ``settings.halving_min_chars`` bound the recursion
+        (``depth`` is the internal recursion counter).
+
         Loss-of-information caveat: an edge whose two endpoints fall on opposite sides of a
         halving boundary cannot be emitted (each half-call sees only its own nodes). In typical
         prose most short-range ties live within the same paragraph, so the loss is generally
-        deemed acceptable below ``max_depth``. Above ``max_depth`` or below ``min_chars`` we
-        re-raise so the source goes to ``result.errors`` honestly rather than producing a
-        bad-quality extraction silently.
+        deemed acceptable below ``halving_max_depth``. Above ``halving_max_depth`` or below
+        ``halving_min_chars`` we re-raise so the source goes to ``result.errors`` honestly
+        rather than producing a bad-quality extraction silently.
         """
+        max_depth = self.settings.halving_max_depth
+        min_chars = self.settings.halving_min_chars
         try:
             return await self._extract_batch(text, client, model, graph_batch_cls)
         except Exception as exc:
             if depth >= max_depth or len(text) <= min_chars:
                 logger.error(
-                    "KnowledgeGraphProcessor: halving exhausted at depth=%d len=%d (%r); giving up",
+                    "KnowledgeGraphExtractor: halving exhausted at depth=%d len=%d (%r); giving up",
                     depth,
                     len(text),
                     exc,
@@ -371,38 +348,22 @@ class KnowledgeGraphProcessor(DocumentProcessor):
             left, right = _halve_text(text)
             if not left.strip() or not right.strip():
                 logger.error(
-                    "KnowledgeGraphProcessor: could not halve text at depth=%d len=%d (%r); giving up",
+                    "KnowledgeGraphExtractor: could not halve text at depth=%d len=%d (%r); giving up",
                     depth,
                     len(text),
                     exc,
                 )
                 raise
             logger.warning(
-                "KnowledgeGraphProcessor: halving on failure at depth=%d (len %d -> %d + %d): %s",
+                "KnowledgeGraphExtractor: halving on failure at depth=%d (len %d -> %d + %d): %s",
                 depth,
                 len(text),
                 len(left),
                 len(right),
                 exc,
             )
-            primary = await self._extract_with_halving(
-                left,
-                client,
-                model,
-                graph_batch_cls,
-                depth=depth + 1,
-                max_depth=max_depth,
-                min_chars=min_chars,
-            )
-            secondary = await self._extract_with_halving(
-                right,
-                client,
-                model,
-                graph_batch_cls,
-                depth=depth + 1,
-                max_depth=max_depth,
-                min_chars=min_chars,
-            )
+            primary = await self._extract_with_halving(left, client, model, graph_batch_cls, depth=depth + 1)
+            secondary = await self._extract_with_halving(right, client, model, graph_batch_cls, depth=depth + 1)
             offset = len(primary.node_mentions)  # type: ignore[attr-defined]
             merged_nodes, merged_edges = _merge_gleaning(
                 list(primary.node_mentions),  # type: ignore[attr-defined]
@@ -413,25 +374,20 @@ class KnowledgeGraphProcessor(DocumentProcessor):
             )
             return graph_batch_cls(node_mentions=merged_nodes, edge_mentions=merged_edges)
 
-    async def process(self, document: Document) -> Document:
-        existing = document.metadata.get(self.metadata_key)
-        if not self.overwrite and existing:
-            logger.debug("KnowledgeGraphProcessor: %s already set, skipping", self.metadata_key)
-            return document
-
-        renderer = self._get_renderer()
+    async def extract(self, document: Document) -> list[Mention[BaseModel]]:
+        """Extract nodes + edges from *document*; returns the merged mention list (nodes first)."""
+        renderer = resolve_renderer(self._renderer)
         rendered = renderer.render(document)
         if not rendered.strip():
-            document.metadata[self.metadata_key] = []
-            return document
-        if self.settings.min_tokens > 0 and self._get_tokenizer().count(rendered) < self.settings.min_tokens:
-            logger.debug("KnowledgeGraphProcessor: below min_tokens, skipping")
-            document.metadata[self.metadata_key] = []
-            return document
+            return []
+        min_tokens = self.settings.min_tokens
+        if min_tokens > 0 and resolve_tokenizer(self._tokenizer).count(rendered) < min_tokens:
+            logger.debug("KnowledgeGraphExtractor: below min_tokens, skipping")
+            return []
 
         graph_batch_cls, _ = build_graph_batch_model(self._schema)
-        client = self._get_client()
-        model = self._get_model()
+        client = resolve_client(self._client)
+        model = resolve_model(self._model, self.settings)
 
         primary = await self._extract_with_halving(rendered, client, model, graph_batch_cls)
         wrapped_nodes = list(primary.node_mentions)  # type: ignore[attr-defined]
@@ -465,13 +421,13 @@ class KnowledgeGraphProcessor(DocumentProcessor):
         content_hash = document.content_hash()
         source_id = document.source_id or document.source_path or document.id
         source_hash = document.source_hash or content_hash
-        # Snapshot metadata BEFORE writing our key.
-        meta_snapshot = {k: v for k, v in document.metadata.items() if k != self.metadata_key}
+        metadata_copy = dict(document.metadata)
 
         # Build the merged mention list (nodes first so the local_id map is ready for edges).
         # Ordinals are contiguous across nodes + edges — single position-within-source counter.
-        all_mentions: list[Mention] = []
+        all_mentions: list[Mention[BaseModel]] = []
         local_to_mention: dict[str, str] = {}
+        local_to_kind: dict[str, str] = {}
         ordinal = 0
 
         for wrapped in wrapped_nodes:
@@ -482,19 +438,24 @@ class KnowledgeGraphProcessor(DocumentProcessor):
                     f"Duplicate node local_id {local_id!r} in extraction output; the LLM must "
                     f"assign each node a unique chunk-local id."
                 )
-            mention = Mention(
+            mention = Mention[BaseModel](
                 mention_id=mint_mention_id(source_id, content_hash, ordinal, payload),
                 source_id=source_id,
                 source_path=document.source_path or None,
                 source_hash=source_hash,
                 content_hash=content_hash,
                 ordinal=ordinal,
-                metadata=meta_snapshot,
+                metadata=metadata_copy,
                 payload=payload,
             )
             local_to_mention[local_id] = mention.mention_id
+            local_to_kind[local_id] = payload.kind
             all_mentions.append(mention)
             ordinal += 1
+
+        allowed = _allowed_pattern_kinds(_SchemaKey(self._schema))
+        dropped = 0
+        dropped_triples: set[tuple[str, str, str]] = set()
 
         for edge_payload in edge_payloads:
             refs = edge_payload.refs
@@ -510,24 +471,47 @@ class KnowledgeGraphProcessor(DocumentProcessor):
                     f"Edge {edge_payload.kind!r} references unknown target local_id {tgt_local!r}; "
                     f"known local_ids: {sorted(local_to_mention.keys())}"
                 )
+
+            # Pattern enforcement (Layer B): validated on local ids so errors can cite them.
+            triple = (local_to_kind[src_local], edge_payload.kind, local_to_kind[tgt_local])
+            if triple not in allowed:
+                if self.settings.on_pattern_violation == "error":
+                    raise ValueError(
+                        f"Edge {edge_payload.kind!r} violates the schema patterns: "
+                        f"({triple[0]})-[{triple[1]}]->({triple[2]}) (endpoints {src_local!r} -> "
+                        f"{tgt_local!r}) is not a legal triple. Legal patterns: {sorted(allowed)}."
+                    )
+                dropped += 1
+                dropped_triples.add(triple)
+                continue
+
             refs.source_mention_id = local_to_mention[src_local]
             refs.target_mention_id = local_to_mention[tgt_local]
 
-            mention = Mention(
+            mention = Mention[BaseModel](
                 mention_id=mint_mention_id(source_id, content_hash, ordinal, edge_payload),
                 source_id=source_id,
                 source_path=document.source_path or None,
                 source_hash=source_hash,
                 content_hash=content_hash,
                 ordinal=ordinal,
-                metadata=meta_snapshot,
+                metadata=metadata_copy,
                 payload=edge_payload,
             )
             all_mentions.append(mention)
             ordinal += 1
 
-        document.metadata[self.metadata_key] = [m.model_dump(mode="json") for m in all_mentions]
-        return document
+        if dropped:
+            logger.warning(
+                "KnowledgeGraphExtractor: dropped %d edge(s) violating schema patterns in source %r; "
+                "illegal triples: %s. Legal patterns: %s.",
+                dropped,
+                source_id,
+                sorted(dropped_triples),
+                sorted(allowed),
+            )
+
+        return all_mentions
 
 
 # ---------------------------------------------------------------------------
@@ -535,18 +519,11 @@ class KnowledgeGraphProcessor(DocumentProcessor):
 # ---------------------------------------------------------------------------
 
 
-def _read_gleaning_env() -> bool:
-    import os
-
-    raw = os.environ.get("EXTRACTION_GLEANING", "").lower()
-    return raw in ("1", "true", "yes", "on")
-
-
 def _halve_text(text: str) -> tuple[str, str]:
     """Split *text* at the closest paragraph (double-newline) boundary to the midpoint.
 
     Falls back to single-newline, then to the literal character midpoint. Used by
-    :meth:`KnowledgeGraphProcessor._extract_with_halving` to recursively shrink an LLM
+    :meth:`KnowledgeGraphExtractor._extract_with_halving` to recursively shrink an LLM
     input that triggered a pathological extraction (timeout, validation failure).
     """
     if not text:
