@@ -24,7 +24,6 @@ pytest.importorskip("pydantic_settings", reason="pydantic_settings not installed
 from ragdoc.chunking.chunk import Chunk
 from ragdoc.chunking.llm import DocumentTopicSummaries, LLMChunker
 from ragdoc.document import Document, Heading
-from ragdoc.parsing.mineru.base import _latex_to_text
 from ragdoc.parsing.multi_source import MultiSourceParser
 from ragdoc.parsing.registry import get_parser
 from ragdoc.pipeline import DocumentPipeline, VectorStorePipeline
@@ -37,8 +36,9 @@ from ragdoc.processing.heading_llm import (
     LLMHeadingResolver,
 )
 from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
-from ragdoc.utils.helpers import _normalize_text
+from ragdoc.utils.helpers import normalize_text
 from ragdoc.utils.tokenizer import GPTTokenizer
+from tests.latex_text import latex_to_text
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -103,7 +103,7 @@ def mineru_to_pandoc_resolver(path: Path) -> Path | None:
 
 def _norm(text: str) -> str:
     """Normalise text for fuzzy comparison (whitespace + LaTeX + NFKC)."""
-    return re.sub(r"\s+", "", _normalize_text(_latex_to_text(text))).strip()
+    return re.sub(r"\s+", "", normalize_text(latex_to_text(text))).strip()
 
 
 def _find_heading(doc: Document, heading_text: str) -> Heading | None:

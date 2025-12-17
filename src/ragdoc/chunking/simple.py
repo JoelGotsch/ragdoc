@@ -16,6 +16,7 @@ Typical usage::
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -72,7 +73,8 @@ class SimpleChunker(Chunker):
         return self._prompt_renderer if self._prompt_renderer is not None else _default_prompt_renderer()
 
     async def chunk(self, document: Document) -> list[Chunk]:
-        prompt_content = self._get_prompt_renderer().render(document)
+        # Rendering is CPU-bound and may fork a pandoc subprocess (non-HTML formats).
+        prompt_content = await asyncio.to_thread(self._get_prompt_renderer().render, document)
         prov = resolve_chunk_provenance(document)
         chunk = Chunk(
             source_path=document.source_path or None,

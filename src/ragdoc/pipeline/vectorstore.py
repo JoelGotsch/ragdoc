@@ -276,7 +276,8 @@ class VectorStorePipeline(Generic[TMetadata]):
 
     async def run_directory(self, directory: Path, glob: str = "**/*") -> UpdateResult:
         """Discover files matching *glob* under *directory*, then :meth:`run` them."""
-        sources = [p for p in directory.glob(glob) if p.is_file()]  # noqa: ASYNC240 -- threaded in Phase 8 (D9)
+        # Directory traversal is blocking filesystem I/O — run it off the event loop.
+        sources = await asyncio.to_thread(lambda: [p for p in directory.glob(glob) if p.is_file()])
         return await self.run(sources)
 
     # ------------------------------------------------------------------

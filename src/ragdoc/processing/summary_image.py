@@ -28,17 +28,15 @@ from functools import partial
 from io import BytesIO
 from typing import TYPE_CHECKING, Literal, TypeAlias
 
-from PIL import Image as PILModule
-from PIL.Image import Image as PILImage
-
 from ragdoc.document import Image
 from ragdoc.llm import ChatClient, LLMRefusalError, call_structured, resolve_openai_client
-from ragdoc.processing._concurrency import _fan_out
 from ragdoc.processing.base import DocumentProcessor
 from ragdoc.processing.summary_base import ImageSummary
+from ragdoc.utils.concurrency import fan_out
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
+    from PIL.Image import Image as PILImage
 
     from ragdoc.document import Document
 
@@ -69,12 +67,24 @@ Ensure that the extracted data is comprehensive and correctly formatted. Respond
 IMAGE_USER_MESSAGE = "Please analyze the provided image."
 
 
+def _import_pil_module():
+    """Lazy PIL import — pillow lives behind the 'llm' extra."""
+    try:
+        from PIL import Image as pil_module
+    except ImportError as exc:
+        raise ImportError(
+            "Image transformations require pillow, installed with the 'llm' extra: pip install 'ragdoc[llm]'"
+        ) from exc
+    return pil_module
+
+
 def _remove_alpha_channel(image: PILImage, background: str = "white") -> PILImage:
     """Composite image onto a solid background to remove the alpha channel."""
     if "A" not in image.mode:
         return image
-    bg = PILModule.new("RGBA", image.size, background)
-    return PILModule.alpha_composite(bg, image)
+    pil_module = _import_pil_module()
+    bg = pil_module.new("RGBA", image.size, background)
+    return pil_module.alpha_composite(bg, image)
 
 
 DEFAULT_TRANSFORMATIONS: list[Callable[[PILImage], PILImage]] = [
@@ -83,7 +93,7 @@ DEFAULT_TRANSFORMATIONS: list[Callable[[PILImage], PILImage]] = [
 
 
 def _to_pil(image_bytes: bytes) -> PILImage:
-    return PILModule.open(BytesIO(image_bytes))
+    return _import_pil_module().open(BytesIO(image_bytes))
 
 
 def _pil_to_base64(image: PILImage) -> str:
@@ -188,8 +198,9 @@ def openai_image_summarizer(
             raise ValueError("Image has no base64 content to summarize.")
         image_bytes = base64.b64decode(image.image)
         if _transforms:
-            pil = apply_image_transformations(image_bytes, _transforms)
-            b64 = _pil_to_base64(pil)
+            # PIL decode/transform/encode is CPU-bound — run off the event loop.
+            pil = await asyncio.to_thread(apply_image_transformations, image_bytes, _transforms)
+            b64 = await asyncio.to_thread(_pil_to_base64, pil)
             img_type = "png"  # PIL always saves as PNG after transforms
         else:
             b64 = image.image  # already base64; skip PIL round-trip
@@ -272,7 +283,7 @@ class ImageSummaryProcessor(DocumentProcessor):
                 + (f" ({skipped} skipped: already summarized)" if skipped else "")
             )
         coros: list[Awaitable[None]] = [self._process_one(summarize, img, document) for img in images]
-        await _fan_out(coros, self._concurrency)
+        await fan_out(coros, self._concurrency)
         return document
 
     async def _process_one(
@@ -281,8 +292,6 @@ class ImageSummaryProcessor(DocumentProcessor):
         image: Image,
         document: Document,
     ) -> None:
-        from PIL import UnidentifiedImageError
-
         context = self._context_fn(image, document) if self._context_fn else None
         try:
             result = await summarize(image, context)
@@ -290,7 +299,9 @@ class ImageSummaryProcessor(DocumentProcessor):
                 image.text_representation = None
             else:
                 image.text_representation = result.text_representation or result.summary
-        except (UnidentifiedImageError, OSError):
+        except OSError:
+            # PIL's UnidentifiedImageError subclasses OSError, so this also covers unreadable
+            # image payloads without importing PIL here (pillow lives behind the 'llm' extra).
             logger.exception(f"Failed to summarize image {image.id}: image type {image.image_type!r} not supported")
         except (LLMRefusalError, ValueError) as exc:
             # Contain per-image LLM refusals/schema failures — one bad image must not abort the

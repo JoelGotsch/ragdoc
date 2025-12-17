@@ -17,10 +17,11 @@ pytest.importorskip("pylatexenc", reason="pdf_mineru extra not installed")
 from pathlib import Path
 
 from ragdoc.document import Document, Heading
-from ragdoc.parsing.mineru.base import MinerUMiddleDocument, _latex_to_text
-from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUExtractor as MinerUParser
+from ragdoc.parsing.mineru.base import MinerUMiddleDocument
+from ragdoc.parsing.mineru.parser import CoreExtractor, MinerUExtractor as MinerUParser
 from ragdoc.processing.heading import HeadingLevelProcessor, TitleDetectionProcessor
-from ragdoc.utils.helpers import _normalize_text
+from ragdoc.utils.helpers import normalize_text
+from tests.latex_text import latex_to_text
 
 TEST_CASES_FILE = Path(__file__).parent.parent / "data" / "test_cases.json"
 FILES_DIR = Path(__file__).parent.parent / "parsing" / "data" / "mineru"
@@ -32,7 +33,7 @@ FILES_DIR = Path(__file__).parent.parent / "parsing" / "data" / "mineru"
 
 
 def _norm(text: str) -> str:
-    return re.sub(r"\s+", "", _normalize_text(_latex_to_text(text))).strip()
+    return re.sub(r"\s+", "", normalize_text(latex_to_text(text))).strip()
 
 
 def _load_raw() -> tuple[dict, dict[str, MinerUMiddleDocument]]:
@@ -56,8 +57,8 @@ _TEST_CASES, _MIDDLE_DOCS = _load_raw()
 
 async def _parse_fresh(name: str) -> Document:
     """Return a freshly parsed Document (no processing applied)."""
-    parser = MinerUParser(use_default_middlewares=False)
-    parser.use(CoreExtractionMiddleware())
+    parser = MinerUParser(use_default_stages=False)
+    parser.use(CoreExtractor())
     return await parser.parse(_MIDDLE_DOCS[name])
 
 

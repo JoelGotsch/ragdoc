@@ -33,9 +33,9 @@ from ragdoc.rendering.base import (
     Renderer,
 )
 from ragdoc.rendering.elements import (
+    format_metadata_value,
     render_for_prompt,
     render_raw,
-    serialize_metadata_value,
 )
 
 # TODO: Implement HierarchicalRenderer using the new architecture.
@@ -63,7 +63,7 @@ __all__ = [
     "OutputFormat",
     "RenderContext",
     "Renderer",
+    "format_metadata_value",
     "render_for_prompt",
     "render_raw",
-    "serialize_metadata_value",
 ]

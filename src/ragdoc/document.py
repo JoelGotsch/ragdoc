@@ -955,9 +955,3 @@ def join_documents(documents: list[Document], *, metadata_policy: MetadataMergeP
     if len(documents) == 0:
         return Document()
     return reduce(lambda a, b: merge_documents(a, b, metadata_policy=metadata_policy), documents)
-
-
-DocumentPrimaryElement = Heading | Paragraph | Table | DocumentList | RawText  # elements that get rendered to md
-DocumentSecondaryElement = (
-    Image | Footnote
-)  # elements referenced within primary elements (images via src, footnotes via anchor links)

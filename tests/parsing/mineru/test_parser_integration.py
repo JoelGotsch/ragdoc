@@ -1,5 +1,5 @@
 """
-Integration tests for the MinerU CoreExtractionMiddleware pipeline.
+Integration tests for the MinerU CoreExtractor pipeline.
 
 These tests build minimal MinerUMiddleDocument fixtures in-memory and verify
 end-to-end pipeline behaviour: block dispatch order, caption placement,
@@ -39,7 +39,7 @@ from ragdoc.parsing.mineru.handlers import (
     ExtractionConfig,
     handle_discarded_as_raw_text,
 )
-from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUExtractor
+from ragdoc.parsing.mineru.parser import CoreExtractor, MinerUExtractor
 
 # ---------------------------------------------------------------------------
 # Fixture factories (shared with test_handlers.py but duplicated to keep files independent)
@@ -205,8 +205,8 @@ def test_header_handler_swapped_to_raw_text():
     """Swapping HEADER handler to handle_discarded_as_raw_text emits a RawText element."""
     config = ExtractionConfig()
     config.discarded_handlers[DiscardedBlockType.HEADER] = handle_discarded_as_raw_text
-    extractor = MinerUExtractor(use_default_middlewares=False)
-    extractor.use(CoreExtractionMiddleware(config=config))
+    extractor = MinerUExtractor(use_default_stages=False)
+    extractor.use(CoreExtractor(config=config))
     doc = asyncio.run(extractor.parse(_HEADER_DOC))
     raw_texts = [el for el in doc.elements if isinstance(el, RawText)]
     assert any("Confidential" in el.innerhtml for el in raw_texts)

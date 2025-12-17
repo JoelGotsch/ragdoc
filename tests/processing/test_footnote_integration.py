@@ -24,9 +24,10 @@ from ragdoc.processing.footnote import (
 # MinerU-specific imports — guarded so the module still loads without pylatexenc.
 _HAS_MINERU = True
 try:
-    from ragdoc.parsing.mineru.base import MinerUMiddleDocument, _latex_to_text
-    from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUParser
-    from ragdoc.utils.helpers import _normalize_text
+    from ragdoc.parsing.mineru.base import MinerUMiddleDocument
+    from ragdoc.parsing.mineru.parser import CoreExtractor, MinerUExtractor
+    from ragdoc.utils.helpers import normalize_text
+    from tests.latex_text import latex_to_text
 except ImportError:
     _HAS_MINERU = False
 
@@ -42,7 +43,7 @@ FILES_DIR = Path(__file__).parent.parent / "parsing" / "data" / "mineru"
 
 
 def _norm(text: str) -> str:
-    return re.sub(r"\s+", "", _normalize_text(_latex_to_text(text))).strip()
+    return re.sub(r"\s+", "", normalize_text(latex_to_text(text))).strip()
 
 
 def _contains(haystack: str, needle: str) -> bool:
@@ -75,8 +76,8 @@ import asyncio as _asyncio
 _PARSED_DOCS: dict[str, Document] = {}
 if _HAS_MINERU:
     for _name, _middle in _MIDDLE_DOCS.items():
-        _p = MinerUParser(use_default_middlewares=False)
-        _p.use(CoreExtractionMiddleware())
+        _p = MinerUExtractor(use_default_stages=False)
+        _p.use(CoreExtractor())
         _PARSED_DOCS[_name] = _asyncio.run(_p.parse(_middle))
 
 

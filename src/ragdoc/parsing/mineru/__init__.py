@@ -1,115 +1,128 @@
-try:
-    from pathlib import Path
+"""MinerU ``_middle.json`` parsing.
 
-    from pydantic import ConfigDict
+The module is importable without the ``pdf-mineru`` extra; LaTeX equation
+conversion (``latex2mathml``) is imported lazily at conversion time and the
+parser reports itself unavailable via :meth:`MinerUParser.is_available` until
+the extra is installed.
+"""
 
-    from ragdoc.document import Document
-    from ragdoc.parsing.mineru.base import parse_middle_json_file
-    from ragdoc.parsing.mineru.handlers import (
-        ExtractionConfig,
-        build_heading_html,
-        build_text_html,
-        check_mineru_images,
-        handle_chart_block,
-        handle_code_block,
-        handle_discarded_as_footnote,
-        handle_discarded_as_metadata,
-        handle_discarded_as_raw_text,
-        handle_discarded_drop,
-        handle_image_block,
-        handle_list_block,
-        handle_table_block,
-        handle_text_block,
-        handle_title_block,
-    )
-    from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUExtractor
-    from ragdoc.parsing.parser import Parser
+import importlib.util
+from pathlib import Path
 
-    async def parse_mineru_file(path: Path) -> Document:
-        """Parse a MinerU ``_middle.json`` file into a :class:`~ragdoc.document.Document`.
+from pydantic import ConfigDict
 
-        This is the standalone entry point for one-off parsing without going through
-        the registry. Equivalent to ``MinerUParser()(path)``.
+from ragdoc.document import Document
+from ragdoc.parsing.mineru.base import parse_middle_json_file
+from ragdoc.parsing.mineru.handlers import (
+    ExtractionConfig,
+    build_heading_html,
+    build_text_html,
+    check_mineru_images,
+    handle_chart_block,
+    handle_code_block,
+    handle_discarded_as_footnote,
+    handle_discarded_as_metadata,
+    handle_discarded_as_raw_text,
+    handle_discarded_drop,
+    handle_image_block,
+    handle_list_block,
+    handle_table_block,
+    handle_text_block,
+    handle_title_block,
+)
+from ragdoc.parsing.mineru.parser import CoreExtractor, MinerUExtractor
+from ragdoc.parsing.parser import Parser
 
-        Args:
-            path: Path to the ``_middle.json`` file produced by MinerU.
 
-        Returns:
-            Parsed :class:`~ragdoc.document.Document` with ``parser="mineru"``.
-        """
-        source = parse_middle_json_file(path)
-        extractor = MinerUExtractor()
-        return await extractor.parse(source, source_path=path)
+async def parse_mineru_file(path: Path) -> Document:
+    """Parse a MinerU ``_middle.json`` file into a :class:`~ragdoc.document.Document`.
 
-    class MinerUParser(Parser):
-        """Public parser entry point for MinerU ``_middle.json`` files.
+    This is the standalone entry point for one-off parsing without going through
+    the registry. Equivalent to ``MinerUParser()(path)``.
 
-        Registered in the ragdoc parser registry under the name ``"mineru"`` at
-        priority 50.  Accepts an optional *extractor* argument to inject a custom
-        :class:`MinerUExtractor` (e.g., one with a modified middleware chain) without
-        exposing :class:`~ragdoc.parsing.mineru.base.MinerUMiddleDocument` to callers.
+    Args:
+        path: Path to the ``_middle.json`` file produced by MinerU.
 
-        The only key written to ``document.metadata`` is ``"filename"``.  If
-        discarded content (running headers, footers, …) should be preserved it
-        must be emitted as document elements by configuring the extractor — see
-        :class:`~ragdoc.parsing.mineru.handlers.ExtractionConfig` for the full
-        handler reference.
+    Returns:
+        Parsed :class:`~ragdoc.document.Document` with ``parser="mineru"``.
+    """
+    source = parse_middle_json_file(path)
+    extractor = MinerUExtractor()
+    return await extractor.parse(source, source_path=path)
 
-        Example — preserve running page headers as :class:`~ragdoc.document.RawText`::
 
-            from ragdoc.parsing.mineru import (
-                MinerUParser, MinerUExtractor, CoreExtractionMiddleware, ExtractionConfig,
-                handle_discarded_as_raw_text,
-            )
-            from ragdoc.parsing.mineru.base import DiscardedBlockType
+class MinerUParser(Parser):
+    """Public parser entry point for MinerU ``_middle.json`` files.
 
-            config = ExtractionConfig()
-            config.discarded_handlers[DiscardedBlockType.HEADER] = handle_discarded_as_raw_text
-            extractor = MinerUExtractor()
-            extractor.use(CoreExtractionMiddleware(config=config))
+    Registered in the ragdoc parser registry under the name ``"mineru"`` at
+    priority 50.  Accepts an optional *extractor* argument to inject a custom
+    :class:`MinerUExtractor` (e.g., one with a modified stage chain) without
+    exposing :class:`~ragdoc.parsing.mineru.base.MinerUMiddleDocument` to callers.
 
-            parser = MinerUParser(extractor=extractor)
-            document = await parser(Path("report_middle.json"))
-        """
+    The only key written to ``document.metadata`` is ``"filename"``.  If
+    discarded content (running headers, footers, …) should be preserved it
+    must be emitted as document elements by configuring the extractor — see
+    :class:`~ragdoc.parsing.mineru.handlers.ExtractionConfig` for the full
+    handler reference.
 
-        model_config = ConfigDict(arbitrary_types_allowed=True)
+    Example — preserve running page headers as :class:`~ragdoc.document.RawText`::
 
-        name: str = "mineru"
-        patterns: list[str] = ["_middle.json"]
-        priority: int = 50
-        description: str = "MinerU middle JSON files"
+        from ragdoc.parsing.mineru import (
+            MinerUParser, MinerUExtractor, CoreExtractor, ExtractionConfig,
+            handle_discarded_as_raw_text,
+        )
+        from ragdoc.parsing.mineru.base import DiscardedBlockType
 
-        extractor: MinerUExtractor | None = None
+        config = ExtractionConfig()
+        config.discarded_handlers[DiscardedBlockType.HEADER] = handle_discarded_as_raw_text
+        extractor = MinerUExtractor(use_default_stages=False)
+        extractor.use(CoreExtractor(config=config))
 
-        async def __call__(self, path: Path) -> Document:
-            if self.extractor is not None:
-                source = parse_middle_json_file(path)
-                return await self.extractor.parse(source, source_path=path)
-            return await parse_mineru_file(path)
+        parser = MinerUParser(extractor=extractor)
+        document = await parser(Path("report_middle.json"))
+    """
 
-    __all__ = [
-        "CoreExtractionMiddleware",
-        "ExtractionConfig",
-        "MinerUExtractor",
-        "MinerUParser",
-        "build_heading_html",
-        "build_text_html",
-        "check_mineru_images",
-        "handle_code_block",
-        "handle_discarded_as_footnote",
-        "handle_discarded_as_metadata",
-        "handle_discarded_as_raw_text",
-        "handle_discarded_drop",
-        "handle_image_block",
-        "handle_list_block",
-        "handle_table_block",
-        "handle_text_block",
-        "handle_title_block",
-        "parse_mineru_file",
-    ]
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-except ImportError:
-    pass  # pdf_mineru extra not installed
+    name: str = "mineru"
+    patterns: list[str] = ["_middle.json"]
+    priority: int = 50
+    description: str = "MinerU middle JSON files"
+
+    extractor: MinerUExtractor | None = None
+
+    def is_available(self) -> bool:
+        return importlib.util.find_spec("latex2mathml") is not None
+
+    def unavailable_reason(self) -> str:
+        return "mineru: install 'ragdoc[pdf-mineru]' for MinerU middle-JSON parsing"
+
+    async def __call__(self, path: Path) -> Document:
+        if self.extractor is not None:
+            source = parse_middle_json_file(path)
+            return await self.extractor.parse(source, source_path=path)
+        return await parse_mineru_file(path)
+
+
+__all__ = [
+    "CoreExtractor",
+    "ExtractionConfig",
+    "MinerUExtractor",
+    "MinerUParser",
+    "build_heading_html",
+    "build_text_html",
+    "check_mineru_images",
+    "handle_code_block",
+    "handle_discarded_as_footnote",
+    "handle_discarded_as_metadata",
+    "handle_discarded_as_raw_text",
+    "handle_discarded_drop",
+    "handle_image_block",
+    "handle_list_block",
+    "handle_table_block",
+    "handle_text_block",
+    "handle_title_block",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -118,11 +131,6 @@ except ImportError:
 
 
 def _register() -> None:
-    try:
-        from ragdoc.parsing.mineru import MinerUParser as _MP
-    except ImportError:
-        return  # pdf_mineru extra not installed
-
     from ragdoc.parsing.registry import register_parser
 
-    register_parser(_MP())
+    register_parser(MinerUParser())

@@ -50,14 +50,6 @@ Classes and functions for converting `Document` objects into formatted text stri
       show_source: true
       heading_level: 3
 
-## Renderable
-
-`Renderable = BaseElement | DocumentMetadata`
-
-The union type accepted by element renderer functions. Element renderers registered
-via `singledispatch` handle either a [`BaseElement`](document.md) subclass or a
-[`DocumentMetadata`](#documentmetadata) instance (used to render the metadata header).
-
 ## Element Renderers
 
 Element renderers are `singledispatch` functions. They always return HTML. The `Renderer`

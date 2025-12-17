@@ -240,7 +240,7 @@ def _(mo):
     The `_middle.json` is MinerU's intermediate representation: a list of pages, each containing
     typed blocks (`title`, `text`, `table`, `figure`, …) with bounding boxes and line-level layout data.
 
-    `MinerUParser` runs a middleware chain (`CoreExtractionMiddleware`) that:
+    `MinerUParser` runs a chain of extraction stages (`CoreExtractor`) that:
 
     1. Reads each block type and creates the corresponding `BaseElement` subclass.
     2. Encodes visual properties — font size, text alignment — as **inline CSS** on the element's `html`.

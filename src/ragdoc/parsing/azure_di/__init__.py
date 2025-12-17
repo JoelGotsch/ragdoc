@@ -87,6 +87,25 @@ class AzureDIParser(Parser):
     priority: int = 40
     description: str = "PDF via Azure Document Intelligence"
 
+    def is_available(self) -> bool:
+        import importlib.util
+
+        from ragdoc.config import get_config
+
+        try:
+            if importlib.util.find_spec("azure.ai.documentintelligence") is None:
+                return False
+        except ModuleNotFoundError:  # a parent 'azure' namespace package is absent entirely
+            return False
+        cfg = get_config()
+        return bool(cfg.azure_key and cfg.azure_endpoint)
+
+    def unavailable_reason(self) -> str:
+        return (
+            "azure_di: install 'ragdoc[azure-di]' and configure azure_key/azure_endpoint "
+            "via ragdoc.configure(RagdocConfig(...))"
+        )
+
     async def __call__(self, path: Path) -> Document:
         return parse_pdf_azure_di(path)
 

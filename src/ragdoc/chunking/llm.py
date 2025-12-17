@@ -27,6 +27,7 @@ Customising the prompt::
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
@@ -222,7 +223,8 @@ class LLMChunker(Chunker):
         from pathlib import Path
 
         doc_label = f"{Path(document.source_path).name} ({document.id})" if document.source_path else document.id
-        rendered = self._get_prompt_renderer().render(document)
+        # Rendering is CPU-bound and may fork a pandoc subprocess (non-HTML formats).
+        rendered = await asyncio.to_thread(self._get_prompt_renderer().render, document)
         logger.debug(f"LLMChunker: rendered document: {len(rendered)} chars")
         messages = self._create_messages(self._budget_llm_input(rendered, doc_label))
 

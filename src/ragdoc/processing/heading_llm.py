@@ -20,8 +20,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from ragdoc.config import get_config
 from ragdoc.document import Heading, Paragraph
 from ragdoc.llm import ChatClient, call_structured
-from ragdoc.processing._concurrency import _fan_out
 from ragdoc.processing.base import DocumentProcessor
+from ragdoc.utils.concurrency import fan_out
 
 if TYPE_CHECKING:
     from ragdoc.document import Document
@@ -226,7 +226,12 @@ Guidelines:
     def _create_client_from_settings(self) -> ChatClient | None:
         """Create an AsyncOpenAI client from settings if base_url and api_key are provided."""
         if self.settings.base_url and self.settings.api_key and self.settings.api_key.get_secret_value():
-            from openai import AsyncOpenAI  # lazy: openai moves behind an extra in Phase 8
+            try:
+                from openai import AsyncOpenAI  # lazy: openai lives behind the 'llm' extra
+            except ImportError as exc:
+                raise ImportError(
+                    "LLMHeadingResolver's settings-based client requires the 'llm' extra: pip install 'ragdoc[llm]'"
+                ) from exc
 
             return AsyncOpenAI(
                 base_url=self.settings.base_url,
@@ -362,7 +367,7 @@ Guidelines:
         coros: list[Awaitable[None]] = [
             _process_batch(idx, offset, batch) for idx, (offset, batch) in enumerate(batches)
         ]
-        await _fan_out(coros, self._concurrency)
+        await fan_out(coros, self._concurrency)
 
         return [j for r in results for j in r]
 

@@ -17,8 +17,7 @@ Notes:
     * One Document per ``source_id`` (no versioning).
     * Document JSON uses Pydantic ``model_dump_json``; images are inlined (binary sidecars are
       a future extension).
-    * File I/O is synchronous inside ``async`` methods — fine for local dev, not for
-      high-concurrency production access.
+    * File reads/writes go through :mod:`aiofiles`, so the store does not block the event loop.
 """
 
 from __future__ import annotations
@@ -26,6 +25,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from pathlib import Path
 from urllib.parse import quote, unquote
+
+import aiofiles
 
 from ragdoc.document import Document
 from ragdoc.pipeline.stores import SourceState
@@ -64,7 +65,8 @@ class LocalDocumentStore:
                     "LocalDocumentStore.upsert requires document.source_id to be set "
                     "(normally done by DocumentStorePipeline before upsert)."
                 )
-            self._doc_path(doc.source_id).write_text(doc.model_dump_json(indent=2), encoding="utf-8")
+            async with aiofiles.open(self._doc_path(doc.source_id), "w", encoding="utf-8") as f:
+                await f.write(doc.model_dump_json(indent=2))
             written.append(doc.source_id)
         return written
 
@@ -77,7 +79,9 @@ class LocalDocumentStore:
         path = self._doc_path(source_id)
         if not path.exists():
             return None
-        return Document.model_validate_json(path.read_text(encoding="utf-8"))
+        async with aiofiles.open(path, encoding="utf-8") as f:
+            content = await f.read()
+        return Document.model_validate_json(content)
 
     async def list_source_ids(self) -> set[str]:
         """Return all stored source_ids (decoded from filenames, no document loads)."""
@@ -88,7 +92,9 @@ class LocalDocumentStore:
         **live** files so manual edits are detected."""
         state: dict[str, SourceState] = {}
         for path in self._iter_doc_files():
-            doc: Document = Document.model_validate_json(path.read_text(encoding="utf-8"))
+            async with aiofiles.open(path, encoding="utf-8") as f:
+                content = await f.read()
+            doc: Document = Document.model_validate_json(content)
             if doc.source_id:
                 state[doc.source_id] = SourceState(
                     source_hash=doc.source_hash or "",

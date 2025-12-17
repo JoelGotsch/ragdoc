@@ -30,7 +30,7 @@ from ragdoc.merging.heuristics import (
     select_table,
 )
 from ragdoc.merging.patch import PatchOperation, PatchOperationType
-from ragdoc.utils.helpers import _normalize_text
+from ragdoc.utils.helpers import normalize_text
 
 # Primary element types that drive alignment (text-bearing elements)
 _PRIMARY_TYPES = frozenset(
@@ -49,7 +49,7 @@ def alignment_key(element: ElementType) -> str:
 
     - ``Image`` → unique per-element sentinel (never auto-aligned)
     - ``Footnote`` → ``"__footnote__{number}"`` (aligned by footnote number)
-    - All others → ``_normalize_text(element.text)``
+    - All others → ``normalize_text(element.text)``
 
     Args:
         element: Element to produce a key for.
@@ -61,7 +61,7 @@ def alignment_key(element: ElementType) -> str:
         return f"__image__{element.id}"
     if isinstance(element, Footnote):
         return f"__footnote__{element.number}"
-    return _normalize_text(element.text)
+    return normalize_text(element.text)
 
 
 def _is_insertion_allowed(

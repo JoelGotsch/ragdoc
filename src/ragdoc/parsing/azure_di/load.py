@@ -5,8 +5,8 @@ import logging
 from functools import partial
 from itertools import islice
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import pymupdf
 from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 from pypandoc import convert_text
@@ -14,11 +14,20 @@ from pypandoc import convert_text
 from ragdoc.document import Document
 from ragdoc.parsing.html.load import HTML, generate_document as html_generate_documents, unwrap_idiotic_tables
 
+if TYPE_CHECKING:
+    import pymupdf
+
 logger = logging.getLogger(__name__)
 
 
 class FigureExtractor:
     def __init__(self, file_path: str):
+        try:
+            import pymupdf
+        except ImportError as exc:
+            raise ImportError(
+                "PDF figure extraction requires pymupdf (installed with 'ragdoc[azure-di]' or 'ragdoc[pdf]')"
+            ) from exc
         self.file_path: str = file_path
         self.doc = pymupdf.open(file_path)
 
@@ -28,6 +37,8 @@ class FigureExtractor:
         return min(y_values), max(y_values), min(x_values), max(x_values)
 
     def extract_document_image(self, page: int, polygon: list[tuple[float, float]]) -> tuple[tuple[int, int], bytes]:
+        import pymupdf
+
         pdf_page: pymupdf.Page = self.doc[page - 1]
         top, bottom, left, right = self._rectangular_hull(polygon)
         clip_rectangle = pymupdf.Rect(left, top, right, bottom)

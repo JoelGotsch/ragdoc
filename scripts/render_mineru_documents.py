@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 
 from ragdoc.parsing.mineru.base import MinerUMiddleDocument
-from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUParser
+from ragdoc.parsing.mineru.parser import CoreExtractor, MinerUExtractor as MinerUParser
 from ragdoc.processing.footnote import SyncFootnoteProcessor
 from ragdoc.processing.heading import HeadingLevelProcessor
 from ragdoc.rendering import OutputFormat, Renderer, render_for_embedding, render_for_prompt, render_raw
@@ -31,8 +31,8 @@ def parse_middle_json(path: Path):
     with open(path, encoding="utf-8") as f:
         json_data = json.load(f)
     mineru_doc = MinerUMiddleDocument.model_validate(json_data)
-    parser = MinerUParser(use_default_middlewares=False)
-    parser.use(CoreExtractionMiddleware())
+    parser = MinerUParser(use_default_stages=False)
+    parser.use(CoreExtractor())
     document = parser.parse_sync(mineru_doc)
     document = HeadingLevelProcessor().process(document)
     document = SyncFootnoteProcessor().process(document)

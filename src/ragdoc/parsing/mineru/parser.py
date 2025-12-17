@@ -6,16 +6,16 @@ from ragdoc.document import Document
 
 from .base import (
     AsyncCallNext,
-    BaseMiddleware,
+    BaseExtractionStage,
     ChartBlock,
     CodeBlock,
+    ExtractionStage,
     ImageBlock,
     InterlineEquationBlock,
     ListBlock,
     MinerUMiddleDocument,
     ParseContext,
     ParsedElement,
-    ParserMiddleware,
     RefTextBlock,
     TableBlock,
     TextBlock,
@@ -24,9 +24,9 @@ from .base import (
 from .handlers import ExtractionConfig
 
 
-class CoreExtractionMiddleware(BaseMiddleware):
+class CoreExtractor(BaseExtractionStage):
     """
-    Core middleware that converts MinerU blocks into :class:`ParsedElement` objects.
+    Core extraction stage that converts MinerU blocks into :class:`ParsedElement` objects.
 
     Dispatches each block to the appropriate handler in *config*.  Replace any
     handler to change extraction behaviour for that block type without
@@ -34,7 +34,7 @@ class CoreExtractionMiddleware(BaseMiddleware):
 
         config = ExtractionConfig()
         config.handle_image = lambda block, page, ctx: []  # drop all images
-        middleware = CoreExtractionMiddleware(config=config)
+        extractor_stage = CoreExtractor(config=config)
 
     See :class:`~ragdoc.parsing.mineru.handlers.ExtractionConfig` for the full
     set of configurable handlers.
@@ -96,11 +96,11 @@ class MinerUExtractor:
 
     Accepts a :class:`~ragdoc.parsing.mineru.base.MinerUMiddleDocument` (not a
     ``Path``) and converts it to a :class:`~ragdoc.document.Document` via a
-    configurable middleware chain.  This is **not** a :class:`~ragdoc.parsing.parser.Parser`
+    configurable chain of extraction stages.  This is **not** a :class:`~ragdoc.parsing.parser.Parser`
     subclass and is not the public entry point — use :class:`MinerUParser` or
     :func:`parse_mineru_file` instead.
 
-    Customise extraction by composing middleware::
+    Customise extraction by composing stages::
 
         from ragdoc.parsing.mineru.handlers import (
             ExtractionConfig, handle_discarded_as_raw_text,
@@ -109,55 +109,29 @@ class MinerUExtractor:
 
         config = ExtractionConfig()
         config.discarded_handlers[DiscardedBlockType.HEADER] = handle_discarded_as_raw_text
-        extractor = MinerUExtractor(use_default_middlewares=False)
-        extractor.use(CoreExtractionMiddleware(config=config))
+        extractor = MinerUExtractor(use_default_stages=False)
+        extractor.use(CoreExtractor(config=config))
 
         doc = await extractor.parse(mineru_document, source_path=Path("report/_middle.json"))
     """
 
     def __init__(
         self,
-        middlewares: list[ParserMiddleware] | None = None,
-        use_default_middlewares: bool = True,
+        stages: list[ExtractionStage] | None = None,
+        use_default_stages: bool = True,
     ) -> None:
-        self.middlewares: list[ParserMiddleware] = []
+        self.stages: list[ExtractionStage] = []
 
-        if use_default_middlewares:
-            self.middlewares.append(CoreExtractionMiddleware())
+        if use_default_stages:
+            self.stages.append(CoreExtractor())
 
-        if middlewares:
-            for mw in middlewares:
-                self.use(mw)
+        if stages:
+            for stage in stages:
+                self.use(stage)
 
-    def use(self, middleware: ParserMiddleware) -> MinerUExtractor:
-        """Append a middleware to the pipeline."""
-        self.middlewares.append(middleware)
-        return self
-
-    def use_before(
-        self,
-        middleware: ParserMiddleware,
-        before: type[ParserMiddleware],
-    ) -> MinerUExtractor:
-        """Insert a middleware immediately before the first instance of *before*."""
-        for i, mw in enumerate(self.middlewares):
-            if isinstance(mw, before):
-                self.middlewares.insert(i, middleware)
-                return self
-        self.middlewares.insert(0, middleware)
-        return self
-
-    def use_after(
-        self,
-        middleware: ParserMiddleware,
-        after: type[ParserMiddleware],
-    ) -> MinerUExtractor:
-        """Insert a middleware immediately after the first instance of *after*."""
-        for i, mw in enumerate(self.middlewares):
-            if isinstance(mw, after):
-                self.middlewares.insert(i + 1, middleware)
-                return self
-        self.middlewares.append(middleware)
+    def use(self, stage: ExtractionStage) -> MinerUExtractor:
+        """Append an extraction stage to the pipeline."""
+        self.stages.append(stage)
         return self
 
     async def parse(
@@ -174,7 +148,7 @@ class MinerUExtractor:
                 parent directory is stored in ``context.metadata["source_dir"]``
                 so that image handlers can resolve relative image paths.
 
-        After all middlewares run, ``document.metadata`` is empty —
+        After all stages run, ``document.metadata`` is empty —
         ``metadata["filename"]`` is stamped centrally by :func:`ragdoc.parsing.load`.
         Parsers must not inject any other keys into document metadata; if discarded content
         (headers, footers, …) should be preserved it must be emitted as
@@ -184,7 +158,7 @@ class MinerUExtractor:
         if source_path is not None:
             context.metadata["source_dir"] = source_path.parent
 
-        context = await self._run_middlewares(context)
+        context = await self._run_stages(context)
         # Provenance (source_path, metadata["filename"]) is stamped centrally by
         # ragdoc.parsing.load(); only the parser-specific `parser` field is set here.
         return Document(
@@ -193,12 +167,12 @@ class MinerUExtractor:
             parser="mineru",
         )
 
-    async def _run_middlewares(self, context: ParseContext) -> ParseContext:
+    async def _run_stages(self, context: ParseContext) -> ParseContext:
         def create_chain(index: int) -> AsyncCallNext:
             async def call_next(ctx: ParseContext) -> ParseContext:
-                if index >= len(self.middlewares):
+                if index >= len(self.stages):
                     return ctx
-                return await self.middlewares[index](ctx, create_chain(index + 1))
+                return await self.stages[index](ctx, create_chain(index + 1))
 
             return call_next
 

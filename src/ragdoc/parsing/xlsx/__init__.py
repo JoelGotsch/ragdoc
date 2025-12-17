@@ -1,11 +1,16 @@
+import asyncio
+import importlib.util
 from pathlib import Path
 
-import pandas as pd
 from pydantic import Field
 
 from ragdoc.document import Document
 from ragdoc.parsing.parser import Parser
-from ragdoc.parsing.xlsx.load import ExcelConfig, generate_document as generate_xlsx_documents
+from ragdoc.parsing.xlsx.load import (
+    _XLSX_IMPORT_ERROR,
+    ExcelConfig,
+    generate_document as generate_xlsx_documents,
+)
 
 
 def load_excel(path: Path | str, config: ExcelConfig | None = None) -> Document:
@@ -13,7 +18,14 @@ def load_excel(path: Path | str, config: ExcelConfig | None = None) -> Document:
 
     Provenance (``source_path``, ``metadata["filename"]``) is stamped centrally by
     :func:`ragdoc.parsing.load` — not here.
+
+    Raises:
+        ImportError: If pandas is not installed (the ``xlsx`` extra).
     """
+    try:
+        import pandas as pd
+    except ImportError as exc:
+        raise ImportError(_XLSX_IMPORT_ERROR) from exc
     return generate_xlsx_documents(pd.ExcelFile(Path(path)), config or ExcelConfig())
 
 
@@ -28,8 +40,15 @@ class XlsxParser(Parser):
     description: str = "Excel spreadsheets"
     config: ExcelConfig = Field(default_factory=ExcelConfig, description="Per-parser Excel parsing configuration.")
 
+    def is_available(self) -> bool:
+        return importlib.util.find_spec("pandas") is not None
+
+    def unavailable_reason(self) -> str:
+        return "xlsx: install 'ragdoc[xlsx]' for Excel parsing"
+
     async def __call__(self, path: Path) -> Document:
-        return load_excel(path, self.config)
+        # pandas parses the workbook synchronously (CPU + file I/O) — run it off the event loop.
+        return await asyncio.to_thread(load_excel, path, self.config)
 
 
 def _register() -> None:

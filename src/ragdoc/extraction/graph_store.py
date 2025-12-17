@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from urllib.parse import quote, unquote
 
+import aiofiles
 from pydantic import BaseModel
 
 from ragdoc.extraction.entity import Entity
@@ -30,6 +31,18 @@ if TYPE_CHECKING:
 
 
 _ENTITY_SUFFIX = ".entity.json"
+
+
+async def _read_text(path: Path) -> str:
+    """Read *path* via aiofiles (UTF-8) without blocking the event loop."""
+    async with aiofiles.open(path, encoding="utf-8") as f:
+        return await f.read()
+
+
+async def _write_text(path: Path, content: str) -> None:
+    """Write *content* to *path* via aiofiles (UTF-8) without blocking the event loop."""
+    async with aiofiles.open(path, "w", encoding="utf-8") as f:
+        await f.write(content)
 
 
 @runtime_checkable
@@ -135,18 +148,18 @@ class LocalGraphStore:
 
     async def upsert_nodes(self, entities: list[Entity]) -> list[str]:
         for e in entities:
-            self._node_path(e.entity_id).write_text(e.model_dump_json(indent=2), encoding="utf-8")
+            await _write_text(self._node_path(e.entity_id), e.model_dump_json(indent=2))
         return [e.entity_id for e in entities]
 
     async def get_node(self, entity_id: str) -> Entity | None:
         path = self._node_path(entity_id)
         if not path.exists():
             return None
-        return self._node_entity_type().model_validate_json(path.read_text(encoding="utf-8"))
+        return self._node_entity_type().model_validate_json(await _read_text(path))
 
     async def list_nodes(self, payload_type: type[BaseModel] | None = None) -> list[Entity]:
         etype = self._node_entity_type()
-        out = [etype.model_validate_json(p.read_text(encoding="utf-8")) for p in self._iter_node_files()]
+        out = [etype.model_validate_json(await _read_text(p)) for p in self._iter_node_files()]
         if payload_type is None:
             return out
         return [e for e in out if isinstance(e.payload, payload_type)]
@@ -155,18 +168,18 @@ class LocalGraphStore:
 
     async def upsert_edges(self, entities: list[Entity]) -> list[str]:
         for e in entities:
-            self._edge_path(e.entity_id).write_text(e.model_dump_json(indent=2), encoding="utf-8")
+            await _write_text(self._edge_path(e.entity_id), e.model_dump_json(indent=2))
         return [e.entity_id for e in entities]
 
     async def get_edge(self, entity_id: str) -> Entity | None:
         path = self._edge_path(entity_id)
         if not path.exists():
             return None
-        return self._edge_entity_type().model_validate_json(path.read_text(encoding="utf-8"))
+        return self._edge_entity_type().model_validate_json(await _read_text(path))
 
     async def list_edges(self, payload_type: type[BaseModel] | None = None) -> list[Entity]:
         etype = self._edge_entity_type()
-        out = [etype.model_validate_json(p.read_text(encoding="utf-8")) for p in self._iter_edge_files()]
+        out = [etype.model_validate_json(await _read_text(p)) for p in self._iter_edge_files()]
         if payload_type is None:
             return out
         return [e for e in out if isinstance(e.payload, payload_type)]
@@ -182,12 +195,12 @@ class LocalGraphStore:
     async def delete_by_source(self, source_id: str) -> None:
         node_etype = self._node_entity_type()
         for path in list(self._iter_node_files()):
-            entity = node_etype.model_validate_json(path.read_text(encoding="utf-8"))
+            entity = node_etype.model_validate_json(await _read_text(path))
             if entity.source_ids == [source_id]:
                 path.unlink(missing_ok=True)
         edge_etype = self._edge_entity_type()
         for path in list(self._iter_edge_files()):
-            entity = edge_etype.model_validate_json(path.read_text(encoding="utf-8"))
+            entity = edge_etype.model_validate_json(await _read_text(path))
             if entity.source_ids == [source_id]:
                 path.unlink(missing_ok=True)
 
