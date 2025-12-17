@@ -222,6 +222,7 @@ scripts/output/
 # Design docs and implementation plans are local-only working notes
 plans/
 designs/
+feature-requests/
 
 
 # Auto-generated devcontainer feature lock (regenerates; pins the claude-code feature)

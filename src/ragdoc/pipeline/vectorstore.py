@@ -4,15 +4,21 @@
 :class:`~ragdoc.pipeline.linear.DocumentPipeline` with a
 :class:`~ragdoc.pipeline.stores.VectorStore` to provide incremental updates.
 
-The work is split into two composable halves:
+Two entry points:
 
-* :meth:`plan` — determine what changed and compute chunks for new/modified sources,
-  returning a serializable :class:`~ragdoc.pipeline.changeset.ChangeSet`.  Does **not**
-  touch the store; safe to call repeatedly.
-* :meth:`apply` — embed the chunks and write the ChangeSet to the store (embed-first, then
-  per-source delete-then-upsert).
+* :meth:`run` — the **standard** path. Syncs **per source** (parse → chunk → embed →
+  delete-then-upsert), writing each source as soon as it is ready. Each source is atomic
+  (embed-first per source); the corpus is **not** all-or-nothing — a completed source stays
+  durable even if a later one fails. Flat peak memory (one source's chunks at a time).
+* :meth:`plan` / :meth:`apply` — the **reviewable** path. :meth:`plan` determines what changed
+  and computes chunks for new/modified sources, returning a serializable
+  :class:`~ragdoc.pipeline.changeset.ChangeSet` without touching the store (safe to call
+  repeatedly). :meth:`apply` embeds the **whole corpus first** (store untouched if embedding
+  fails), then writes per source.
 
-:meth:`run` is simply ``apply(plan(...))``.
+:meth:`run` streams rather than buffering the corpus, so it is **not** ``apply(plan(...))``;
+use :meth:`plan` / :meth:`apply` when you need to review changes or want whole-corpus
+embed-first semantics.
 
 Provenance: each chunk carries ``source_id`` (from the ``DocumentPipeline``'s ``source_id_fn``)
 and ``source_hash`` (file-byte SHA-256, set here via ``hash_fn``).  ``chunk.metadata`` is never
@@ -65,6 +71,13 @@ class UpdateResult:
 class VectorStorePipeline(Generic[TMetadata]):
     """Incremental vector-store synchronisation via plan/apply.
 
+    In **Boundary-2 mode** (a ``document_store`` is given), the pipeline loads already
+    parsed-and-processed Documents from the store and only splits + chunks them. Processors and a
+    custom parser are therefore meaningless here and are **rejected at construction** (not
+    silently ignored): processing already happened at Boundary 1 (re-running it is destructive),
+    and the source is the store, not a file. In **direct mode** (no ``document_store``) every
+    stage runs and no such restriction applies.
+
     Args:
         pipeline: :class:`~ragdoc.pipeline.linear.DocumentPipeline` for parsing,
             processing, splitting, and chunking.  Its ``source_id_fn`` is the single source
@@ -91,6 +104,20 @@ class VectorStorePipeline(Generic[TMetadata]):
         hash_fn: Callable[[Path], str] = lambda p: _file_hash(p),
         concurrency: int | asyncio.Semaphore = 10,
     ) -> None:
+        if document_store is not None:
+            misplaced: list[str] = []
+            if pipeline.has_processors:
+                misplaced.append("processors (they ran once at Boundary 1; re-running is destructive)")
+            if pipeline.has_custom_parser:
+                misplaced.append("a custom parser (the source is the document_store, not a file)")
+            if misplaced:
+                raise ValueError(
+                    "A Boundary-2 VectorStorePipeline (document_store given) splits and chunks "
+                    "Documents loaded from the store; its DocumentPipeline must not carry "
+                    + " or ".join(misplaced)
+                    + ". Configure those on the DocumentStorePipeline (Boundary 1) instead."
+                )
+
         self._pipeline = pipeline
         self._vector_store = vector_store
         self._embedders = embedders or {}
@@ -144,10 +171,12 @@ class VectorStorePipeline(Generic[TMetadata]):
             raise ValueError("Direct mode (no document_store) requires `sources` paths.")
         return await self._plan_from_paths(sources, delete_orphans)  # type: ignore[arg-type]
 
-    async def _plan_from_paths(
-        self, sources: Iterable[Path], delete_orphans: bool
-    ) -> tuple[ChangeSet[Chunk], list[str], list[tuple[str, BaseException]]]:
-        # Build current map (source_id -> (path, file_hash)) and detect collisions up front.
+    def _build_current_map(self, sources: Iterable[Path]) -> dict[str, tuple[Path, str]]:
+        """Map ``source_id -> (path, file_hash)`` for *sources*, raising on id collisions.
+
+        Shared by :meth:`_plan_from_paths` and :meth:`_run_from_paths` so both use one identity
+        and collision implementation (single source of truth, no drift).
+        """
         current: dict[str, tuple[Path, str]] = {}
         collisions: dict[str, list[Path]] = {}
         for path in sources:
@@ -164,6 +193,12 @@ class VectorStorePipeline(Generic[TMetadata]):
                 + "\n".join(lines)
                 + "\nConsider a relative-path strategy: lambda p: str(p.relative_to(base_dir))"
             )
+        return current
+
+    async def _plan_from_paths(
+        self, sources: Iterable[Path], delete_orphans: bool
+    ) -> tuple[ChangeSet[Chunk], list[str], list[tuple[str, BaseException]]]:
+        current = self._build_current_map(sources)
 
         store_state = await self._vector_store.list_source_state()
         logger.info(f"plan(): {len(current)} sources, {len(store_state)} known in store")
@@ -341,7 +376,22 @@ class VectorStorePipeline(Generic[TMetadata]):
         sources: Iterable[Path] | Iterable[str] | None = None,
         delete_orphans: bool = False,
     ) -> UpdateResult:
-        """Convenience: ``apply(plan(sources, delete_orphans))`` with full reporting.
+        """Streaming, **per-source** sync (the standard path).
+
+        Produces the **same end result** as ``apply(plan(sources, delete_orphans))`` — same change
+        detection (skip/add/update/orphan) and the same final store contents. The difference is
+        *scheduling*, not outcome: ``apply(plan(...))`` chunks the whole corpus and embeds *all*
+        chunks before any write, whereas ``run()`` processes each source independently and writes
+        it as soon as it is ready (parse → chunk → embed → delete-then-upsert). ``run()`` is **not**
+        literally implemented as ``apply(plan(...))``, but it is equivalent up to the per-source vs
+        whole-corpus failure boundary described below.
+
+        **Per-source atomicity.** Each source is written delete-then-upsert, so an individual
+        source is never left half-replaced, and its embed runs *before* its write (an embed
+        failure leaves that one source untouched and records it in ``errors``). The **corpus** is
+        *not* all-or-nothing: a source that succeeds is durable in the store even if a later
+        source fails. Use ``apply(plan(...))`` when you need whole-corpus embed-first semantics
+        or a reviewable :class:`~ragdoc.pipeline.changeset.ChangeSet`.
 
         Args:
             sources: Paths (direct mode) or source_ids / ``None`` for all (from a
@@ -350,23 +400,130 @@ class VectorStorePipeline(Generic[TMetadata]):
                 corpus).
 
         Returns:
-            :class:`UpdateResult` including plan-time ``skipped`` and any plan/apply errors.
+            :class:`UpdateResult` (``skipped`` = unchanged sources, ``errors`` = per-source
+            parse/chunk/embed/write failures).
         """
         try:
-            changeset, skipped, plan_errors = await self._plan_internal(sources, delete_orphans)
-            result = await self.apply(changeset)
+            if self._document_store is not None:
+                result = await self._run_from_doc_store(sources, delete_orphans)  # type: ignore[arg-type]
+            elif sources is None:
+                raise ValueError("Direct mode (no document_store) requires `sources` paths.")
+            else:
+                result = await self._run_from_paths(sources, delete_orphans)  # type: ignore[arg-type]
         except BaseException:
-            # A fatal exception (e.g. asyncio.CancelledError) escaped plan/apply — collected
+            # A fatal exception (e.g. asyncio.CancelledError) escaped the run loop — collected
             # per-source errors do not reach here; this is the abort path.
             logger.error("Run failed before completion", exc_info=True)
             raise
-        result.skipped = skipped
-        result.errors = plan_errors + result.errors
         logger.info(
             f"run complete: {len(result.processed)} processed, {len(result.skipped)} skipped, "
             f"{len(result.deleted)} deleted, {len(result.errors)} errors"
         )
         return result
+
+    async def _sync_one(self, source_id: str, chunks: list[Chunk], *, is_update: bool) -> None:
+        """Embed *chunks* for one source, then write them (atomic per source).
+
+        Embed-first **per source**: embedding raises before any store mutation, so a failed embed
+        leaves this source untouched. ``is_update`` ⇒ delete the source's stale chunks before
+        upserting (atomic replace); a fresh source skips the delete.
+        """
+        await self._embed_chunks(chunks)
+        if is_update:
+            await self._vector_store.delete_by_source(source_id)
+        if chunks:
+            await self._vector_store.upsert(chunks)
+
+    async def _run_from_paths(self, sources: Iterable[Path], delete_orphans: bool) -> UpdateResult:
+        current = self._build_current_map(sources)
+        store_state = await self._vector_store.list_source_state()
+        logger.info(f"run(): {len(current)} sources, {len(store_state)} known in store")
+
+        result = UpdateResult()
+        sem = _resolve_semaphore(self._concurrency)
+
+        async def _process(sid: str, path: Path, file_hash: str) -> None:
+            async with sem:
+                try:
+                    existing = store_state.get(sid)
+                    if existing is not None and existing.source_hash == file_hash:
+                        result.skipped.append(sid)
+                        return
+                    chunks = await self._pipeline.run(path)
+                    for chunk in chunks:
+                        chunk.source_id = sid
+                        chunk.source_hash = file_hash
+                    await self._sync_one(sid, chunks, is_update=existing is not None)
+                    result.processed.append(sid)
+                except asyncio.CancelledError:
+                    raise
+                except BaseException as exc:
+                    logger.error(f"run() failed for {path.name}: {exc!r}", exc_info=True)
+                    result.errors.append((sid, exc))
+
+        await asyncio.gather(*[_process(sid, p, h) for sid, (p, h) in current.items()])
+
+        if delete_orphans:
+            await self._delete_orphans([sid for sid in store_state if sid not in current], result)
+        return result
+
+    async def _run_from_doc_store(self, source_ids: Iterable[str] | None, delete_orphans: bool) -> UpdateResult:
+        assert self._document_store is not None
+        doc_state = await self._document_store.list_source_state()
+        vec_state = await self._vector_store.list_source_state()
+        targets = list(source_ids) if source_ids is not None else list(doc_state.keys())
+        logger.info(f"run(): {len(targets)} doc-store sources, {len(vec_state)} in vec store")
+
+        result = UpdateResult()
+        sem = _resolve_semaphore(self._concurrency)
+
+        async def _process(sid: str) -> None:
+            async with sem:
+                try:
+                    doc_entry = doc_state.get(sid)
+                    if doc_entry is None:
+                        logger.warning(f"run(): source_id {sid!r} not in document store; skipping")
+                        return
+                    existing = vec_state.get(sid)
+                    # content_hash drives Boundary-2 detection; None stored ⇒ always changed.
+                    if (
+                        existing is not None
+                        and existing.content_hash is not None
+                        and existing.content_hash == doc_entry.content_hash
+                    ):
+                        result.skipped.append(sid)
+                        return
+                    doc = await self._document_store.get_document(sid)  # type: ignore[union-attr]
+                    if doc is None:
+                        return
+                    # Already processed at Boundary 1 — split/chunk only (see _plan_from_doc_store).
+                    chunks = await self._pipeline.chunk_document(doc)
+                    await self._sync_one(sid, chunks, is_update=existing is not None)
+                    result.processed.append(sid)
+                except asyncio.CancelledError:
+                    raise
+                except BaseException as exc:
+                    logger.error(f"run() failed for {sid}: {exc!r}", exc_info=True)
+                    result.errors.append((sid, exc))
+
+        await asyncio.gather(*[_process(sid) for sid in targets])
+
+        if delete_orphans:
+            # Orphans compared against the FULL document store (not the target subset).
+            await self._delete_orphans([sid for sid in vec_state if sid not in doc_state], result)
+        return result
+
+    async def _delete_orphans(self, orphan_ids: list[str], result: UpdateResult) -> None:
+        """Delete *orphan_ids* from the vector store, recording outcomes on *result*."""
+        for sid in orphan_ids:
+            try:
+                await self._vector_store.delete_by_source(sid)
+                result.deleted.append(sid)
+            except asyncio.CancelledError:
+                raise
+            except BaseException as exc:
+                logger.error(f"run(): delete orphan {sid} failed: {exc!r}", exc_info=True)
+                result.errors.append((sid, exc))
 
     async def _embed_chunks(self, chunks: list[Chunk]) -> None:
         """Populate ``chunk.named_embeddings`` for all configured embedders (in place)."""

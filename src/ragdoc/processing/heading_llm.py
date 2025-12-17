@@ -228,6 +228,14 @@ Guidelines:
     async def process(self, document: Document) -> Document:
         """Analyze all headings using LLM and update their levels."""
 
+        # Idempotency guard: a resolved title means this (or another title processor)
+        # already ran. Re-running re-detects a *different* "title" and re-strips the
+        # elements before it — the non-idempotency this guard prevents. Mirrors
+        # TitleDetectionProcessor.
+        if document.title:
+            logger.debug("LLMHeadingResolver: document already has a title, skipping")
+            return document
+
         # Collect heading information
         heading_infos = self._collect_heading_infos(document)
 

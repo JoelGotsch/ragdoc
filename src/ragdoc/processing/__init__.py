@@ -56,7 +56,14 @@ from ragdoc.processing.footnote import (
     find_footnote_candidates,
     score_footnote_candidates,
 )
-from ragdoc.processing.summary_base import ImageSummary
+from ragdoc.processing.summary_base import DocumentSummary, ImageSummary
+from ragdoc.processing.summary_document import (
+    SUMMARY_SYSTEM_PROMPT,
+    DocumentSummarizerProcessor,
+    DocumentSummarizerSettings,
+    build_summary_messages,
+    pack_summaries,
+)
 from ragdoc.processing.summary_image import (
     DEFAULT_TRANSFORMATIONS,
     ImageSummarizeFn,
@@ -67,10 +74,15 @@ from ragdoc.processing.summary_image import (
 
 __all__ = [
     "DEFAULT_TRANSFORMATIONS",
+    "SUMMARY_SYSTEM_PROMPT",
     # Document dump
     "DocumentDumpProcessor",
     # Base classes
     "DocumentProcessor",
+    # Document summary
+    "DocumentSummarizerProcessor",
+    "DocumentSummarizerSettings",
+    "DocumentSummary",
     # Filters
     "EmptyDocumentFilter",
     "FileNamer",
@@ -98,6 +110,7 @@ __all__ = [
     "TitleDetectionProcessor",
     "apply_ref_patches",
     "build_image_messages",
+    "build_summary_messages",
     "compute_size_to_level_mapping",
     "default_file_namer",
     # Standalone functions
@@ -107,4 +120,5 @@ __all__ = [
     "is_bold",
     "is_centered",
     "openai_image_summarizer",
+    "pack_summaries",
 ]

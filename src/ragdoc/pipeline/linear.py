@@ -133,6 +133,40 @@ class DocumentPipeline(Generic[TMetadata]):
         """
         return self._source_id_fn
 
+    # The following predicates let the sync pipelines validate that a DocumentPipeline carries
+    # only the stages meaningful at their boundary, and fail loudly (not silently) otherwise.
+    # See DocumentStorePipeline (Boundary 1) and VectorStorePipeline (Boundary 2).
+
+    @property
+    def has_splitter(self) -> bool:
+        """True if a splitter is configured (Boundary 1 forbids one — it stores whole Documents)."""
+        return self._splitter is not None
+
+    @property
+    def has_custom_chunker(self) -> bool:
+        """True if the chunker is not the default :class:`SimpleChunker` (Boundary 1 forbids one).
+
+        A default ``SimpleChunker`` (whether implicit or passed explicitly) can't be told apart
+        and is harmless — only a deliberately-configured chunker (e.g. ``LLMChunker``) signals a
+        misplaced Boundary-2 stage.
+        """
+        from ragdoc.chunking import SimpleChunker
+
+        return not isinstance(self._chunker, SimpleChunker)
+
+    @property
+    def has_processors(self) -> bool:
+        """True if any processor is configured (Boundary 2 forbids them — docs are pre-processed)."""
+        return len(self._processing_pipeline) > 0
+
+    @property
+    def has_custom_parser(self) -> bool:
+        """True if the parser is not the default :class:`AutoParser` (Boundary 2 forbids one —
+        its source is the document store, not a file)."""
+        from ragdoc.pipeline.parser import AutoParser
+
+        return not isinstance(self._parser, AutoParser)
+
     async def run(self, source: Path) -> list[Chunk[TMetadata]]:
         """Parse, process, split, and chunk a single file.
 
@@ -231,15 +265,8 @@ class DocumentPipeline(Generic[TMetadata]):
             logger.debug(f"Stream batch yielded: {len(batch)} chunks")
             yield batch
 
-    async def parse_and_process(self, source: Path) -> Document | None:
-        """Parse + process a file into a Document, **without** splitting or chunking.
-
-        Boundary-1 entry point for :class:`~ragdoc.pipeline.DocumentStorePipeline`, which
-        stores Documents (not chunks).  Returns ``None`` if a processor drops the document.
-        """
-        return await self._processing_pipeline.process(await self._parser(source))
-
-    async def _process_one(self, source: Path) -> list[Chunk[TMetadata]]:
+    async def _parse(self, source: Path) -> Document:
+        """Parse *source* and stamp ``source_id`` (pure, no I/O). Shared parse prefix."""
         logger.debug(f"Parsing {source.name}")
         doc = await self._parser(source)
         logger.debug(f"Parsed {source.name}: {len(doc.elements)} elements")
@@ -248,18 +275,43 @@ class DocumentPipeline(Generic[TMetadata]):
                 f"Parser did not set source_path on document from {source}. "
                 "Set doc.source_path in your parser function."
             )
-
-        # source_id is a pure function of the path (no I/O); set before chunking so it
-        # propagates onto every chunk. The file-byte source_hash is a sync concern and is
-        # stamped by the sync pipeline (VectorStorePipeline / DocumentStorePipeline).
+        # source_id is a pure function of the path; the file-byte source_hash is a sync
+        # concern stamped by the sync pipeline (VectorStorePipeline / DocumentStorePipeline).
         doc.source_id = self._source_id_fn(source)
+        return doc
+
+    async def parse_and_process(self, source: Path) -> Document | None:
+        """Parse + process a file into a Document, **without** splitting or chunking.
+
+        Boundary-1 entry point for :class:`~ragdoc.pipeline.DocumentStorePipeline`, which
+        stores Documents (not chunks).  Returns ``None`` if a processor drops the document.
+        """
+        return await self._processing_pipeline.process(await self._parse(source))
+
+    async def _process_one(self, source: Path) -> list[Chunk[TMetadata]]:
+        # Direct parse path: a freshly parsed document is not yet processed, so run the
+        # processor chain here before chunking. Documents read back from a DocumentStore are
+        # already processed (Boundary 1) and go straight to chunk_document, bypassing this.
+        doc = await self._processing_pipeline.process(await self._parse(source))
+        if doc is None:
+            logger.info("Document filtered out by processing pipeline")
+            return []
         return await self.chunk_document(doc)
 
     async def chunk_document(self, document: Document) -> list[Chunk[TMetadata]]:
-        """Process → split → chunk an already-parsed Document (skips parsing).
+        """Split → chunk an already parsed-and-processed Document (no parsing, no processing).
 
         Shared tail of :meth:`run` and the entry point for re-chunking a Document read
-        back from a :class:`~ragdoc.pipeline.stores.DocumentStore` (Mode 2).
+        back from a :class:`~ragdoc.pipeline.stores.DocumentStore` (Boundary 2 / Mode 2).
+
+        **Processing is the caller's responsibility, not this method's.** The processor chain
+        runs exactly once — at parse time on the direct path (:meth:`_process_one`) or at
+        Boundary 1 (:class:`~ragdoc.pipeline.document_store_pipeline.DocumentStorePipeline`). This
+        method deliberately never re-runs it: doing so on an already-processed document is both
+        wasteful and **destructive**, because non-idempotent processors corrupt it (e.g.
+        ``LLMHeadingResolver(remove_elements_before_title=True)`` re-detects a title and strips
+        most elements; ``FootnoteProcessor`` re-resolves already-anchored footnotes onto the
+        wrong numerals, inserting duplicate refs).
 
         Provenance is materialized **uniformly** here: ``content_hash`` is computed once
         from *document* and stamped on every chunk, and ``source_id`` / ``source_hash`` are
@@ -267,15 +319,12 @@ class DocumentPipeline(Generic[TMetadata]):
         ``content_hash`` (required for Boundary-2 change detection).
 
         Args:
-            document: A parsed (and optionally provenance-stamped) Document.
+            document: A parsed, processed, and (optionally) provenance-stamped Document.
 
         Returns:
-            List of chunks, or ``[]`` if the document is dropped by processing.
+            List of chunks (one or more per split, depending on the chunker).
         """
-        doc = await self._processing_pipeline.process(document)
-        if doc is None:
-            logger.info("Document filtered out by processing pipeline")
-            return []
+        doc = document
 
         if self._metadata_type is not None:
             required = self._metadata_type.__required_keys__ - {"filename"}
