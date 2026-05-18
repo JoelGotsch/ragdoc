@@ -117,6 +117,7 @@ class SpanType(str, Enum):
     INTERLINE_EQUATION = "interline_equation"
     IMAGE = "image"
     TABLE = "table"
+    CHART = "chart"
 
 
 class BlockType(str, Enum):
@@ -126,16 +127,20 @@ class BlockType(str, Enum):
     TITLE = "title"
     LIST = "list"
     CODE = "code"
-    # Level 1 block types (containers for table/image content)
+    # Level 1 block types (containers for table/image/chart content)
     IMAGE = "image"
     TABLE = "table"
-    # Level 2 block types (inside image/table containers)
+    CHART = "chart"
+    # Level 2 block types (inside image/table/chart containers)
     IMAGE_BODY = "image_body"
     IMAGE_CAPTION = "image_caption"
     IMAGE_FOOTNOTE = "image_footnote"
     TABLE_BODY = "table_body"
     TABLE_CAPTION = "table_caption"
     TABLE_FOOTNOTE = "table_footnote"
+    CHART_BODY = "chart_body"
+    CHART_CAPTION = "chart_caption"
+    CHART_FOOTNOTE = "chart_footnote"
     INTERLINE_EQUATION = "interline_equation"
     INDEX = "index"
 
@@ -234,8 +239,17 @@ class TableSpan(BaseModel):
     image_path: str = Field(default="", description="Path to the table image file")
 
 
+class ChartSpan(BaseModel):
+    """A chart span within a line — OCR'd chart data as markdown plus its image path."""
+
+    bbox: BBox
+    type: Literal["chart"] = "chart"
+    content: str = Field(default="", description="Markdown representation of the chart data")
+    image_path: str = Field(default="", description="Path to the rendered chart image file")
+
+
 Span = Annotated[
-    Union[TextSpan, InlineEquationSpan, InterlineEquationSpan, ImageSpan, TableSpan],
+    Union[TextSpan, InlineEquationSpan, InterlineEquationSpan, ImageSpan, TableSpan, ChartSpan],
     Field(discriminator="type"),
 ]
 
@@ -293,9 +307,14 @@ class TitleBlock(BaseBlock):
 
 
 class ListItemBlock(BaseBlock):
-    """An item within a list block (text block)."""
+    """An item within a list block.
 
-    type: Literal["text"] = "text"
+    MinerU v3.1+ tags some list items as ``ref_text`` (bibliography / reference
+    entries) instead of plain ``text``. Both shapes are otherwise identical, so
+    accept either discriminator value.
+    """
+
+    type: Literal["text", "ref_text"] = "text"
     lines: list[Line]
 
 
@@ -524,6 +543,104 @@ class TableBlock(BaseModel):
 
 
 # =============================================================================
+# Reference-text + Interline-equation top-level blocks
+#
+# MinerU v3.1+ emits these as top-level para_blocks (previously they appeared
+# only as list items / spans). Their shape mirrors TextBlock — a flat list of
+# lines — so we model them as such with their own type discriminator.
+# =============================================================================
+
+
+class RefTextBlock(BaseBlock):
+    """A bibliography / reference-style block at top level (mineru ``ref_text``)."""
+
+    type: Literal["ref_text"] = "ref_text"
+    lines: list[Line]
+
+
+class InterlineEquationBlock(BaseBlock):
+    """A standalone interline equation occupying its own paragraph block.
+
+    ``interline_equation`` also exists as a SpanType; this is the para_block
+    variant introduced in mineru v3.1+.
+    """
+
+    type: Literal["interline_equation"] = "interline_equation"
+    lines: list[Line]
+
+
+# =============================================================================
+# Chart Block Models (Level 1 with Level 2 inner blocks)
+#
+# MinerU v3.1+ emits `chart` blocks for figures whose visual content has been
+# OCR'd into a markdown table (bar charts, line plots, etc.). Structurally
+# identical to TableBlock — the inner span content is markdown — so we model
+# them as a parallel set of pydantic types and reuse the table handler.
+# =============================================================================
+
+
+class ChartBodyBlock(BaseModel):
+    """The body of a chart block containing the OCR'd chart data."""
+
+    bbox: BBox
+    lines: list[Line]
+    index: int
+    angle: BlockAngle = Field(default=BlockAngle.DEG_0)
+    type: Literal["chart_body"] = "chart_body"
+
+
+class ChartCaptionBlock(BaseModel):
+    """Caption for a chart block."""
+
+    bbox: BBox
+    lines: list[Line]
+    index: int
+    angle: BlockAngle = Field(default=BlockAngle.DEG_0)
+    type: Literal["chart_caption"] = "chart_caption"
+
+
+class ChartFootnoteBlock(BaseModel):
+    """Footnote for a chart block."""
+
+    bbox: BBox
+    lines: list[Line]
+    index: int
+    angle: BlockAngle = Field(default=BlockAngle.DEG_0)
+    type: Literal["chart_footnote"] = "chart_footnote"
+
+
+ChartInnerBlock = Annotated[
+    Union[ChartBodyBlock, ChartCaptionBlock, ChartFootnoteBlock],
+    Field(discriminator="type"),
+]
+
+
+class ChartBlock(BaseModel):
+    """A chart block (Level 1) containing chart body and optional caption/footnote."""
+
+    type: Literal["chart"] = "chart"
+    bbox: BBox
+    blocks: list[ChartInnerBlock] = Field(
+        description="Chart body and optional caption/footnote blocks"
+    )
+    index: int = Field(description="Block index within the page")
+
+    @property
+    def chart_body(self) -> ChartBodyBlock | None:
+        for block in self.blocks:
+            if isinstance(block, ChartBodyBlock):
+                return block
+        return None
+
+    @property
+    def chart_caption(self) -> ChartCaptionBlock | None:
+        for block in self.blocks:
+            if isinstance(block, ChartCaptionBlock):
+                return block
+        return None
+
+
+# =============================================================================
 # Discarded Block Model
 # =============================================================================
 
@@ -549,7 +666,17 @@ class DiscardedBlock(BaseBlock):
 # =============================================================================
 
 ParaBlock = Annotated[
-    Union[TextBlock, TitleBlock, ListBlock, CodeBlock, ImageBlock, TableBlock],
+    Union[
+        TextBlock,
+        TitleBlock,
+        ListBlock,
+        CodeBlock,
+        ImageBlock,
+        TableBlock,
+        ChartBlock,
+        RefTextBlock,
+        InterlineEquationBlock,
+    ],
     Field(discriminator="type"),
 ]
 

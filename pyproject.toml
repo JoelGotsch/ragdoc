@@ -2,13 +2,53 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# Keep the wheel slim: only the library source ships. Tests, fixtures, docs,
+# notebooks, designs, plans, scripts, devcontainer config, and editor configs
+# are not part of the pip release — they're for repo contributors only.
+[tool.hatch.build.targets.wheel]
+packages = ["src/ragdoc"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/tests",
+  "/docs",
+  "/designs",
+  "/plans",
+  "/backup",
+  "/scripts",
+  "/.devcontainer",
+  "/.vscode",
+  "/.github",
+  "/.skills",
+  "/.claude",
+  "/CHANGELOG.md",
+  "/TODO",
+]
+
+# Pin uv to public PyPI as the default index. This makes `uv sync` work in any
+# environment without relying on an internal mirror — the prior `uv.lock` was
+# generated against an internal artifactory host that's not reachable outside
+# the corporate network. PyTorch CPU wheels are pulled from a secondary index.
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv]
+index-strategy = "unsafe-best-match"
+
 [project]
 name = "ragdoc"
 version = "0.1.0"
 description = "A library to assist with chunking and preprocessing of documents for usage in LLM usecases."
 readme = "README.md"
 license = {text = "Proprietary"}
-requires-python= ">=3.10,<4"
+requires-python = ">=3.10,<3.13"
 authors = [
     { name = "Joel GOTSCH", email = "contact@joelgotsch.com" },
 ]
@@ -77,6 +117,27 @@ docs = [
     "mkdocs-autorefs>=1.4.4",
     "mike>=2.1.4",
     "marimo>=0.23.0",
+]
+# Dev-only group for regenerating parsing test fixtures via MinerU.
+#
+# We deliberately AVOID `mineru[all]` because it pulls `[gradio]`, whose
+# transitive cap on `aiofiles<25.0` conflicts with our base dep
+# `aiofiles>=25.1.0`. The web UI isn't needed for fixture regen anyway.
+#
+# Components installed:
+#   - [pipeline]: torch, torchvision, transformers, onnxruntime, shapely,
+#                 pyclipper, omegaconf, albumentations, ...  (used by the
+#                 hybrid_auto pipeline backend invoked by the script)
+#   - [vlm]:      torch, transformers, accelerate  (enables the VLM backend
+#                 in case you switch via `-b hybrid-auto-engine`)
+#   - [mlx]:      mlx, mlx-vlm  — Apple Silicon MPS acceleration for VLM;
+#                 gated to darwin since mlx is macOS-only.
+#
+# Activate with:  uv sync --group fixture_regen
+# Then run:       uv run python scripts/regenerate_test_fixtures.py
+fixture_regen = [
+    "mineru[pipeline,vlm]>=3.1,<4",
+    "mineru[mlx]>=3.1,<4; sys_platform == 'darwin'",
 ]
 
 

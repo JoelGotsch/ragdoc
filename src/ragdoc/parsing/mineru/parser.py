@@ -5,13 +5,16 @@ from pathlib import Path
 from .base import (
     AsyncCallNext,
     BaseMiddleware,
+    ChartBlock,
     CodeBlock,
     ImageBlock,
+    InterlineEquationBlock,
     ListBlock,
     MinerUMiddleDocument,
     ParserMiddleware,
     ParseContext,
     ParsedElement,
+    RefTextBlock,
     TableBlock,
     TextBlock,
     TitleBlock,
@@ -58,6 +61,17 @@ class CoreExtractionMiddleware(BaseMiddleware):
                     results = self.config.handle_image(block, page, context)
                 elif isinstance(block, TableBlock):
                     results = self.config.handle_table(block, page, context)
+                elif isinstance(block, ChartBlock):
+                    # Charts are structurally tables (OCR'd markdown); reuse
+                    # the table handler. A ChartBlock duck-types as TableBlock
+                    # since chart_body / chart_caption mirror the table API.
+                    results = self.config.handle_table(block, page, context)
+                elif isinstance(block, (RefTextBlock, InterlineEquationBlock)):
+                    # Top-level ref_text (bibliography entries) and
+                    # interline_equation blocks have the same shape as a
+                    # TextBlock — a flat list of lines — so reuse the text
+                    # handler. They become Paragraph elements in the Document.
+                    results = self.config.handle_text(block, page, context)
                 else:
                     results = []
                 context.elements.extend(results)

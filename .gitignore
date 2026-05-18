@@ -33,7 +33,6 @@ fabric.properties
 [Ll]ib
 [Ll]ib64
 [Ll]ocal
-[Ss]cripts
 pyvenv.cfg
 .venv
 pip-selfcheck.json
@@ -167,6 +166,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+# Devcontainer-local venv (set via UV_PROJECT_ENVIRONMENT in devcontainer.json
+# to avoid clobbering the host's .venv when the workspace is bind-mounted).
+.venv-devcontainer/
 
 # Spyder project settings
 .spyderproject
@@ -206,3 +208,10 @@ cython_debug/
 
 # lock files should not be committed for libraries
 *.lock
+.claude/
+docs/notebooks/document_model.py
+docs/notebooks/pipeline_walkthrough.py
+
+# regenerate_test_fixtures.py staging
+scripts/.fixture_pdfs/
+

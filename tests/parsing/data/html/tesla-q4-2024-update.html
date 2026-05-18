@@ -1,0 +1,7581 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>tesla-q4-2024-update</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<h1 id="q4-and-fy-2024-update">Q4 and FY 2024 Update</h1>
+<p>Highlights 03</p>
+<p>Financial Summary 04</p>
+<p>Operational Summary 07</p>
+<p>Vehicle Capacity 09</p>
+<p>Core Technology 10</p>
+<p>Other Highlights 11</p>
+<p>Outlook 12</p>
+<p>Photos &amp; Charts 13</p>
+<p>Key Metrics 26</p>
+<p>Financial Statements 28</p>
+<p>Additional Information 35</p>
+<h1 id="h-i-g-h-l-i-g-h-t-s">H I G H L I G H T S</h1>
+<h1 id="profitability">Profitability</h1>
+<p>$7.1B GAAP operating income in 2024; $1.6B in Q4</p>
+<p>$7.1B GAAP net income in 2024; $2.3B in Q4 incl. $0.6B mark-to-market
+gain on digital assets</p>
+<p>$8.4B non-GAAP net income1 in 2024; $2.6B in Q4</p>
+<h1 id="cash">Cash</h1>
+<p>Operating cash flow of $14.9B in 2024; $4.8B in Q4</p>
+<p>Free cash flow2 of $3.6B in 2024; $2.0B in Q4</p>
+<p>$7.5B increase in our cash and investments3 in 2024 to $36.6B</p>
+<h1 id="operations">Operations</h1>
+<p>Increased AI training compute by over 400% in 2024</p>
+<p>Over three billion miles driven cumulatively on FSD (Supervised)4 as
+of January</p>
+<p>Completed construction of Megafactory Shanghai</p>
+<h1 id="s-u-m-m-a-r-y">S U M M A R Y</h1>
+<p>Q4 was a record quarter for both vehicle deliveries and energy
+storage deployments. We expect Model Y to once again be the best-selling
+vehicle, of any kind, globally for the full year 2024, and we have made
+it even better, with the New Model Y now launched in all markets. In
+2024, we made significant investments in infrastructure that will spur
+the next wave of growth for the company, including vehicle manufacturing
+capabilities for new models, AI training compute and energy storage
+manufacturing capacity.</p>
+<p>Affordability remains top of mind for customers, and we continue to
+review every aspect of our cost of goods sold (COGS) per vehicle5 to
+help alleviate this concern. In Q4, COGS per vehicle reached its lowest
+level ever at &lt;$35,000, driven largely by raw material cost
+improvement, helping us to partially offset our investment in compelling
+financing and lease options.</p>
+<p>The Energy business achieved another record in Q4 with its
+highest-ever gross profit generation. Construction of Megafactory
+Shanghai was completed in December and will begin ramping this quarter.
+Powerwall deployments achieved another record quarter as we continue to
+ramp Powerwall 3 production and launch in additional markets.</p>
+<p>2025 will be a seminal year in Tesla’s history as FSD (Supervised)
+continues to rapidly improve with the aim of ultimately exceeding human
+levels of safety. This will eventually unlock an unsupervised FSD option
+for our customers and the Robotaxi business, which we expect to begin
+launching later this year in parts of the U.S. We also continue to work
+on launching FSD (Supervised) in Europe and China in 2025.</p>
+<p>F I N A N C I A L S U M M A R Y<br />
+(Unaudited)</p>
+<table>
+<tr>
+<td>
+($ in millions, except percentages and per share data)
+</td>
+<td>
+Q4-2023
+</td>
+<td>
+Q1-2024
+</td>
+<td>
+Q2-2024
+</td>
+<td>
+Q3-2024
+</td>
+<td>
+Q4-2024
+</td>
+<td>
+YoY
+</td>
+</tr>
+<tr>
+<td>
+Total automotive revenues
+</td>
+<td>
+21,563
+</td>
+<td>
+17,378
+</td>
+<td>
+19,878
+</td>
+<td>
+20,016
+</td>
+<td>
+19,798
+</td>
+<td>
+-8%
+</td>
+</tr>
+<tr>
+<td>
+Energy generation and storage revenue
+</td>
+<td>
+1,438
+</td>
+<td>
+1,635
+</td>
+<td>
+3,014
+</td>
+<td>
+2,376
+</td>
+<td>
+3,061
+</td>
+<td>
+113%
+</td>
+</tr>
+<tr>
+<td>
+Services and other revenue
+</td>
+<td>
+2,166
+</td>
+<td>
+2,288
+</td>
+<td>
+2,608
+</td>
+<td>
+2,790
+</td>
+<td>
+2,848
+</td>
+<td>
+31%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Total revenues
+</td>
+<td>
+25,167
+</td>
+<td>
+21,301
+</td>
+<td>
+25,500
+</td>
+<td>
+25,182
+</td>
+<td>
+25,707
+</td>
+<td>
+2%
+</td>
+</tr>
+<tr>
+<td>
+Total gross profit
+</td>
+<td>
+4,438
+</td>
+<td>
+3,696
+</td>
+<td>
+4,578
+</td>
+<td>
+4,997
+</td>
+<td>
+4,179
+</td>
+<td>
+-6%
+</td>
+</tr>
+<tr>
+<td>
+Total GAAP gross margin
+</td>
+<td>
+17.6%
+</td>
+<td>
+17.4%
+</td>
+<td>
+18.0%
+</td>
+<td>
+19.8%
+</td>
+<td>
+16.3%
+</td>
+<td>
+-138 bp
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Operating expenses
+</td>
+<td>
+2,374
+</td>
+<td>
+2,525
+</td>
+<td>
+2,973
+</td>
+<td>
+2,280
+</td>
+<td>
+2,596
+</td>
+<td>
+9%
+</td>
+</tr>
+<tr>
+<td>
+Income from operations
+</td>
+<td>
+2,064
+</td>
+<td>
+1,171
+</td>
+<td>
+1,605
+</td>
+<td>
+2,717
+</td>
+<td>
+1,583
+</td>
+<td>
+-23%
+</td>
+</tr>
+<tr>
+<td>
+Operating margin
+</td>
+<td>
+8.2%
+</td>
+<td>
+5.5%
+</td>
+<td>
+6.3%
+</td>
+<td>
+10.8%
+</td>
+<td>
+6.2%
+</td>
+<td>
+-204 bp
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Adjusted EBITDA
+</td>
+<td>
+3,953
+</td>
+<td>
+3,384
+</td>
+<td>
+3,674
+</td>
+<td>
+4,665
+</td>
+<td>
+4,922
+</td>
+<td>
+25%
+</td>
+</tr>
+<tr>
+<td>
+Adjusted EBITDA margin
+</td>
+<td>
+15.7%
+</td>
+<td>
+15.9%
+</td>
+<td>
+14.4%
+</td>
+<td>
+18.5%
+</td>
+<td>
+19.1%
+</td>
+<td>
+344 bp
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders (GAAP)
+</td>
+<td>
+7,928
+</td>
+<td>
+1,129
+</td>
+<td>
+1,478
+</td>
+<td>
+2,167
+</td>
+<td>
+2,317
+</td>
+<td>
+-71%
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders (non-GAAP)
+</td>
+<td>
+2,485
+</td>
+<td>
+1,536
+</td>
+<td>
+1,812
+</td>
+<td>
+2,505
+</td>
+<td>
+2,566
+</td>
+<td>
+3%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+EPS attributable to common stockholders, diluted (GAAP)
+</td>
+<td>
+2.27
+</td>
+<td>
+0.34
+</td>
+<td>
+0.42
+</td>
+<td>
+0.62
+</td>
+<td>
+0.66
+</td>
+<td>
+-71%
+</td>
+</tr>
+<tr>
+<td>
+EPS attributable to common stockholders, diluted (non-GAAP)
+</td>
+<td>
+0.71
+</td>
+<td>
+0.45
+</td>
+<td>
+0.52
+</td>
+<td>
+0.72
+</td>
+<td>
+0.73
+</td>
+<td>
+3%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Net cash provided by operating activities
+</td>
+<td>
+4,370
+</td>
+<td>
+242
+</td>
+<td>
+3,612
+</td>
+<td>
+6,255
+</td>
+<td>
+4,814
+</td>
+<td>
+10%
+</td>
+</tr>
+<tr>
+<td>
+Capital expenditures
+</td>
+<td>
+(2,306)
+</td>
+<td>
+(2,773)
+</td>
+<td>
+(2,270)
+</td>
+<td>
+(3,513)
+</td>
+<td>
+(2,783)
+</td>
+<td>
+21%
+</td>
+</tr>
+<tr>
+<td>
+Free cash flow
+</td>
+<td>
+2,064
+</td>
+<td>
+(2,531)
+</td>
+<td>
+1,342
+</td>
+<td>
+2,742
+</td>
+<td>
+2,031
+</td>
+<td>
+-2%
+</td>
+</tr>
+<tr>
+<td>
+Cash, cash equivalents and investments
+</td>
+<td>
+29,094
+</td>
+<td>
+26,863
+</td>
+<td>
+30,720
+</td>
+<td>
+33,648
+</td>
+<td>
+36,563
+</td>
+<td>
+26%
+</td>
+</tr>
+</table>
+<p>F I N A N C I A L S U M M A R Y<br />
+(Unaudited)</p>
+<table>
+<tr>
+<td>
+($ in millions, except percentages and per share data)
+</td>
+<td>
+2020
+</td>
+<td>
+2021
+</td>
+<td>
+2022
+</td>
+<td>
+2023
+</td>
+<td>
+2024
+</td>
+<td>
+YoY
+</td>
+</tr>
+<tr>
+<td>
+Total automotive revenues
+</td>
+<td>
+27,236
+</td>
+<td>
+47,232
+</td>
+<td>
+71,462
+</td>
+<td>
+82,419
+</td>
+<td>
+77,070
+</td>
+<td>
+-6%
+</td>
+</tr>
+<tr>
+<td>
+Energy generation and storage revenue
+</td>
+<td>
+1,994
+</td>
+<td>
+2,789
+</td>
+<td>
+3,909
+</td>
+<td>
+6,035
+</td>
+<td>
+10,086
+</td>
+<td>
+67%
+</td>
+</tr>
+<tr>
+<td>
+Services and other revenue
+</td>
+<td>
+2,306
+</td>
+<td>
+3,802
+</td>
+<td>
+6,091
+</td>
+<td>
+8,319
+</td>
+<td>
+10,534
+</td>
+<td>
+27%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Total revenues
+</td>
+<td>
+31,536
+</td>
+<td>
+53,823
+</td>
+<td>
+81,462
+</td>
+<td>
+96,773
+</td>
+<td>
+97,690
+</td>
+<td>
+1%
+</td>
+</tr>
+<tr>
+<td>
+Total gross profit
+</td>
+<td>
+6,630
+</td>
+<td>
+13,606
+</td>
+<td>
+20,853
+</td>
+<td>
+17,660
+</td>
+<td>
+17,450
+</td>
+<td>
+-1%
+</td>
+</tr>
+<tr>
+<td>
+Total GAAP gross margin
+</td>
+<td>
+21.0%
+</td>
+<td>
+25.3%
+</td>
+<td>
+25.6%
+</td>
+<td>
+18.2%
+</td>
+<td>
+17.9%
+</td>
+<td>
+-39 bp
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Operating expenses
+</td>
+<td>
+4,636
+</td>
+<td>
+7,083
+</td>
+<td>
+7,197
+</td>
+<td>
+8,769
+</td>
+<td>
+10,374
+</td>
+<td>
+18%
+</td>
+</tr>
+<tr>
+<td>
+Income from operations
+</td>
+<td>
+1,994
+</td>
+<td>
+6,523
+</td>
+<td>
+13,656
+</td>
+<td>
+8,891
+</td>
+<td>
+7,076
+</td>
+<td>
+-20%
+</td>
+</tr>
+<tr>
+<td>
+Operating margin
+</td>
+<td>
+6.3%
+</td>
+<td>
+12.1%
+</td>
+<td>
+16.8%
+</td>
+<td>
+9.2%
+</td>
+<td>
+7.2%
+</td>
+<td>
+-194 bp
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Adjusted EBITDA
+</td>
+<td>
+5,817
+</td>
+<td>
+11,621
+</td>
+<td>
+19,186
+</td>
+<td>
+16,631
+</td>
+<td>
+16,645
+</td>
+<td>
+0%
+</td>
+</tr>
+<tr>
+<td>
+Adjusted EBITDA margin
+</td>
+<td>
+18.4%
+</td>
+<td>
+21.6%
+</td>
+<td>
+23.6%
+</td>
+<td>
+17.2%
+</td>
+<td>
+17.0%
+</td>
+<td>
+-15 bp
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders (GAAP)
+</td>
+<td>
+721
+</td>
+<td>
+5,519
+</td>
+<td>
+12,556
+</td>
+<td>
+14,997
+</td>
+<td>
+7,091
+</td>
+<td>
+-53%
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders (non-GAAP)
+</td>
+<td>
+2,455
+</td>
+<td>
+7,640
+</td>
+<td>
+14,116
+</td>
+<td>
+10,882
+</td>
+<td>
+8,419
+</td>
+<td>
+-23%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+EPS attributable to common stockholders, diluted (GAAP)
+</td>
+<td>
+0.21
+</td>
+<td>
+1.63
+</td>
+<td>
+3.62
+</td>
+<td>
+4.30
+</td>
+<td>
+2.04
+</td>
+<td>
+-53%
+</td>
+</tr>
+<tr>
+<td>
+EPS attributable to common stockholders, diluted (non-GAAP)
+</td>
+<td>
+0.75
+</td>
+<td>
+2.26
+</td>
+<td>
+4.07
+</td>
+<td>
+3.12
+</td>
+<td>
+2.42
+</td>
+<td>
+-22%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Net cash provided by operating activities
+</td>
+<td>
+5,943
+</td>
+<td>
+11,497
+</td>
+<td>
+14,724
+</td>
+<td>
+13,256
+</td>
+<td>
+14,923
+</td>
+<td>
+13%
+</td>
+</tr>
+<tr>
+<td>
+Capital expenditures
+</td>
+<td>
+(3,157)
+</td>
+<td>
+(6,482)
+</td>
+<td>
+(7,158)
+</td>
+<td>
+(8,898)
+</td>
+<td>
+(11,339)
+</td>
+<td>
+27%
+</td>
+</tr>
+<tr>
+<td>
+Free cash flow
+</td>
+<td>
+2,786
+</td>
+<td>
+5,015
+</td>
+<td>
+7,566
+</td>
+<td>
+4,358
+</td>
+<td>
+3,584
+</td>
+<td>
+-18%
+</td>
+</tr>
+<tr>
+<td>
+Cash, cash equivalents and investments
+</td>
+<td>
+19,384
+</td>
+<td>
+17,707
+</td>
+<td>
+22,185
+</td>
+<td>
+29,094
+</td>
+<td>
+36,563
+</td>
+<td>
+26%
+</td>
+</tr>
+</table>
+<h1 id="revenue">Revenue</h1>
+<p>Total revenue increased 2% YoY in Q4 to $25.7B. YoY, revenue was
+impacted by the following items:</p>
+<ul>
+<li>growth in Energy Generation and Storage and Services and Other<br />
+</li>
+<li>growth in vehicle deliveries<br />
+</li>
+<li>higher regulatory credit revenue<br />
+</li>
+<li>reduced S3XY vehicle average selling price (ASP) (excl. FX impact1),
+due to pricing, attractive financing options and mix</li>
+</ul>
+<h1 id="profitability-1">Profitability</h1>
+<p>Our operating income decreased 23% YoY to $1.6B in Q4, resulting in a
+6.2% operating margin. YoY, operating income was primarily impacted by
+the following items:</p>
+<ul>
+<li>reduced S3XY vehicle ASP<br />
+</li>
+<li>increase in operating expenses driven by AI and other R&amp;D
+projects<br />
+</li>
+<li>growth in Energy Generation and Storage and Services and Other gross
+profit<br />
+</li>
+<li>lower cost per vehicle, including lower raw material costs partially
+offset by lower fixed cost absorption from production decrease YoY<br />
+</li>
+<li>higher regulatory credit revenue</li>
+</ul>
+<h1 id="cash-1">Cash</h1>
+<p>Quarter-end cash, cash equivalents and investments in Q4 was $36.6B.
+The sequential increase of $2.9B was primarily the result of positive
+free cash flow of $2.0B.</p>
+<p>O P E R A T I O N A L S U M M A R Y<br />
+(Unaudited)</p>
+<table>
+<tr>
+<td>
+</td>
+<td>
+Q4-2023
+</td>
+<td>
+Q1-2024
+</td>
+<td>
+Q2-2024
+</td>
+<td>
+Q3-2024
+</td>
+<td>
+Q4-2024
+</td>
+<td>
+YoY
+</td>
+</tr>
+<tr>
+<td>
+Model 3/Y production
+</td>
+<td>
+476,777
+</td>
+<td>
+412,376
+</td>
+<td>
+386,576
+</td>
+<td>
+443,668
+</td>
+<td>
+436,718
+</td>
+<td>
+-8%
+</td>
+</tr>
+<tr>
+<td>
+Other models production
+</td>
+<td>
+18,212
+</td>
+<td>
+20,995
+</td>
+<td>
+24,255
+</td>
+<td>
+26,128
+</td>
+<td>
+22,727
+</td>
+<td>
+25%
+</td>
+</tr>
+<tr>
+<td>
+Total production
+</td>
+<td>
+494,989
+</td>
+<td>
+433,371
+</td>
+<td>
+410,831
+</td>
+<td>
+469,796
+</td>
+<td>
+459,445
+</td>
+<td>
+-7%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Model 3/Y deliveries
+</td>
+<td>
+461,538
+</td>
+<td>
+369,783
+</td>
+<td>
+422,405
+</td>
+<td>
+439,975
+</td>
+<td>
+471,930
+</td>
+<td>
+2%
+</td>
+</tr>
+<tr>
+<td>
+Other models deliveries
+</td>
+<td>
+22,969
+</td>
+<td>
+17,027
+</td>
+<td>
+21,551
+</td>
+<td>
+22,915
+</td>
+<td>
+23,640
+</td>
+<td>
+3%
+</td>
+</tr>
+<tr>
+<td>
+Total deliveries
+</td>
+<td>
+484,507
+</td>
+<td>
+386,810
+</td>
+<td>
+443,956
+</td>
+<td>
+462,890
+</td>
+<td>
+495,570
+</td>
+<td>
+2%
+</td>
+</tr>
+<tr>
+<td>
+of which subject to operating lease accounting
+</td>
+<td>
+10,563
+</td>
+<td>
+8,365
+</td>
+<td>
+10,227
+</td>
+<td>
+14,449
+</td>
+<td>
+26,962
+</td>
+<td>
+155%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Total end of quarter operating lease vehicle count
+</td>
+<td>
+176,564
+</td>
+<td>
+173,131
+</td>
+<td>
+171,353
+</td>
+<td>
+168,867
+</td>
+<td>
+180,523
+</td>
+<td>
+2%
+</td>
+</tr>
+<tr>
+<td>
+Global vehicle inventory (days of supply)(1)
+</td>
+<td>
+15
+</td>
+<td>
+28
+</td>
+<td>
+18
+</td>
+<td>
+19
+</td>
+<td>
+12
+</td>
+<td>
+-20%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Storage deployed (GWh)
+</td>
+<td>
+3.2
+</td>
+<td>
+4.1
+</td>
+<td>
+9.4
+</td>
+<td>
+6.9
+</td>
+<td>
+11.0
+</td>
+<td>
+244%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Tesla locations
+</td>
+<td>
+1,208
+</td>
+<td>
+1,258
+</td>
+<td>
+1,286
+</td>
+<td>
+1,306
+</td>
+<td>
+1,359
+</td>
+<td>
+13%
+</td>
+</tr>
+<tr>
+<td>
+Mobile service fleet
+</td>
+<td>
+1,909
+</td>
+<td>
+1,897
+</td>
+<td>
+1,896
+</td>
+<td>
+1,933
+</td>
+<td>
+1,895
+</td>
+<td>
+-1%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Supercharger stations
+</td>
+<td>
+5,952
+</td>
+<td>
+6,249
+</td>
+<td>
+6,473
+</td>
+<td>
+6,706
+</td>
+<td>
+6,975
+</td>
+<td>
+17%
+</td>
+</tr>
+<tr>
+<td>
+Supercharger connectors
+</td>
+<td>
+54,892
+</td>
+<td>
+57,579
+</td>
+<td>
+59,596
+</td>
+<td>
+62,421
+</td>
+<td>
+65,495
+</td>
+<td>
+19%
+</td>
+</tr>
+</table>
+<p>O P E R A T I O N A L S U M M A R Y<br />
+(Unaudited)</p>
+<table>
+<tr>
+<td>
+</td>
+<td>
+2020
+</td>
+<td>
+2021
+</td>
+<td>
+2022
+</td>
+<td>
+2023
+</td>
+<td>
+2024
+</td>
+<td>
+YoY
+</td>
+</tr>
+<tr>
+<td>
+Model 3/Y production
+</td>
+<td>
+454,932
+</td>
+<td>
+906,032
+</td>
+<td>
+1,298,434
+</td>
+<td>
+1,775,159
+</td>
+<td>
+1,679,338
+</td>
+<td>
+-5%
+</td>
+</tr>
+<tr>
+<td>
+Other models production
+</td>
+<td>
+54,805
+</td>
+<td>
+24,390
+</td>
+<td>
+71,177
+</td>
+<td>
+70,826
+</td>
+<td>
+94,105
+</td>
+<td>
+33%
+</td>
+</tr>
+<tr>
+<td>
+Total production
+</td>
+<td>
+509,737
+</td>
+<td>
+930,422
+</td>
+<td>
+1,369,611
+</td>
+<td>
+1,845,985
+</td>
+<td>
+1,773,443
+</td>
+<td>
+-4%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Model 3/Y deliveries
+</td>
+<td>
+442,562
+</td>
+<td>
+911,242
+</td>
+<td>
+1,247,146
+</td>
+<td>
+1,739,707
+</td>
+<td>
+1,704,093
+</td>
+<td>
+-2%
+</td>
+</tr>
+<tr>
+<td>
+Other models deliveries
+</td>
+<td>
+57,085
+</td>
+<td>
+24,980
+</td>
+<td>
+66,705
+</td>
+<td>
+68,874
+</td>
+<td>
+85,133
+</td>
+<td>
+24%
+</td>
+</tr>
+<tr>
+<td>
+Total deliveries
+</td>
+<td>
+499,647
+</td>
+<td>
+936,222
+</td>
+<td>
+1,313,851
+</td>
+<td>
+1,808,581
+</td>
+<td>
+1,789,226
+</td>
+<td>
+-1%
+</td>
+</tr>
+<tr>
+<td>
+of which subject to operating lease accounting
+</td>
+<td>
+34,470
+</td>
+<td>
+60,912
+</td>
+<td>
+47,582
+</td>
+<td>
+72,226
+</td>
+<td>
+60,003
+</td>
+<td>
+-17%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Total end of quarter operating lease vehicle count
+</td>
+<td>
+72,089
+</td>
+<td>
+120,342
+</td>
+<td>
+140,667
+</td>
+<td>
+176,564
+</td>
+<td>
+180,523
+</td>
+<td>
+2%
+</td>
+</tr>
+<tr>
+<td>
+Global vehicle inventory (days of supply)(1)
+</td>
+<td>
+15
+</td>
+<td>
+6
+</td>
+<td>
+16
+</td>
+<td>
+16
+</td>
+<td>
+13
+</td>
+<td>
+-19%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Storage deployed (GWh)
+</td>
+<td>
+3.0
+</td>
+<td>
+4.0
+</td>
+<td>
+6.5
+</td>
+<td>
+14.7
+</td>
+<td>
+31.4
+</td>
+<td>
+114%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Tesla locations
+</td>
+<td>
+523
+</td>
+<td>
+644
+</td>
+<td>
+963
+</td>
+<td>
+1,208
+</td>
+<td>
+1,359
+</td>
+<td>
+13%
+</td>
+</tr>
+<tr>
+<td>
+Mobile service fleet
+</td>
+<td>
+894
+</td>
+<td>
+1,281
+</td>
+<td>
+1,584
+</td>
+<td>
+1,909
+</td>
+<td>
+1,895
+</td>
+<td>
+-1%
+</td>
+</tr>
+<tr>
+<td colspan="7">
+</td>
+</tr>
+<tr>
+<td>
+Supercharger stations
+</td>
+<td>
+2,564
+</td>
+<td>
+3,476
+</td>
+<td>
+4,678
+</td>
+<td>
+5,952
+</td>
+<td>
+6,975
+</td>
+<td>
+17%
+</td>
+</tr>
+<tr>
+<td>
+Supercharger connectors
+</td>
+<td>
+23,277
+</td>
+<td>
+31,498
+</td>
+<td>
+42,419
+</td>
+<td>
+54,892
+</td>
+<td>
+65,495
+</td>
+<td>
+19%
+</td>
+</tr>
+</table>
+<p>Preparations are underway across our existing factories for the
+launch of new products in 2025, including more affordable models. New
+Model Y has launched on the configurator globally with production ramp
+and deliveries beginning later in Q1.</p>
+<h1 id="us-california-nevada-and-texas">US: California, Nevada and
+Texas</h1>
+<p>Semi Factory construction continued in Q4 and recently completed roof
+and wall enclosure of the main building area. First truck builds are
+scheduled to start by end of 2025 with ramp beginning in early 2026.
+Preparation is underway for Cybercab lines at Gigafactory Texas with
+volume production planned for 2026.</p>
+<p>Given its unique functionality – including Powershare, stainless
+steel exterior, enhanced durability and bioweapon defense mode – we
+deployed a fleet of Cybertrucks equipped with Starlink in the Los
+Angeles area to help first responders and those impacted by the fires
+get access to electricity and Wi-Fi. We expect Cybertruck to be eligible
+for the IRA consumer tax credit, helping to improve affordability and
+access for even more customers.</p>
+<h1 id="apac-shanghai">APAC: Shanghai</h1>
+<p>In Q4, we achieved record deliveries in China as Model Y became the
+best-selling vehicle for the full year. Tesla also became the fastest
+growing brand in South Korea, and we launched vehicle sales in the
+Philippines.</p>
+<h1 id="europe-berlin-brandenburg">Europe: Berlin-Brandenburg</h1>
+<p>In 2024, Model Y was the best-selling vehicle of any type in Denmark,
+Norway, Sweden, Switzerland and the Netherlands and we expect Model Y to
+have been the second best-selling vehicle of any type in Europe. Tesla
+was the most sold brand in Norway for the fourth year in a row with
+Model Y and Model 3 the best- and second-best selling cars of any type
+in 2024.</p>
+<p>Current Installed Annual Vehicle Capacity</p>
+<table>
+<tr>
+<td>
+Region
+</td>
+<td>
+Model
+</td>
+<td>
+Capacity
+</td>
+<td>
+Status
+</td>
+</tr>
+<tr>
+<td>
+California
+</td>
+<td>
+Model S / Model X
+</td>
+<td>
+100,000
+</td>
+<td>
+Production
+</td>
+</tr>
+<tr>
+<td>
+</td>
+<td>
+Model 3 / Model Y
+</td>
+<td>
+&gt;550,000
+</td>
+<td>
+Production
+</td>
+</tr>
+<tr>
+<td>
+Shanghai
+</td>
+<td>
+Model 3 / Model Y
+</td>
+<td>
+&gt;950,000
+</td>
+<td>
+Production
+</td>
+</tr>
+<tr>
+<td>
+Berlin
+</td>
+<td>
+Model Y
+</td>
+<td>
+&gt;375,000
+</td>
+<td>
+Production
+</td>
+</tr>
+<tr>
+<td>
+Texas
+</td>
+<td>
+Model Y
+</td>
+<td>
+&gt;250,000
+</td>
+<td>
+Production
+</td>
+</tr>
+<tr>
+<td>
+</td>
+<td>
+Cybertruck
+</td>
+<td>
+&gt;125,000
+</td>
+<td>
+Production
+</td>
+</tr>
+<tr>
+<td>
+</td>
+<td>
+Cybercab
+</td>
+<td>
+-
+</td>
+<td>
+In development
+</td>
+</tr>
+<tr>
+<td>
+Nevada
+</td>
+<td>
+Tesla Semi
+</td>
+<td>
+-
+</td>
+<td>
+Pilot production
+</td>
+</tr>
+<tr>
+<td>
+TBD
+</td>
+<td>
+Roadster
+</td>
+<td>
+-
+</td>
+<td>
+In development
+</td>
+</tr>
+</table>
+<p>Installed capacity ≠ current production rate and there may be
+limitations discovered as production rates approach capacity. Production
+rates depend on a variety of factors, including equipment uptime,
+component supply, downtime related to factory upgrades, regulatory
+considerations and other factors.</p>
+<p><img
+src="images/0ba61c4896162fc403153e35d9b41a38648ab1c053d2e641dd84a97701c1ebd1.jpg" /></p>
+<details>
+<summary>
+line
+</summary>
+<table>
+<thead>
+<tr>
+<th>Quarter</th>
+<th>US/Canada</th>
+<th>Europe</th>
+<th>China</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q1 2019</td>
+<td>1.0%</td>
+<td>0.3%</td>
+<td>0.1%</td>
+</tr>
+<tr>
+<td>Q2 2019</td>
+<td>1.2%</td>
+<td>0.4%</td>
+<td>0.2%</td>
+</tr>
+<tr>
+<td>Q3 2019</td>
+<td>1.1%</td>
+<td>0.5%</td>
+<td>0.3%</td>
+</tr>
+<tr>
+<td>Q4 2019</td>
+<td>1.0%</td>
+<td>0.6%</td>
+<td>0.4%</td>
+</tr>
+<tr>
+<td>Q1 2020</td>
+<td>1.1%</td>
+<td>0.7%</td>
+<td>0.5%</td>
+</tr>
+<tr>
+<td>Q2 2020</td>
+<td>1.1%</td>
+<td>0.8%</td>
+<td>0.6%</td>
+</tr>
+<tr>
+<td>Q3 2020</td>
+<td>1.2%</td>
+<td>0.8%</td>
+<td>0.7%</td>
+</tr>
+<tr>
+<td>Q4 2020</td>
+<td>1.3%</td>
+<td>0.8%</td>
+<td>0.8%</td>
+</tr>
+<tr>
+<td>Q1 2021</td>
+<td>1.5%</td>
+<td>0.9%</td>
+<td>0.9%</td>
+</tr>
+<tr>
+<td>Q2 2021</td>
+<td>1.6%</td>
+<td>0.9%</td>
+<td>1.0%</td>
+</tr>
+<tr>
+<td>Q3 2021</td>
+<td>1.8%</td>
+<td>1.0%</td>
+<td>1.1%</td>
+</tr>
+<tr>
+<td>Q4 2021</td>
+<td>2.0%</td>
+<td>1.2%</td>
+<td>1.3%</td>
+</tr>
+<tr>
+<td>Q1 2022</td>
+<td>2.5%</td>
+<td>1.7%</td>
+<td>1.6%</td>
+</tr>
+<tr>
+<td>Q2 2022</td>
+<td>3.0%</td>
+<td>1.7%</td>
+<td>1.7%</td>
+</tr>
+<tr>
+<td>Q3 2022</td>
+<td>3.2%</td>
+<td>1.8%</td>
+<td>1.8%</td>
+</tr>
+<tr>
+<td>Q4 2022</td>
+<td>3.5%</td>
+<td>2.0%</td>
+<td>1.9%</td>
+</tr>
+<tr>
+<td>Q1 2023</td>
+<td>3.7%</td>
+<td>2.2%</td>
+<td>2.0%</td>
+</tr>
+<tr>
+<td>Q2 2023</td>
+<td>3.8%</td>
+<td>2.6%</td>
+<td>2.1%</td>
+</tr>
+<tr>
+<td>Q3 2023</td>
+<td>3.9%</td>
+<td>2.8%</td>
+<td>2.2%</td>
+</tr>
+<tr>
+<td>Q4 2023</td>
+<td>4.0%</td>
+<td>2.8%</td>
+<td>2.3%</td>
+</tr>
+<tr>
+<td>Q1 2024</td>
+<td>3.8%</td>
+<td>2.7%</td>
+<td>2.2%</td>
+</tr>
+<tr>
+<td>Q2 2024</td>
+<td>3.8%</td>
+<td>2.6%</td>
+<td>2.2%</td>
+</tr>
+<tr>
+<td>Q3 2024</td>
+<td>3.8%</td>
+<td>2.5%</td>
+<td>2.3%</td>
+</tr>
+<tr>
+<td>Q4 2024</td>
+<td>3.7%</td>
+<td>2.5%</td>
+<td>2.4%</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p>Source: Tesla estimates based on latest available data from ACEA;
+Autonews.com; CAAM – light-duty vehicles<br />
+only; TTM = Trailing twelve months</p>
+<h1 id="artificial-intelligence-software-and-hardware">Artificial
+Intelligence Software and Hardware</h1>
+<p>In Q4, we completed the deployment of Cortex, a ~50k H100 training
+cluster at Gigafactory Texas. Cortex helped enable V13 of FSD
+(Supervised)1, which boasts major improvements in safety and comfort
+thanks to 4.2x increase in data, higher resolution video inputs, 2x
+reduction in photon-to-control latency and redesigned controller, among
+other enhancements. FSD (Supervised) can now start from park and perform
+unpark, reverse and park capabilities. In Q4, Tesla vehicles using
+Autopilot technology drove 5.94 million miles between accidents2 – the
+best Q4 ever – compared to the U.S. average of .70 million miles.
+Progress on Optimus hardware and software continued in Q4, including the
+latest generation hand, robust locomotion and training on additional
+tasks, ahead of planned pilot production in 2025.</p>
+<h1 id="vehicle-and-other-software">Vehicle and Other Software</h1>
+<p>The holiday release included Apple Watch support - customers can pair
+their watch as a key to unlock and lock their vehicle without ever
+pressing a button just like the phone key. With a Premium Connectivity
+subscription, Dashcam and Sentry Mode clips can be viewed and downloaded
+directly from the Tesla mobile app. An animated three-hour precipitation
+forecast can be viewed on the map, and SiriusXM is now available to our
+full lineup with launch as a native app for Model 3, Model Y and
+Cybertruck.</p>
+<h1 id="battery-powertrain-and-manufacturing">Battery, Powertrain and
+Manufacturing</h1>
+<p>We processed our first spodumene (lithium-containing concentrate)
+through the front-end of the lithium refinery only 18 months after
+ground-breaking: much faster than any plant we know of outside of Asia.
+The intermediate material was on-spec, and we are on track to commission
+the plant in 2025. Our in-house 4680 cell hit a production rate
+exceeding 2.5k Cybertrucks/week.</p>
+<p><img
+src="images/683969fb6a16bba3381dc84daf84de57dd0ebbba0ca8bed25e88d481e723eb7f.jpg" /></p>
+<details>
+<summary>
+bar_stacked
+</summary>
+<table>
+<colgroup>
+<col style="width: 15%" />
+<col style="width: 42%" />
+<col style="width: 42%" />
+</colgroup>
+<thead>
+<tr>
+<th>Date</th>
+<th>FSD Miles on V12 and Beyond</th>
+<th>FSD Miles on V11 and Before</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dec-2024</td>
+<td>2.8</td>
+<td>0.9</td>
+</tr>
+<tr>
+<td>Mar-2024</td>
+<td>0.9</td>
+<td>0.9</td>
+</tr>
+<tr>
+<td>Jun-2024</td>
+<td>1.4</td>
+<td>0.9</td>
+</tr>
+<tr>
+<td>Sep-2024</td>
+<td>2.1</td>
+<td>0.9</td>
+</tr>
+<tr>
+<td>Dec-2024</td>
+<td>2.9</td>
+<td>0.9</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p>Cumulative miles driven with FSD (Supervised) (billions)</p>
+<p><img
+src="images/c8ca234ee0b6ae68deda4cf854674708cb7f711534ea5fc9d24f288e34bb07f5.jpg" /></p>
+<details>
+<summary>
+line
+</summary>
+<table>
+<colgroup>
+<col style="width: 9%" />
+<col style="width: 39%" />
+<col style="width: 43%" />
+<col style="width: 7%" />
+</colgroup>
+<thead>
+<tr>
+<th>Quarter</th>
+<th>Tesla vehicles using Autopilot technology</th>
+<th>Tesla vehicles not using Autopilot technology</th>
+<th>U.S. avg</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q4 2019</td>
+<td>3.1</td>
+<td>1.5</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>Q4 2020</td>
+<td>3.8</td>
+<td>1.3</td>
+<td>0.6</td>
+</tr>
+<tr>
+<td>Q4 2021</td>
+<td>4.4</td>
+<td>1.5</td>
+<td>0.7</td>
+</tr>
+<tr>
+<td>Q4 2022</td>
+<td>4.9</td>
+<td>1.4</td>
+<td>0.7</td>
+</tr>
+<tr>
+<td>Q4 2023</td>
+<td>5.4</td>
+<td>1.0</td>
+<td>0.7</td>
+</tr>
+<tr>
+<td>Q4 2024</td>
+<td>6.0</td>
+<td>1.1</td>
+<td>0.7</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p>Million miles driven before an accident occurs<br />
+(1) Active driver supervision required; does not make the vehicle
+autonomous<br />
+(2) For more information, see our Vehicle Safety Report</p>
+<p>Our Energy business continued to grow rapidly in 2024 as we expand
+capacity for both Megapack and Powerwall to meet demand. Services and
+Other – a collection of businesses that support new vehicle sales –
+achieved its third year in a row of profitability in 2024.</p>
+<h1 id="energy-generation-and-storage">Energy Generation and
+Storage</h1>
+<p>The Energy business achieved record deployments for both Powerwall
+and Megapack at a combined 11.0 GWh, resulting in a record gross profit
+in Q4. Material and other costs continued to come down in Q4 at the
+Lathrop Megafactory. Both Powerwall and Megapack continue to be supply
+constrained as we open new markets and demand for energy storage
+products continues to grow. With construction completed, Shanghai
+Megafactory will begin ramping in Q1.</p>
+<h1 id="services-and-other">Services and Other</h1>
+<p>In Q4, we added over 3k Supercharger stalls to the network and
+delivered 1.4 TWh of energy. We unveiled our V4 cabinet, which supports
+400V-1,000V vehicle architectures, charges up to 500kW for passenger
+vehicles and 1.2MW for Tesla Semi and has cutting-edge power electronics
+with 3x the power density. We launched Battery Heating at Superchargers,
+a feature that gets vehicles with LFP battery packs back on the road up
+to 4x faster. We also continued to welcome more OEMs to the North
+American Supercharger network, including the first NACS native vehicles.
+Overall, in 2024, we launched Superchargers in three new countries,
+added over 10k new Supercharger stalls, and grew the network by 19%
+year-over-year, for a total of 65k+ Superchargers worldwide. We
+delivered 5.2+ TWh, offsetting over 5.5 billion kg of direct CO2
+emissions and 2.4 billion liters of gasoline.</p>
+<p><img
+src="images/9b8e27d49cffe52f739491907d349bd4099b34682da0144b3ccfa87e277669e2.jpg" /></p>
+<details>
+<summary>
+bar
+</summary>
+<table>
+<thead>
+<tr>
+<th>Quarter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q1 2018</td>
+<td>-50</td>
+</tr>
+<tr>
+<td>Q2 2018</td>
+<td>-50</td>
+</tr>
+<tr>
+<td>Q3 2018</td>
+<td>-50</td>
+</tr>
+<tr>
+<td>Q4 2018</td>
+<td>-75</td>
+</tr>
+<tr>
+<td>Q1 2019</td>
+<td>-180</td>
+</tr>
+<tr>
+<td>Q2 2019</td>
+<td>-75</td>
+</tr>
+<tr>
+<td>Q3 2019</td>
+<td>-25</td>
+</tr>
+<tr>
+<td>Q4 2019</td>
+<td>-25</td>
+</tr>
+<tr>
+<td>Q1 2020</td>
+<td>-50</td>
+</tr>
+<tr>
+<td>Q2 2020</td>
+<td>-50</td>
+</tr>
+<tr>
+<td>Q3 2020</td>
+<td>-25</td>
+</tr>
+<tr>
+<td>Q4 2020</td>
+<td>-180</td>
+</tr>
+<tr>
+<td>Q1 2021</td>
+<td>-180</td>
+</tr>
+<tr>
+<td>Q2 2021</td>
+<td>-25</td>
+</tr>
+<tr>
+<td>Q3 2021</td>
+<td>-25</td>
+</tr>
+<tr>
+<td>Q4 2021</td>
+<td>-25</td>
+</tr>
+<tr>
+<td>Q1 2022</td>
+<td>-75</td>
+</tr>
+<tr>
+<td>Q2 2022</td>
+<td>150</td>
+</tr>
+<tr>
+<td>Q3 2022</td>
+<td>175</td>
+</tr>
+<tr>
+<td>Q4 2022</td>
+<td>250</td>
+</tr>
+<tr>
+<td>Q1 2023</td>
+<td>300</td>
+</tr>
+<tr>
+<td>Q2 2023</td>
+<td>450</td>
+</tr>
+<tr>
+<td>Q3 2023</td>
+<td>510</td>
+</tr>
+<tr>
+<td>Q4 2023</td>
+<td>380</td>
+</tr>
+<tr>
+<td>Q1 2024</td>
+<td>480</td>
+</tr>
+<tr>
+<td>Q2 2024</td>
+<td>900</td>
+</tr>
+<tr>
+<td>Q3 2024</td>
+<td>980</td>
+</tr>
+<tr>
+<td>Q4 2024</td>
+<td>900</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p>Energy and Services and Other gross profit ($M)</p>
+<p><img
+src="images/937a6275ad3727c5a1113de7d587282bc4e00d3949de6ad132c251e377134e65.jpg" /></p>
+<details>
+<summary>
+bar
+</summary>
+<table>
+<thead>
+<tr>
+<th>Quarter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q1 2018</td>
+<td>0.3</td>
+</tr>
+<tr>
+<td>Q2 2018</td>
+<td>0.1</td>
+</tr>
+<tr>
+<td>Q3 2018</td>
+<td>0.2</td>
+</tr>
+<tr>
+<td>Q4 2018</td>
+<td>0.15</td>
+</tr>
+<tr>
+<td>Q1 2019</td>
+<td>0.15</td>
+</tr>
+<tr>
+<td>Q2 2019</td>
+<td>0.2</td>
+</tr>
+<tr>
+<td>Q3 2019</td>
+<td>0.35</td>
+</tr>
+<tr>
+<td>Q4 2019</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td>Q1 2020</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>Q2 2020</td>
+<td>0.2</td>
+</tr>
+<tr>
+<td>Q3 2020</td>
+<td>0.35</td>
+</tr>
+<tr>
+<td>Q4 2020</td>
+<td>0.7</td>
+</tr>
+<tr>
+<td>Q1 2021</td>
+<td>1.6</td>
+</tr>
+<tr>
+<td>Q2 2021</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td>Q3 2021</td>
+<td>1.25</td>
+</tr>
+<tr>
+<td>Q4 2021</td>
+<td>1.25</td>
+</tr>
+<tr>
+<td>Q1 2022</td>
+<td>0.95</td>
+</tr>
+<tr>
+<td>Q2 2022</td>
+<td>0.8</td>
+</tr>
+<tr>
+<td>Q3 2022</td>
+<td>1.1</td>
+</tr>
+<tr>
+<td>Q4 2022</td>
+<td>2.1</td>
+</tr>
+<tr>
+<td>Q1 2023</td>
+<td>2.45</td>
+</tr>
+<tr>
+<td>Q2 2023</td>
+<td>3.9</td>
+</tr>
+<tr>
+<td>Q3 2023</td>
+<td>3.65</td>
+</tr>
+<tr>
+<td>Q4 2023</td>
+<td>4.0</td>
+</tr>
+<tr>
+<td>Q1 2024</td>
+<td>3.2</td>
+</tr>
+<tr>
+<td>Q2 2024</td>
+<td>4.05</td>
+</tr>
+<tr>
+<td>Q3 2024</td>
+<td>9.4</td>
+</tr>
+<tr>
+<td>Q4 2024</td>
+<td>7.0</td>
+</tr>
+<tr>
+<td>Q1 2025</td>
+<td>11.0</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p>Energy Storage deployments (GWh)</p>
+<h1 id="o-u-t-l-o-o-k">O U T L O O K</h1>
+<h1 id="volume">Volume</h1>
+<p>With the advancements in vehicle autonomy and the introduction of new
+products, we expect the vehicle business to return to growth in 2025.
+The rate of growth will depend on a variety of factors, including the
+rate of acceleration of our autonomy efforts, production ramp at our
+factories and the broader macroeconomic environment. We expect energy
+storage deployments to grow at least 50% year-over-year in 2025.</p>
+<h1 id="cash-2">Cash</h1>
+<p>We have sufficient liquidity to fund our product roadmap, long-term
+capacity expansion plans and other expenses. Furthermore, we will manage
+the business such that we maintain a strong balance sheet during this
+uncertain period.</p>
+<h1 id="profit">Profit</h1>
+<p>While we continue to execute on innovations to reduce the cost of
+manufacturing and operations, over time, we expect our hardwarerelated
+profits to be accompanied by an acceleration of AI, software and
+fleet-based profits.</p>
+<h1 id="product">Product</h1>
+<p>Plans for new vehicles, including more affordable models, remain on
+track for start of production in the first half of 2025. These vehicles
+will utilize aspects of the next generation platform as well as aspects
+of our current platforms and will be produced on the same manufacturing
+lines as our current vehicle line-up.</p>
+<p>This approach will result in achieving less cost reduction than
+previously expected but enables us to prudently grow our vehicle volumes
+in a more capex efficient manner during uncertain times. This should
+help us fully utilize our current expected maximum capacity of close to
+three million vehicles, enabling more than 60% growth over 2024
+production before investing in new manufacturing lines.</p>
+<p>Our purpose-built Robotaxi product – Cybercab – will continue to
+pursue a revolutionary “unboxed” manufacturing strategy and is scheduled
+for volume production starting in 2026.</p>
+<p>P H O T O S &amp; C H A R T S</p>
+<p>A V E R A G E C O G S P E R V E H I C L E * A C H I E V E D A N A L L
+– T I M E L O W I N Q 4 2 0 2 4<br />
+<img
+src="images/58dde0be450931fa83f269607052367ecc5c012f3386828f13a9c4311deb3919.jpg" /></p>
+<details>
+<summary>
+bar
+</summary>
+<table>
+<thead>
+<tr>
+<th>Quarter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Q1 2023</td>
+<td>$38,500</td>
+</tr>
+<tr>
+<td>Q2 2023</td>
+<td>$37,900</td>
+</tr>
+<tr>
+<td>Q3 2023</td>
+<td>$37,500</td>
+</tr>
+<tr>
+<td>Q4 2023</td>
+<td>$36,300</td>
+</tr>
+<tr>
+<td>Q1 2024</td>
+<td>$36,700</td>
+</tr>
+<tr>
+<td>Q2 2024</td>
+<td>$36,800</td>
+</tr>
+<tr>
+<td>Q3 2024</td>
+<td>$35,100</td>
+</tr>
+<tr>
+<td>Q4 2024</td>
+<td>$34,600</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p>C Y B E R T R U C K - A D V A N C E M E N T S I N V E H I C L E T E C
+H N O L O G Y A N D A R C H I T E C T U R E</p>
+<table>
+<tr>
+<td>
+</td>
+<td>
+Technology
+</td>
+<td>
+Description
+</td>
+<td>
+Use in Future Vehicles
+</td>
+</tr>
+<tr>
+<td rowspan="4">
+Manufacturing and Design
+</td>
+<td>
+Stainless Steel Exoskeleton
+</td>
+<td>
+Cold-rolled full hard stainless steel exoskeleton carries crash loads
+and increases torsional stiffness of the bodyIconic visual design; high
+dent- and corrosion- resistance reduce concerns over daily wear and tear
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+Air Bending Manufacturing Process
+</td>
+<td>
+First-of-its-kind automated tooling developed by Tesla that can bend
+full hard stainless steel without touching itEnables the use of full
+hard stainless steel as an A-surface without getting scratched by
+tooling
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+Giga-castings
+</td>
+<td>
+Our largest castings ever - custom alloy and a 9,000-ton press combine
+to make front and rear vehicle structuresReduces number of parts and
+manufacturing complexity, and, as a bonus, scrap is fully recyclable
+</td>
+<td>
+√
+</td>
+</tr>
+<tr>
+<td>
+Integrated Audio with Body Structure
+</td>
+<td>
+Utilizes the body structure as the reactive volume for dual
+subwoofersGiant sound in extremely dense packaging
+</td>
+<td>
+√
+</td>
+</tr>
+<tr>
+<td rowspan="4">
+Powertrain and Electrical Architecture
+</td>
+<td>
+48-Volt Electrical Architecture
+</td>
+<td>
+48-volt electrical system reduces current by 4x and heat generated by
+16x compared to typical automotive voltageReduction in vehicle harness
+reduces vehicle weight, increases energy efficiency and simplifies
+electrical systems
+</td>
+<td>
+√
+</td>
+</tr>
+<tr>
+<td>
+800-Volt Battery System
+</td>
+<td>
+Higher voltage powertrain is more energy efficient for high power
+vehicles such as Cybertruck and Tesla SemiEnables smaller cables which
+reduces cost and mass while also enabling higher power (500kW) charging
+</td>
+<td>
+√
+</td>
+</tr>
+<tr>
+<td>
+Etherloop Communication Architecture
+</td>
+<td>
+Gigabit ethernet communication is 1,000x faster than traditional
+automotive communication standardsEnables distributed controller
+architecture which improves redundancy and eliminates 70% of
+cross-vehicle wires
+</td>
+<td>
+√
+</td>
+</tr>
+<tr>
+<td>
+Bidirectional Charging (Powershare)
+</td>
+<td>
+The Cybertruck can provide power to your jobsite, home or other devices
+(Vehicle-to-Grid or Vehicle-to-Home)Turns vehicles into mobile energy
+storage units with up to 11.5kW of onboard power, enabling hours of work
+</td>
+<td>
+√
+</td>
+</tr>
+<tr>
+<td rowspan="4">
+Ride and Comfort
+</td>
+<td>
+Custom Laminated Glass
+</td>
+<td>
+Novel glass and laminate developed by Tesla for increased comfort and
+strengthImproves sound isolation and blocks harmful UV, keeping the
+cabin cool while maintaining a panoramic view
+</td>
+<td>
+√
+</td>
+</tr>
+<tr>
+<td>
+Adaptive Air Suspension
+</td>
+<td>
+Adjusts ride height and damping for different terrains with 12" of
+adjustment getting up to 16" of ground clearanceImproves on-road comfort
+and stability without sacrificing off-road capability
+</td>
+<td>
+√
+</td>
+</tr>
+<tr>
+<td>
+Steer-by-Wire
+</td>
+<td>
+Replaces traditional steer shaft with redundant controllers and motors,
+enabling an adjustable steering ratio for different speeds and driving
+stylesReduces the amount you need to turn the wheel, enabling more
+agility at low speeds and more stability at high speeds
+</td>
+<td>
+√
+</td>
+</tr>
+<tr>
+<td>
+Rear Wheel Steering
+</td>
+<td>
+Leveraging steer-by-wire, enables approximately ten degrees of steering
+on the rear wheelsImproves turning radius at low speeds and increases
+stability at high speeds
+</td>
+<td>
+√
+</td>
+</tr>
+</table>
+<h1
+id="n-e-w-m-o-d-e-l-y---t-h-e-w-o-r-l-d-s-b-e-s-t-s-e-l-l-i-n-g-v-e-h-i-c-l-e-i-s-n-o-w-e-v-e-n-b-e-t-t-e-r">N
+E W M O D E L Y - T H E W O R L D ’ S B E S T S E L L I N G V E H I C L
+E I S N O W E V E N B E T T E R</h1>
+<p><img
+src="images/d50fded77db3ea4bd43d7204d450e0e4ce8077041cad3e4b0bd3cd666e2dd0da.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Side profile of a modern silver sedan against a dark blue studio
+background (no visible text or symbols)
+</details>
+<p><img
+src="images/d514aaee224a36a910f58407a9d557b73ec1f898e56d64668c6d908b2226c455.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Exterior view of a modern electric sedan against a dark background (no
+visible text or symbols)
+</details>
+<h1
+id="n-e-w-m-o-d-e-l-y---t-h-e-w-o-r-l-d-s-b-e-s-t-s-e-l-l-i-n-g-v-e-h-i-c-l-e-i-s-n-o-w-e-v-e-n-b-e-t-t-e-r-1">N
+E W M O D E L Y - T H E W O R L D ’ S B E S T S E L L I N G V E H I C L
+E I S N O W E V E N B E T T E R</h1>
+<p><img
+src="images/ec53edeb68ec2330f5441b5becfa10f8990b58c3451eef4394d834537e0b5d07.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Interior view of a Tesla car cockpit with digital dashboard and steering
+wheel (no visible text or symbols)
+</details>
+<p><img
+src="images/a85d0e629296f7ff443bc8e7700ff3495c9537dfa73f08c2011aca6eb02206e1.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Interior view of a modern electric vehicle with white leather seats,
+dashboard, and digital display (no visible text or symbols)
+</details>
+<p><img
+src="images/9f127eb4265ad5137a3b10281b39d1429b7704ff7170045030c0f898c32395a7.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Exterior view of a modern silver electric SUV (no visible text or
+symbols)
+</details>
+<p>NewModel Y</p>
+<p><img
+src="images/05f26003b3ed90968efb183ed7e431912be185ba11df78ef322ab324b23c7a43.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Exterior view of a modern white Tesla Model 3 SUV (no visible text or
+symbols)
+</details>
+<p>modely</p>
+<table>
+<tr>
+<td>
+</td>
+<td>
+Model Y
+</td>
+<td>
+New Model Y
+</td>
+</tr>
+<tr>
+<td>
+Trim
+</td>
+<td>
+Long Range All-Wheel Drive
+</td>
+<td>
+<img src="images/1dd45633c1770226006556819e997aef94739dae310eaff669cbf0128338b92c.jpg"/>Long
+Range All-Wheel Drive
+</td>
+</tr>
+<tr>
+<td>
+Delivery Timing
+</td>
+<td>
+Available Now
+</td>
+<td>
+Available starting March
+</td>
+</tr>
+<tr>
+<td>
+Starting Price After Est. Savings
+</td>
+<td>
+$34,490*
+</td>
+<td>
+$46,490*
+</td>
+</tr>
+<tr>
+<td>
+Range**
+</td>
+<td>
+311 miles (EPA est.)
+</td>
+<td>
+320 miles (est.)
+</td>
+</tr>
+<tr>
+<td>
+Seating
+</td>
+<td>
+First row: power recline and heatedSecond row: manual fold and heated
+</td>
+<td>
+First row: power recline, heated and ventilatedSecond row: power two-way
+folding and heated
+</td>
+</tr>
+<tr>
+<td>
+Displays
+</td>
+<td>
+15.4" front-row touchscreen
+</td>
+<td>
+15.4" front-row touchscreen8" second-row touchscreen
+</td>
+</tr>
+<tr>
+<td>
+Ride Comfort
+</td>
+<td>
+First-generation suspensionFirst-generation noise reduction hardware
+</td>
+<td>
+Second-generation suspensionSecond-generation noise reduction hardware
+</td>
+</tr>
+<tr>
+<td>
+Cameras
+</td>
+<td>
+7 exterior cameras
+</td>
+<td>
+8 exterior cameras (includes new front-facing camera)
+</td>
+</tr>
+<tr>
+<td>
+Audio
+</td>
+<td>
+13 speakers, 1 subwoofer
+</td>
+<td>
+15 speakers, 1 subwoofer
+</td>
+</tr>
+<tr>
+<td>
+Connectivity
+</td>
+<td>
+First-generation hardware
+</td>
+<td>
+Second-generation hardware
+</td>
+</tr>
+<tr>
+<td>
+Trunk
+</td>
+<td>
+Power open
+</td>
+<td>
+Hands-free power open on approach
+</td>
+</tr>
+<tr>
+<td>
+Interior
+</td>
+<td>
+Footwell and door pocket ambient lightingWooden detailing with black
+interior
+</td>
+<td>
+Footwell and door pocket ambient lightingWrap-around ambient
+lightingAluminum detailing and premium textiles
+</td>
+</tr>
+<tr>
+<td>
+Climate
+</td>
+<td>
+Tinted and laminated safety glassPower-actuated first-row air
+ventsManual second-row air vents
+</td>
+<td>
+Laminated safety glass on cabin windows and roofTinted safety glass with
+metallic infrared reflective coating across the roofPower-actuated
+first- and second-row air vents
+</td>
+</tr>
+</table>
+<h1
+id="s-e-m-i-f-a-c-t-o-r-y---f-i-r-s-t-t-r-u-c-k-b-u-i-l-d-s-s-c-h-e-d-u-l-e-d-l-a-t-e-r-t-h-i-s-y-e-a-r">S
+E M I F A C T O R Y - F I R S T T R U C K B U I L D S S C H E D U L E D
+L A T E R T H I S Y E A R</h1>
+<p><img
+src="images/5582d7bcaa8cbdab449be176d164f3fb833b3589000d764779d4e63f8b52ebe0.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Aerial view of a large industrial complex surrounded by arid hills, with
+no visible text or signage.
+</details>
+<h1
+id="m-e-g-a-f-a-c-t-o-r-y-s-h-a-n-g-h-a-i---w-i-t-h-g-i-g-a-f-a-c-t-o-r-y-s-h-a-n-g-h-a-i-i-n-t-h-e-b-a-c-k-g-r-o-u-n-d">M
+E G A F A C T O R Y S H A N G H A I - W I T H G I G A F A C T O R Y S H
+A N G H A I I N T H E B A C K G R O U N D</h1>
+<p><img
+src="images/a1fc7894375371ee48eec422e7a1860865a5f42414bf3d90d9a8ede6c869532e.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Aerial view of a large industrial park with Tesla-branded buildings,
+parking lots, and a river running through the area (no visible signage
+or text)
+</details>
+<h1
+id="m-e-g-a-f-a-c-t-o-r-y-s-h-a-n-g-h-a-i---g-e-n-e-r-a-l-a-s-s-e-m-b-l-y">M
+E G A F A C T O R Y S H A N G H A I - G E N E R A L A S S E M B L Y</h1>
+<p><img
+src="images/32e2f32cfb7ce404048c2f04cbcb81b7ef888001ab642b929cd139ce05666863.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Interior view of a Tesla power plant assembly line with workers
+installing equipment, no visible text or symbols on the equipment
+itself.
+</details>
+<h1
+id="t-e-s-l-a-l-i-t-h-i-u-m-r-e-f-i-n-e-r-y---s-t-a-r-t-o-f-p-r-o-d-u-c-t-i-o-n-i-n-2-0-2-5">T
+E S L A L I T H I U M R E F I N E R Y - S T A R T O F P R O D U C T I O
+N I N 2 0 2 5</h1>
+<p><img
+src="images/da4725a236f66e3bcb3b3a8c12d707bc6c5678c0694596aeeb20b35261c81c38.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Aerial view of a large industrial facility under construction at sunset,
+surrounded by open fields and parking lots (no visible text or signage)
+</details>
+<h1 id="t-e-s-l-a-l-i-t-h-i-u-m-t-e-a-m-o-n-s-p-o-d-u-m-e-n-e-d-a-y">T E
+S L A L I T H I U M T E A M O N S P O D U M E N E D A Y</h1>
+<p><img
+src="images/355c8c1897dda904a3d859db26c4fb381b2432042bdd05e874f04d758246f239.jpg" /></p>
+<details>
+<summary>
+text_image
+</summary>
+TESLA | LITHIUM
+</details>
+<h1 id="c-o-r-t-e-x-5-0-k-g-p-u-t-r-a-i-n-i-n-g-c-l-u-s-t-e-r">C O R T E
+X ~ 5 0 K G P U T R A I N I N G C L U S T E R</h1>
+<p><img
+src="images/e773006d23a2d8eb512d85c7e45e81cd80e3e8f7dd12ca7e4967801273c773a8.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Interior view of a data center with rows of server racks and a central
+aisle (no visible text or labels)
+</details>
+<h1 id="c-o-r-t-e-x-5-0-k-g-p-u-t-r-a-i-n-i-n-g-c-l-u-s-t-e-r-1">C O R T
+E X ~ 5 0 K G P U T R A I N I N G C L U S T E R</h1>
+<p><img
+src="images/4a3605edcd91e0480c6ba4ab6a829f999ec45e87f4392317c1dd8da6c24cc5e7.jpg" /></p>
+<details>
+<summary>
+natural_image
+</summary>
+Interior view of a data center with rows of server racks and overhead
+cables (no visible text or labels)
+</details>
+<p><img
+src="images/33e830ed3bb67d3fa1d7590b8d75232839b9a1901897e34d63f571f50bc480c9.jpg" /></p>
+<details>
+<summary>
+bar
+</summary>
+<table>
+<thead>
+<tr>
+<th>Quarter</th>
+<th>Vehicle Deliveries (millions of units)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1Q-2022</td>
+<td>0.31</td>
+</tr>
+<tr>
+<td>2Q-2022</td>
+<td>0.25</td>
+</tr>
+<tr>
+<td>3Q-2022</td>
+<td>0.34</td>
+</tr>
+<tr>
+<td>4Q-2022</td>
+<td>0.40</td>
+</tr>
+<tr>
+<td>1Q-2023</td>
+<td>0.42</td>
+</tr>
+<tr>
+<td>2Q-2023</td>
+<td>0.46</td>
+</tr>
+<tr>
+<td>3Q-2023</td>
+<td>0.43</td>
+</tr>
+<tr>
+<td>4Q-2023</td>
+<td>0.48</td>
+</tr>
+<tr>
+<td>1Q-2024</td>
+<td>0.38</td>
+</tr>
+<tr>
+<td>2Q-2024</td>
+<td>0.44</td>
+</tr>
+<tr>
+<td>3Q-2024</td>
+<td>0.46</td>
+</tr>
+<tr>
+<td>4Q-2024</td>
+<td>0.49</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p><img
+src="images/a16e2672d2423bb3af8d972e9b6feff350e813bfa3bf8a4751f1015f5fe88aba.jpg" /></p>
+<details>
+<summary>
+bar
+</summary>
+<table>
+<thead>
+<tr>
+<th>Quarter</th>
+<th>Operating Cash Flow (<span
+class="math inline"><em>B</em>)|<em>F</em><em>r</em><em>e</em><em>e</em><em>C</em><em>a</em><em>s</em><em>h</em><em>F</em><em>l</em><em>o</em><em>w</em>(</span>B)</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1Q-2022</td>
+<td>4.0</td>
+<td>2.2</td>
+</tr>
+<tr>
+<td>2Q-2022</td>
+<td>2.3</td>
+<td>0.6</td>
+</tr>
+<tr>
+<td>3Q-2022</td>
+<td>5.1</td>
+<td>3.3</td>
+</tr>
+<tr>
+<td>4Q-2022</td>
+<td>3.3</td>
+<td>1.4</td>
+</tr>
+<tr>
+<td>1Q-2023</td>
+<td>2.5</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td>2Q-2023</td>
+<td>3.1</td>
+<td>1.0</td>
+</tr>
+<tr>
+<td>3Q-2023</td>
+<td>3.3</td>
+<td>0.8</td>
+</tr>
+<tr>
+<td>4Q-2023</td>
+<td>4.4</td>
+<td>2.0</td>
+</tr>
+<tr>
+<td>1Q-2024</td>
+<td>0.2</td>
+<td>-2.5</td>
+</tr>
+<tr>
+<td>2Q-2024</td>
+<td>3.6</td>
+<td>1.3</td>
+</tr>
+<tr>
+<td>3Q-2024</td>
+<td>6.2</td>
+<td>2.7</td>
+</tr>
+<tr>
+<td>4Q-2024</td>
+<td>4.8</td>
+<td>2.0</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p><img
+src="images/bec088a84f38f03bb3a1b89a7e3936d2dc7d9fc9441aac33fd799dbf9e67b2c1.jpg" /></p>
+<details>
+<summary>
+bar
+</summary>
+<table>
+<thead>
+<tr>
+<th>Quarter</th>
+<th>Net Income (<span
+class="math inline"><em>B</em>)|<em>A</em><em>d</em><em>j</em><em>u</em><em>s</em><em>t</em><em>e</em><em>d</em><em>E</em><em>B</em><em>I</em><em>T</em><em>D</em><em>A</em>(</span>B)</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1Q-2022</td>
+<td>3.3</td>
+<td>5.0</td>
+</tr>
+<tr>
+<td>2Q-2022</td>
+<td>2.2</td>
+<td>3.8</td>
+</tr>
+<tr>
+<td>3Q-2022</td>
+<td>3.3</td>
+<td>5.0</td>
+</tr>
+<tr>
+<td>4Q-2022</td>
+<td>3.7</td>
+<td>5.4</td>
+</tr>
+<tr>
+<td>1Q-2023</td>
+<td>2.5</td>
+<td>4.3</td>
+</tr>
+<tr>
+<td>2Q-2023</td>
+<td>2.7</td>
+<td>4.6</td>
+</tr>
+<tr>
+<td>3Q-2023</td>
+<td>1.8</td>
+<td>3.8</td>
+</tr>
+<tr>
+<td>4Q-2023</td>
+<td>8.0</td>
+<td>4.0</td>
+</tr>
+<tr>
+<td>1Q-2024</td>
+<td>1.1</td>
+<td>3.4</td>
+</tr>
+<tr>
+<td>2Q-2024</td>
+<td>1.5</td>
+<td>3.7</td>
+</tr>
+<tr>
+<td>3Q-2024</td>
+<td>2.1</td>
+<td>4.7</td>
+</tr>
+<tr>
+<td>4Q-2024</td>
+<td>2.3</td>
+<td>4.9</td>
+</tr>
+</tbody>
+</table>
+</details>
+<h1
+id="k-e-y-m-e-t-r-i-c-s-t-r-a-i-l-i-n-g-1-2-m-o-n-t-h-s-t-t-m-unaudited">K
+E Y M E T R I C S T R A I L I N G 1 2 M O N T H S ( T T M )
+(Unaudited)</h1>
+<p><img
+src="images/11f28bb8dcfa5752c7eaebea54b73b785b6eddd2b58904efc81ff3e112777c88.jpg" /></p>
+<details>
+<summary>
+bar
+</summary>
+<table>
+<thead>
+<tr>
+<th>Quarter</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1Q-2022</td>
+<td>1.05</td>
+</tr>
+<tr>
+<td>2Q-2022</td>
+<td>1.10</td>
+</tr>
+<tr>
+<td>3Q-2022</td>
+<td>1.20</td>
+</tr>
+<tr>
+<td>4Q-2022</td>
+<td>1.30</td>
+</tr>
+<tr>
+<td>1Q-2023</td>
+<td>1.42</td>
+</tr>
+<tr>
+<td>2Q-2023</td>
+<td>1.63</td>
+</tr>
+<tr>
+<td>3Q-2023</td>
+<td>1.72</td>
+</tr>
+<tr>
+<td>4Q-2023</td>
+<td>1.81</td>
+</tr>
+<tr>
+<td>1Q-2024</td>
+<td>1.77</td>
+</tr>
+<tr>
+<td>2Q-2024</td>
+<td>1.75</td>
+</tr>
+<tr>
+<td>3Q-2024</td>
+<td>1.78</td>
+</tr>
+<tr>
+<td>4Q-2024</td>
+<td>1.79</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p>Vehicle Deliveries (millions of units)</p>
+<p><img
+src="images/0ef40543d8368da52b95e1a8a5dfcdc499562c59ceb4a6363ea3cb143362d1df.jpg" /></p>
+<details>
+<summary>
+bar
+</summary>
+<table>
+<thead>
+<tr>
+<th>Quarter</th>
+<th>Series 1</th>
+<th>Series 2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1Q-2022</td>
+<td>13.8</td>
+<td>6.9</td>
+</tr>
+<tr>
+<td>2Q-2022</td>
+<td>14.1</td>
+<td>6.9</td>
+</tr>
+<tr>
+<td>3Q-2022</td>
+<td>16.0</td>
+<td>8.9</td>
+</tr>
+<tr>
+<td>4Q-2022</td>
+<td>14.7</td>
+<td>7.6</td>
+</tr>
+<tr>
+<td>1Q-2023</td>
+<td>13.2</td>
+<td>5.7</td>
+</tr>
+<tr>
+<td>2Q-2023</td>
+<td>14.0</td>
+<td>6.1</td>
+</tr>
+<tr>
+<td>3Q-2023</td>
+<td>12.1</td>
+<td>3.7</td>
+</tr>
+<tr>
+<td>4Q-2023</td>
+<td>13.2</td>
+<td>4.3</td>
+</tr>
+<tr>
+<td>1Q-2024</td>
+<td>11.0</td>
+<td>1.3</td>
+</tr>
+<tr>
+<td>2Q-2024</td>
+<td>11.5</td>
+<td>1.7</td>
+</tr>
+<tr>
+<td>3Q-2024</td>
+<td>14.5</td>
+<td>3.6</td>
+</tr>
+<tr>
+<td>4Q-2024</td>
+<td>14.9</td>
+<td>3.5</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p>Operating Cash Flow ($B)</p>
+<p>Free Cash Flow ($B)</p>
+<p><img
+src="images/a717af051efc8943237590359d486681053ee94ca374b55cdafdd24c73237c48.jpg" /></p>
+<details>
+<summary>
+bar
+</summary>
+<table>
+<thead>
+<tr>
+<th>Quarter</th>
+<th>Series 1</th>
+<th>Series 2</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1Q-2022</td>
+<td>8.3</td>
+<td>14.8</td>
+</tr>
+<tr>
+<td>2Q-2022</td>
+<td>9.5</td>
+<td>16.1</td>
+</tr>
+<tr>
+<td>3Q-2022</td>
+<td>11.1</td>
+<td>17.9</td>
+</tr>
+<tr>
+<td>4Q-2022</td>
+<td>12.5</td>
+<td>19.2</td>
+</tr>
+<tr>
+<td>1Q-2023</td>
+<td>11.7</td>
+<td>18.4</td>
+</tr>
+<tr>
+<td>2Q-2023</td>
+<td>12.1</td>
+<td>19.3</td>
+</tr>
+<tr>
+<td>3Q-2023</td>
+<td>10.7</td>
+<td>18.1</td>
+</tr>
+<tr>
+<td>4Q-2023</td>
+<td>15.0</td>
+<td>16.6</td>
+</tr>
+<tr>
+<td>1Q-2024</td>
+<td>13.6</td>
+<td>15.7</td>
+</tr>
+<tr>
+<td>2Q-2024</td>
+<td>12.3</td>
+<td>14.8</td>
+</tr>
+<tr>
+<td>3Q-2024</td>
+<td>12.7</td>
+<td>15.6</td>
+</tr>
+<tr>
+<td>4Q-2024</td>
+<td>7.1</td>
+<td>16.6</td>
+</tr>
+</tbody>
+</table>
+</details>
+<p>Net Income ($B)</p>
+<p>Adjusted EBITDA ($B)</p>
+<h1 id="f-i-n-a-n-c-i-a-l-s-t-a-t-e-m-e-n-t-s">F I N A N C I A L S T A T
+E M E N T S</h1>
+<p>S T A T E M E N T O F O P E R A T I O N S<br />
+(Unaudited)</p>
+<table>
+<tr>
+<td>
+In millions of USD or shares as applicable, except per share data
+</td>
+<td>
+Q4-2023
+</td>
+<td>
+Q1-2024
+</td>
+<td>
+Q2-2024
+</td>
+<td>
+Q3-2024
+</td>
+<td>
+Q4-2024
+</td>
+</tr>
+<tr>
+<td colspan="6">
+REVENUES
+</td>
+</tr>
+<tr>
+<td>
+Automotive sales
+</td>
+<td>
+20,630
+</td>
+<td>
+16,460
+</td>
+<td>
+18,530
+</td>
+<td>
+18,831
+</td>
+<td>
+18,659
+</td>
+</tr>
+<tr>
+<td>
+Automotive regulatory credits
+</td>
+<td>
+433
+</td>
+<td>
+442
+</td>
+<td>
+890
+</td>
+<td>
+739
+</td>
+<td>
+692
+</td>
+</tr>
+<tr>
+<td>
+Automotive leasing
+</td>
+<td>
+500
+</td>
+<td>
+476
+</td>
+<td>
+458
+</td>
+<td>
+446
+</td>
+<td>
+447
+</td>
+</tr>
+<tr>
+<td>
+Total automotive revenues
+</td>
+<td>
+21,563
+</td>
+<td>
+17,378
+</td>
+<td>
+19,878
+</td>
+<td>
+20,016
+</td>
+<td>
+19,798
+</td>
+</tr>
+<tr>
+<td>
+Energy generation and storage
+</td>
+<td>
+1,438
+</td>
+<td>
+1,635
+</td>
+<td>
+3,014
+</td>
+<td>
+2,376
+</td>
+<td>
+3,061
+</td>
+</tr>
+<tr>
+<td>
+Services and other
+</td>
+<td>
+2,166
+</td>
+<td>
+2,288
+</td>
+<td>
+2,608
+</td>
+<td>
+2,790
+</td>
+<td>
+2,848
+</td>
+</tr>
+<tr>
+<td>
+Total revenues
+</td>
+<td>
+25,167
+</td>
+<td>
+21,301
+</td>
+<td>
+25,500
+</td>
+<td>
+25,182
+</td>
+<td>
+25,707
+</td>
+</tr>
+<tr>
+<td colspan="6">
+COST OF REVENUES
+</td>
+</tr>
+<tr>
+<td>
+Automotive sales
+</td>
+<td>
+17,202
+</td>
+<td>
+13,897
+</td>
+<td>
+15,962
+</td>
+<td>
+15,743
+</td>
+<td>
+16,268
+</td>
+</tr>
+<tr>
+<td>
+Automotive leasing
+</td>
+<td>
+296
+</td>
+<td>
+269
+</td>
+<td>
+245
+</td>
+<td>
+247
+</td>
+<td>
+242
+</td>
+</tr>
+<tr>
+<td>
+Total automotive cost of revenues
+</td>
+<td>
+17,498
+</td>
+<td>
+14,166
+</td>
+<td>
+16,207
+</td>
+<td>
+15,990
+</td>
+<td>
+16,510
+</td>
+</tr>
+<tr>
+<td>
+Energy generation and storage
+</td>
+<td>
+1,124
+</td>
+<td>
+1,232
+</td>
+<td>
+2,274
+</td>
+<td>
+1,651
+</td>
+<td>
+2,289
+</td>
+</tr>
+<tr>
+<td>
+Services and other
+</td>
+<td>
+2,107
+</td>
+<td>
+2,207
+</td>
+<td>
+2,441
+</td>
+<td>
+2,544
+</td>
+<td>
+2,729
+</td>
+</tr>
+<tr>
+<td>
+Total cost of revenues
+</td>
+<td>
+20,729
+</td>
+<td>
+17,605
+</td>
+<td>
+20,922
+</td>
+<td>
+20,185
+</td>
+<td>
+21,528
+</td>
+</tr>
+<tr>
+<td>
+Gross profit
+</td>
+<td>
+4,438
+</td>
+<td>
+3,696
+</td>
+<td>
+4,578
+</td>
+<td>
+4,997
+</td>
+<td>
+4,179
+</td>
+</tr>
+<tr>
+<td colspan="6">
+OPERATING EXPENSES
+</td>
+</tr>
+<tr>
+<td>
+Research and development
+</td>
+<td>
+1,094
+</td>
+<td>
+1,151
+</td>
+<td>
+1,074
+</td>
+<td>
+1,039
+</td>
+<td>
+1,276
+</td>
+</tr>
+<tr>
+<td>
+Selling, general and administrative
+</td>
+<td>
+1,280
+</td>
+<td>
+1,374
+</td>
+<td>
+1,277
+</td>
+<td>
+1,186
+</td>
+<td>
+1,313
+</td>
+</tr>
+<tr>
+<td>
+Restructuring and other
+</td>
+<td>
+-
+</td>
+<td>
+-
+</td>
+<td>
+622
+</td>
+<td>
+55
+</td>
+<td>
+7
+</td>
+</tr>
+<tr>
+<td>
+Total operating expenses
+</td>
+<td>
+2,374
+</td>
+<td>
+2,525
+</td>
+<td>
+2,973
+</td>
+<td>
+2,280
+</td>
+<td>
+2,596
+</td>
+</tr>
+<tr>
+<td>
+INCOME FROM OPERATIONS
+</td>
+<td>
+2,064
+</td>
+<td>
+1,171
+</td>
+<td>
+1,605
+</td>
+<td>
+2,717
+</td>
+<td>
+1,583
+</td>
+</tr>
+<tr>
+<td>
+Interest income
+</td>
+<td>
+333
+</td>
+<td>
+350
+</td>
+<td>
+348
+</td>
+<td>
+429
+</td>
+<td>
+442
+</td>
+</tr>
+<tr>
+<td>
+Interest expense
+</td>
+<td>
+(61)
+</td>
+<td>
+(76)
+</td>
+<td>
+(86)
+</td>
+<td>
+(92)
+</td>
+<td>
+(96)
+</td>
+</tr>
+<tr>
+<td>
+Other (expense) income, net
+</td>
+<td>
+(145)
+</td>
+<td>
+108
+</td>
+<td>
+20
+</td>
+<td>
+(270)
+</td>
+<td>
+837
+</td>
+</tr>
+<tr>
+<td>
+INCOME BEFORE INCOME TAXES
+</td>
+<td>
+2,191
+</td>
+<td>
+1,553
+</td>
+<td>
+1,887
+</td>
+<td>
+2,784
+</td>
+<td>
+2,766
+</td>
+</tr>
+<tr>
+<td>
+(Benefit from) provision for income taxes
+</td>
+<td>
+(5,752)
+</td>
+<td>
+409
+</td>
+<td>
+393
+</td>
+<td>
+601
+</td>
+<td>
+434
+</td>
+</tr>
+<tr>
+<td>
+NET INCOME
+</td>
+<td>
+7,943
+</td>
+<td>
+1,144
+</td>
+<td>
+1,494
+</td>
+<td>
+2,183
+</td>
+<td>
+2,332
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to noncontrolling interests and redeemable
+noncontrolling interests in subsidiaries
+</td>
+<td>
+15
+</td>
+<td>
+15
+</td>
+<td>
+16
+</td>
+<td>
+16
+</td>
+<td>
+15
+</td>
+</tr>
+<tr>
+<td>
+NET INCOME ATTRIBUTABLE TO COMMON STOCKHOLDERS
+</td>
+<td>
+7,928
+</td>
+<td>
+1,129
+</td>
+<td>
+1,478
+</td>
+<td>
+2,167
+</td>
+<td>
+2,317
+</td>
+</tr>
+<tr>
+<td colspan="6">
+Net income per share of common stock attributable to common stockholders
+</td>
+</tr>
+<tr>
+<td>
+Basic
+</td>
+<td>
+$ 2.49
+</td>
+<td>
+$ 0.37
+</td>
+<td>
+$ 0.46
+</td>
+<td>
+$ 0.68
+</td>
+<td>
+$ 0.72
+</td>
+</tr>
+<tr>
+<td>
+Diluted
+</td>
+<td>
+$ 2.27
+</td>
+<td>
+$ 0.34
+</td>
+<td>
+$ 0.42
+</td>
+<td>
+$ 0.62
+</td>
+<td>
+$ 0.66
+</td>
+</tr>
+<tr>
+<td colspan="6">
+Weighted average shares used in computing net income per share of common
+stock
+</td>
+</tr>
+<tr>
+<td>
+Basic
+</td>
+<td>
+3,181
+</td>
+<td>
+3,186
+</td>
+<td>
+3,191
+</td>
+<td>
+3,198
+</td>
+<td>
+3,213
+</td>
+</tr>
+<tr>
+<td>
+Diluted
+</td>
+<td>
+3,492
+</td>
+<td>
+3,484
+</td>
+<td>
+3,481
+</td>
+<td>
+3,497
+</td>
+<td>
+3,517
+</td>
+</tr>
+</table>
+<p>B A L A N C E S H E E T<br />
+(Unaudited )</p>
+<table>
+<tr>
+<td>
+In millions of USD
+</td>
+<td>
+31-Dec-23
+</td>
+<td>
+31-Mar-24
+</td>
+<td>
+30-Jun-24
+</td>
+<td>
+30-Sep-24
+</td>
+<td>
+31-Dec-24
+</td>
+</tr>
+<tr>
+<td colspan="6">
+ASSETS
+</td>
+</tr>
+<tr>
+<td colspan="6">
+Current assets
+</td>
+</tr>
+<tr>
+<td>
+Cash, cash equivalents and investments
+</td>
+<td>
+29,094
+</td>
+<td>
+26,863
+</td>
+<td>
+30,720
+</td>
+<td>
+33,648
+</td>
+<td>
+36,563
+</td>
+</tr>
+<tr>
+<td>
+Accounts receivable, net
+</td>
+<td>
+3,508
+</td>
+<td>
+3,887
+</td>
+<td>
+3,737
+</td>
+<td>
+3,313
+</td>
+<td>
+4,418
+</td>
+</tr>
+<tr>
+<td>
+Inventory
+</td>
+<td>
+13,626
+</td>
+<td>
+16,033
+</td>
+<td>
+14,195
+</td>
+<td>
+14,530
+</td>
+<td>
+12,017
+</td>
+</tr>
+<tr>
+<td>
+Prepaid expenses and other current assets
+</td>
+<td>
+3,388
+</td>
+<td>
+3,752
+</td>
+<td>
+4,325
+</td>
+<td>
+4,888
+</td>
+<td>
+5,362
+</td>
+</tr>
+<tr>
+<td>
+Total current assets
+</td>
+<td>
+49,616
+</td>
+<td>
+50,535
+</td>
+<td>
+52,977
+</td>
+<td>
+56,379
+</td>
+<td>
+58,360
+</td>
+</tr>
+<tr>
+<td>
+Operating lease vehicles, net
+</td>
+<td>
+5,989
+</td>
+<td>
+5,736
+</td>
+<td>
+5,541
+</td>
+<td>
+5,380
+</td>
+<td>
+5,581
+</td>
+</tr>
+<tr>
+<td>
+Solar energy systems, net
+</td>
+<td>
+5,229
+</td>
+<td>
+5,162
+</td>
+<td>
+5,102
+</td>
+<td>
+5,040
+</td>
+<td>
+4,924
+</td>
+</tr>
+<tr>
+<td>
+Property, plant and equipment, net
+</td>
+<td>
+29,725
+</td>
+<td>
+31,436
+</td>
+<td>
+32,902
+</td>
+<td>
+36,116
+</td>
+<td>
+35,836
+</td>
+</tr>
+<tr>
+<td>
+Operating lease right-of-use assets
+</td>
+<td>
+4,180
+</td>
+<td>
+4,367
+</td>
+<td>
+4,563
+</td>
+<td>
+4,867
+</td>
+<td>
+5,160
+</td>
+</tr>
+<tr>
+<td>
+Digital assets, net
+</td>
+<td>
+184
+</td>
+<td>
+184
+</td>
+<td>
+184
+</td>
+<td>
+184
+</td>
+<td>
+1,076
+</td>
+</tr>
+<tr>
+<td>
+Goodwill and intangible assets, net
+</td>
+<td>
+431
+</td>
+<td>
+421
+</td>
+<td>
+413
+</td>
+<td>
+411
+</td>
+<td>
+394
+</td>
+</tr>
+<tr>
+<td>
+Deferred tax assets
+</td>
+<td>
+6,733
+</td>
+<td>
+6,769
+</td>
+<td>
+6,692
+</td>
+<td>
+6,486
+</td>
+<td>
+6,524
+</td>
+</tr>
+<tr>
+<td>
+Other non-current assets
+</td>
+<td>
+4,531
+</td>
+<td>
+4,616
+</td>
+<td>
+4,458
+</td>
+<td>
+4,989
+</td>
+<td>
+4,215
+</td>
+</tr>
+<tr>
+<td>
+Total assets
+</td>
+<td>
+106,618
+</td>
+<td>
+109,226
+</td>
+<td>
+112,832
+</td>
+<td>
+119,852
+</td>
+<td>
+122,070
+</td>
+</tr>
+<tr>
+<td colspan="6">
+LIABILITIES AND EQUITY
+</td>
+</tr>
+<tr>
+<td colspan="6">
+Current liabilities
+</td>
+</tr>
+<tr>
+<td>
+Accounts payable
+</td>
+<td>
+14,431
+</td>
+<td>
+14,725
+</td>
+<td>
+13,056
+</td>
+<td>
+14,654
+</td>
+<td>
+12,474
+</td>
+</tr>
+<tr>
+<td>
+Accrued liabilities and other
+</td>
+<td>
+9,080
+</td>
+<td>
+9,243
+</td>
+<td>
+9,616
+</td>
+<td>
+10,601
+</td>
+<td>
+10,723
+</td>
+</tr>
+<tr>
+<td>
+Deferred revenue
+</td>
+<td>
+2,864
+</td>
+<td>
+3,024
+</td>
+<td>
+2,793
+</td>
+<td>
+3,031
+</td>
+<td>
+3,168
+</td>
+</tr>
+<tr>
+<td>
+Current portion of debt and finance leases (1)
+</td>
+<td>
+2,373
+</td>
+<td>
+2,461
+</td>
+<td>
+2,264
+</td>
+<td>
+2,291
+</td>
+<td>
+2,456
+</td>
+</tr>
+<tr>
+<td>
+Total current liabilities
+</td>
+<td>
+28,748
+</td>
+<td>
+29,453
+</td>
+<td>
+27,729
+</td>
+<td>
+30,577
+</td>
+<td>
+28,821
+</td>
+</tr>
+<tr>
+<td>
+Debt and finance leases, net of current portion (1)
+</td>
+<td>
+2,857
+</td>
+<td>
+2,899
+</td>
+<td>
+5,481
+</td>
+<td>
+5,405
+</td>
+<td>
+5,757
+</td>
+</tr>
+<tr>
+<td>
+Deferred revenue, net of current portion
+</td>
+<td>
+3,251
+</td>
+<td>
+3,214
+</td>
+<td>
+3,357
+</td>
+<td>
+3,350
+</td>
+<td>
+3,317
+</td>
+</tr>
+<tr>
+<td>
+Other long-term liabilities
+</td>
+<td>
+8,153
+</td>
+<td>
+8,480
+</td>
+<td>
+9,002
+</td>
+<td>
+9,810
+</td>
+<td>
+10,495
+</td>
+</tr>
+<tr>
+<td>
+Total liabilities
+</td>
+<td>
+43,009
+</td>
+<td>
+44,046
+</td>
+<td>
+45,569
+</td>
+<td>
+49,142
+</td>
+<td>
+48,390
+</td>
+</tr>
+<tr>
+<td>
+Redeemable noncontrolling interests in subsidiaries
+</td>
+<td>
+242
+</td>
+<td>
+73
+</td>
+<td>
+72
+</td>
+<td>
+70
+</td>
+<td>
+63
+</td>
+</tr>
+<tr>
+<td>
+Total stockholders' equity
+</td>
+<td>
+62,634
+</td>
+<td>
+64,378
+</td>
+<td>
+66,468
+</td>
+<td>
+69,931
+</td>
+<td>
+72,913
+</td>
+</tr>
+<tr>
+<td>
+Noncontrolling interests in subsidiaries
+</td>
+<td>
+733
+</td>
+<td>
+729
+</td>
+<td>
+723
+</td>
+<td>
+709
+</td>
+<td>
+704
+</td>
+</tr>
+<tr>
+<td>
+Total liabilities and equity
+</td>
+<td>
+106,618
+</td>
+<td>
+109,226
+</td>
+<td>
+112,832
+</td>
+<td>
+119,852
+</td>
+<td>
+122,070
+</td>
+</tr>
+<tr>
+<td colspan="6">
+<ol type="1">
+<li>Breakdown of our debt is as follows:
+</td>
+</tr>
+<tr>
+<td>
+Non-recourse debt
+</td>
+<td>
+4,613
+</td>
+<td>
+4,820
+</td>
+<td>
+7,355
+</td>
+<td>
+7,379
+</td>
+<td>
+7,871
+</td>
+</tr>
+<tr>
+<td>
+Recourse debt
+</td>
+<td>
+44
+</td>
+<td>
+54
+</td>
+<td>
+7
+</td>
+<td>
+11
+</td>
+<td>
+7
+</td>
+</tr>
+<tr>
+<td>
+Days sales outstanding
+</td>
+<td>
+11
+</td>
+<td>
+16
+</td>
+<td>
+14
+</td>
+<td>
+13
+</td>
+<td>
+14
+</td>
+</tr>
+<tr>
+<td>
+Days payable outstanding
+</td>
+<td>
+63
+</td>
+<td>
+75
+</td>
+<td>
+60
+</td>
+<td>
+63
+</td>
+<td>
+58
+</td>
+</tr>
+</table></li>
+</ol>
+<p>S T A T E M E N T O F C A S H F L O W S<br />
+(Unaudited)</p>
+<table>
+<tr>
+<td>
+In millions of USD
+</td>
+<td>
+Q4-2023
+</td>
+<td>
+Q1-2024
+</td>
+<td>
+Q2-2024
+</td>
+<td>
+Q3-2024
+</td>
+<td>
+Q4-2024
+</td>
+</tr>
+<tr>
+<td colspan="6">
+CASH FLOWS FROM OPERATING ACTIVITIES
+</td>
+</tr>
+<tr>
+<td>
+Net income
+</td>
+<td>
+7,943
+</td>
+<td>
+1,144
+</td>
+<td>
+1,494
+</td>
+<td>
+2,183
+</td>
+<td>
+2,332
+</td>
+</tr>
+<tr>
+<td colspan="6">
+Adjustments to reconcile net income to net cash provided by operating
+activities:
+</td>
+</tr>
+<tr>
+<td>
+Depreciation, amortization and impairment
+</td>
+<td>
+1,232
+</td>
+<td>
+1,246
+</td>
+<td>
+1,278
+</td>
+<td>
+1,348
+</td>
+<td>
+1,496
+</td>
+</tr>
+<tr>
+<td>
+Stock-based compensation
+</td>
+<td>
+484
+</td>
+<td>
+524
+</td>
+<td>
+439
+</td>
+<td>
+457
+</td>
+<td>
+579
+</td>
+</tr>
+<tr>
+<td>
+Deferred income taxes
+</td>
+<td>
+(6,033)
+</td>
+<td>
+(11)
+</td>
+<td>
+144
+</td>
+<td>
+285
+</td>
+<td>
+59
+</td>
+</tr>
+<tr>
+<td>
+Digital assets gain, net
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+(589)
+</td>
+</tr>
+<tr>
+<td>
+Other
+</td>
+<td>
+262
+</td>
+<td>
+—
+</td>
+<td>
+119
+</td>
+<td>
+408
+</td>
+<td>
+(93)
+</td>
+</tr>
+<tr>
+<td>
+Changes in operating assets and liabilities
+</td>
+<td>
+482
+</td>
+<td>
+(2,661)
+</td>
+<td>
+138
+</td>
+<td>
+1,574
+</td>
+<td>
+1030
+</td>
+</tr>
+<tr>
+<td>
+Net cash provided by operating activities
+</td>
+<td>
+4,370
+</td>
+<td>
+242
+</td>
+<td>
+3,612
+</td>
+<td>
+6,255
+</td>
+<td>
+4,814
+</td>
+</tr>
+<tr>
+<td colspan="6">
+CASH FLOWS FROM INVESTING ACTIVITIES
+</td>
+</tr>
+<tr>
+<td>
+Capital expenditures
+</td>
+<td>
+(2,306)
+</td>
+<td>
+(2,773)
+</td>
+<td>
+(2,270)
+</td>
+<td>
+(3,513)
+</td>
+<td>
+(2,783)
+</td>
+</tr>
+<tr>
+<td>
+Purchases of solar energy systems, net of sales
+</td>
+<td>
+(1)
+</td>
+<td>
+(4)
+</td>
+<td>
+(2)
+</td>
+<td>
+—
+</td>
+<td>
+3
+</td>
+</tr>
+<tr>
+<td>
+Purchases of investments
+</td>
+<td>
+(5,891)
+</td>
+<td>
+(6,622)
+</td>
+<td>
+(8,143)
+</td>
+<td>
+(6,032)
+</td>
+<td>
+(15,158)
+</td>
+</tr>
+<tr>
+<td>
+Proceeds from maturities of investments
+</td>
+<td>
+3,394
+</td>
+<td>
+4,315
+</td>
+<td>
+6,990
+</td>
+<td>
+6,670
+</td>
+<td>
+10,335
+</td>
+</tr>
+<tr>
+<td>
+Proceeds from sales of investments
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+200
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+</tr>
+<tr>
+<td>
+Net cash used in investing activities
+</td>
+<td>
+(4,804)
+</td>
+<td>
+(5,084)
+</td>
+<td>
+(3,225)
+</td>
+<td>
+(2,875)
+</td>
+<td>
+(7,603)
+</td>
+</tr>
+<tr>
+<td colspan="6">
+CASH FLOWS FROM FINANCING ACTIVITIES
+</td>
+</tr>
+<tr>
+<td>
+Net cash flows from other debt activities
+</td>
+<td>
+(141)
+</td>
+<td>
+(140)
+</td>
+<td>
+2,598
+</td>
+<td>
+(75)
+</td>
+<td>
+(108)
+</td>
+</tr>
+<tr>
+<td>
+Net borrowings (repayments) under vehicle and energy product financing
+</td>
+<td>
+952
+</td>
+<td>
+216
+</td>
+<td>
+(212)
+</td>
+<td>
+(107)
+</td>
+<td>
+677
+</td>
+</tr>
+<tr>
+<td>
+Net cash flows from noncontrolling interests – Solar
+</td>
+<td>
+(76)
+</td>
+<td>
+(131)
+</td>
+<td>
+(43)
+</td>
+<td>
+(26)
+</td>
+<td>
+(37)
+</td>
+</tr>
+<tr>
+<td>
+Other
+</td>
+<td>
+152
+</td>
+<td>
+251
+</td>
+<td>
+197
+</td>
+<td>
+340
+</td>
+<td>
+453
+</td>
+</tr>
+<tr>
+<td>
+Net cash provided by financing activities
+</td>
+<td>
+887
+</td>
+<td>
+196
+</td>
+<td>
+2,540
+</td>
+<td>
+132
+</td>
+<td>
+985
+</td>
+</tr>
+<tr>
+<td>
+Effect of exchange rate changes on cash and cash equivalents and
+restricted cash
+</td>
+<td>
+146
+</td>
+<td>
+(79)
+</td>
+<td>
+(37)
+</td>
+<td>
+108
+</td>
+<td>
+(133)
+</td>
+</tr>
+<tr>
+<td>
+Net increase (decrease) in cash and cash equivalents and restricted cash
+</td>
+<td>
+599
+</td>
+<td>
+(4,725)
+</td>
+<td>
+2,890
+</td>
+<td>
+3,620
+</td>
+<td>
+(1,937)
+</td>
+</tr>
+<tr>
+<td>
+Cash and cash equivalents and restricted cash at beginning of period
+</td>
+<td>
+16,590
+</td>
+<td>
+17,189
+</td>
+<td>
+12,464
+</td>
+<td>
+15,354
+</td>
+<td>
+18,974
+</td>
+</tr>
+<tr>
+<td>
+Cash and cash equivalents and restricted cash at end of period
+</td>
+<td>
+17,189
+</td>
+<td>
+12,464
+</td>
+<td>
+15,354
+</td>
+<td>
+18,974
+</td>
+<td>
+17,037
+</td>
+</tr>
+</table>
+<p>R E C O N C I L I A T I O N O F G A A P T O N O N – G A A P F I N A N
+C I A L I N F O R M A T I O N (Unaudited)</p>
+<table>
+<tr>
+<td>
+In millions of USD or shares as applicable, except per share data
+</td>
+<td>
+Q4-2023
+</td>
+<td>
+Q1-2024
+</td>
+<td>
+Q2-2024
+</td>
+<td>
+Q3-2024
+</td>
+<td>
+Q4-2024
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders (GAAP)
+</td>
+<td>
+7,928
+</td>
+<td>
+1,129
+</td>
+<td>
+1,478
+</td>
+<td>
+2,167
+</td>
+<td>
+2,317
+</td>
+</tr>
+<tr>
+<td>
+Stock-based compensation expense, net of tax
+</td>
+<td>
+484
+</td>
+<td>
+407
+</td>
+<td>
+334
+</td>
+<td>
+338
+</td>
+<td>
+249
+</td>
+</tr>
+<tr>
+<td>
+Release of valuation allowance on deferred tax assets
+</td>
+<td>
+(5,927)
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders (non-GAAP)
+</td>
+<td>
+2,485
+</td>
+<td>
+1,536
+</td>
+<td>
+1,812
+</td>
+<td>
+2,505
+</td>
+<td>
+2,566
+</td>
+</tr>
+<tr>
+<td>
+Less: Buy-outs of noncontrolling interests
+</td>
+<td>
+1
+</td>
+<td>
+(42)
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+3
+</td>
+</tr>
+<tr>
+<td>
+Net income used in computing diluted EPS attributable to common
+stockholders (non-GAAP)
+</td>
+<td>
+2,484
+</td>
+<td>
+1,578
+</td>
+<td>
+1,812
+</td>
+<td>
+2,505
+</td>
+<td>
+2,563
+</td>
+</tr>
+<tr>
+<td>
+EPS attributable to common stockholders, diluted (GAAP)
+</td>
+<td>
+2.27
+</td>
+<td>
+0.34
+</td>
+<td>
+0.42
+</td>
+<td>
+0.62
+</td>
+<td>
+0.66
+</td>
+</tr>
+<tr>
+<td>
+Stock-based compensation expense per share, net of tax
+</td>
+<td>
+0.14
+</td>
+<td>
+0.11
+</td>
+<td>
+0.10
+</td>
+<td>
+0.10
+</td>
+<td>
+0.07
+</td>
+</tr>
+<tr>
+<td>
+Release of valuation allowance on deferred tax assets per share
+</td>
+<td>
+(1.70)
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+</tr>
+<tr>
+<td>
+EPS attributable to common stockholders, diluted (non-GAAP)
+</td>
+<td>
+0.71
+</td>
+<td>
+0.45
+</td>
+<td>
+0.52
+</td>
+<td>
+0.72
+</td>
+<td>
+0.73
+</td>
+</tr>
+<tr>
+<td>
+Shares used in EPS calculation, diluted (GAAP and non-GAAP)
+</td>
+<td>
+3,492
+</td>
+<td>
+3,484
+</td>
+<td>
+3,481
+</td>
+<td>
+3,497
+</td>
+<td>
+3,517
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders (GAAP)
+</td>
+<td>
+7,928
+</td>
+<td>
+1,129
+</td>
+<td>
+1,478
+</td>
+<td>
+2,167
+</td>
+<td>
+2,317
+</td>
+</tr>
+<tr>
+<td>
+Interest expense
+</td>
+<td>
+61
+</td>
+<td>
+76
+</td>
+<td>
+86
+</td>
+<td>
+92
+</td>
+<td>
+96
+</td>
+</tr>
+<tr>
+<td>
+(Benefit from) provision for income taxes
+</td>
+<td>
+(5,752)
+</td>
+<td>
+409
+</td>
+<td>
+393
+</td>
+<td>
+601
+</td>
+<td>
+434
+</td>
+</tr>
+<tr>
+<td>
+Depreciation, amortization and impairment
+</td>
+<td>
+1,232
+</td>
+<td>
+1,246
+</td>
+<td>
+1,278
+</td>
+<td>
+1,348
+</td>
+<td>
+1,496
+</td>
+</tr>
+<tr>
+<td>
+Stock-based compensation expense
+</td>
+<td>
+484
+</td>
+<td>
+524
+</td>
+<td>
+439
+</td>
+<td>
+457
+</td>
+<td>
+579
+</td>
+</tr>
+<tr>
+<td>
+Adjusted EBITDA (non-GAAP)
+</td>
+<td>
+3,953
+</td>
+<td>
+3,384
+</td>
+<td>
+3,674
+</td>
+<td>
+4,665
+</td>
+<td>
+4,922
+</td>
+</tr>
+<tr>
+<td>
+Total revenues
+</td>
+<td>
+25,167
+</td>
+<td>
+21,301
+</td>
+<td>
+25,500
+</td>
+<td>
+25,182
+</td>
+<td>
+25,707
+</td>
+</tr>
+<tr>
+<td>
+Adjusted EBITDA margin (non-GAAP)
+</td>
+<td>
+15.7%
+</td>
+<td>
+15.9%
+</td>
+<td>
+14.4%
+</td>
+<td>
+18.5%
+</td>
+<td>
+19.1%
+</td>
+</tr>
+</table>
+<p>R E C O N C I L I A T I O N O F G A A P T O N O N – G A A P F I N A N
+C I A L I N F O R M A T I O N<br />
+(Unaudited)</p>
+<table>
+<tr>
+<td>
+In millions of USD or shares as applicable, except per share data
+</td>
+<td>
+2020
+</td>
+<td>
+2021
+</td>
+<td>
+2022
+</td>
+<td>
+2023
+</td>
+<td>
+2024
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders (GAAP)
+</td>
+<td>
+721
+</td>
+<td>
+5,519
+</td>
+<td>
+12,556
+</td>
+<td>
+14,997
+</td>
+<td>
+7,091
+</td>
+</tr>
+<tr>
+<td>
+Stock-based compensation expense, net of tax
+</td>
+<td>
+1,734
+</td>
+<td>
+2,121
+</td>
+<td>
+1,560
+</td>
+<td>
+1,812
+</td>
+<td>
+1,328
+</td>
+</tr>
+<tr>
+<td>
+Release of valuation allowance on deferred tax assets
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+(5,927)
+</td>
+<td>
+—
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders (non-GAAP)
+</td>
+<td>
+2,455
+</td>
+<td>
+7,640
+</td>
+<td>
+14,116
+</td>
+<td>
+10,882
+</td>
+<td>
+8,419
+</td>
+</tr>
+<tr>
+<td>
+Less: Buy-outs of noncontrolling interests
+</td>
+<td>
+31
+</td>
+<td>
+(5)
+</td>
+<td>
+(27)
+</td>
+<td>
+(2)
+</td>
+<td>
+(39)
+</td>
+</tr>
+<tr>
+<td>
+Less: Dilutive convertible debt
+</td>
+<td>
+—
+</td>
+<td>
+(9)
+</td>
+<td>
+(1)
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+</tr>
+<tr>
+<td>
+Net income used in computing diluted EPS attributable to common
+stockholders (non-GAAP)
+</td>
+<td>
+2,424
+</td>
+<td>
+7,654
+</td>
+<td>
+14,143
+</td>
+<td>
+10,884
+</td>
+<td>
+8,458
+</td>
+</tr>
+<tr>
+<td>
+EPS attributable to common stockholders, diluted (GAAP)
+</td>
+<td>
+0.21
+</td>
+<td>
+1.63
+</td>
+<td>
+3.62
+</td>
+<td>
+4.30
+</td>
+<td>
+2.04
+</td>
+</tr>
+<tr>
+<td>
+Stock-based compensation expense per share, net of tax
+</td>
+<td>
+0.54
+</td>
+<td>
+0.63
+</td>
+<td>
+0.45
+</td>
+<td>
+0.52
+</td>
+<td>
+0.38
+</td>
+</tr>
+<tr>
+<td>
+Release of valuation allowance on deferred tax assets per share
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+—
+</td>
+<td>
+(1.70)
+</td>
+<td>
+—
+</td>
+</tr>
+<tr>
+<td>
+EPS attributable to common stockholders, diluted (non-GAAP)
+</td>
+<td>
+0.75
+</td>
+<td>
+2.26
+</td>
+<td>
+4.07
+</td>
+<td>
+3.12
+</td>
+<td>
+2.42
+</td>
+</tr>
+<tr>
+<td>
+Shares used in EPS calculation, diluted (GAAP and non-GAAP)
+</td>
+<td>
+3,249
+</td>
+<td>
+3,386
+</td>
+<td>
+3,475
+</td>
+<td>
+3,485
+</td>
+<td>
+3,498
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders (GAAP)
+</td>
+<td>
+721
+</td>
+<td>
+5,519
+</td>
+<td>
+12,556
+</td>
+<td>
+14,997
+</td>
+<td>
+7,091
+</td>
+</tr>
+<tr>
+<td>
+Interest expense
+</td>
+<td>
+748
+</td>
+<td>
+371
+</td>
+<td>
+191
+</td>
+<td>
+156
+</td>
+<td>
+350
+</td>
+</tr>
+<tr>
+<td>
+Provision for (benefit from) income taxes
+</td>
+<td>
+292
+</td>
+<td>
+699
+</td>
+<td>
+1,132
+</td>
+<td>
+(5,001)
+</td>
+<td>
+1,837
+</td>
+</tr>
+<tr>
+<td>
+Depreciation, amortization and impairment
+</td>
+<td>
+2,322
+</td>
+<td>
+2,911
+</td>
+<td>
+3,747
+</td>
+<td>
+4,667
+</td>
+<td>
+5,368
+</td>
+</tr>
+<tr>
+<td>
+Stock-based compensation expense
+</td>
+<td>
+1,734
+</td>
+<td>
+2,121
+</td>
+<td>
+1,560
+</td>
+<td>
+1,812
+</td>
+<td>
+1,999
+</td>
+</tr>
+<tr>
+<td>
+Adjusted EBITDA (non-GAAP)
+</td>
+<td>
+5,817
+</td>
+<td>
+11,621
+</td>
+<td>
+19,186
+</td>
+<td>
+16,331
+</td>
+<td>
+16,645
+</td>
+</tr>
+<tr>
+<td>
+Total revenues
+</td>
+<td>
+31,536
+</td>
+<td>
+53,823
+</td>
+<td>
+81,462
+</td>
+<td>
+96,773
+</td>
+<td>
+97,690
+</td>
+</tr>
+<tr>
+<td>
+Adjusted EBITDA margin (non-GAAP)
+</td>
+<td>
+18.4%
+</td>
+<td>
+21.6%
+</td>
+<td>
+23.6%
+</td>
+<td>
+17.2%
+</td>
+<td>
+17.0%
+</td>
+</tr>
+</table>
+<p>R E C O N C I L I A T I O N O F G A A P T O N O N – G A A P F I N A N
+C I A L I N F O R M A T I O N<br />
+(Unaudited)</p>
+<table>
+<tr>
+<td>
+In millions of USD
+</td>
+<td>
+2Q-2021
+</td>
+<td>
+3Q-2021
+</td>
+<td>
+4Q-2021
+</td>
+<td>
+1Q-2022
+</td>
+<td>
+2Q-2022
+</td>
+<td>
+3Q-2022
+</td>
+<td>
+4Q-2022
+</td>
+<td>
+1Q-2023
+</td>
+<td>
+2Q-2023
+</td>
+<td>
+3Q-2023
+</td>
+<td>
+4Q-2023
+</td>
+<td>
+1Q-2024
+</td>
+<td>
+2Q-2024
+</td>
+<td>
+3Q-2024
+</td>
+<td>
+4Q-2024
+</td>
+</tr>
+<tr>
+<td>
+Net cash provided by operating activities (GAAP)
+</td>
+<td>
+2,124
+</td>
+<td>
+3,147
+</td>
+<td>
+4,585
+</td>
+<td>
+3,995
+</td>
+<td>
+2,351
+</td>
+<td>
+5,100
+</td>
+<td>
+3,278
+</td>
+<td>
+2,513
+</td>
+<td>
+3,065
+</td>
+<td>
+3,308
+</td>
+<td>
+4,370
+</td>
+<td>
+242
+</td>
+<td>
+3,612
+</td>
+<td>
+6,255
+</td>
+<td>
+4,814
+</td>
+</tr>
+<tr>
+<td>
+Capital expenditures
+</td>
+<td>
+(1,505)
+</td>
+<td>
+(1,819)
+</td>
+<td>
+(1,810)
+</td>
+<td>
+(1,767)
+</td>
+<td>
+(1,730)
+</td>
+<td>
+(1,803)
+</td>
+<td>
+(1,858)
+</td>
+<td>
+(2,072)
+</td>
+<td>
+(2,060)
+</td>
+<td>
+(2,460)
+</td>
+<td>
+(2,306)
+</td>
+<td>
+(2,773)
+</td>
+<td>
+(2,270)
+</td>
+<td>
+(3,513)
+</td>
+<td>
+(2,783)
+</td>
+</tr>
+<tr>
+<td>
+Free cash flow (non-GAAP)
+</td>
+<td>
+619
+</td>
+<td>
+1,328
+</td>
+<td>
+2,775
+</td>
+<td>
+2,228
+</td>
+<td>
+621
+</td>
+<td>
+3,297
+</td>
+<td>
+1,420
+</td>
+<td>
+441
+</td>
+<td>
+1,005
+</td>
+<td>
+848
+</td>
+<td>
+2,064
+</td>
+<td>
+(2,531)
+</td>
+<td>
+1,342
+</td>
+<td>
+2,742
+</td>
+<td>
+2,031
+</td>
+</tr>
+<tr>
+<td>
+In millions of USD
+</td>
+<td>
+2Q-2021
+</td>
+<td>
+3Q-2021
+</td>
+<td>
+4Q-2021
+</td>
+<td>
+1Q-2022
+</td>
+<td>
+2Q-2022
+</td>
+<td>
+3Q-2022
+</td>
+<td>
+4Q-2022
+</td>
+<td>
+1Q-2023
+</td>
+<td>
+2Q-2023
+</td>
+<td>
+3Q-2023
+</td>
+<td>
+4Q-2023
+</td>
+<td>
+1Q-2024
+</td>
+<td>
+2Q-2024
+</td>
+<td>
+3Q-2024
+</td>
+<td>
+3Q-2024
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders (GAAP)
+</td>
+<td>
+1,142
+</td>
+<td>
+1,618
+</td>
+<td>
+2,321
+</td>
+<td>
+3,318
+</td>
+<td>
+2,259
+</td>
+<td>
+3,292
+</td>
+<td>
+3,687
+</td>
+<td>
+2,513
+</td>
+<td>
+2,703
+</td>
+<td>
+1,853
+</td>
+<td>
+7,928
+</td>
+<td>
+1,129
+</td>
+<td>
+1,478
+</td>
+<td>
+2,167
+</td>
+<td>
+2,317
+</td>
+</tr>
+<tr>
+<td>
+Interest expense
+</td>
+<td>
+75
+</td>
+<td>
+126
+</td>
+<td>
+71
+</td>
+<td>
+61
+</td>
+<td>
+44
+</td>
+<td>
+53
+</td>
+<td>
+33
+</td>
+<td>
+29
+</td>
+<td>
+28
+</td>
+<td>
+38
+</td>
+<td>
+61
+</td>
+<td>
+76
+</td>
+<td>
+86
+</td>
+<td>
+92
+</td>
+<td>
+96
+</td>
+</tr>
+<tr>
+<td>
+Provision for (benefit from) income taxes
+</td>
+<td>
+115
+</td>
+<td>
+223
+</td>
+<td>
+292
+</td>
+<td>
+346
+</td>
+<td>
+205
+</td>
+<td>
+305
+</td>
+<td>
+276
+</td>
+<td>
+261
+</td>
+<td>
+323
+</td>
+<td>
+167
+</td>
+<td>
+(5,752)
+</td>
+<td>
+409
+</td>
+<td>
+393
+</td>
+<td>
+601
+</td>
+<td>
+434
+</td>
+</tr>
+<tr>
+<td>
+Depreciation, amortization and impairment
+</td>
+<td>
+681
+</td>
+<td>
+761
+</td>
+<td>
+848
+</td>
+<td>
+880
+</td>
+<td>
+922
+</td>
+<td>
+956
+</td>
+<td>
+989
+</td>
+<td>
+1,046
+</td>
+<td>
+1,154
+</td>
+<td>
+1,235
+</td>
+<td>
+1,232
+</td>
+<td>
+1,246
+</td>
+<td>
+1,278
+</td>
+<td>
+1,348
+</td>
+<td>
+1,496
+</td>
+</tr>
+<tr>
+<td>
+Stock-based compensation expense
+</td>
+<td>
+474
+</td>
+<td>
+475
+</td>
+<td>
+558
+</td>
+<td>
+418
+</td>
+<td>
+361
+</td>
+<td>
+362
+</td>
+<td>
+419
+</td>
+<td>
+418
+</td>
+<td>
+445
+</td>
+<td>
+465
+</td>
+<td>
+484
+</td>
+<td>
+524
+</td>
+<td>
+439
+</td>
+<td>
+457
+</td>
+<td>
+579
+</td>
+</tr>
+<tr>
+<td>
+Adjusted EBITDA (non-GAAP)
+</td>
+<td>
+2,487
+</td>
+<td>
+3,203
+</td>
+<td>
+4,090
+</td>
+<td>
+5,023
+</td>
+<td>
+3,791
+</td>
+<td>
+4,968
+</td>
+<td>
+5,404
+</td>
+<td>
+4,267
+</td>
+<td>
+4,653
+</td>
+<td>
+3,758
+</td>
+<td>
+3,953
+</td>
+<td>
+3,384
+</td>
+<td>
+3,674
+</td>
+<td>
+4,665
+</td>
+<td>
+4,922
+</td>
+</tr>
+</table>
+<table>
+<tr>
+<td>
+In millions of USD
+</td>
+<td>
+1Q-2022
+</td>
+<td>
+2Q-2022
+</td>
+<td>
+3Q-2022
+</td>
+<td>
+4Q-2022
+</td>
+<td>
+1Q-2023
+</td>
+<td>
+2Q-2023
+</td>
+<td>
+3Q-2023
+</td>
+<td>
+4Q-2023
+</td>
+<td>
+1Q-2024
+</td>
+<td>
+2Q-2024
+</td>
+<td>
+3Q-2024
+</td>
+<td>
+4Q-2024
+</td>
+</tr>
+<tr>
+<td>
+Net cash provided by operating activities – TTM (GAAP)
+</td>
+<td>
+13,851
+</td>
+<td>
+14,078
+</td>
+<td>
+16,031
+</td>
+<td>
+14,724
+</td>
+<td>
+13,242
+</td>
+<td>
+13,956
+</td>
+<td>
+12,164
+</td>
+<td>
+13,256
+</td>
+<td>
+10,985
+</td>
+<td>
+11,532
+</td>
+<td>
+14,479
+</td>
+<td>
+14,923
+</td>
+</tr>
+<tr>
+<td>
+Capital expenditures – TTM
+</td>
+<td>
+(6,901)
+</td>
+<td>
+(7,126)
+</td>
+<td>
+(7,110)
+</td>
+<td>
+(7,158)
+</td>
+<td>
+(7,463)
+</td>
+<td>
+(7,793)
+</td>
+<td>
+(8,450)
+</td>
+<td>
+(8,898)
+</td>
+<td>
+(9,599)
+</td>
+<td>
+(9,809)
+</td>
+<td>
+(10,862)
+</td>
+<td>
+(11,339)
+</td>
+</tr>
+<tr>
+<td>
+Free cash flow – TTM (non-GAAP)
+</td>
+<td>
+6,950
+</td>
+<td>
+6,952
+</td>
+<td>
+8,921
+</td>
+<td>
+7,566
+</td>
+<td>
+5,779
+</td>
+<td>
+6,163
+</td>
+<td>
+3,714
+</td>
+<td>
+4,358
+</td>
+<td>
+1,386
+</td>
+<td>
+1,723
+</td>
+<td>
+3,617
+</td>
+<td>
+3,584
+</td>
+</tr>
+<tr>
+<td>
+In millions of USD
+</td>
+<td>
+1Q-2022
+</td>
+<td>
+2Q-2022
+</td>
+<td>
+3Q-2022
+</td>
+<td>
+4Q-2022
+</td>
+<td>
+1Q-2023
+</td>
+<td>
+2Q-2023
+</td>
+<td>
+3Q-2023
+</td>
+<td>
+4Q-2023
+</td>
+<td>
+1Q-2024
+</td>
+<td>
+2Q-2024
+</td>
+<td>
+3Q-2024
+</td>
+<td>
+3Q-2024
+</td>
+</tr>
+<tr>
+<td>
+Net income attributable to common stockholders – TTM (GAAP)
+</td>
+<td>
+8,399
+</td>
+<td>
+9,516
+</td>
+<td>
+11,190
+</td>
+<td>
+12,556
+</td>
+<td>
+11,751
+</td>
+<td>
+12,195
+</td>
+<td>
+10,756
+</td>
+<td>
+14,997
+</td>
+<td>
+13,613
+</td>
+<td>
+12,388
+</td>
+<td>
+12,702
+</td>
+<td>
+7,091
+</td>
+</tr>
+<tr>
+<td>
+Interest expense – TTM
+</td>
+<td>
+333
+</td>
+<td>
+302
+</td>
+<td>
+229
+</td>
+<td>
+191
+</td>
+<td>
+159
+</td>
+<td>
+143
+</td>
+<td>
+128
+</td>
+<td>
+156
+</td>
+<td>
+203
+</td>
+<td>
+261
+</td>
+<td>
+315
+</td>
+<td>
+350
+</td>
+</tr>
+<tr>
+<td>
+Provision for (benefit from) income taxes – TTM
+</td>
+<td>
+976
+</td>
+<td>
+1,066
+</td>
+<td>
+1,148
+</td>
+<td>
+1,132
+</td>
+<td>
+1,047
+</td>
+<td>
+1,165
+</td>
+<td>
+1,027
+</td>
+<td>
+(5,001)
+</td>
+<td>
+(4,853)
+</td>
+<td>
+(4,783)
+</td>
+<td>
+(4,349)
+</td>
+<td>
+1,837
+</td>
+</tr>
+<tr>
+<td>
+Depreciation, amortization and impairment – TTM
+</td>
+<td>
+3,170
+</td>
+<td>
+3,411
+</td>
+<td>
+3,606
+</td>
+<td>
+3,747
+</td>
+<td>
+3,913
+</td>
+<td>
+4,145
+</td>
+<td>
+4,424
+</td>
+<td>
+4,667
+</td>
+<td>
+4,867
+</td>
+<td>
+4,991
+</td>
+<td>
+5,104
+</td>
+<td>
+5,368
+</td>
+</tr>
+<tr>
+<td>
+Stock-based compensation expense – TTM
+</td>
+<td>
+1,925
+</td>
+<td>
+1,812
+</td>
+<td>
+1,699
+</td>
+<td>
+1,560
+</td>
+<td>
+1,560
+</td>
+<td>
+1,644
+</td>
+<td>
+1,747
+</td>
+<td>
+1,812
+</td>
+<td>
+1,918
+</td>
+<td>
+1,912
+</td>
+<td>
+1,904
+</td>
+<td>
+1,999
+</td>
+</tr>
+<tr>
+<td>
+Adjusted EBITDA – TTM (non-GAAP)
+</td>
+<td>
+14,803
+</td>
+<td>
+16,107
+</td>
+<td>
+17,872
+</td>
+<td>
+19,186
+</td>
+<td>
+18,430
+</td>
+<td>
+19,292
+</td>
+<td>
+18,082
+</td>
+<td>
+16,631
+</td>
+<td>
+15,748
+</td>
+<td>
+14,769
+</td>
+<td>
+15,676
+</td>
+<td>
+16,645
+</td>
+</tr>
+</table>
+<h1 id="webcast-information">WEBCAST INFORMATION</h1>
+<p>Tesla will provide a live webcast of its fourth quarter 2024
+financial results conference call beginning at 4:30 p.m. CT on January
+29, 2025 at ir.tesla.com. This webcast will also be available for replay
+for approximately one year thereafter.</p>
+<h1 id="certain-terms">CERTAIN TERMS</h1>
+<p>When used in this update, certain terms have the following meanings.
+Our vehicle deliveries include only vehicles that have been transferred
+to end customers with all paperwork correctly completed. Our energy
+product deployment volume includes both customer units when installed
+and equipment sales at time of delivery. “Adjusted EBITDA” is equal to
+(i) net income (loss) attributable to common stockholders before (ii)(a)
+interest expense, (b) provision for income taxes, (c) depreciation,
+amortization and impairment and (d) stock-based compensation expense.
+“Free cash flow” is operating cash flow less capital expenditures.
+Average cost per vehicle is cost of automotive sales divided by new
+vehicle deliveries (excluding operating leases). “Days sales
+outstanding” is equal to (i) average accounts receivable, net for the
+period divided by (ii) total revenues and multiplied by (iii) the number
+of days in the period. “Days payable outstanding” is equal to (i)
+average accounts payable for the period divided by (ii) total cost of
+revenues and multiplied by (iii) the number of days in the period. “Days
+of supply” is calculated by dividing new car ending inventory by the
+relevant period’s deliveries and using trading days. Constant currency
+impacts are calculated by comparing actuals against current results
+converted into USD using average exchange rates from the prior
+period.</p>
+<h1 id="non-gaap-financial-information">NON-GAAP FINANCIAL
+INFORMATION</h1>
+<p>Consolidated financial information has been presented in accordance
+with GAAP as well as on a non-GAAP basis to supplement our consolidated
+financial results. Our non-GAAP financial measures include non-GAAP net
+income (loss) attributable to common stockholders, non-GAAP net income
+(loss) attributable to common stockholders on a diluted per share basis
+(calculated using weighted average shares for GAAP diluted net income
+(loss) attributable to common stockholders), Adjusted EBITDA, Adjusted
+EBITDA margin and free cash flow. These non-GAAP financial measures also
+facilitate management’s internal comparisons to Tesla’s historical
+performance as well as comparisons to the operating results of other
+companies. Management believes that it is useful to supplement its GAAP
+financial statements with this non-GAAP information because management
+uses such information internally for its operating, budgeting and
+financial planning purposes. Management also believes that presentation
+of the non-GAAP financial measures provides useful information to our
+investors regarding our financial condition and results of operations,
+so that investors can see through the eyes of Tesla management regarding
+important financial metrics that Tesla uses to run the business and
+allowing investors to better understand Tesla’s performance. Non-GAAP
+information is not prepared under a comprehensive set of accounting
+rules and therefore, should only be read in conjunction with financial
+information reported under U.S. GAAP when understanding Tesla’s
+operating performance. A reconciliation between GAAP and non-GAAP
+financial information is provided above.</p>
+<h1 id="forward-looking-statements">FORWARD-LOOKING STATEMENTS</h1>
+<p>Certain statements in this update, including, but not limited to,
+statements in the “Outlook” section; statements relating to the
+development, strategy, ramp, production and capacity, demand and market
+growth, cost, pricing and profitability, investment, deliveries,
+deployment, availability and other features and improvements and timing
+of existing and future Tesla products and services; statements regarding
+operating margin, operating profits, spending and liquidity; and
+statements regarding expansion, improvements and/or ramp and related
+timing at our factories and refinery are “forward-looking statements”
+within the meaning of the Private Securities Litigation Reform Act of
+1995. Forward-looking statements are based on assumptions and
+management’s current expectations, involve certain risks and
+uncertainties, and are not guarantees. Future results may differ
+materially from those expressed in any forward-looking statement. The
+following important factors, without limitation, could cause actual
+results to differ materially from those in the forward-looking
+statements: the risk of delays in launching and/or manufacturing our
+products, services and features cost-effectively; our ability to build
+and/or grow our products and services, sales, delivery, installation,
+servicing and charging capabilities and effectively manage this growth;
+our ability to successfully and timely develop, introduce and scale, as
+well as our consumers’ demand for, products and services based on
+artificial intelligence, robotics and automation, electric vehicles,
+Autopilot and FSD (Supervised) features, and ride-hailing services
+generally and our vehicles and services specifically; the ability of
+suppliers to deliver components according to schedules, prices, quality
+and volumes acceptable to us, and our ability to manage such components
+effectively; any issues with lithium-ion cells or other components
+manufactured at our factories; our ability to ramp our factories in
+accordance with our plans; our ability to procure supply of battery
+cells, including through our own manufacturing; risks relating to
+international expansion; any failures by Tesla products to perform as
+expected or if product recalls occur; the risk of product liability
+claims; competition in the automotive, transportation and energy product
+and services markets; our ability to maintain public credibility and
+confidence in our long-term business prospects; our ability to manage
+risks relating to our various product financing programs; the status of
+government and economic incentives for electric vehicles and energy
+products; our ability to attract, hire and retain key employees and
+qualified personnel; our ability to maintain the security of our
+information and production and product systems; our compliance with
+various regulations and laws applicable to our operations and products,
+which may evolve from time to time; risks relating to our indebtedness
+and financing strategies; and adverse foreign exchange movements. More
+information on potential factors that could affect our financial results
+is included from time to time in our Securities and Exchange Commission
+filings and reports, including the risks identified under the section
+captioned “Risk Factors” in our annual report on Form 10-K filed with
+the SEC on January 29, 2024 and subsequent quarterly reports on Form
+10-Q. Tesla disclaims any obligation to update information contained in
+these forward-looking statements whether as a result of new information,
+future events or otherwise.</p>
+<p>T=sln</p>
+</body>
+</html>
