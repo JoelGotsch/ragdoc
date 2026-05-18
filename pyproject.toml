@@ -1,0 +1,134 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ragdoc"
+version = "0.1.0"
+description = "A library to assist with chunking and preprocessing of documents for usage in LLM usecases."
+readme = "README.md"
+license = {text = "Proprietary"}
+requires-python= ">=3.10,<4"
+authors = [
+    { name = "Joel GOTSCH", email = "contact@joelgotsch.com" },
+]
+dependencies = [
+    "tiktoken>=0.4.0,<1.0.0",
+    "funcy>=2.0,<3",
+    "pandas>=2.0.3,<3",
+    "pandas-stubs>=2.0.3.230814,<3",
+    "numpy>=1.26.4,<3",
+    "transformers>=4.31.0,<6",
+    "openpyxl>=3.1.2,<4",
+    "tabulate>=0.9.0,<1",
+    "pypandoc-binary>=1.14,<2",
+    "beautifulsoup4>=4.12.3,<5",
+    "pymupdf>=1.24.3,<2",
+    "markdownify>=0.12.1,<1",
+    "pydantic>=2.10.2,<3",
+    "lxml>=5.3.0,<6",
+    "click>=8.1.7,<9",
+    "orjson>=3.10.11,<4",
+    "openai>=1.54.5,<3",
+    #     "pillow>=12.1.1",
+    "pillow>=11.1.1",
+    "aiofiles>=25.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/joelgotsch/ragdoc"
+
+[project.optional-dependencies]
+azure_di = ["azure-ai-documentintelligence>=1.0.0"]
+pdf_mineru = [
+    "pylatexenc>=2.10,<3",
+    "pydantic-settings>=2.13.0",
+    "latex2mathml>=3.79.0",
+]
+qdrant = ["qdrant-client>=1.9,<2"]
+    
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2.2",
+    "pytest-cov>=6.0.0",
+    "coverage[toml]>=7.6.0",
+    "pytest-watcher>=0.4.2",
+    "python-dotenv>=1.0.1",
+    "pip>=25.0.1",
+    "devtools>=0.12.2",
+    "pytest-cov>=7.0.0",
+    "anyio>=4.12.1",
+    "python-docx>=1.2.0",
+    "types-aiofiles>=25.1.0.20260409",
+    "nest-asyncio>=1.6.0",
+]
+docs = [
+    "autodoc-pydantic>=2.2.0",
+    "myst-parser>=4.0.0",
+    "myst-nb>=1.1.1",
+    "sphinx-rtd-theme>=2.0.0",
+    "tomli>=2.0.1",
+    "ipykernel>=6.29.5",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.6",
+    "mkdocstrings[python]>=1.0.3",
+    "mkdocs-jupyter>=0.25.1",
+    "mkdocs-autorefs>=1.4.4",
+    "mike>=2.1.4",
+    "marimo>=0.23.0",
+]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "-ra",
+    "-v",
+    "--tb=short",
+    "--cov=ragdoc",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+]
+
+
+[tool.coverage.run]
+source = ["ragpill"]
+branch = true
+omit = ["tests/*", "*/site-packages/*"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "@overload",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+
+[tool.coverage.paths]
+source = ["src/ragdoc", "*/site-packages/ragdoc"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+src_paths = ["src"]
+known_first_party = ["ragdoc"]
+
+
+[tool.mypy]
+mypy_path = "src"
+disallow_untyped_defs = true
+disallow_any_unimported = true
+no_implicit_optional = true
+namespace_packages = true
+
+[tool.tox]
+
+[tool.pylint]
+
+[tool.cruft]

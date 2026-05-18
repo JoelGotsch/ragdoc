@@ -1,0 +1,96 @@
+site_name: ragdoc
+site_description: A library for chunking and preprocessing documents for LLM use cases
+site_author: Joel GOTSCH
+site_url: https://joelgotsch.github.io/ragdoc/
+docs_dir: docs
+repo_url: https://github.com/joelgotsch/ragdoc
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_source: true
+            show_signature_annotations: true
+            separate_signature: true
+            merge_init_into_class: true
+            show_if_no_docstring: false
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+  - Guide:
+      - Overview: guide/overview.md
+      - Document Model: guide/document-model.md
+      - Parsing: guide/parsing.md
+      - Merging: guide/merging.md
+      - Rendering: guide/rendering.md
+      - Splitting: guide/splitting.md
+      - Chunking: guide/chunking.md
+      - Pipeline: guide/pipeline.md
+      - Custom Metadata: guide/custom-metadata.md
+  - API Reference:
+      - Document: api/document.md
+      - Configuration: api/config.md
+      - Parsing: api/parsing.md
+      - Processing: api/processing.md
+      - Rendering: api/rendering.md
+      - Splitting: api/splitting.md
+      - Chunking: api/chunking.md
+      - Pipeline: api/pipeline.md
+      - Metadata: api/metadata.md
+      - Utilities: api/utils.md
+      - Integrations: api/integrations.md
+  - Development:
+      - Contributing: development/contributing.md
+  - Tutorials: tutorials.md
