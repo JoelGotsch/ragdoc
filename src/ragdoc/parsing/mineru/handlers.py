@@ -319,8 +319,10 @@ def handle_chart_block(block: ChartBlock, page: PageInfo, context: ParseContext)
     :class:`TableBlock` — which carries HTML in :attr:`TableSpan.html` — a
     chart body stores its data as a markdown string in :attr:`ChartSpan.content`.
 
-    The markdown is converted to HTML via pypandoc and emitted as a
-    :class:`~ragdoc.document.Table`.  Captions are emitted as
+    The markdown is converted to HTML via pypandoc (a core dependency) and emitted
+    as a :class:`~ragdoc.document.Table`.  If conversion fails for any reason the
+    chart body is silently skipped and a ``WARNING`` is logged; caption and footnote
+    elements are still emitted.  Captions are emitted as
     :class:`~ragdoc.document.Paragraph` elements and footnotes as
     :class:`~ragdoc.document.RawText`, following the same pattern as
     :func:`handle_table_block`.
@@ -367,8 +369,10 @@ def handle_chart_block(block: ChartBlock, page: PageInfo, context: ParseContext)
                 ))
             except Exception as exc:
                 logger.warning(
-                    "Could not convert chart markdown to HTML on page %d: %s",
+                    "Could not convert chart markdown to HTML on page %d (%s: %s); "
+                    "chart body skipped",
                     page_number,
+                    type(exc).__name__,
                     exc,
                 )
 
