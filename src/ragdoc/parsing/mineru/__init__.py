@@ -15,6 +15,7 @@ try:
         handle_code_block,
         handle_image_block,
         handle_table_block,
+        handle_chart_block,
         handle_discarded_as_footnote,
         handle_discarded_as_raw_text,
         handle_discarded_as_metadata,

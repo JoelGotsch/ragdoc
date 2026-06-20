@@ -62,10 +62,7 @@ class CoreExtractionMiddleware(BaseMiddleware):
                 elif isinstance(block, TableBlock):
                     results = self.config.handle_table(block, page, context)
                 elif isinstance(block, ChartBlock):
-                    # Charts are structurally tables (OCR'd markdown); reuse
-                    # the table handler. A ChartBlock duck-types as TableBlock
-                    # since chart_body / chart_caption mirror the table API.
-                    results = self.config.handle_table(block, page, context)
+                    results = self.config.handle_chart(block, page, context)
                 elif isinstance(block, (RefTextBlock, InterlineEquationBlock)):
                     # Top-level ref_text (bibliography entries) and
                     # interline_equation blocks have the same shape as a

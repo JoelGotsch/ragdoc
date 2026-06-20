@@ -41,6 +41,11 @@ from ragdoc.document import (
 )
 
 from .base import (
+    ChartBlock,
+    ChartBodyBlock,
+    ChartCaptionBlock,
+    ChartFootnoteBlock,
+    ChartSpan,
     CodeBlock,
     DiscardedBlock,
     DiscardedBlockType,
@@ -293,6 +298,78 @@ def handle_table_block(block: TableBlock, page: PageInfo, context: ParseContext)
                 element=RawText(
                     innerhtml=fn_text,
                     bounding_box=_get_bounding_box(table_footnote),
+                    page=page_number,
+                ),
+                source_block=block,
+                source_page=page,
+            ))
+
+    return results
+
+
+def handle_chart_block(block: ChartBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+    """
+    Convert a :class:`ChartBlock` to zero or more elements.
+
+    MinerU v3.1+ emits ``chart`` blocks for figures whose visual content has
+    been OCR'd into a markdown table (bar charts, line plots, etc.).  Unlike
+    :class:`TableBlock` — which carries HTML in :attr:`TableSpan.html` — a
+    chart body stores its data as a markdown string in :attr:`ChartSpan.content`.
+
+    The markdown is converted to HTML via pypandoc and emitted as a
+    :class:`~ragdoc.document.Table`.  Caption and footnote sub-blocks follow
+    the same pattern as :func:`handle_table_block`.
+    """
+    from pypandoc import convert_text as _convert_text  # noqa: PLC0415
+
+    results: list[ParsedElement] = []
+    page_number = page.page_idx + 1
+
+    chart_caption = next((b for b in block.blocks if isinstance(b, ChartCaptionBlock)), None)
+    if chart_caption is not None:
+        caption_text = extract_text_from_lines(chart_caption.lines).strip()
+        if caption_text:
+            results.append(ParsedElement(
+                element=Paragraph(
+                    html=f"<p>{caption_text}</p>",
+                    bounding_box=_get_bounding_box(chart_caption),
+                    page=page_number,
+                ),
+                source_block=block,
+                source_page=page,
+            ))
+
+    chart_body = next((b for b in block.blocks if isinstance(b, ChartBodyBlock)), None)
+    if chart_body is not None:
+        chart_span = next(
+            (
+                span
+                for line in chart_body.lines
+                for span in line.spans
+                if isinstance(span, ChartSpan)
+            ),
+            None,
+        )
+        if chart_span is not None and chart_span.content.strip():
+            html_content = _convert_text(chart_span.content, to="html", format="markdown")
+            results.append(ParsedElement(
+                element=Table(
+                    html_content=html_content.strip(),
+                    bounding_box=_get_bounding_box(block),
+                    page=page_number,
+                ),
+                source_block=block,
+                source_page=page,
+            ))
+
+    chart_footnote = next((b for b in block.blocks if isinstance(b, ChartFootnoteBlock)), None)
+    if chart_footnote is not None:
+        fn_text = extract_text_from_lines(chart_footnote.lines).strip()
+        if fn_text:
+            results.append(ParsedElement(
+                element=RawText(
+                    innerhtml=fn_text,
+                    bounding_box=_get_bounding_box(chart_footnote),
                     page=page_number,
                 ),
                 source_block=block,
@@ -647,6 +724,9 @@ class ExtractionConfig:
     )
     handle_table: Callable[[TableBlock, PageInfo, ParseContext], list[ParsedElement]] = field(
         default_factory=lambda: handle_table_block
+    )
+    handle_chart: Callable[[ChartBlock, PageInfo, ParseContext], list[ParsedElement]] = field(
+        default_factory=lambda: handle_chart_block
     )
     discarded_handlers: dict[DiscardedBlockType, DiscardedBlockHandler] = field(
         default_factory=_default_discarded_handlers
