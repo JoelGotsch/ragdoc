@@ -20,9 +20,8 @@ Typical customisation::
 """
 
 from __future__ import annotations
-
 import base64
-import html
+import base64
 import logging
 import re
 from collections.abc import Callable
@@ -336,7 +335,7 @@ def handle_chart_block(block: ChartBlock, page: PageInfo, context: ParseContext)
         if caption_text:
             results.append(ParsedElement(
                 element=Paragraph(
-                    html=f"<p>{html.escape(caption_text)}</p>",
+                    html=f"<p>{caption_text}</p>",
                     bounding_box=_get_bounding_box(chart_caption),
                     page=page_number,
                 ),
@@ -370,10 +369,11 @@ def handle_chart_block(block: ChartBlock, page: PageInfo, context: ParseContext)
             except Exception as exc:
                 logger.warning(
                     "Could not convert chart markdown to HTML on page %d (%s: %s); "
-                    "chart body skipped",
+                    "chart body skipped. Content prefix: %r",
                     page_number,
                     type(exc).__name__,
                     exc,
+                    chart_span.content[:100],
                 )
 
     chart_footnote = next((b for b in block.blocks if isinstance(b, ChartFootnoteBlock)), None)
