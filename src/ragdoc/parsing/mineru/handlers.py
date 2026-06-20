@@ -22,6 +22,7 @@ Typical customisation::
 from __future__ import annotations
 
 import base64
+import html
 import logging
 import re
 from collections.abc import Callable
@@ -29,6 +30,8 @@ from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
 from typing import Protocol
+
+from pypandoc import convert_text as _pandoc_convert
 
 from ragdoc.document import (
     DocumentList,
@@ -317,11 +320,11 @@ def handle_chart_block(block: ChartBlock, page: PageInfo, context: ParseContext)
     chart body stores its data as a markdown string in :attr:`ChartSpan.content`.
 
     The markdown is converted to HTML via pypandoc and emitted as a
-    :class:`~ragdoc.document.Table`.  Caption and footnote sub-blocks follow
-    the same pattern as :func:`handle_table_block`.
+    :class:`~ragdoc.document.Table`.  Captions are emitted as
+    :class:`~ragdoc.document.Paragraph` elements and footnotes as
+    :class:`~ragdoc.document.RawText`, following the same pattern as
+    :func:`handle_table_block`.
     """
-    from pypandoc import convert_text as _convert_text  # noqa: PLC0415
-
     results: list[ParsedElement] = []
     page_number = page.page_idx + 1
 
@@ -331,7 +334,7 @@ def handle_chart_block(block: ChartBlock, page: PageInfo, context: ParseContext)
         if caption_text:
             results.append(ParsedElement(
                 element=Paragraph(
-                    html=f"<p>{caption_text}</p>",
+                    html=f"<p>{html.escape(caption_text)}</p>",
                     bounding_box=_get_bounding_box(chart_caption),
                     page=page_number,
                 ),
@@ -351,16 +354,23 @@ def handle_chart_block(block: ChartBlock, page: PageInfo, context: ParseContext)
             None,
         )
         if chart_span is not None and chart_span.content.strip():
-            html_content = _convert_text(chart_span.content, to="html", format="markdown")
-            results.append(ParsedElement(
-                element=Table(
-                    html_content=html_content.strip(),
-                    bounding_box=_get_bounding_box(block),
-                    page=page_number,
-                ),
-                source_block=block,
-                source_page=page,
-            ))
+            try:
+                html_content = _pandoc_convert(chart_span.content, to="html", format="markdown")
+                results.append(ParsedElement(
+                    element=Table(
+                        html_content=html_content.strip(),
+                        bounding_box=_get_bounding_box(block),
+                        page=page_number,
+                    ),
+                    source_block=block,
+                    source_page=page,
+                ))
+            except Exception as exc:
+                logger.warning(
+                    "Could not convert chart markdown to HTML on page %d: %s",
+                    page_number,
+                    exc,
+                )
 
     chart_footnote = next((b for b in block.blocks if isinstance(b, ChartFootnoteBlock)), None)
     if chart_footnote is not None:
