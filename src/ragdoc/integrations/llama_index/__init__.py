@@ -47,6 +47,10 @@ def node_dict_to_document_fragment(node_dict: dict, content_replacement_key: str
 
     return Chunk(
         id=node_dict["id_"],
+        # Provenance is required on Chunk. LlamaIndex nodes carry no source-file hash,
+        # so fall back to the node id / declared source_id (never None).
+        source_id=metadata.get("source_id") or node_dict["id_"],
+        source_hash=metadata.get("source_hash") or node_dict["id_"],
         embedding_content=embedding_content,
         prompt_content=prompt_content,
         metadata=metadata,

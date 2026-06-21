@@ -42,6 +42,7 @@ except ImportError as _e:
     ) from _e
 
 from ragdoc.chunking import Chunk
+from ragdoc.pipeline.stores import SourceState
 
 if TYPE_CHECKING:
     pass
@@ -469,3 +470,33 @@ class QdrantVectorStore:
                 break
             offset = next_offset  # type: ignore[reportAssignmentType]  # qdrant PointId is str | int at runtime
         return source_ids
+
+    async def list_source_state(self) -> dict[str, SourceState]:
+        """Return ``source_id`` -> :class:`SourceState` for every source, in one scan.
+
+        Scrolls the whole collection once, recording the first ``source_hash`` /
+        ``content_hash`` seen per ``source_id`` (all chunks of a source share them).
+        """
+        state: dict[str, SourceState] = {}
+        offset: str | int | None = None
+        while True:
+            results, next_offset = await self._client.scroll(
+                collection_name=self._collection_name,
+                scroll_filter=None,
+                with_payload=["source_id", "source_hash", "content_hash"],
+                with_vectors=False,
+                limit=_SCROLL_BATCH,
+                offset=offset,
+            )
+            for point in results:
+                payload = point.payload or {}
+                sid = payload.get("source_id")
+                if sid is not None and sid not in state:
+                    state[sid] = SourceState(
+                        source_hash=payload.get("source_hash") or "",
+                        content_hash=payload.get("content_hash"),
+                    )
+            if next_offset is None:
+                break
+            offset = next_offset  # type: ignore[reportAssignmentType]  # qdrant PointId is str | int at runtime
+        return state

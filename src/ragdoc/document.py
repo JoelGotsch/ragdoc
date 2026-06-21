@@ -536,6 +536,23 @@ class Document(BaseModel, Generic[TMetadata]):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for the document")
     source_path: str = Field(default="", description="Full path to the source file")
+    source_id: str | None = Field(
+        default=None,
+        description=(
+            "Sync identity key for this document, derived from its source Path by "
+            "DocumentPipeline.source_id_fn. Set before chunking; propagated onto each Chunk. "
+            "None when the document was not produced through a sync pipeline."
+        ),
+    )
+    source_hash: str | None = Field(
+        default=None,
+        description=(
+            "SHA-256 hex digest of the original source file bytes, set by "
+            "DocumentPipeline.hash_fn before chunking. True file provenance (not content). "
+            "None when not produced through a sync pipeline. For content-based change "
+            "detection use the content_hash() method."
+        ),
+    )
     title: str | None = Field(default=None, description="Title of the document, usually derived from the main heading")
     elements: list[ElementType] = Field(default_factory=list, description="Elements in this document")
     metadata: SkipValidation[TMetadata] = Field(default_factory=dict)  # type: ignore[assignment]

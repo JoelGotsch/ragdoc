@@ -32,7 +32,7 @@ def make_embedder(vectors: list[list[float]]) -> Embedder:
 
 
 def make_chunk(**overrides: object) -> Chunk:
-    defaults: dict = dict(prompt_content="prompt text", embedding_content="embed text")
+    defaults: dict = dict(prompt_content="prompt text", embedding_content="embed text", source_id="s", source_hash="h")
     return Chunk(**(defaults | overrides))  # type: ignore[arg-type]
 
 

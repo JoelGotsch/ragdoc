@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, Literal, cast
@@ -99,6 +99,7 @@ class DocumentPipeline(Generic[TMetadata]):
         processors: list[DocumentProcessor] | ProcessingPipeline | None = None,
         splitter: TokenSplitter | None = None,
         chunker: Chunker | None = None,
+        source_id_fn: Callable[[Path], str] = lambda p: p.name,
         concurrency: int = 1,
         on_error: Literal["raise", "skip"] = "raise",
         metadata_type: type[TMetadata] | None = None,
@@ -110,6 +111,7 @@ class DocumentPipeline(Generic[TMetadata]):
         self._parser: Parser | AutoParser = parser or AutoParser()
         self._splitter = splitter
         self._chunker: Chunker = chunker or SimpleChunker()
+        self._source_id_fn = source_id_fn
         self._concurrency = concurrency
         self._on_error = on_error
         self._metadata_type = metadata_type
@@ -120,6 +122,16 @@ class DocumentPipeline(Generic[TMetadata]):
             self._processing_pipeline = processors
         else:
             self._processing_pipeline = PP(processors)
+
+    @property
+    def source_id_fn(self) -> Callable[[Path], str]:
+        """The Path -> source_id function this pipeline stamps onto documents.
+
+        Read by sync pipelines (``VectorStorePipeline`` / ``DocumentStorePipeline``) so the
+        pre-parse collision/orphan checks use the same identity function — single source of
+        truth, no drift.
+        """
+        return self._source_id_fn
 
     async def run(self, source: Path) -> list[Chunk[TMetadata]]:
         """Parse, process, split, and chunk a single file.
@@ -219,6 +231,14 @@ class DocumentPipeline(Generic[TMetadata]):
             logger.debug(f"Stream batch yielded: {len(batch)} chunks")
             yield batch
 
+    async def parse_and_process(self, source: Path) -> Document | None:
+        """Parse + process a file into a Document, **without** splitting or chunking.
+
+        Boundary-1 entry point for :class:`~ragdoc.pipeline.DocumentStorePipeline`, which
+        stores Documents (not chunks).  Returns ``None`` if a processor drops the document.
+        """
+        return await self._processing_pipeline.process(await self._parser(source))
+
     async def _process_one(self, source: Path) -> list[Chunk[TMetadata]]:
         logger.debug(f"Parsing {source.name}")
         doc = await self._parser(source)
@@ -226,13 +246,35 @@ class DocumentPipeline(Generic[TMetadata]):
         if not doc.source_path:
             logger.warning(
                 f"Parser did not set source_path on document from {source}. "
-                "Chunks will have null provenance fields. "
                 "Set doc.source_path in your parser function."
             )
 
-        doc = await self._processing_pipeline.process(doc)
+        # source_id is a pure function of the path (no I/O); set before chunking so it
+        # propagates onto every chunk. The file-byte source_hash is a sync concern and is
+        # stamped by the sync pipeline (VectorStorePipeline / DocumentStorePipeline).
+        doc.source_id = self._source_id_fn(source)
+        return await self.chunk_document(doc)
+
+    async def chunk_document(self, document: Document) -> list[Chunk[TMetadata]]:
+        """Process → split → chunk an already-parsed Document (skips parsing).
+
+        Shared tail of :meth:`run` and the entry point for re-chunking a Document read
+        back from a :class:`~ragdoc.pipeline.stores.DocumentStore` (Mode 2).
+
+        Provenance is materialized **uniformly** here: ``content_hash`` is computed once
+        from *document* and stamped on every chunk, and ``source_id`` / ``source_hash`` are
+        propagated to each split so a multi-split source produces chunks that share one
+        ``content_hash`` (required for Boundary-2 change detection).
+
+        Args:
+            document: A parsed (and optionally provenance-stamped) Document.
+
+        Returns:
+            List of chunks, or ``[]`` if the document is dropped by processing.
+        """
+        doc = await self._processing_pipeline.process(document)
         if doc is None:
-            logger.info(f"Document filtered out by processing pipeline: {source.name}")
+            logger.info("Document filtered out by processing pipeline")
             return []
 
         if self._metadata_type is not None:
@@ -244,12 +286,21 @@ class DocumentPipeline(Generic[TMetadata]):
                     f"Expected by {self._metadata_type.__name__}."
                 )
 
+        # Source-level provenance (uniform across all of this document's chunks).
+        content_hash = doc.content_hash()
+        source_id = doc.source_id or doc.source_path or doc.id
+        source_hash = doc.source_hash or content_hash
+
         typed_doc: Document[TMetadata] = cast("Document[TMetadata]", doc)
 
-        logger.debug(f"Splitting {source.name}")
         splits = self._splitter(typed_doc) if self._splitter else [typed_doc]
-        logger.debug(f"Split {source.name} into {len(splits)} sub-documents")
+        logger.debug(f"Split into {len(splits)} sub-documents")
+        for split in splits:
+            split.source_id = source_id
+            split.source_hash = source_hash
 
         chunks: list[Chunk[TMetadata]] = [c for split in splits for c in await self._chunker.chunk(split)]
-        logger.info(f"Completed {source.name}: {len(chunks)} chunks produced")
+        for chunk in chunks:
+            chunk.content_hash = content_hash
+        logger.info(f"Chunked document {source_id}: {len(chunks)} chunks produced")
         return chunks

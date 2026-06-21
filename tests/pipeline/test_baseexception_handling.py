@@ -102,9 +102,9 @@ async def test_vs_runtime_error_collected(tmp_path: Path):
     result = await vs.run([a, b])
 
     assert len(result.errors) == 1
-    assert result.errors[0][0] == a
+    assert result.errors[0][0] == a.name  # results are keyed on source_id
     assert isinstance(result.errors[0][1], RuntimeError)
-    assert b in result.processed
+    assert b.name in result.processed
     assert len(result.processed) == 1
 
 

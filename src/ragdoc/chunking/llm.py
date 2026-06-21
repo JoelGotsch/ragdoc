@@ -194,10 +194,16 @@ class LLMChunker(Chunker):
         )
 
         metadata = self._metadata_fn(document)
+        content_hash = document.content_hash()
+        source_id = document.source_id or document.source_path or document.id
+        source_hash = document.source_hash or content_hash
         chunks = [
             Chunk(
                 id=self._id_fn(document, i),
                 source_path=document.source_path or None,
+                source_id=source_id,
+                source_hash=source_hash,
+                content_hash=content_hash,
                 prompt_content=rendered,
                 embedding_content=summary,
                 metadata=metadata,  # type: ignore[reportArgumentType]  # metadata_fn returns MetadataDict
