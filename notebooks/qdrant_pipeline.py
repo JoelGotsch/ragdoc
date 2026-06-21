@@ -262,7 +262,7 @@ async def _():
 
     print(f"QdrantVectorStore would connect to {QDRANT_URL}, collection={COLLECTION!r}")
     print(f"  vector_size={VECTOR_SIZE} — must match the embedder output dimension")
-    print("  create() adds a source_id payload index → O(log n) filters in get_source_hash / delete_by_source")
+    print("  create() adds a source_id payload index → O(log n) filters in list_source_state / delete_by_source")
     print()
     print("  With sparse_vectors={'sparse': ServerSideVector('Qdrant/bm25')}:")
     print("    → named-vector layout: 'dense' + 'sparse' fields")
@@ -331,6 +331,11 @@ def _(doc_pipeline):
     #     async def embed(self, texts: list[str]) -> list[list[float]]:
     #         ...
     #
+    # # source_id_fn lives on the DocumentPipeline (single source of truth):
+    # doc_pipeline = DocumentPipeline(
+    #     splitter=..., chunker=...,
+    #     source_id_fn=lambda p: str(p.relative_to(DOCUMENTS_DIR)),  # portable multi-dir
+    # )
     # vs_pipeline = VectorStorePipeline(
     #     pipeline=doc_pipeline,
     #     vector_store=store,
@@ -338,7 +343,6 @@ def _(doc_pipeline):
     #         "dense":  EmbedderConfig(MyDenseEmbedder()),
     #         "sparse": EmbedderConfig(MySparseEmbedder(), text_fn=prompt_content_text),
     #     },
-    #     # source_id_fn=lambda p: str(p.relative_to(DOCUMENTS_DIR)),  # portable multi-dir
     # )
 
     print("VectorStorePipeline (illustrative — requires live Qdrant + embedders):")
@@ -394,8 +398,9 @@ def _(mo):
     mo.md(r"""
     ### Subsequent runs — unchanged files skipped
 
-    On re-runs, `VectorStorePipeline` reads the stored `source_hash` via `get_source_hash(source_id)`.
-    If the raw file bytes are unchanged, the file is skipped without parsing or embedding:
+    On re-runs, `VectorStorePipeline.plan()` reads all stored hashes in one call via
+    `list_source_state()`. If a file's bytes are unchanged (its `source_hash` matches), it is
+    skipped — it appears in `result.skipped` and in none of the ChangeSet lists:
     """)
     return
 
@@ -445,12 +450,15 @@ def _(mo):
     | Full path | `lambda p: str(p)` | Multi-dir, single machine |
     | Relative path | `lambda p: str(p.relative_to(base_dir))` | Portable multi-dir |
 
+    `source_id_fn` is set on the `DocumentPipeline` (the single source of truth); the
+    `VectorStorePipeline` reads it from there for collision/orphan checks.
+
     ```python
-    vs_pipeline = VectorStorePipeline(
-        pipeline=doc_pipeline,
-        vector_store=store,
+    doc_pipeline = DocumentPipeline(
+        splitter=..., chunker=...,
         source_id_fn=lambda p: str(p.relative_to(DOCUMENTS_DIR)),
     )
+    vs_pipeline = VectorStorePipeline(pipeline=doc_pipeline, vector_store=store)
     ```
     """)
     return

@@ -1109,6 +1109,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#plan-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        plan() / apply()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#running-against-a-directory" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1204,6 +1215,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scenario-d-two-stage-with-a-documentstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenario D — two-stage with a DocumentStore
+      
+    </span>
+  </a>
   
 </li>
       
@@ -2019,6 +2041,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#plan-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        plan() / apply()
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#running-against-a-directory" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2114,6 +2147,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scenario-d-two-stage-with-a-documentstore" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scenario D — two-stage with a DocumentStore
+      
+    </span>
+  </a>
   
 </li>
       
@@ -2336,7 +2380,7 @@ without parsing or uploading:</p>
 <a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="c1"># processed: 0, skipped: 42   (nothing changed)</span>
 </code></pre></div>
 <h3 id="handling-modifications-and-deletions">Handling modifications and deletions<a class="headerlink" href="#handling-modifications-and-deletions" title="Permanent link">&para;</a></h3>
-<p><code>VectorStorePipeline.run</code> handles all three cases automatically on every call:</p>
+<p><code>VectorStorePipeline.run</code> handles new and modified files automatically on every call:</p>
 <table>
 <thead>
 <tr>
@@ -2347,7 +2391,7 @@ without parsing or uploading:</p>
 <tbody>
 <tr>
 <td><strong>New file</strong></td>
-<td>Parsed, chunked, upserted; <code>source_id</code> and <code>source_hash</code> set on each chunk.</td>
+<td>Parsed, chunked, upserted; <code>source_id</code> / <code>source_hash</code> / <code>content_hash</code> set on each chunk.</td>
 </tr>
 <tr>
 <td><strong>Modified file</strong> (byte hash changed)</td>
@@ -2355,23 +2399,34 @@ without parsing or uploading:</p>
 </tr>
 <tr>
 <td><strong>Removed file</strong> (path no longer in source list)</td>
-<td>All chunks deleted by <code>source_id</code>.</td>
+<td>Kept by default; deleted only with <code>delete_orphans=True</code>.</td>
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Remove one file from the list — its chunks will be deleted automatically</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">vs_pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">paths</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">deleted</span><span class="p">)</span>  <span class="c1"># [&quot;old_report.docx&quot;]  (source IDs, not paths)</span>
+<p>Orphan deletion is <strong>opt-in</strong> and must be requested explicitly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># ⚠ delete_orphans=True deletes every source NOT in `paths`. Only safe when `paths`</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="c1"># is your COMPLETE corpus — an incremental subset would wipe everything else.</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">vs_pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">all_paths</span><span class="p">,</span> <span class="n">delete_orphans</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">deleted</span><span class="p">)</span>  <span class="c1"># [&quot;old_report.docx&quot;]  (source IDs, not paths)</span>
+</code></pre></div>
+<h3 id="plan-apply">plan() / apply()<a class="headerlink" href="#plan-apply" title="Permanent link">&para;</a></h3>
+<p><code>run()</code> is <code>apply(plan(...))</code>. Call them separately to review changes before they reach the
+store — <code>plan()</code> returns a serializable <code>ChangeSet</code> and does not touch the store:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">changeset</span> <span class="o">=</span> <span class="k">await</span> <span class="n">vs_pipeline</span><span class="o">.</span><span class="n">plan</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="n">changeset</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;review/changes.json&quot;</span><span class="p">))</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="c1"># ... inspect / edit the JSON ...</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="n">approved</span> <span class="o">=</span> <span class="n">ChangeSet</span><span class="p">[</span><span class="n">Chunk</span><span class="p">]</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;review/changes.json&quot;</span><span class="p">))</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">vs_pipeline</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">approved</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="running-against-a-directory">Running against a directory<a class="headerlink" href="#running-against-a-directory" title="Permanent link">&para;</a></h3>
 <p>Use <code>run_directory</code> to discover files automatically:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">vs_pipeline</span><span class="o">.</span><span class="n">run_directory</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;docs/&quot;</span><span class="p">),</span> <span class="n">glob</span><span class="o">=</span><span class="s2">&quot;**/*.docx&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">vs_pipeline</span><span class="o">.</span><span class="n">run_directory</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;docs/&quot;</span><span class="p">),</span> <span class="n">glob</span><span class="o">=</span><span class="s2">&quot;**/*.docx&quot;</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="error-handling_1">Error handling<a class="headerlink" href="#error-handling_1" title="Permanent link">&para;</a></h3>
 <p>Per-file exceptions are collected in <code>UpdateResult.errors</code> rather than propagated:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">vs_pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">exc</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;FAILED </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">vs_pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">exc</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;FAILED </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
 <hr />
 <h2 id="scenario-c-qdrant-vector-store">Scenario C — Qdrant vector store<a class="headerlink" href="#scenario-c-qdrant-vector-store" title="Permanent link">&para;</a></h2>
@@ -2379,25 +2434,25 @@ without parsing or uploading:</p>
 concrete implementation of <code>VectorStore</code>, backed by <code>qdrant-client</code>'s
 <code>AsyncQdrantClient</code>.</p>
 <p>Install the extra first:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;ragdoc[qdrant]&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;ragdoc[qdrant]&quot;</span>
 </code></pre></div>
 <h3 id="create-a-store-and-run-incremental-sync">Create a store and run incremental sync<a class="headerlink" href="#create-a-store-and-run-incremental-sync" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">qdrant_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncQdrantClient</span>
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.integrations.vector_stores</span><span class="w"> </span><span class="kn">import</span> <span class="n">QdrantVectorStore</span>
-<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">DocumentPipeline</span><span class="p">,</span> <span class="n">VectorStorePipeline</span><span class="p">,</span> <span class="n">TokenSplitter</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="n">client</span> <span class="o">=</span> <span class="n">AsyncQdrantClient</span><span class="p">(</span><span class="s2">&quot;http://localhost:6333&quot;</span><span class="p">)</span>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="c1"># create() creates the collection (and a source_id payload index) if it doesn&#39;t exist.</span>
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="c1"># Safe to call on every startup — it is idempotent.</span>
-<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="n">store</span> <span class="o">=</span> <span class="k">await</span> <span class="n">QdrantVectorStore</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="s2">&quot;my_docs&quot;</span><span class="p">,</span> <span class="n">vector_size</span><span class="o">=</span><span class="mi">1536</span><span class="p">)</span>
-<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>
-<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">DocumentPipeline</span><span class="p">(</span><span class="n">splitter</span><span class="o">=</span><span class="n">TokenSplitter</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">4000</span><span class="p">))</span>
-<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="n">vs_pipeline</span> <span class="o">=</span> <span class="n">VectorStorePipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="o">=</span><span class="n">pipeline</span><span class="p">,</span> <span class="n">vector_store</span><span class="o">=</span><span class="n">store</span><span class="p">)</span>
-<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>
-<a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">vs_pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;docs/&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;**/*.docx&quot;</span><span class="p">)))</span>
-<a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;processed: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">processed</span><span class="p">)</span><span class="si">}</span><span class="s2">, skipped: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">skipped</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">qdrant_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncQdrantClient</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.integrations.vector_stores</span><span class="w"> </span><span class="kn">import</span> <span class="n">QdrantVectorStore</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">DocumentPipeline</span><span class="p">,</span> <span class="n">VectorStorePipeline</span><span class="p">,</span> <span class="n">TokenSplitter</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="n">client</span> <span class="o">=</span> <span class="n">AsyncQdrantClient</span><span class="p">(</span><span class="s2">&quot;http://localhost:6333&quot;</span><span class="p">)</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="c1"># create() creates the collection (and a source_id payload index) if it doesn&#39;t exist.</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="c1"># Safe to call on every startup — it is idempotent.</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a><span class="n">store</span> <span class="o">=</span> <span class="k">await</span> <span class="n">QdrantVectorStore</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="s2">&quot;my_docs&quot;</span><span class="p">,</span> <span class="n">vector_size</span><span class="o">=</span><span class="mi">1536</span><span class="p">)</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">DocumentPipeline</span><span class="p">(</span><span class="n">splitter</span><span class="o">=</span><span class="n">TokenSplitter</span><span class="p">(</span><span class="n">max_tokens</span><span class="o">=</span><span class="mi">4000</span><span class="p">))</span>
+<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a><span class="n">vs_pipeline</span> <span class="o">=</span> <span class="n">VectorStorePipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="o">=</span><span class="n">pipeline</span><span class="p">,</span> <span class="n">vector_store</span><span class="o">=</span><span class="n">store</span><span class="p">)</span>
+<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>
+<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a><span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">vs_pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;docs/&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;**/*.docx&quot;</span><span class="p">)))</span>
+<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;processed: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">processed</span><span class="p">)</span><span class="si">}</span><span class="s2">, skipped: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">skipped</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="payload-schema">Payload schema<a class="headerlink" href="#payload-schema" title="Permanent link">&para;</a></h3>
 <p>Each Qdrant point stores the full <code>Chunk</code> as payload.  The provenance fields
@@ -2452,7 +2507,7 @@ into the user-facing <code>metadata</code> dict:</p>
 <h3 id="performance-notes">Performance notes<a class="headerlink" href="#performance-notes" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>create()</code> adds a Qdrant payload index on <code>source_id</code>, turning filter operations
-  in <code>get_source_hash</code> and <code>delete_by_source</code> from O(n) scans into O(log n) lookups.</li>
+  in <code>list_source_state</code> and <code>delete_by_source</code> from O(n) scans into O(log n) lookups.</li>
 <li><code>upsert()</code> batches points in groups of 100 to avoid gRPC message size limits.</li>
 <li><code>list_source_ids()</code> uses scroll pagination (1000 points per page) so it works
   correctly at any collection size.</li>
@@ -2465,27 +2520,29 @@ into the user-facing <code>metadata</code> dict:</p>
 The protocol requires five async methods — implementations should index on
 <code>chunk.source_id</code> and <code>chunk.source_hash</code> (first-class fields, not
 <code>chunk.metadata</code>):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyVectorStore</span><span class="p">:</span>
-<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">upsert</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chunks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Chunk</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>        <span class="n">ids</span> <span class="o">=</span> <span class="p">[</span><span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">chunks</span><span class="p">]</span>
-<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>        <span class="k">return</span> <span class="n">ids</span>
-<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>
-<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>        <span class="k">for</span> <span class="n">id_</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">:</span>
-<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">id_</span><span class="p">)</span>
-<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>
-<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_source_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the stored hash for source_id, or None if not present.&quot;&quot;&quot;</span>
-<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>        <span class="n">row</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">query_one</span><span class="p">(</span><span class="n">source_id</span><span class="o">=</span><span class="n">source_id</span><span class="p">)</span>
-<a id="__codelineno-18-13" name="__codelineno-18-13" href="#__codelineno-18-13"></a>        <span class="k">return</span> <span class="n">row</span><span class="o">.</span><span class="n">source_hash</span> <span class="k">if</span> <span class="n">row</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-18-14" name="__codelineno-18-14" href="#__codelineno-18-14"></a>
-<a id="__codelineno-18-15" name="__codelineno-18-15" href="#__codelineno-18-15"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">delete_by_source</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-18-16" name="__codelineno-18-16" href="#__codelineno-18-16"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Delete all chunks whose source_id field equals source_id.&quot;&quot;&quot;</span>
-<a id="__codelineno-18-17" name="__codelineno-18-17" href="#__codelineno-18-17"></a>        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">source_id</span><span class="o">=</span><span class="n">source_id</span><span class="p">)</span>
-<a id="__codelineno-18-18" name="__codelineno-18-18" href="#__codelineno-18-18"></a>
-<a id="__codelineno-18-19" name="__codelineno-18-19" href="#__codelineno-18-19"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">list_source_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<a id="__codelineno-18-20" name="__codelineno-18-20" href="#__codelineno-18-20"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Return all distinct source_id values stored in this vector store.&quot;&quot;&quot;</span>
-<a id="__codelineno-18-21" name="__codelineno-18-21" href="#__codelineno-18-21"></a>        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">distinct_source_ids</span><span class="p">()</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyVectorStore</span><span class="p">:</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">upsert</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chunks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Chunk</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>        <span class="n">ids</span> <span class="o">=</span> <span class="p">[</span><span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">chunks</span><span class="p">]</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>        <span class="k">return</span> <span class="n">ids</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ids</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>        <span class="k">for</span> <span class="n">id_</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">:</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">id_</span><span class="p">)</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">delete_by_source</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Delete all chunks whose source_id field equals source_id.&quot;&quot;&quot;</span>
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>        <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">source_id</span><span class="o">=</span><span class="n">source_id</span><span class="p">)</span>
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a>
+<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">list_source_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<a id="__codelineno-19-15" name="__codelineno-19-15" href="#__codelineno-19-15"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Return all distinct source_id values stored in this vector store.&quot;&quot;&quot;</span>
+<a id="__codelineno-19-16" name="__codelineno-19-16" href="#__codelineno-19-16"></a>        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">distinct_source_ids</span><span class="p">()</span>
+<a id="__codelineno-19-17" name="__codelineno-19-17" href="#__codelineno-19-17"></a>
+<a id="__codelineno-19-18" name="__codelineno-19-18" href="#__codelineno-19-18"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">list_source_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SourceState</span><span class="p">]:</span>
+<a id="__codelineno-19-19" name="__codelineno-19-19" href="#__codelineno-19-19"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;Bulk-read each source&#39;s hashes in one round-trip (used by plan()).&quot;&quot;&quot;</span>
+<a id="__codelineno-19-20" name="__codelineno-19-20" href="#__codelineno-19-20"></a>        <span class="k">return</span> <span class="p">{</span>
+<a id="__codelineno-19-21" name="__codelineno-19-21" href="#__codelineno-19-21"></a>            <span class="n">row</span><span class="o">.</span><span class="n">source_id</span><span class="p">:</span> <span class="n">SourceState</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">source_hash</span><span class="p">,</span> <span class="n">row</span><span class="o">.</span><span class="n">content_hash</span><span class="p">)</span>
+<a id="__codelineno-19-22" name="__codelineno-19-22" href="#__codelineno-19-22"></a>            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_db</span><span class="o">.</span><span class="n">distinct_sources</span><span class="p">()</span>
+<a id="__codelineno-19-23" name="__codelineno-19-23" href="#__codelineno-19-23"></a>        <span class="p">}</span>
 </code></pre></div>
 <h3 id="provenance-fields">Provenance fields<a class="headerlink" href="#provenance-fields" title="Permanent link">&para;</a></h3>
 <p>Each chunk upserted by <code>VectorStorePipeline</code> has two first-class fields set
@@ -2511,13 +2568,68 @@ before upsert — these are <strong>not</strong> injected into <code>chunk.metad
 </tr>
 </tbody>
 </table>
-<p>To customise the source identity key, pass a <code>source_id_fn</code> to the constructor:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">vs_pipeline</span> <span class="o">=</span> <span class="n">VectorStorePipeline</span><span class="p">(</span>
-<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>    <span class="n">pipeline</span><span class="o">=</span><span class="n">pipeline</span><span class="p">,</span>
-<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>    <span class="n">vector_store</span><span class="o">=</span><span class="n">my_vector_store</span><span class="p">,</span>
-<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    <span class="n">source_id_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">base_dir</span><span class="p">)),</span>  <span class="c1"># portable multi-dir</span>
-<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="p">)</span>
+<p>To customise the source identity key, set <code>source_id_fn</code> on the <strong><code>DocumentPipeline</code></strong> (the
+single source of truth — the <code>VectorStorePipeline</code> reads it from there for collision/orphan
+checks):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="n">doc_pipeline</span> <span class="o">=</span> <span class="n">DocumentPipeline</span><span class="p">(</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>    <span class="n">splitter</span><span class="o">=</span><span class="n">TokenSplitter</span><span class="p">(),</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>    <span class="n">source_id_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">base_dir</span><span class="p">)),</span>  <span class="c1"># portable multi-dir</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="p">)</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="n">vs_pipeline</span> <span class="o">=</span> <span class="n">VectorStorePipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="o">=</span><span class="n">doc_pipeline</span><span class="p">,</span> <span class="n">vector_store</span><span class="o">=</span><span class="n">my_vector_store</span><span class="p">)</span>
 </code></pre></div>
+<p>A third field, <code>chunk.content_hash</code> (<code>Document.content_hash()</code>), is also set — it drives
+re-chunking when a stored Document is edited in the two-stage <code>DocumentStore</code> workflow
+(<code>DocumentStorePipeline</code> → editing → <code>VectorStorePipeline(document_store=...)</code>).</p>
+<hr />
+<h2 id="scenario-d-two-stage-with-a-documentstore">Scenario D — two-stage with a <code>DocumentStore</code><a class="headerlink" href="#scenario-d-two-stage-with-a-documentstore" title="Permanent link">&para;</a></h2>
+<p>Parse once, chunk many ways. <code>DocumentStorePipeline</code> syncs parsed+processed <code>Document</code>s into a
+<code>DocumentStore</code> (Boundary 1); you can then edit them and re-chunk into the vector store
+(Boundary 2) without re-parsing — which matters when parsing is expensive (OCR, LLM heading
+resolution).</p>
+<table>
+<thead>
+<tr>
+<th>Implementation</th>
+<th>Backing</th>
+<th>Use case</th>
+<th>Extra</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LocalDocumentStore</code></td>
+<td>one JSON file per source on disk</td>
+<td>local dev, single machine, hand-editing</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>QdrantDocumentStore</code></td>
+<td>one Qdrant point per source</td>
+<td>shared across workers/containers</td>
+<td><code>qdrant</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">DocumentPipeline</span><span class="p">,</span> <span class="n">DocumentStorePipeline</span><span class="p">,</span> <span class="n">VectorStorePipeline</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.integrations.document_stores</span><span class="w"> </span><span class="kn">import</span> <span class="n">QdrantDocumentStore</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="n">doc_store</span> <span class="o">=</span> <span class="k">await</span> <span class="n">QdrantDocumentStore</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="s2">&quot;my_documents&quot;</span><span class="p">)</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="c1"># Stage 1: parse + process → DocumentStore (no chunking)</span>
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="k">await</span> <span class="n">DocumentStorePipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="o">=</span><span class="n">DocumentPipeline</span><span class="p">(</span><span class="o">...</span><span class="p">),</span> <span class="n">document_store</span><span class="o">=</span><span class="n">doc_store</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span>
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a><span class="c1"># ... edit stored Documents (any worker) ...</span>
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a><span class="c1"># Stage 2: chunk + embed only the documents whose content_hash changed</span>
+<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a><span class="n">vs</span> <span class="o">=</span> <span class="n">VectorStorePipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="o">=</span><span class="n">DocumentPipeline</span><span class="p">(</span><span class="n">chunker</span><span class="o">=...</span><span class="p">),</span> <span class="n">vector_store</span><span class="o">=</span><span class="n">store</span><span class="p">,</span>
+<a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>                         <span class="n">document_store</span><span class="o">=</span><span class="n">doc_store</span><span class="p">)</span>
+<a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a><span class="k">await</span> <span class="n">vs</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">source_ids</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>   <span class="c1"># None → all documents in the store</span>
+</code></pre></div>
+<p><code>QdrantDocumentStore</code> stores each Document as a single point with a <strong>throwaway 1-dim vector</strong>
+(Documents aren't embedded) — the collection is a key-value store keyed on <code>source_id</code>, not
+semantically searchable. A Document whose payload exceeds Qdrant's size limit raises
+<code>DocumentTooLargeError</code> (carrying the <code>source_id</code> and byte size) rather than silently
+splitting or dropping image data.</p>
 <hr />
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
