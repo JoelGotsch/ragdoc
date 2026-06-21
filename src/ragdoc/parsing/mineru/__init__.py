@@ -1,27 +1,29 @@
 try:
     from pathlib import Path
 
+    from pydantic import ConfigDict
+
     from ragdoc.document import Document
     from ragdoc.parsing.mineru.base import parse_middle_json_file
-    from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUExtractor
     from ragdoc.parsing.mineru.handlers import (
         ExtractionConfig,
         build_heading_html,
         build_text_html,
         check_mineru_images,
-        handle_title_block,
-        handle_text_block,
-        handle_list_block,
+        handle_chart_block,
         handle_code_block,
-        handle_image_block,
-        handle_table_block,
         handle_discarded_as_footnote,
-        handle_discarded_as_raw_text,
         handle_discarded_as_metadata,
+        handle_discarded_as_raw_text,
         handle_discarded_drop,
+        handle_image_block,
+        handle_list_block,
+        handle_table_block,
+        handle_text_block,
+        handle_title_block,
     )
+    from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUExtractor
     from ragdoc.parsing.parser import Parser
-    from pydantic import ConfigDict
 
     async def parse_mineru_file(path: Path) -> Document:
         """Parse a MinerU ``_middle.json`` file into a :class:`~ragdoc.document.Document`.
@@ -92,24 +94,24 @@ try:
             return await parse_mineru_file(path)
 
     __all__ = [
-        "MinerUParser",
-        "MinerUExtractor",
-        "parse_mineru_file",
-        "check_mineru_images",
         "CoreExtractionMiddleware",
         "ExtractionConfig",
+        "MinerUExtractor",
+        "MinerUParser",
         "build_heading_html",
         "build_text_html",
-        "handle_title_block",
-        "handle_text_block",
-        "handle_list_block",
+        "check_mineru_images",
         "handle_code_block",
-        "handle_image_block",
-        "handle_table_block",
         "handle_discarded_as_footnote",
-        "handle_discarded_as_raw_text",
         "handle_discarded_as_metadata",
+        "handle_discarded_as_raw_text",
         "handle_discarded_drop",
+        "handle_image_block",
+        "handle_list_block",
+        "handle_table_block",
+        "handle_text_block",
+        "handle_title_block",
+        "parse_mineru_file",
     ]
 
 except ImportError:
@@ -119,6 +121,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Registry integration
 # ---------------------------------------------------------------------------
+
 
 def _register() -> None:
     try:

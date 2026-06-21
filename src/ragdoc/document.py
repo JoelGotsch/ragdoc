@@ -1,19 +1,22 @@
 from __future__ import annotations
 
-from enum import Enum
 import re
 import uuid
-
-from bs4 import BeautifulSoup, Tag
-from typing import Annotated, Generic, Literal, TypeVar
-from typing_extensions import Self
+from enum import Enum
 from functools import reduce
 from operator import or_
-from markdownify import markdownify as md
-from pypandoc import convert_text
+from typing import TYPE_CHECKING, Annotated, Generic, Literal, TypeVar
 
+from bs4 import BeautifulSoup, Tag
+from markdownify import markdownify as md
 from pydantic import BaseModel, Field, SkipValidation, computed_field, model_validator
+from pypandoc import convert_text
+from typing_extensions import Self
+
 from ragdoc.metadata import MetadataDict, TMetadata, validate_metadata_dict
+
+if TYPE_CHECKING:
+    from ragdoc.rendering import Renderer
 
 
 class InlineRef(BaseModel):
@@ -42,13 +45,9 @@ class InlineRef(BaseModel):
         ```
     """
 
-    target_id: str = Field(
-        ...,
-        description="ID of the referenced element. Must exist in the same Document."
-    )
+    target_id: str = Field(..., description="ID of the referenced element. Must exist in the same Document.")
     rel_type: Literal["image", "footnote", "table", "figure"] = Field(
-        ...,
-        description="Type of inline relationship: image, footnote, table, or figure."
+        ..., description="Type of inline relationship: image, footnote, table, or figure."
     )
 
 
@@ -96,13 +95,10 @@ class ExternalRef(BaseModel):
         ```
     """
 
-    target_id: str = Field(
-        ...,
-        description="ID of the external element or document being referenced."
-    )
+    target_id: str = Field(..., description="ID of the external element or document being referenced.")
     rel_type: Literal["external-parent", "external-child", "external-cites", "external-related"] = Field(
         ...,
-        description="Type of external relationship: external-parent, external-child, external-cites, or external-related."
+        description="Type of external relationship: external-parent, external-child, external-cites, or external-related.",
     )
 
 
@@ -118,10 +114,18 @@ class ElementTypeEnum(str, Enum):
 
 class BaseElement(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for the element")
-    element_type: str = Field(..., description="Type of the element. Built-in types use ElementTypeEnum values (e.g. 'heading', 'paragraph'). Custom subclasses should narrow this to their own Literal string.")
+    element_type: str = Field(
+        ...,
+        description="Type of the element. Built-in types use ElementTypeEnum values (e.g. 'heading', 'paragraph'). Custom subclasses should narrow this to their own Literal string.",
+    )
     page: int | None = Field(default=0, description="Page number of the element. Should start with 1, if set.")
-    metadata: MetadataDict = Field(default_factory=dict, description="Additional metadata for the element. Can be used for custom parsers.")
-    bounding_box: tuple[float, float, float, float] | None = Field(default=None, description="Bounding box of the element in the format (x0, y0, x1, y1). Coordinates are expected to be normalized between 0 and 1, relative to the page dimensions.")
+    metadata: MetadataDict = Field(
+        default_factory=dict, description="Additional metadata for the element. Can be used for custom parsers."
+    )
+    bounding_box: tuple[float, float, float, float] | None = Field(
+        default=None,
+        description="Bounding box of the element in the format (x0, y0, x1, y1). Coordinates are expected to be normalized between 0 and 1, relative to the page dimensions.",
+    )
 
     @property
     def inline_refs(self) -> list[InlineRef]:
@@ -130,16 +134,16 @@ class BaseElement(BaseModel):
         The element's HTML is the single source of truth. To add an inline ref,
         embed a <ref id="<target-id>" rel="<rel-type>"/> tag in the HTML content.
         """
-        soup = BeautifulSoup(self.html, 'html.parser')
+        soup = BeautifulSoup(self.html, "html.parser")
         refs: list[InlineRef] = []
-        for ref_tag in soup.find_all('ref'):
-            ref_id = ref_tag.get('id')
-            rel_attr = ref_tag.get('rel')
+        for ref_tag in soup.find_all("ref"):
+            ref_id = ref_tag.get("id")
+            rel_attr = ref_tag.get("rel")
             # BeautifulSoup may return list for multi-valued attrs
             rel_type = rel_attr[0] if isinstance(rel_attr, list) else rel_attr
             if ref_id and rel_type:
                 try:
-                    refs.append(InlineRef(target_id=ref_id, rel_type=rel_type))
+                    refs.append(InlineRef(target_id=str(ref_id), rel_type=str(rel_type)))  # type: ignore[arg-type]  # rel_type validated by pydantic
                 except Exception:
                     pass  # skip unknown rel_type values
         return refs
@@ -157,7 +161,7 @@ class BaseElement(BaseModel):
     def html(self) -> str:
         """
         HTML representation of the element content. Should be implemented by subclasses.
-        
+
         Should include the outer tag (e.g. <p> for paragraphs, <hN> for headings, etc.).
         Footnotes should be represented as <p id='footnote-{id}'>[{number}] {text}</p>.
         Images referenced inline use <ref id='{id}' rel='image'/> tags.
@@ -179,26 +183,25 @@ class BaseElement(BaseModel):
         for k, v in type(self)._fields_from_html(value).items():
             setattr(self, k, v)
 
-
     @classmethod
-    def _fields_from_html(cls, html: str) -> dict:
+    def _fields_from_html(cls, html: str) -> dict:  # pyright: ignore[reportUnusedParameter]  # overridden by subclasses
         """Parse HTML and return a dict of field values for construction.
         Subclasses should override this to enable from_html / from_markdown construction."""
         raise NotImplementedError(f"{cls.__name__} does not support construction from HTML")
 
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     @classmethod
     def _parse_html_input(cls, data):
-        if isinstance(data, dict) and 'html' in data:
+        if isinstance(data, dict) and "html" in data:
             try:
-                parsed = cls._fields_from_html(data.pop('html'))
+                parsed = cls._fields_from_html(data.pop("html"))
                 merged = data | parsed
                 data = {**merged}
             except NotImplementedError:
                 pass
         return data
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def _validate_metadata(self) -> Self:
         validate_metadata_dict(self.metadata)
         return self
@@ -206,7 +209,7 @@ class BaseElement(BaseModel):
     @classmethod
     def from_html(cls, html: str, **kwargs) -> Self:
         """Create an element from an HTML string."""
-        return cls(html=html, **kwargs)
+        return cls(html=html, **kwargs)  # type: ignore[call-arg]  # 'html' consumed by _parse_html_input validator
 
     @classmethod
     def from_markdown(cls, markdown_text: str, page: int = 0, **kwargs) -> Self:
@@ -214,8 +217,8 @@ class BaseElement(BaseModel):
         Expects img links in markdown format (e.g. ![alt text](document_image/id/{id})).
         Embedded footnotes are expected in markdown format (e.g. [^footnote-<footnote-id>]).
         """
-        html = convert_text(markdown_text, 'html', format='md').strip()
-        return cls(html=html, page=page, **kwargs)
+        html = convert_text(markdown_text, "html", format="md").strip()
+        return cls(html=html, page=page, **kwargs)  # type: ignore[call-arg]  # 'html' consumed by _parse_html_input validator
 
     @property
     def footnote_ids(self) -> list[str]:
@@ -230,23 +233,25 @@ class BaseElement(BaseModel):
     @property
     def text(self) -> str:
         """Plain text content of the element, derived from html via BeautifulSoup get_text()."""
-        return BeautifulSoup(self.html, 'html.parser').get_text().strip("\n -")
+        return BeautifulSoup(self.html, "html.parser").get_text().strip("\n -")
 
     @property
     def html_tag(self) -> Tag:
         """BeautifulSoup Tag representation of the element. Parses the html property."""
-        tag = BeautifulSoup(self.html, 'html.parser')
-        return tag.contents[0] if tag.contents else Tag(name="div")
+        tag = BeautifulSoup(self.html, "html.parser")
+        return tag.contents[0] if tag.contents else Tag(name="div")  # type: ignore[return-value]  # first content is a Tag
 
     @property
     def markdown(self) -> str:
         """Markdown representation of the element. Converts HTML to markdown using markdownify."""
         return md(self.html).rstrip("\n-").strip()
 
+
 E = TypeVar("E", bound=BaseElement)
 
+
 class Heading(BaseElement):
-    element_type: Literal[ElementTypeEnum.HEADING] = Field(default=ElementTypeEnum.HEADING)
+    element_type: Literal[ElementTypeEnum.HEADING] = Field(default=ElementTypeEnum.HEADING)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     html_content: str = Field(..., description="Full HTML of the heading element including the outer <hN> tag")
 
     @model_validator(mode="before")
@@ -262,14 +267,13 @@ class Heading(BaseElement):
 
     @classmethod
     def _fields_from_html(cls, html: str) -> dict:
-        soup = BeautifulSoup(html, 'html.parser')
-        tag = soup.find(re.compile(r'h[1-6]'))
+        soup = BeautifulSoup(html, "html.parser")
+        tag = soup.find(re.compile(r"h[1-6]"))
         if tag:
             inner = tag.decode_contents(formatter="html").strip()
             level = int(tag.name[1])
             attrs_html = "".join(
-                f' {k}="{v if not isinstance(v, list) else " ".join(v)}"'
-                for k, v in tag.attrs.items()
+                f' {k}="{v if not isinstance(v, list) else " ".join(v)}"' for k, v in tag.attrs.items()
             )
             return {"html_content": f"<h{level}{attrs_html}>{inner}</h{level}>"}
         return {"html_content": f"<h1>{soup.get_text().strip()}</h1>"}
@@ -280,19 +284,19 @@ class Heading(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
     @property
     def level(self) -> int:
-        tag = BeautifulSoup(self.html_content, 'html.parser').find(re.compile(r'h[1-6]'))
+        tag = BeautifulSoup(self.html_content, "html.parser").find(re.compile(r"h[1-6]"))
         return int(tag.name[1]) if tag else 1
 
     @level.setter
     def level(self, new_level: int) -> None:
         if new_level == 0:
             raise ValueError("Heading level 0 (h0) is not allowed. Use level 1-6.")
-        soup = BeautifulSoup(self.html_content, 'html.parser')
-        tag = soup.find(re.compile(r'h[1-6]'))
+        soup = BeautifulSoup(self.html_content, "html.parser")
+        tag = soup.find(re.compile(r"h[1-6]"))
         if tag:
             tag.name = f"h{new_level}"
             self.html_content = str(tag)
@@ -301,12 +305,12 @@ class Heading(BaseElement):
 
     @property
     def innerhtml(self) -> str:
-        tag = BeautifulSoup(self.html_content, 'html.parser').find(re.compile(r'h[1-6]'))
+        tag = BeautifulSoup(self.html_content, "html.parser").find(re.compile(r"h[1-6]"))
         return tag.decode_contents(formatter="html").strip() if tag else self.html_content
 
 
 class Paragraph(BaseElement):
-    element_type: Literal[ElementTypeEnum.PARAGRAPH] = Field(default=ElementTypeEnum.PARAGRAPH)
+    element_type: Literal[ElementTypeEnum.PARAGRAPH] = Field(default=ElementTypeEnum.PARAGRAPH)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     html_content: str = ""
 
     @classmethod
@@ -319,11 +323,11 @@ class Paragraph(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
 
 class DocumentList(BaseElement):
-    element_type: Literal[ElementTypeEnum.DOCUMENT_LIST] = Field(default=ElementTypeEnum.DOCUMENT_LIST)
+    element_type: Literal[ElementTypeEnum.DOCUMENT_LIST] = Field(default=ElementTypeEnum.DOCUMENT_LIST)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     html_content: str = Field(..., description="HTML content of the list. Should be a <ul>, <ol>, or <dl> element.")
 
     @classmethod
@@ -337,28 +341,28 @@ class DocumentList(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
 
 class Table(BaseElement):
-    element_type: Literal[ElementTypeEnum.TABLE] = Field(default=ElementTypeEnum.TABLE)
+    element_type: Literal[ElementTypeEnum.TABLE] = Field(default=ElementTypeEnum.TABLE)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     html_content: str = Field(..., description="HTML content of the table. Should be a <table> element.")
 
     @classmethod
     def _fields_from_html(cls, html: str) -> dict:
         return {"html_content": html.strip()}
-    
+
     @property
     def html(self) -> str:
         return self.html_content
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
 
 class Image(BaseElement):
-    element_type: Literal[ElementTypeEnum.IMAGE] = Field(default=ElementTypeEnum.IMAGE)
+    element_type: Literal[ElementTypeEnum.IMAGE] = Field(default=ElementTypeEnum.IMAGE)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     image: str | None = Field(
         default=None,
         description="Base64 representation of this image. None when no image data is available.",
@@ -367,11 +371,14 @@ class Image(BaseElement):
     width: int | None = Field(default=None, description="Width of the image in pixels.")
     height: int | None = Field(default=None, description="Height of image in pixels.")
     alt: str | None = Field(default=None, description="Alt text of image content")
-    text_representation: str | None = Field(default=None, description="Text representation of the element, usually generated by a vision-capable-llm. \
+    text_representation: str | None = Field(
+        default=None,
+        description="Text representation of the element, usually generated by a vision-capable-llm. \
                                                 E.g. html code if the element content is an image of a table, \
                                                 mermaid code if the element content is an image of a diagram, \
                                                 formatted text if the element content is some image of a text passage. \
-                                                None if image content cannot be represented as text.")
+                                                None if image content cannot be represented as text.",
+    )
 
     @property
     def src(self) -> str:
@@ -393,42 +400,51 @@ class Image(BaseElement):
     @property
     def html(self) -> str:
         src = self.src
-        return f'<img src="{src}"' + (f' alt="{self.alt}"' if self.alt else '') + (f' width="{self.width}"' if self.width else '') + (f' height="{self.height}"' if self.height else '') + '/>'
+        return (
+            f'<img src="{src}"'
+            + (f' alt="{self.alt}"' if self.alt else "")
+            + (f' width="{self.width}"' if self.width else "")
+            + (f' height="{self.height}"' if self.height else "")
+            + "/>"
+        )
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
     @classmethod
     def _fields_from_html(cls, html: str) -> dict:
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
         img_tag = soup.find("img")
         if not img_tag:
             return {}
         src = img_tag.get("src", "")
-        data_pattern = re.compile(r'data:image/(?P<image_type>[^;]+);base64,(?P<image_data>.+)')
-        data_match = data_pattern.match(src)
+        data_pattern = re.compile(r"data:image/(?P<image_type>[^;]+);base64,(?P<image_data>.+)")
+        data_match = data_pattern.match(src)  # type: ignore[arg-type]  # src is the str 'src' attribute
         data = {}
         if data_match:
+            width = img_tag.get("width")
+            height = img_tag.get("height")
             data = {
                 "image": data_match.group("image_data"),
                 "image_type": data_match.group("image_type"),
                 "alt": img_tag.get("alt", None),
-                "width": int(img_tag.get("width")) if img_tag.get("width") else None,
-                "height": int(img_tag.get("height")) if img_tag.get("height") else None,
+                "width": int(width) if width else None,  # type: ignore[arg-type]  # width attr is str
+                "height": int(height) if height else None,  # type: ignore[arg-type]  # height attr is str
             }
         return {k: v for k, v in data.items() if v is not None}
 
+
 class RawText(BaseElement):
-    element_type: Literal[ElementTypeEnum.RAW_TEXT] = Field(default=ElementTypeEnum.RAW_TEXT)
+    element_type: Literal[ElementTypeEnum.RAW_TEXT] = Field(default=ElementTypeEnum.RAW_TEXT)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     innerhtml: str = Field(default="", description="Inner HTML content of the element (without outer tag)")
 
     @classmethod
     def _fields_from_html(cls, html: str) -> dict:
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, "html.parser")
         # Find the first element tag and extract its inner contents
         first_tag = soup.find()
-        if first_tag and hasattr(first_tag, 'decode_contents'):
+        if first_tag and hasattr(first_tag, "decode_contents"):
             return {"innerhtml": first_tag.decode_contents(formatter="html").strip()}
         return {"innerhtml": soup.decode_contents(formatter="html").strip()}
 
@@ -438,28 +454,29 @@ class RawText(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
 
 class Footnote(BaseElement):
     """Represents a footnote definition in the document."""
-    element_type: Literal[ElementTypeEnum.FOOTNOTE] = Field(default=ElementTypeEnum.FOOTNOTE)
+
+    element_type: Literal[ElementTypeEnum.FOOTNOTE] = Field(default=ElementTypeEnum.FOOTNOTE)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     number: int = Field(..., description="The footnote number as it appears in the document")
     innerhtml: str = Field(..., description="The footnote text content (without number prefix)")
 
     @classmethod
     def _fields_from_html(cls, html: str) -> dict:
-        soup = BeautifulSoup(html, 'html.parser')
-        aside = soup.find('aside', class_='footnote')
+        soup = BeautifulSoup(html, "html.parser")
+        aside = soup.find("aside", class_="footnote")
         if aside:
             try:
-                number = int(aside.get('data-number', 0))
+                number = int(aside.get("data-number", 0))  # type: ignore[union-attr,arg-type]  # find yields a Tag; attr is str
             except (ValueError, TypeError):
                 number = 0
             return {"number": number, "innerhtml": aside.decode_contents().strip()}
         # Fallback: [N] text pattern (legacy or external HTML)
         raw = soup.get_text().strip()
-        match = re.match(r'^\[(\d+)\]\s*(.*)', raw, re.DOTALL)
+        match = re.match(r"^\[(\d+)\]\s*(.*)", raw, re.DOTALL)
         if match:
             return {"number": int(match.group(1)), "innerhtml": match.group(2)}
         return {"innerhtml": raw.strip()}
@@ -475,14 +492,16 @@ class Footnote(BaseElement):
 
     @html.setter
     def html(self, value: str) -> None:
-        BaseElement.html.fset(self, value)
+        BaseElement.html.fset(self, value)  # type: ignore[misc]  # fset defined via @html.setter
 
     @property
     def text(self) -> str:
-        return BeautifulSoup(self.innerhtml, 'html.parser').get_text().strip()
+        return BeautifulSoup(self.innerhtml, "html.parser").get_text().strip()
 
 
-ElementType = Annotated[Heading | Paragraph | Table | DocumentList | Image | RawText | Footnote, Field(discriminator="element_type")]
+ElementType = Annotated[
+    Heading | Paragraph | Table | DocumentList | Image | RawText | Footnote, Field(discriminator="element_type")
+]
 
 
 class Document(BaseModel, Generic[TMetadata]):
@@ -514,6 +533,7 @@ class Document(BaseModel, Generic[TMetadata]):
         parser: Name of the parser that created this document (for processor behavior)
         parser_version: Version of the parser (optional)
     """
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for the document")
     source_path: str = Field(default="", description="Full path to the source file")
     title: str | None = Field(default=None, description="Title of the document, usually derived from the main heading")
@@ -522,18 +542,16 @@ class Document(BaseModel, Generic[TMetadata]):
     external_refs: list[ExternalRef] = Field(
         default_factory=list,
         description="References to external documents or elements (parents, siblings, etc.). "
-        "Used for hierarchical rendering and navigation, NOT for inline substitution."
+        "Used for hierarchical rendering and navigation, NOT for inline substitution.",
     )
     parser: str | None = Field(
         default=None,
         description="Name of the parser that created this document: 'mineru', 'azure_di', 'html', 'pandoc', etc. "
-        "Used by processors to adjust behavior based on parser reliability."
+        "Used by processors to adjust behavior based on parser reliability.",
     )
-    parser_version: str | None = Field(
-        default=None,
-        description="Version of the parser that created this document."
-    )
-    @model_validator(mode='after')
+    parser_version: str | None = Field(default=None, description="Version of the parser that created this document.")
+
+    @model_validator(mode="after")
     def _validate_metadata(self) -> Self:
         validate_metadata_dict(self.metadata)  # type: ignore[arg-type]
         return self
@@ -551,34 +569,34 @@ class Document(BaseModel, Generic[TMetadata]):
     @property
     def empty(self) -> bool:
         return len(self.elements) == 0
-    
+
     def _filter_elements_by_type(self, element_type: type[E]) -> list[E]:
         return [e for e in self.elements if isinstance(e, element_type)]
-    
+
     @property
     def headings(self) -> list[Heading]:
         return self._filter_elements_by_type(Heading)
-    
+
     @property
     def paragraphs(self) -> list[Paragraph]:
         return self._filter_elements_by_type(Paragraph)
-    
+
     @property
     def tables(self) -> list[Table]:
         return self._filter_elements_by_type(Table)
-    
+
     @property
     def lists(self) -> list[DocumentList]:
         return self._filter_elements_by_type(DocumentList)
-    
+
     @property
     def images(self) -> list[Image]:
         return self._filter_elements_by_type(Image)
-    
+
     @property
     def raw_texts(self) -> list[RawText]:
         return self._filter_elements_by_type(RawText)
-    
+
     @property
     def footnotes(self) -> list[Footnote]:
         return self._filter_elements_by_type(Footnote)
@@ -586,13 +604,13 @@ class Document(BaseModel, Generic[TMetadata]):
     def get_element(self, element_id: str) -> ElementType | None:
         """
         Look up an element by its ID.
-        
+
         This is used by the renderer to resolve inline references (<ref id="..."/>)
         to their actual elements for inline substitution.
-        
+
         Args:
             element_id: The unique ID of the element to find
-            
+
         Returns:
             The element with the given ID, or None if not found
         """
@@ -634,7 +652,7 @@ class Document(BaseModel, Generic[TMetadata]):
     @property
     def level(self) -> int | None:
         return self.main_heading.level if self.main_heading else None
-    
+
     @property
     def orphaned_footnotes(self) -> list[Footnote]:
         """Footnotes that are not referenced from any element's text."""
@@ -643,7 +661,7 @@ class Document(BaseModel, Generic[TMetadata]):
             referenced_ids.update(e.footnote_ids)
         return [f for f in self.footnotes if f.id not in referenced_ids]
 
-    def content_hash(self, renderer: "Renderer | None" = None) -> str:
+    def content_hash(self, renderer: Renderer | None = None) -> str:
         """Content-stable SHA-256 hash of this document.
 
         Uses the default prompt renderer (MARKDOWN + render_for_prompt) to produce
@@ -681,7 +699,7 @@ class Document(BaseModel, Generic[TMetadata]):
     def __or__(self, other: Self) -> Self:
         title = self.title or other.title
         if self.title and other.title:
-            new_heading = [Heading(innerhtml=other.title, level=1)]
+            new_heading = [Heading(innerhtml=other.title, level=1)]  # type: ignore[call-arg]  # consumed by _from_innerhtml_level validator
         else:
             new_heading = []
         return Document(  # type: ignore[return-value]
@@ -699,4 +717,6 @@ def join_documents(documents: list[Document]) -> Document:
 
 
 DocumentPrimaryElement = Heading | Paragraph | Table | DocumentList | RawText  # elements that get rendered to md
-DocumentSecondaryElement = Image | Footnote  # elements referenced within primary elements (images via src, footnotes via anchor links)
+DocumentSecondaryElement = (
+    Image | Footnote
+)  # elements referenced within primary elements (images via src, footnotes via anchor links)

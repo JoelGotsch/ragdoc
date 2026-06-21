@@ -34,7 +34,7 @@ Consumer notes
 from __future__ import annotations
 
 import json
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 from typing_extensions import Required, TypedDict
@@ -47,7 +47,7 @@ from typing_extensions import Required, TypedDict
 # forward-reference resolution errors. The full recursive constraint
 # (list[MetadataValue] / dict[str, MetadataValue]) is enforced at runtime
 # by validate_metadata_dict via json.dumps().
-MetadataValue = Union[str, int, float, bool, None, list[Any], dict[str, Any], BaseModel]
+MetadataValue = str | int | float | bool | None | list[Any] | dict[str, Any] | BaseModel
 """
 Canonical type for a single metadata value.
 
@@ -124,7 +124,7 @@ so that metadata keys are typed end-to-end.
 # ---------------------------------------------------------------------------
 
 
-def metadata_json_schema(metadata_type: type) -> dict:  # type: ignore[type-arg]
+def metadata_json_schema(metadata_type: type) -> dict:
     """Return a JSON Schema dict for *metadata_type*, suitable for LLM self-query prompts.
 
     Uses ``pydantic.TypeAdapter`` to generate the schema, so all standard
@@ -191,7 +191,7 @@ def serialize_metadata_value(val: MetadataValue) -> object:
 # ---------------------------------------------------------------------------
 
 
-def validate_metadata_dict(metadata: dict) -> None:  # type: ignore[type-arg]
+def validate_metadata_dict(metadata: dict) -> None:
     """Raise ValueError if any metadata value is not a supported MetadataValue.
 
     Validates by attempting a full json.dumps() of the serialized metadata,

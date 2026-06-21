@@ -63,6 +63,7 @@ import asyncio
 import logging
 import re
 import uuid
+from collections.abc import Awaitable
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
@@ -171,18 +172,18 @@ class FootnoteCandidate(BaseModel):
 class FootnoteResolver(Protocol):
     """
     Protocol for resolving which candidate is the correct footnote reference.
-    
+
     Implementations select the best candidate from a list based on various
     criteria (heuristics, LLM analysis, etc.).
-    
+
     This protocol supports both sync and async implementations:
     - SimpleFootnoteResolver: Sync, heuristic-based
     - LLMFootnoteResolver: Async, LLM-based
-    
+
     The resolve method is async to support LLM calls, but sync implementations
     can simply return an awaitable directly.
     """
-    
+
     async def resolve(
         self,
         candidates: list[FootnoteCandidate],
@@ -249,7 +250,7 @@ def build_footnote_pattern(number: int) -> re.Pattern[str]:
 
 
 def find_footnote_candidates(
-    document: "Document",
+    document: Document,
     footnote: Footnote,
     context_chars: int = 50,
     same_page_only: bool = True,
@@ -515,7 +516,7 @@ class _HtmlTextNodeLocator(HTMLParser):
 
 
 def apply_ref_patches(
-    element: "BaseElement",
+    element: BaseElement,
     patches: list[tuple[int, int, int, str]],
 ) -> None:
     """
@@ -599,8 +600,8 @@ class SimpleFootnoteResolver:
     async def resolve(
         self,
         candidates: list[FootnoteCandidate],
-        footnote_number: int,
-        footnote_text: str,
+        footnote_number: int,  # pyright: ignore[reportUnusedParameter] # part of FootnoteResolver protocol
+        footnote_text: str,  # pyright: ignore[reportUnusedParameter] # part of FootnoteResolver protocol
         min_element_idx: int | None = None,
     ) -> FootnoteCandidate | None:
         """Select the best candidate using structural/positional heuristics."""
@@ -622,25 +623,25 @@ class SimpleFootnoteResolver:
 class LLMFootnoteResolver:
     """
     LLM-based footnote reference resolver.
-    
+
     Uses an LLM to select the most likely location for a footnote reference
     from a list of candidates. This is more accurate than heuristics for
     complex documents where context matters.
-    
+
     The resolver uses a system prompt explaining footnote patterns and asks
     the LLM to select the most appropriate candidate.
-    
+
     Attributes:
         client: AsyncOpenAI-compatible client for LLM calls
         model: Model name to use (default: gpt-4o-mini)
-    
+
     Example:
         >>> from openai import AsyncOpenAI
         >>> client = AsyncOpenAI()
         >>> resolver = LLMFootnoteResolver(client)
         >>> best = await resolver.resolve(candidates, 1, "See Smith et al., 2023")
     """
-    
+
     SYSTEM_PROMPT = """You are analyzing document text to find footnote references.
 Given a footnote number and its content, plus several candidate locations where 
 the reference might appear, select the most appropriate location.
@@ -667,9 +668,9 @@ Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate
         """
         from ragdoc.config import get_config
 
-        self.client = client if client is not None else get_config().openai_client
+        self.client: Any = client if client is not None else get_config().openai_client
         self.model = model
-    
+
     async def resolve(
         self,
         candidates: list[FootnoteCandidate],
@@ -697,14 +698,14 @@ Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate
             "",
             "Candidate locations:",
         ]
-        
+
         for i, candidate in enumerate(candidates, 1):
             prompt_parts.append(
                 f"{i}. Page {candidate.page}: ...{candidate.context_before}[{footnote_number}]{candidate.context_after}..."
             )
-        
+
         prompt = "\n".join(prompt_parts)
-        
+
         try:
             response = await self.client.chat.completions.create(
                 model=self.model,
@@ -715,12 +716,12 @@ Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate
                 temperature=0.0,
                 max_tokens=10,
             )
-            
+
             result = response.choices[0].message.content.strip().upper()
-            
+
             if result == "NONE":
                 return None
-            
+
             # Try to parse the selection
             try:
                 selection = int(result.replace(".", "").strip())
@@ -728,9 +729,9 @@ Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate
                     return candidates[selection - 1]
             except ValueError:
                 pass
-            
+
             return None
-            
+
         except Exception:
             # On error, return the first candidate as fallback
             return candidates[0] if candidates else None
@@ -775,7 +776,7 @@ class FootnoteProcessor(DocumentProcessor):
         >>> processor = FootnoteProcessor(resolver=resolver)
         >>> doc = await processor.process(doc)
     """
-    
+
     def __init__(
         self,
         resolver: FootnoteResolver | None = None,
@@ -810,13 +811,13 @@ class FootnoteProcessor(DocumentProcessor):
         self.update_html = update_html
         self.only_orphaned = only_orphaned
         self._concurrency = concurrency
-    
+
     async def _resolve_footnote(
         self,
-        document: "Document",
+        document: Document,
         footnote: Footnote,
         min_element_idx: int | None,
-    ) -> "FootnoteCandidate | None":
+    ) -> FootnoteCandidate | None:
         """Find candidates for *footnote* and resolve the best one."""
         candidates = find_footnote_candidates(
             document=document,
@@ -827,9 +828,7 @@ class FootnoteProcessor(DocumentProcessor):
         if not candidates:
             logger.debug(f"FootnoteProcessor: footnote {footnote.number}: no candidates found")
             return None
-        logger.debug(
-            f"FootnoteProcessor: footnote {footnote.number}: {len(candidates)} candidates found"
-        )
+        logger.debug(f"FootnoteProcessor: footnote {footnote.number}: {len(candidates)} candidates found")
         best = await self.resolver.resolve(
             candidates=candidates,
             footnote_number=footnote.number,
@@ -837,12 +836,10 @@ class FootnoteProcessor(DocumentProcessor):
             min_element_idx=min_element_idx,
         )
         if best is not None:
-            logger.debug(
-                f"FootnoteProcessor: footnote {footnote.number} resolved to element {best.element_idx}"
-            )
+            logger.debug(f"FootnoteProcessor: footnote {footnote.number} resolved to element {best.element_idx}")
         return best
 
-    async def process(self, document: "Document") -> "Document":
+    async def process(self, document: Document) -> Document:
         """
         Process the document to resolve footnote references.
 
@@ -876,9 +873,7 @@ class FootnoteProcessor(DocumentProcessor):
         # element_idx → list of (text_node_idx, start, end, ref_html)
         patches_by_element: dict[int, list[tuple[int, int, int, str]]] = {}
 
-        footnotes_to_process = (
-            document.orphaned_footnotes if self.only_orphaned else document.footnotes
-        )
+        footnotes_to_process = document.orphaned_footnotes if self.only_orphaned else document.footnotes
         sorted_footnotes = sorted(footnotes_to_process, key=lambda f: f.number)
         logger.debug(f"FootnoteProcessor: {len(sorted_footnotes)} footnotes to resolve")
         resolved_count = 0
@@ -907,7 +902,7 @@ class FootnoteProcessor(DocumentProcessor):
             async def _resolve_one(idx: int, footnote: Footnote) -> None:
                 results[idx] = await self._resolve_footnote(document, footnote, None)
 
-            coros = [_resolve_one(i, f) for i, f in enumerate(sorted_footnotes)]
+            coros: list[Awaitable[None]] = [_resolve_one(i, f) for i, f in enumerate(sorted_footnotes)]
             await _fan_out(coros, self._concurrency)
 
             for footnote, best in zip(sorted_footnotes, results):
@@ -920,9 +915,7 @@ class FootnoteProcessor(DocumentProcessor):
                         (best.text_node_idx, best.match_start, best.match_end, ref_html)
                     )
 
-        logger.info(
-            f"FootnoteProcessor: resolved {resolved_count}/{len(sorted_footnotes)} footnotes"
-        )
+        logger.info(f"FootnoteProcessor: resolved {resolved_count}/{len(sorted_footnotes)} footnotes")
 
         # --- Phase 2: apply HTML patches per element ---
         if self.update_html:
@@ -930,6 +923,7 @@ class FootnoteProcessor(DocumentProcessor):
                 apply_ref_patches(document.elements[element_idx], patches)
 
         return document
+
 
 class SyncFootnoteProcessor(DocumentProcessor):
     """
@@ -965,8 +959,8 @@ class SyncFootnoteProcessor(DocumentProcessor):
         self.same_page_only = same_page_only
         self.update_html = update_html
         self.only_orphaned = only_orphaned
-    
-    async def process(self, document: "Document") -> "Document":
+
+    async def process(self, document: Document) -> Document:
         """
         Process the document to resolve footnote references.
 
@@ -979,7 +973,7 @@ class SyncFootnoteProcessor(DocumentProcessor):
             The processed document (modified in place)
         """
         import asyncio
-        
+
         # Create an async processor with SimpleFootnoteResolver
         async_processor = FootnoteProcessor(
             resolver=SimpleFootnoteResolver(),
@@ -988,13 +982,14 @@ class SyncFootnoteProcessor(DocumentProcessor):
             update_html=self.update_html,
             only_orphaned=self.only_orphaned,
         )
-        
+
         # Run in a new event loop (or existing if available)
         try:
             loop = asyncio.get_running_loop()
             # If we're in an async context, we can't use run_until_complete
             # This shouldn't happen for a SyncProcessor, but handle it
             import nest_asyncio
+
             nest_asyncio.apply()
             return loop.run_until_complete(async_processor.process(document))
         except RuntimeError:

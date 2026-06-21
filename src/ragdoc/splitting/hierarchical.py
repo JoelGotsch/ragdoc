@@ -1,5 +1,6 @@
+from typing import cast
 
-from ragdoc.document import Document, ExternalRef, Heading
+from ragdoc.document import BaseElement, Document, ElementType, ExternalRef, Heading
 from ragdoc.splitting.groups import ElementGroup, build_element_groups
 
 
@@ -68,15 +69,15 @@ def split_hierarchical(document: Document) -> list[Document]:
     # - ElementGroups carry root + all transitively-referenced elements together,
     #   so a footnote physically past a heading boundary follows its referencing paragraph.
 
-    parent_context: dict[int, Heading] = {}   # level → most recent heading
-    context_level_order: list[int] = []        # levels in document order of first appearance
+    parent_context: dict[int, Heading] = {}  # level → most recent heading
+    context_level_order: list[int] = []  # levels in document order of first appearance
 
     preamble_extras: list = []  # non-context elements before first split-level heading
     current_chunk: list | None = None
     current_ctx_snapshot: list[Heading] = []
     raw_chunks: list[tuple[list, list[Heading]]] = []
 
-    for item in build_element_groups(document.elements):
+    for item in build_element_groups(cast("list[BaseElement]", document.elements)):
         if isinstance(item, Heading):
             if item.level == split_level:
                 if current_chunk is not None:
@@ -114,7 +115,12 @@ def split_hierarchical(document: Document) -> list[Document]:
     for i, (elements, ctx) in enumerate(raw_chunks):
         prefix = preamble_extras if i == 0 else []
         all_elements = ctx + prefix + elements
-        doc = Document(elements=all_elements, title=document.title, source_path=document.source_path, metadata=document.metadata)
+        doc = Document(
+            elements=cast("list[ElementType]", all_elements),
+            title=document.title,
+            source_path=document.source_path,
+            metadata=document.metadata,
+        )
         split_docs.append(doc)
 
     parent_ref = ExternalRef(target_id=document.id, rel_type="external-parent")

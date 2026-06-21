@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from tabulate import tabulate
 
 from ragdoc.parsing.mineru.base import MinerUMiddleDocument
-from ragdoc.parsing.mineru.parser import MinerUParser
+from ragdoc.parsing.mineru.parser import MinerUExtractor
 
 
 class MiddleJsonFileResult(BaseModel):
@@ -23,10 +23,10 @@ class MiddleJsonFileResult(BaseModel):
     error: str | None = Field(default=None, description="Error message if processing failed.")
 
 
-async def _process_file(path: Path, parser: MinerUParser) -> MiddleJsonFileResult:
+async def _process_file(path: Path, extractor: MinerUExtractor) -> MiddleJsonFileResult:
     try:
         source = MinerUMiddleDocument.from_json_path(path)
-        document = await parser.parse(source)
+        document = await extractor.parse(source)
         return MiddleJsonFileResult(
             path=path,
             page_count=source.num_pages,
@@ -60,10 +60,10 @@ async def evaluate_middle_jsons(folder: Path | str) -> list[MiddleJsonFileResult
     """
     folder = Path(folder)
     paths = sorted(folder.glob("*_middle.json"))
-    parser = MinerUParser()
+    extractor = MinerUExtractor()
     results = []
     for p in paths:
-        results.append(await _process_file(p, parser))
+        results.append(await _process_file(p, extractor))
     return results
 
 
@@ -84,17 +84,19 @@ def print_summary(results: list[MiddleJsonFileResult]) -> None:
             rows.append([r.path.name, "ERROR", "", "", "", "", "", "", r.error[:60]])
         else:
             title_preview = (r.title[:40] + "…") if r.title and len(r.title) > 40 else (r.title or "")
-            rows.append([
-                r.path.name,
-                r.page_count,
-                r.heading_count,
-                r.paragraph_count,
-                r.table_count,
-                r.image_count,
-                r.list_count,
-                r.footnote_count,
-                title_preview,
-            ])
+            rows.append(
+                [
+                    r.path.name,
+                    r.page_count,
+                    r.heading_count,
+                    r.paragraph_count,
+                    r.table_count,
+                    r.image_count,
+                    r.list_count,
+                    r.footnote_count,
+                    title_preview,
+                ]
+            )
 
     print()
     print(tabulate(rows, headers=headers, tablefmt="github"))
@@ -132,5 +134,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     import asyncio
+
     results = asyncio.run(evaluate_middle_jsons(folder_arg))
     print_summary(results)

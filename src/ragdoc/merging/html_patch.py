@@ -16,6 +16,7 @@ Example::
     patch.operations[2].selected = ["<h2>Custom heading</h2>"]
     merged = patch.apply()
 """
+
 from __future__ import annotations
 
 import difflib
@@ -164,9 +165,7 @@ def compute_html_patch(
                 str(_select_tag(tags_a[idx_a], tags_b[idx_b], prefer_source, hier_a, hier_b))
                 for idx_a, idx_b in zip(range(i1, i2), range(j1, j2))
             ]
-            operations.append(
-                HtmlMergeOperation(opcode="equal", tags_a=ta_strs, tags_b=tb_strs, selected=selected)
-            )
+            operations.append(HtmlMergeOperation(opcode="equal", tags_a=ta_strs, tags_b=tb_strs, selected=selected))
 
         elif opcode == "replace":
             group_a = tags_a[i1:i2]
@@ -176,8 +175,7 @@ def compute_html_patch(
             if ratio >= similarity_threshold or (ratio > 0 and i2 - i1 == j2 - j1 == 1):
                 if len(group_a) == len(group_b):
                     selected = [
-                        str(_select_tag(ta, tb, prefer_source, hier_a, hier_b))
-                        for ta, tb in zip(group_a, group_b)
+                        str(_select_tag(ta, tb, prefer_source, hier_a, hier_b)) for ta, tb in zip(group_a, group_b)
                     ]
                 else:
                     score_a = sum(markup_richness_score(str(t)) for t in group_a)
@@ -194,29 +192,15 @@ def compute_html_patch(
                     else:
                         selected = tb_strs if score_b >= score_a else ta_strs
             else:
-                selected = [
-                    str(tb)
-                    for tb in group_b
-                    if _is_insertion_allowed(tb, allow_insertions_from_b)
-                ]
-            operations.append(
-                HtmlMergeOperation(opcode="replace", tags_a=ta_strs, tags_b=tb_strs, selected=selected)
-            )
+                selected = [str(tb) for tb in group_b if _is_insertion_allowed(tb, allow_insertions_from_b)]
+            operations.append(HtmlMergeOperation(opcode="replace", tags_a=ta_strs, tags_b=tb_strs, selected=selected))
 
         elif opcode == "insert":
-            selected = [
-                str(tb)
-                for tb in tags_b[j1:j2]
-                if _is_insertion_allowed(tb, allow_insertions_from_b)
-            ]
-            operations.append(
-                HtmlMergeOperation(opcode="insert", tags_a=[], tags_b=tb_strs, selected=selected)
-            )
+            selected = [str(tb) for tb in tags_b[j1:j2] if _is_insertion_allowed(tb, allow_insertions_from_b)]
+            operations.append(HtmlMergeOperation(opcode="insert", tags_a=[], tags_b=tb_strs, selected=selected))
 
         elif opcode == "delete":
-            operations.append(
-                HtmlMergeOperation(opcode="delete", tags_a=ta_strs, tags_b=[], selected=ta_strs)
-            )
+            operations.append(HtmlMergeOperation(opcode="delete", tags_a=ta_strs, tags_b=[], selected=ta_strs))
 
     return DocumentHtmlPatch(
         operations=operations,

@@ -5,6 +5,7 @@ compute_patch(). Each operation holds the elements from both sides plus the
 heuristically-resolved result. Users may inspect and override
 ``operation.resolved_elements`` on any operation before calling ``apply()``.
 """
+
 from __future__ import annotations
 
 from enum import Enum
@@ -12,6 +13,7 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 from ragdoc.document import Document, ElementType
+from ragdoc.metadata import MetadataDict
 
 
 class PatchOperationType(str, Enum):
@@ -42,13 +44,11 @@ class PatchOperation(BaseModel):
     )
     elements_a: list[ElementType] = Field(
         default_factory=list,
-        description="Elements from document A participating in this operation "
-        "(empty for INSERT_B).",
+        description="Elements from document A participating in this operation (empty for INSERT_B).",
     )
     elements_b: list[ElementType] = Field(
         default_factory=list,
-        description="Elements from document B participating in this operation "
-        "(empty for DELETE_A).",
+        description="Elements from document B participating in this operation (empty for DELETE_A).",
     )
     resolved_elements: list[ElementType] = Field(
         default_factory=list,
@@ -82,8 +82,7 @@ class DocumentPatch(BaseModel):
     )
     operations: list[PatchOperation] = Field(
         default_factory=list,
-        description="Ordered list of merge operations. Applying them in order "
-        "reconstructs the merged document.",
+        description="Ordered list of merge operations. Applying them in order reconstructs the merged document.",
     )
 
     def apply(self) -> Document:
@@ -115,13 +114,14 @@ class DocumentPatch(BaseModel):
                     seen_ids.add(element.id)
                     merged.append(element)
 
+        metadata: MetadataDict = {
+            "source_parser_a": self.source_parser_a,
+            "source_parser_b": self.source_parser_b,
+        }
         return Document(
             elements=merged,
             parser="merged",
-            metadata={
-                "source_parser_a": self.source_parser_a,
-                "source_parser_b": self.source_parser_b,
-            },
+            metadata=metadata,  # type: ignore[reportArgumentType]  # user keys outside BaseMetadata; runtime is MetadataDict
         )
 
 

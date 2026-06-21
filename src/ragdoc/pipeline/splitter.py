@@ -5,6 +5,7 @@
 :func:`~ragdoc.splitting.split_document` and exposes the most common knobs
 (max tokens, overlap, renderer, tokenizer) as constructor arguments.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -37,8 +38,8 @@ class TokenSplitter:
         self,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         overlap_tokens: int = DEFAULT_OVERLAP_TOKENS,
-        renderer: "Renderer | None" = None,
-        tokenizer: "Tokenizer | None" = None,
+        renderer: Renderer | None = None,
+        tokenizer: Tokenizer | None = None,
     ) -> None:
         self.max_tokens = max_tokens
         self.overlap_tokens = overlap_tokens
@@ -49,8 +50,7 @@ class TokenSplitter:
             renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
         self._renderer = renderer
 
-
-    def __call__(self, document: "Document") -> "list[Document]":
+    def __call__(self, document: Document) -> list[Document]:
         from ragdoc.splitting import split_document
 
         return split_document(

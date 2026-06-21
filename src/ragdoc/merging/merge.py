@@ -5,6 +5,7 @@ This module provides the high-level API for the element-alignment approach.
 are already populated by heuristics.  Callers may inspect and override
 individual operations before calling ``patch.apply()``.
 """
+
 from __future__ import annotations
 
 from typing import Literal

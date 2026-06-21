@@ -4,6 +4,7 @@ Each adapter is an optional integration — install the corresponding extra to u
 
 * ``ragdoc[qdrant]`` — :class:`~ragdoc.integrations.vector_stores.qdrant.QdrantVectorStore`
 """
+
 from __future__ import annotations
 
 try:

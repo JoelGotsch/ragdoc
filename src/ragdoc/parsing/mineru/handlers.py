@@ -30,6 +30,8 @@ from io import BytesIO
 from pathlib import Path
 from typing import Protocol
 
+from pypandoc import convert_text as _pandoc_convert
+
 from ragdoc.document import (
     DocumentList,
     Footnote,
@@ -41,12 +43,15 @@ from ragdoc.document import (
 )
 
 from .base import (
+    ChartBlock,
+    ChartBodyBlock,
+    ChartCaptionBlock,
+    ChartFootnoteBlock,
+    ChartSpan,
     CodeBlock,
     DiscardedBlock,
     DiscardedBlockType,
     ImageBlock,
-    ImageBodyBlock,
-    ImageCaptionBlock,
     ImageSpan,
     ListBlock,
     PageInfo,
@@ -85,9 +90,9 @@ def _get_bounding_box(block: _HasBBox) -> tuple[float, float, float, float]:
 
 
 def _css_from_block(
-    block: "_HasBBox",
+    block: _HasBBox,
     page: PageInfo,
-    lines: "list",
+    lines: list,
 ) -> str:
     """Build a CSS style string from block geometry and page context.
 
@@ -160,7 +165,11 @@ def build_text_html(text: str, block: TextBlock, page: PageInfo) -> str:
     return f"<p{style_attr}>{text}</p>"
 
 
-def handle_text_block(block: TextBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+def handle_text_block(
+    block: TextBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
     """Convert a :class:`TextBlock` to a :class:`Paragraph` element.
 
     The ``<p>`` tag receives inline CSS via :func:`build_text_html`:
@@ -170,37 +179,42 @@ def handle_text_block(block: TextBlock, page: PageInfo, context: ParseContext) -
     text = extract_text_from_lines(block.lines).strip()
     if not text:
         return []
-    paragraph = Paragraph(
-        html=build_text_html(text, block, page),
+    paragraph = Paragraph.from_html(
+        build_text_html(text, block, page),
         bounding_box=_get_bounding_box(block),
         page=page.page_idx + 1,
     )
     return [ParsedElement(element=paragraph, source_block=block, source_page=page)]
 
 
-def handle_list_block(block: ListBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+def handle_list_block(
+    block: ListBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
     """Convert a :class:`ListBlock` to a :class:`DocumentList` element.
 
     The ``<ul>`` tag receives inline CSS: ``font-size`` derived from the
     average line height across all list items, and ``text-align: center``
     when the block is horizontally centred on the page.
     """
-    items = [
-        f"<li>{extract_text_from_lines(item_block.lines).strip()}</li>"
-        for item_block in block.blocks
-    ]
+    items = [f"<li>{extract_text_from_lines(item_block.lines).strip()}</li>" for item_block in block.blocks]
     all_lines = [line for item in block.blocks for line in item.lines]
     css = _css_from_block(block, page, all_lines)
     style_attr = f' style="{css}"' if css else ""
-    doc_list = DocumentList(
-        html=f"<ul{style_attr}>{''.join(items)}</ul>",
+    doc_list = DocumentList.from_html(
+        f"<ul{style_attr}>{''.join(items)}</ul>",
         bounding_box=_get_bounding_box(block),
         page=page.page_idx + 1,
     )
     return [ParsedElement(element=doc_list, source_block=block, source_page=page)]
 
 
-def handle_code_block(block: CodeBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+def handle_code_block(
+    block: CodeBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
     """
     Convert a :class:`CodeBlock` to zero or more elements.
 
@@ -213,33 +227,41 @@ def handle_code_block(block: CodeBlock, page: PageInfo, context: ParseContext) -
     if block.code_caption is not None:
         caption_text = extract_text_from_lines(block.code_caption.lines).strip()
         if caption_text:
-            results.append(ParsedElement(
-                element=Paragraph(
-                    html=f"<p>{caption_text}</p>",
-                    bounding_box=_get_bounding_box(block.code_caption),
-                    page=page_number,
-                ),
-                source_block=block,
-                source_page=page,
-            ))
+            results.append(
+                ParsedElement(
+                    element=Paragraph.from_html(
+                        f"<p>{caption_text}</p>",
+                        bounding_box=_get_bounding_box(block.code_caption),
+                        page=page_number,
+                    ),
+                    source_block=block,
+                    source_page=page,
+                )
+            )
 
     if block.code_body is not None:
         code_text = extract_text_from_lines(block.code_body.lines)
         if code_text.strip():
-            results.append(ParsedElement(
-                element=RawText(
-                    innerhtml=code_text,
-                    bounding_box=_get_bounding_box(block),
-                    page=page_number,
-                ),
-                source_block=block,
-                source_page=page,
-            ))
+            results.append(
+                ParsedElement(
+                    element=RawText(
+                        innerhtml=code_text,
+                        bounding_box=_get_bounding_box(block),
+                        page=page_number,
+                    ),
+                    source_block=block,
+                    source_page=page,
+                )
+            )
 
     return results
 
 
-def handle_table_block(block: TableBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
+def handle_table_block(
+    block: TableBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
     """
     Convert a :class:`TableBlock` to zero or more elements.
 
@@ -253,51 +275,141 @@ def handle_table_block(block: TableBlock, page: PageInfo, context: ParseContext)
     if table_caption is not None:
         caption_text = extract_text_from_lines(table_caption.lines).strip()
         if caption_text:
-            results.append(ParsedElement(
-                element=Paragraph(
-                    html=f"<p>{caption_text}</p>",
-                    bounding_box=_get_bounding_box(table_caption),
-                    page=page_number,
-                ),
-                source_block=block,
-                source_page=page,
-            ))
+            results.append(
+                ParsedElement(
+                    element=Paragraph.from_html(
+                        f"<p>{caption_text}</p>",
+                        bounding_box=_get_bounding_box(table_caption),
+                        page=page_number,
+                    ),
+                    source_block=block,
+                    source_page=page,
+                )
+            )
 
     table_body = next((b for b in block.blocks if isinstance(b, TableBodyBlock)), None)
     if table_body is not None:
         table_span = next(
-            (
-                span
-                for line in table_body.lines
-                for span in line.spans
-                if isinstance(span, TableSpan)
-            ),
+            (span for line in table_body.lines for span in line.spans if isinstance(span, TableSpan)),
             None,
         )
         if table_span is not None and table_span.html.strip():
-            results.append(ParsedElement(
-                element=Table(
-                    html_content=table_span.html.strip(),
-                    bounding_box=_get_bounding_box(block),
-                    page=page_number,
-                ),
-                source_block=block,
-                source_page=page,
-            ))
+            results.append(
+                ParsedElement(
+                    element=Table(
+                        html_content=table_span.html.strip(),
+                        bounding_box=_get_bounding_box(block),
+                        page=page_number,
+                    ),
+                    source_block=block,
+                    source_page=page,
+                )
+            )
 
     table_footnote = next((b for b in block.blocks if isinstance(b, TableFootnoteBlock)), None)
     if table_footnote is not None:
         fn_text = extract_text_from_lines(table_footnote.lines).strip()
         if fn_text:
-            results.append(ParsedElement(
-                element=RawText(
-                    innerhtml=fn_text,
-                    bounding_box=_get_bounding_box(table_footnote),
-                    page=page_number,
-                ),
-                source_block=block,
-                source_page=page,
-            ))
+            results.append(
+                ParsedElement(
+                    element=RawText(
+                        innerhtml=fn_text,
+                        bounding_box=_get_bounding_box(table_footnote),
+                        page=page_number,
+                    ),
+                    source_block=block,
+                    source_page=page,
+                )
+            )
+
+    return results
+
+
+def handle_chart_block(
+    block: ChartBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+) -> list[ParsedElement]:
+    """
+    Convert a :class:`ChartBlock` to zero or more elements.
+
+    MinerU v3.1+ emits ``chart`` blocks for figures whose visual content has
+    been OCR'd into a markdown table (bar charts, line plots, etc.).  Unlike
+    :class:`TableBlock` — which carries HTML in :attr:`TableSpan.html` — a
+    chart body stores its data as a markdown string in :attr:`ChartSpan.content`.
+
+    The markdown is converted to HTML via pypandoc (a core dependency) and emitted
+    as a :class:`~ragdoc.document.Table`.  If conversion fails for any reason the
+    chart body is silently skipped and a ``WARNING`` is logged; caption and footnote
+    elements are still emitted.  Captions are emitted as
+    :class:`~ragdoc.document.Paragraph` elements and footnotes as
+    :class:`~ragdoc.document.RawText`, following the same pattern as
+    :func:`handle_table_block`.
+    """
+    results: list[ParsedElement] = []
+    page_number = page.page_idx + 1
+
+    chart_caption = next((b for b in block.blocks if isinstance(b, ChartCaptionBlock)), None)
+    if chart_caption is not None:
+        caption_text = extract_text_from_lines(chart_caption.lines).strip()
+        if caption_text:
+            results.append(
+                ParsedElement(
+                    element=Paragraph.from_html(
+                        f"<p>{caption_text}</p>",
+                        bounding_box=_get_bounding_box(chart_caption),
+                        page=page_number,
+                    ),
+                    source_block=block,
+                    source_page=page,
+                )
+            )
+
+    chart_body = next((b for b in block.blocks if isinstance(b, ChartBodyBlock)), None)
+    if chart_body is not None:
+        chart_span = next(
+            (span for line in chart_body.lines for span in line.spans if isinstance(span, ChartSpan)),
+            None,
+        )
+        if chart_span is not None and chart_span.content.strip():
+            try:
+                html_content = _pandoc_convert(chart_span.content, to="html", format="markdown")
+                results.append(
+                    ParsedElement(
+                        element=Table(
+                            html_content=html_content.strip(),
+                            bounding_box=_get_bounding_box(block),
+                            page=page_number,
+                        ),
+                        source_block=block,
+                        source_page=page,
+                    )
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Could not convert chart markdown to HTML on page %d (%s: %s); "
+                    "chart body skipped. Content prefix: %r",
+                    page_number,
+                    type(exc).__name__,
+                    exc,
+                    chart_span.content[:100],
+                )
+
+    chart_footnote = next((b for b in block.blocks if isinstance(b, ChartFootnoteBlock)), None)
+    if chart_footnote is not None:
+        fn_text = extract_text_from_lines(chart_footnote.lines).strip()
+        if fn_text:
+            results.append(
+                ParsedElement(
+                    element=RawText(
+                        innerhtml=fn_text,
+                        bounding_box=_get_bounding_box(chart_footnote),
+                        page=page_number,
+                    ),
+                    source_block=block,
+                    source_page=page,
+                )
+            )
 
     return results
 
@@ -310,7 +422,7 @@ def _load_image_bytes(path: Path) -> tuple[str, str, int, int] | None:
     image, unsupported format, …).
     """
     try:
-        from PIL import Image as PILImage  # noqa: PLC0415 (lazy import for optional dep)
+        from PIL import Image as PILImage
 
         with PILImage.open(path) as img:
             fmt = (img.format or "png").lower()
@@ -352,57 +464,53 @@ def handle_image_block(block: ImageBlock, page: PageInfo, context: ParseContext)
     body = block.image_body
     if body is not None:
         image_span = next(
-            (
-                span
-                for line in body.lines
-                for span in line.spans
-                if isinstance(span, ImageSpan)
-            ),
+            (span for line in body.lines for span in line.spans if isinstance(span, ImageSpan)),
             None,
         )
         if image_span is not None:
             if source_dir is None:
                 context.warnings.append(
-                    f"Cannot load image on page {page_number}: "
-                    "source_dir not set in context.metadata"
+                    f"Cannot load image on page {page_number}: source_dir not set in context.metadata"
                 )
             else:
                 img_path = source_dir / "images" / image_span.image_path
                 if not img_path.exists():
-                    context.warnings.append(
-                        f"Image file not found on page {page_number}: {img_path}"
-                    )
+                    context.warnings.append(f"Image file not found on page {page_number}: {img_path}")
                     loaded = None
                 else:
                     loaded = _load_image_bytes(img_path)
                 if loaded is not None:
                     b64data, fmt, width, height = loaded
-                    results.append(ParsedElement(
-                        element=Image(
-                            image=b64data,
-                            image_type=fmt,
-                            width=width,
-                            height=height,
-                            bounding_box=_get_bounding_box(block),
-                            page=page_number,
-                        ),
-                        source_block=block,
-                        source_page=page,
-                    ))
+                    results.append(
+                        ParsedElement(
+                            element=Image(
+                                image=b64data,
+                                image_type=fmt,
+                                width=width,
+                                height=height,
+                                bounding_box=_get_bounding_box(block),
+                                page=page_number,
+                            ),
+                            source_block=block,
+                            source_page=page,
+                        )
+                    )
 
     caption = block.image_caption
     if caption is not None:
         caption_text = extract_text_from_lines(caption.lines).strip()
         if caption_text:
-            results.append(ParsedElement(
-                element=Paragraph(
-                    html=f"<p>{caption_text}</p>",
-                    bounding_box=_get_bounding_box(caption),
-                    page=page_number,
-                ),
-                source_block=block,
-                source_page=page,
-            ))
+            results.append(
+                ParsedElement(
+                    element=Paragraph.from_html(
+                        f"<p>{caption_text}</p>",
+                        bounding_box=_get_bounding_box(caption),
+                        page=page_number,
+                    ),
+                    source_block=block,
+                    source_page=page,
+                )
+            )
 
     return results
 
@@ -459,9 +567,7 @@ DiscardedBlockHandler = Callable[[DiscardedBlock, PageInfo, ParseContext], list[
 _NUMBERED_FOOTNOTE_RE = re.compile(r"^(\d+)\s*(.+)$", re.DOTALL)
 
 
-def handle_discarded_as_footnote(
-    block: DiscardedBlock, page: PageInfo, context: ParseContext
-) -> list[ParsedElement]:
+def handle_discarded_as_footnote(block: DiscardedBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
     """
     Parse a numbered footnote from a discarded block.
 
@@ -472,44 +578,45 @@ def handle_discarded_as_footnote(
     text = extract_text_from_lines(block.lines).strip()
     match = _NUMBERED_FOOTNOTE_RE.match(text)
     if match:
-        return [ParsedElement(
-            element=Footnote(
-                number=int(match.group(1)),
-                innerhtml=match.group(2).strip(),
-                bounding_box=_get_bounding_box(block),
-                page=page.page_idx + 1,
-            ),
-            source_block=block,
-            source_page=page,
-        )]
-    context.warnings.append(
-        f"Could not parse numbered footnote on page {page.page_idx + 1}: {text[:60]!r}"
-    )
+        return [
+            ParsedElement(
+                element=Footnote(
+                    number=int(match.group(1)),
+                    innerhtml=match.group(2).strip(),
+                    bounding_box=_get_bounding_box(block),
+                    page=page.page_idx + 1,
+                ),
+                source_block=block,
+                source_page=page,
+            )
+        ]
+    context.warnings.append(f"Could not parse numbered footnote on page {page.page_idx + 1}: {text[:60]!r}")
     return []
 
 
 def handle_discarded_as_raw_text(
-    block: DiscardedBlock, page: PageInfo, context: ParseContext
+    block: DiscardedBlock,
+    page: PageInfo,
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
 ) -> list[ParsedElement]:
     """Wrap a discarded block's text in a :class:`RawText` element."""
     text = extract_text_from_lines(block.lines).strip()
     if not text:
         return []
-    return [ParsedElement(
-        element=RawText(
-            innerhtml=text,
-            bounding_box=_get_bounding_box(block),
-            page=page.page_idx + 1,
-        ),
-        source_block=block,
-        source_page=page,
-    )]
+    return [
+        ParsedElement(
+            element=RawText(
+                innerhtml=text,
+                bounding_box=_get_bounding_box(block),
+                page=page.page_idx + 1,
+            ),
+            source_block=block,
+            source_page=page,
+        )
+    ]
 
 
-
-def handle_discarded_as_metadata(
-    block: DiscardedBlock, page: PageInfo, context: ParseContext
-) -> list[ParsedElement]:
+def handle_discarded_as_metadata(block: DiscardedBlock, page: PageInfo, context: ParseContext) -> list[ParsedElement]:
     """
     Store a discarded block's text in ``context.metadata`` without producing
     any document element.
@@ -531,7 +638,9 @@ def handle_discarded_as_metadata(
 
 
 def handle_discarded_drop(
-    block: DiscardedBlock, page: PageInfo, context: ParseContext
+    block: DiscardedBlock,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+    page: PageInfo,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
+    context: ParseContext,  # pyright: ignore[reportUnusedParameter]  # dispatch-table interface
 ) -> list[ParsedElement]:
     """Suppress a discarded block — always returns an empty list."""
     return []
@@ -647,6 +756,9 @@ class ExtractionConfig:
     )
     handle_table: Callable[[TableBlock, PageInfo, ParseContext], list[ParsedElement]] = field(
         default_factory=lambda: handle_table_block
+    )
+    handle_chart: Callable[[ChartBlock, PageInfo, ParseContext], list[ParsedElement]] = field(
+        default_factory=lambda: handle_chart_block
     )
     discarded_handlers: dict[DiscardedBlockType, DiscardedBlockHandler] = field(
         default_factory=_default_discarded_handlers

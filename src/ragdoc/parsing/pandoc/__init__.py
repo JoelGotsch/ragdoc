@@ -1,10 +1,10 @@
-from ragdoc.parsing.pandoc.load import generate_document as generate_pandoc_document, PandocHTML
-
-from pydantic import BaseModel
 from pathlib import Path
 
-from ragdoc.parsing.base import load_file
+from pydantic import BaseModel
+
 from ragdoc.document import Document
+from ragdoc.parsing.base import load_file
+from ragdoc.parsing.pandoc.load import PandocHTML, generate_document as generate_pandoc_document
 from ragdoc.parsing.parser import Parser
 
 
@@ -35,6 +35,7 @@ def load_wordfile(file_obj: WordFile) -> Document:
 # ---------------------------------------------------------------------------
 # Registry integration
 # ---------------------------------------------------------------------------
+
 
 class PandocParser(Parser):
     name: str = "pandoc"

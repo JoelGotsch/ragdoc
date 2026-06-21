@@ -9,8 +9,8 @@ uv sync --all-extras
 ```
 
 Optional extras:
-- `azure_di` — Azure Document Intelligence PDF parsing
-- `pdf_mineru` — MinerU-based PDF parsing
+- `azure-di` — Azure Document Intelligence PDF parsing
+- `pdf-mineru` — MinerU-based PDF parsing
 
 ## Core Philosophy
 

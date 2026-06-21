@@ -2,22 +2,26 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ragdoc.document import Document
+
 from .base import (
     AsyncCallNext,
     BaseMiddleware,
+    ChartBlock,
     CodeBlock,
     ImageBlock,
+    InterlineEquationBlock,
     ListBlock,
     MinerUMiddleDocument,
-    ParserMiddleware,
     ParseContext,
     ParsedElement,
+    ParserMiddleware,
+    RefTextBlock,
     TableBlock,
     TextBlock,
     TitleBlock,
 )
 from .handlers import ExtractionConfig
-from ragdoc.document import Document
 
 
 class CoreExtractionMiddleware(BaseMiddleware):
@@ -58,6 +62,18 @@ class CoreExtractionMiddleware(BaseMiddleware):
                     results = self.config.handle_image(block, page, context)
                 elif isinstance(block, TableBlock):
                     results = self.config.handle_table(block, page, context)
+                elif isinstance(block, ChartBlock):
+                    results = self.config.handle_chart(block, page, context)
+                elif isinstance(block, (RefTextBlock, InterlineEquationBlock)):
+                    # Top-level ref_text (bibliography entries) and
+                    # interline_equation blocks have the same shape as a
+                    # TextBlock — a flat list of lines — so reuse the text
+                    # handler. They become Paragraph elements in the Document.
+                    results = self.config.handle_text(
+                        block,  # type: ignore[arg-type]  # RefTextBlock/InterlineEquationBlock are structurally TextBlock (flat .lines)
+                        page,
+                        context,
+                    )
                 else:
                     results = []
                 context.elements.extend(results)
@@ -113,7 +129,7 @@ class MinerUExtractor:
             for mw in middlewares:
                 self.use(mw)
 
-    def use(self, middleware: ParserMiddleware) -> "MinerUExtractor":
+    def use(self, middleware: ParserMiddleware) -> MinerUExtractor:
         """Append a middleware to the pipeline."""
         self.middlewares.append(middleware)
         return self
@@ -122,7 +138,7 @@ class MinerUExtractor:
         self,
         middleware: ParserMiddleware,
         before: type[ParserMiddleware],
-    ) -> "MinerUExtractor":
+    ) -> MinerUExtractor:
         """Insert a middleware immediately before the first instance of *before*."""
         for i, mw in enumerate(self.middlewares):
             if isinstance(mw, before):
@@ -135,7 +151,7 @@ class MinerUExtractor:
         self,
         middleware: ParserMiddleware,
         after: type[ParserMiddleware],
-    ) -> "MinerUExtractor":
+    ) -> MinerUExtractor:
         """Insert a middleware immediately after the first instance of *after*."""
         for i, mw in enumerate(self.middlewares):
             if isinstance(mw, after):

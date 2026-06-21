@@ -1,26 +1,30 @@
 from __future__ import annotations
-import base64
-import re
-import requests
-from pathlib import Path
-import logging
 
-from bs4 import BeautifulSoup, NavigableString, Tag
+import base64
+import logging
+import re
+from collections.abc import Callable
+from pathlib import Path
+
+import requests
+from bs4 import BeautifulSoup, Tag
+from bs4.element import NavigableString
+
 # from funcy import rcompose
 from pydantic import BaseModel
-from typing import Callable
 
 from ragdoc.config import get_config
-from ragdoc.document import Footnote, Paragraph, Document, Table, DocumentList, Image, Heading
+from ragdoc.document import Document, DocumentList, Footnote, Heading, Image, Paragraph, Table
 
 logger = logging.getLogger(__name__)
+
 
 class HTML(BaseModel):
     content: str
 
     @classmethod
-    def from_file(cls, path: str|Path) -> HTML:
-        with open(path, "r", encoding="utf-8") as fh:
+    def from_file(cls, path: str | Path) -> HTML:
+        with open(path, encoding="utf-8") as fh:
             content = fh.read()
         return cls(content=content)
 
@@ -37,7 +41,7 @@ def is_structural(tag: Tag) -> bool:
 TSoupTransformer = Callable[[BeautifulSoup], BeautifulSoup]
 
 
-def unwrap_structural(soup: BeautifulSoup, tags: list[str]|None = None) -> BeautifulSoup:
+def unwrap_structural(soup: BeautifulSoup, tags: list[str] | None = None) -> BeautifulSoup:
     """This function unwraps (as default) div and span tags, that have no text in them."""
     if tags is None:
         tags = ["div", "span"]
@@ -49,7 +53,7 @@ def unwrap_structural(soup: BeautifulSoup, tags: list[str]|None = None) -> Beaut
 
 def unwrap_idiotic_tables(soup: BeautifulSoup) -> BeautifulSoup:
     """This function looks for tables in the soup tree which fulfill the following criteria:
-    
+
     - contains a THEAD
     - contains a TBODY which is empty
     - THEAD contains exactly one TR
@@ -58,7 +62,7 @@ def unwrap_idiotic_tables(soup: BeautifulSoup) -> BeautifulSoup:
     Those tables are procuded by some tormented soul deciding its a super cool idea
     to use tables for drawing a broder around a bunch of paragraphs in words.
     Because formatting and styling would be very boring and we do not do this here.
-    
+
     Therefor those tables now go away and are replaced by the content of the TH cell.
     """
     tables = soup.find_all("table")
@@ -77,6 +81,7 @@ def unwrap_idiotic_tables(soup: BeautifulSoup) -> BeautifulSoup:
                     th_element.unwrap()
 
     return soup
+
 
 _FOOTNOTE_ID_RE = re.compile(r"^(?:footnote|fn|note)[-_]?(\d+)$", re.I)
 
@@ -103,9 +108,7 @@ def detect_html_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
         # Strip leading [N] prefix from the first text node, if present
         for child in p.children:
             if isinstance(child, NavigableString):
-                child.replace_with(
-                    re.sub(r'^\s*\[' + str(number) + r'\]\s*', '', str(child), count=1)
-                )
+                child.replace_with(re.sub(r"^\s*\[" + str(number) + r"\]\s*", "", str(child), count=1))
                 break
         p.name = "aside"
         p.attrs.clear()
@@ -127,7 +130,7 @@ def generate_image(image: Tag) -> Image | None:
     download_images = get_config().download_images
     if not image.has_attr("src"):
         return None
-    
+
     image_src = image["src"]
     if not isinstance(image_src, str):
         logger.warning(f"Image src is not a string: {image['src']}")
@@ -137,8 +140,7 @@ def generate_image(image: Tag) -> Image | None:
         _, content = image_src.split(",", maxsplit=1)
         image_type = match.group("image_type")
         kwargs = extract_image_attributes(image)
-        image = Image(image=content, image_type=image_type, **kwargs)
-        return image
+        return Image(image=content, image_type=image_type, **kwargs)
     elif download_images and (image_src.startswith("https://") or image_src.startswith("http://")):
         try:
             response = requests.get(image_src)
@@ -153,6 +155,7 @@ def generate_image(image: Tag) -> Image | None:
             logger.error(f"Failed to download image: {image_src}")
             pass
 
+
 def _handle_images(element: Tag) -> list[Image]:
     """Replace <img> tags with <ref id="..." rel="image"/> placeholders and return Image elements."""
     images = []
@@ -160,14 +163,15 @@ def _handle_images(element: Tag) -> list[Image]:
         document_image = generate_image(image)
         if document_image is not None:
             images.append(document_image)
-            ref_tag = BeautifulSoup(document_image.placeholder_html, 'html.parser')
+            ref_tag = BeautifulSoup(document_image.placeholder_html, "html.parser")
             image.replace_with(ref_tag)
     return images
 
+
 def handle_tag(element: Tag, document: Document) -> None:
     """
-    This function handles the tags that are directly nested under the heading tags. 
-    It does not handle nested tags, which are handled in the else case where we loop over 
+    This function handles the tags that are directly nested under the heading tags.
+    It does not handle nested tags, which are handled in the else case where we loop over
     all nested tags and call this function recursively.
     """
     match element.name:
@@ -191,13 +195,14 @@ def handle_tag(element: Tag, document: Document) -> None:
                 document.elements.append(document_image)
         case "aside":
             if "footnote" in (element.get("class") or []):
-                number = int(element.get("data-number") or 0)
+                number = int(element.get("data-number") or 0)  # type: ignore[arg-type]  # bs4 attr value is str at runtime
                 innerhtml = element.decode_contents().strip()
-                aside_id = element.get("id", "")
+                aside_id = str(element.get("id", ""))
                 fn_id = aside_id.removeprefix("footnote-") if aside_id.startswith("footnote-") else None
-                document.elements.append(
-                    Footnote(number=number, innerhtml=innerhtml, **({"id": fn_id} if fn_id else {}))
-                )
+                if fn_id:
+                    document.elements.append(Footnote(number=number, innerhtml=innerhtml, id=fn_id))
+                else:
+                    document.elements.append(Footnote(number=number, innerhtml=innerhtml))
 
 
 def _reconstruct_footnote_refs(document: Document) -> None:
@@ -212,10 +217,10 @@ def _reconstruct_footnote_refs(document: Document) -> None:
     for element in document.elements:
         if not hasattr(element, "html_content"):
             continue
-        soup = BeautifulSoup(element.html_content, "html.parser")
+        soup = BeautifulSoup(getattr(element, "html_content"), "html.parser")
         changed = False
         for a in soup.find_all("a", href=True):
-            href = a.get("href", "")
+            href = str(a.get("href", ""))
             if href.startswith("#footnote-"):
                 fn_id = href.removeprefix("#footnote-")
                 fn = id_to_fn.get(fn_id)
@@ -223,7 +228,7 @@ def _reconstruct_footnote_refs(document: Document) -> None:
                     a.replace_with(BeautifulSoup(fn.placeholder_html, "html.parser"))
                     changed = True
         if changed:
-            element.html_content = str(soup)
+            setattr(element, "html_content", str(soup))
 
 
 def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | None = None) -> Document:
@@ -231,7 +236,9 @@ def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | No
 
     soup = BeautifulSoup(html.content, "html.parser")
 
-    transformers = soup_transformers if soup_transformers is not None else [unwrap_idiotic_tables, detect_html_footnotes]
+    transformers = (
+        soup_transformers if soup_transformers is not None else [unwrap_idiotic_tables, detect_html_footnotes]
+    )
     for transformer in transformers:
         soup = transformer(soup)
 
@@ -254,47 +261,20 @@ def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | No
     # Handle preface elements
     root = soup.find("body") or soup
 
-    # TODO: this is probably too simplistic. It might be better to to first find headings again and then for each heading 
+    # TODO: this is probably too simplistic. It might be better to to first find headings again and then for each heading
     # iterate through siblings until another heading is found - and then continue with that heading.
-    for element in root.find_all(element_names|heading_tags, recursive=False):
-        if element.name in heading_tags or (element.name == "p" and "class" in element.attrs and "heading" in element.attrs["class"]):
+    for element in root.find_all(element_names | heading_tags, recursive=False):
+        if element.name in heading_tags or (
+            element.name == "p" and "class" in element.attrs and "heading" in element.attrs["class"]
+        ):
             heading_innerhtml = element.decode_contents(formatter="html")
             heading_level = int("6" if element.name == "p" else element.name.replace("h", ""))
-            document.elements.append(Heading(innerhtml=heading_innerhtml, level=heading_level))
+            # Heading accepts innerhtml/level via a pydantic model_validator(mode="before") (see document.py).
+            document.elements.append(
+                Heading(innerhtml=heading_innerhtml, level=heading_level)  # type: ignore[call-arg]
+            )
         else:
             handle_tag(element, document)
     document.parser = "html"
     _reconstruct_footnote_refs(document)
     return document
-
-    n = 1
-    first_heading = None
-    for element in root.find_all(element_names|heading_tags, recursive=False):
-        if first_heading is not None and element == first_heading:
-            break
-        n, preface = handle_tag(element, preface, 0, n)
-
-    # Handle everything nested under headings
-    for n_document, heading in enumerate(headings, start=1):
-        name = heading.text.replace("\n", " ")
-        if heading.name == "p":
-            level = 6
-        else:
-            level = int(heading.name.replace("h", ""))
-        document_heading = Heading(innerhtml=name, level=level)
-        documents.append(Document(elements=[document_heading]))
-
-    for n_document, (heading, document) in enumerate(zip(headings, documents), start=1):
-        n_elem_in_document = 1
-        for element in heading.find_next_siblings():
-            if element.name == "p" and "class" in element.attrs and "heading" in element.attrs["class"]:
-                break
-            elif element.name in ["h1", "h2", "h3", "h4", "h5", "h6"]:
-                break
-            elif element.name in ("p", "table", "ul", "ol", "dl", "img", "div"):
-                n_elem_in_document, document = handle_tag(element, document, n_document, n_elem_in_document)
-            else:
-                for nested_element in element.find_all():
-                    n_elem_in_document, document = handle_tag(nested_element, document, n_document, n_elem_in_document)
-
-    return documents, preface.elements

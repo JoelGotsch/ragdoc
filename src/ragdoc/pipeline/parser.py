@@ -11,6 +11,7 @@ The :class:`Parser` Protocol defines the interface expected by
     Import :class:`Parser` from :mod:`ragdoc.parsing.parser` instead.
     Use :func:`~ragdoc.parsing.load` directly instead of ``AutoParser``.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,7 +21,7 @@ from ragdoc.document import Document
 # Re-export the canonical Parser protocol from parsing.parser
 from ragdoc.parsing.parser import Parser
 
-__all__ = ["Parser", "AutoParser"]
+__all__ = ["AutoParser", "Parser"]
 
 
 class AutoParser:

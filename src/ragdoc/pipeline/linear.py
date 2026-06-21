@@ -26,13 +26,15 @@ For memory-efficient streaming::
     async for batch in pipeline.stream(paths):
         await vector_store.upsert(batch)
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, AsyncIterator, Generic, Iterable, Literal, cast
+from typing import TYPE_CHECKING, Generic, Literal, cast
 
 from ragdoc.metadata import TMetadata
 
@@ -93,19 +95,19 @@ class DocumentPipeline(Generic[TMetadata]):
 
     def __init__(
         self,
-        parser: "Parser | None" = None,
-        processors: "list[DocumentProcessor] | ProcessingPipeline | None" = None,
-        splitter: "TokenSplitter | None" = None,
-        chunker: "Chunker | None" = None,
+        parser: Parser | None = None,
+        processors: list[DocumentProcessor] | ProcessingPipeline | None = None,
+        splitter: TokenSplitter | None = None,
+        chunker: Chunker | None = None,
         concurrency: int = 1,
         on_error: Literal["raise", "skip"] = "raise",
-        metadata_type: "type[TMetadata] | None" = None,
+        metadata_type: type[TMetadata] | None = None,
     ) -> None:
         from ragdoc.chunking import SimpleChunker
         from ragdoc.pipeline.parser import AutoParser
         from ragdoc.processing.base import ProcessingPipeline as PP
 
-        self._parser: Parser = parser or AutoParser()
+        self._parser: Parser | AutoParser = parser or AutoParser()
         self._splitter = splitter
         self._chunker: Chunker = chunker or SimpleChunker()
         self._concurrency = concurrency
@@ -119,7 +121,7 @@ class DocumentPipeline(Generic[TMetadata]):
         else:
             self._processing_pipeline = PP(processors)
 
-    async def run(self, source: Path) -> "list[Chunk[TMetadata]]":
+    async def run(self, source: Path) -> list[Chunk[TMetadata]]:
         """Parse, process, split, and chunk a single file.
 
         Args:
@@ -175,14 +177,11 @@ class DocumentPipeline(Generic[TMetadata]):
             await asyncio.gather(*[_run_one(p) for p in source_list])
         except BaseException:
             logger.error(
-                f"Batch failed: {len(result.chunks)} chunks, "
-                f"{len(result.errors)} errors before failure",
+                f"Batch failed: {len(result.chunks)} chunks, {len(result.errors)} errors before failure",
                 exc_info=True,
             )
             raise
-        logger.info(
-            f"Batch complete: {len(result.chunks)} chunks, {len(result.errors)} errors"
-        )
+        logger.info(f"Batch complete: {len(result.chunks)} chunks, {len(result.errors)} errors")
         return result
 
     async def stream(
@@ -220,7 +219,7 @@ class DocumentPipeline(Generic[TMetadata]):
             logger.debug(f"Stream batch yielded: {len(batch)} chunks")
             yield batch
 
-    async def _process_one(self, source: Path) -> "list[Chunk[TMetadata]]":
+    async def _process_one(self, source: Path) -> list[Chunk[TMetadata]]:
         logger.debug(f"Parsing {source.name}")
         doc = await self._parser(source)
         logger.debug(f"Parsed {source.name}: {len(doc.elements)} elements")
@@ -245,14 +244,12 @@ class DocumentPipeline(Generic[TMetadata]):
                     f"Expected by {self._metadata_type.__name__}."
                 )
 
-        typed_doc: "Document[TMetadata]" = cast("Document[TMetadata]", doc)
+        typed_doc: Document[TMetadata] = cast("Document[TMetadata]", doc)
 
         logger.debug(f"Splitting {source.name}")
         splits = self._splitter(typed_doc) if self._splitter else [typed_doc]
         logger.debug(f"Split {source.name} into {len(splits)} sub-documents")
 
-        chunks: list[Chunk[TMetadata]] = [
-            c for split in splits for c in await self._chunker.chunk(split)  # type: ignore[misc]
-        ]
+        chunks: list[Chunk[TMetadata]] = [c for split in splits for c in await self._chunker.chunk(split)]
         logger.info(f"Completed {source.name}: {len(chunks)} chunks produced")
         return chunks

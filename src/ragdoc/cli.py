@@ -1,9 +1,9 @@
 """Command-line interface for ragdoc."""
 
 import asyncio
+from pathlib import Path
 
 import click
-from pathlib import Path
 from pydantic import TypeAdapter
 
 from ragdoc.document import Document

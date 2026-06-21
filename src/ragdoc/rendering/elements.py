@@ -55,24 +55,20 @@ from html import escape
 from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup
+
 from ragdoc.utils.helpers import add_unregister
 
 if TYPE_CHECKING:
     from ragdoc.rendering.base import RenderContext
 
-from ragdoc.metadata import MetadataValue, serialize_metadata_value as _canonical_serialize
-from ragdoc.rendering.base import DocumentMetadata
 from ragdoc.document import (
     BaseElement,
-    DocumentList,
     Footnote,
     Heading,
     Image,
-    Paragraph,
-    RawText,
-    Table,
 )
-
+from ragdoc.metadata import MetadataValue, serialize_metadata_value as _canonical_serialize
+from ragdoc.rendering.base import DocumentMetadata
 
 # =============================================================================
 # Prompt Content Renderer
@@ -81,25 +77,25 @@ from ragdoc.document import (
 
 @add_unregister
 @singledispatch
-def render_for_prompt(element: BaseElement, ctx: "RenderContext", inline: bool = False) -> str:
+def render_for_prompt(element: BaseElement, ctx: RenderContext, inline: bool = False) -> str:
     """
     Render element for LLM prompt context.
-    
+
     This renderer prioritizes:
     - Full content (NOT summary) for complete context
     - Text representations over binary content
     - Human-readable HTML for conversion to markdown
-    
+
     Note: This renderer does NOT use summaries.
 
     Use this for generating content to include in LLM prompts.
     The Renderer will convert HTML to markdown or other formats.
-    
+
     Args:
         element: The element to render
         ctx: Render context with document access
         inline: If True, render for inline substitution (compact format)
-        
+
     Returns:
         HTML string (full content, not summary)
     """
@@ -107,11 +103,15 @@ def render_for_prompt(element: BaseElement, ctx: "RenderContext", inline: bool =
         return f"<span>{element.html}</span>"
     if not ctx.is_inline_referenced(element.id):
         return f"{element.html}"
-    return "" # only render once
+    return ""  # only render once
 
 
 @render_for_prompt.register(Heading)
-def _render_heading_prompt(element: Heading, ctx: "RenderContext", inline: bool = False) -> str:
+def _render_heading_prompt(
+    element: Heading,
+    ctx: RenderContext,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+    inline: bool = False,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+) -> str:
     """Prompt heading renderer - strips inline CSS (e.g. text-align, font-size from MinerU).
 
     CSS visual properties are noise for LLMs. The heading tag and level are preserved.
@@ -124,7 +124,7 @@ def _render_heading_prompt(element: Heading, ctx: "RenderContext", inline: bool 
 
 
 @render_for_prompt.register(Image)
-def _render_image_prompt(element: Image, ctx: "RenderContext", inline: bool = False) -> str:
+def _render_image_prompt(element: Image, ctx: RenderContext, inline: bool = False) -> str:
     """
     Prompt image renderer - prioritizes text representation.
 
@@ -136,7 +136,7 @@ def _render_image_prompt(element: Image, ctx: "RenderContext", inline: bool = Fa
     When inline=True, uses a more compact span format.
     """
     if ctx.is_inline_referenced(element.id) and not inline:
-        return "" # only render once at the inline ref location
+        return ""  # only render once at the inline ref location
     prompt_text = element.text_representation or element.alt
     if prompt_text:
         if inline:
@@ -147,20 +147,18 @@ def _render_image_prompt(element: Image, ctx: "RenderContext", inline: bool = Fa
     return "<p><em>[Unprocessed Image]</em></p>"
 
 
-
-
 @render_for_prompt.register(Footnote)
-def _render_footnote_prompt(element: Footnote, ctx: "RenderContext", inline: bool = False) -> str:
+def _render_footnote_prompt(element: Footnote, ctx: RenderContext, inline: bool = False) -> str:
     """Prompt footnote renderer - compact when inline, full html for referenced standalone.
 
     Orphaned footnotes (no inline ref pointing to them) are wrapped in a
     blockquote so the LLM can distinguish them from properly-anchored notes.
     """
     if inline:
-        return f'<span>[Footnote: {element.text}]</span>'
+        return f"<span>[Footnote: {element.text}]</span>"
     if not ctx.is_inline_referenced(element.id):
         return element.html
-    return "" # only render once
+    return ""  # only render once
 
 
 # =============================================================================
@@ -170,22 +168,26 @@ def _render_footnote_prompt(element: Footnote, ctx: "RenderContext", inline: boo
 
 @add_unregister
 @singledispatch
-def render_raw(element: BaseElement, ctx: "RenderContext", inline: bool = False) -> str:
+def render_raw(
+    element: BaseElement,
+    ctx: RenderContext,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+    inline: bool = False,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+) -> str:
     """
     Render element with full fidelity.
-    
+
     This renderer includes:
     - Full HTML content
     - Embedded images (base64)
     - All formatting
-    
+
     Use this for HTML export or full document rendering.
-    
+
     Args:
         element: The element to render
         ctx: Render context with document access
         inline: If True, render for inline substitution
-        
+
     Returns:
         Full HTML string with all content
     """
@@ -193,10 +195,14 @@ def render_raw(element: BaseElement, ctx: "RenderContext", inline: bool = False)
 
 
 @render_raw.register(Footnote)
-def _render_footnote_raw(element: Footnote, ctx: "RenderContext", inline: bool = False) -> str:
+def _render_footnote_raw(
+    element: Footnote,
+    ctx: RenderContext,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+    inline: bool = False,
+) -> str:
     """Raw footnote renderer - compact when inline."""
     if inline:
-        return f"<a href=\"#footnote-{element.id}\">[{element.number}]</a>" # f"<span class=\"footnote-inline\">[{element.number}: {element.innerhtml}]</span>"
+        return f'<a href="#footnote-{element.id}">[{element.number}]</a>'  # f"<span class=\"footnote-inline\">[{element.number}: {element.innerhtml}]</span>"
     return element.html
 
 
@@ -245,10 +251,7 @@ def _metadata_to_html(data: DocumentMetadata) -> str:
         parts.append(f"<h1>{escape(serialize_metadata_value(raw_title))}</h1>")
     other = {k: v for k, v in data.items() if k != "title" and v is not None}
     if other:
-        dt_dd = "".join(
-            f"<dt>{escape(k)}</dt><dd>{escape(serialize_metadata_value(v))}</dd>"
-            for k, v in other.items()
-        )
+        dt_dd = "".join(f"<dt>{escape(k)}</dt><dd>{escape(serialize_metadata_value(v))}</dd>" for k, v in other.items())
         parts.append(f"<dl>{dt_dd}</dl>")
     return f'<header class="document-metadata">{"".join(parts)}</header>' if parts else ""
 
@@ -256,9 +259,9 @@ def _metadata_to_html(data: DocumentMetadata) -> str:
 @render_for_prompt.register(DocumentMetadata)
 @render_raw.register(DocumentMetadata)
 def _render_metadata_block(
-    element: DocumentMetadata, ctx: "RenderContext", inline: bool = False
+    element: DocumentMetadata,
+    ctx: RenderContext,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
+    inline: bool = False,  # pyright: ignore[reportUnusedParameter] # singledispatch interface
 ) -> str:
     """Render document metadata as a semantic HTML header block."""
     return _metadata_to_html(element)
-
-

@@ -1,0 +1,389 @@
+# Pipeline
+
+> Run interactively: `marimo edit docs/notebooks/pipeline.py`
+
+The `ragdoc.pipeline` module provides a high-level facade that wires together
+all four stages — **parse → process → split → chunk** — into a single call.
+
+## When to use it
+
+Use `DocumentPipeline` when you want to go from a file on disk to
+[`Chunk`](chunking.md) objects in one step, without manually threading
+`Document` objects through each stage yourself.
+
+Use the individual stage APIs ([Parsing](parsing.md), [Processing](../api/processing.md),
+[Splitting](splitting.md), [Chunking](chunking.md)) when you need fine-grained
+control — custom parsers that don't fit a `Path → Document` signature, partial
+re-processing, or stage-level debugging.
+
+---
+
+## Scenario A — Linear pipeline
+
+### Minimal example
+
+```python
+from pathlib import Path
+from ragdoc.pipeline import DocumentPipeline
+
+pipeline = DocumentPipeline()
+chunks = await pipeline.run(Path("report.docx"))
+```
+
+`DocumentPipeline` defaults:
+
+| Stage | Default |
+|-------|---------|
+| Parser | `AutoParser` — picks parser from file extension |
+| Processors | none (identity pass-through) |
+| Splitter | none — whole document → one chunk |
+| Chunker | `SimpleChunker` — one chunk per document |
+
+### Adding a splitter
+
+To split documents into retrieval-sized chunks, pass a
+[`TokenSplitter`](../api/pipeline.md#TokenSplitter).
+Chunk size is independent of your LLM's context window — chunks are sized
+for retrieval quality, typically 1/50th to 1/10th of the context window.
+Test different `max_tokens` values for your use case:
+
+```python
+from ragdoc.pipeline import DocumentPipeline, TokenSplitter
+
+pipeline = DocumentPipeline(
+    splitter=TokenSplitter(max_tokens=4000),
+)
+chunks = await pipeline.run(Path("annual_report.docx"))
+```
+
+Each split section becomes an independent chunk.
+
+### Adding processors
+
+Pass processors as a list or a `ProcessingPipeline`:
+
+```python
+from ragdoc.pipeline import DocumentPipeline, TokenSplitter
+from ragdoc.processing import HeadingLevelProcessor, TitleDetectionProcessor
+
+pipeline = DocumentPipeline(
+    processors=[
+        HeadingLevelProcessor(),
+        TitleDetectionProcessor(),
+    ],
+    splitter=TokenSplitter(max_tokens=4000),
+)
+```
+
+#### Metadata: extend, don't replace
+
+When a processor sets metadata, always write individual keys; never assign a new dict:
+
+```python
+# correct — preserves filename and any keys set by earlier processors
+document.metadata["document_name"] = _extract_name(document)
+document.metadata["document_date"] = _extract_date(document)
+
+# wrong — silently discards filename and all prior processor output
+document.metadata = {"document_name": _extract_name(document)}
+```
+
+`document.metadata["filename"]` is set by every parser and is the primary provenance
+key used throughout the pipeline. Replacing the dict loses it silently.
+
+### Custom parser
+
+Any callable `(Path) -> Document` satisfies the `Parser` protocol:
+
+```python
+from pathlib import Path
+from ragdoc.document import Document
+from ragdoc.pipeline import DocumentPipeline
+
+async def my_parser(path: Path) -> Document:
+    # e.g. call an internal API, parse a custom format, …
+    return Document(...)
+
+pipeline = DocumentPipeline(parser=my_parser)
+```
+
+### Deterministic chunk IDs
+
+`SimpleChunker` now uses
+[`Document.content_hash()`](../api/document.md#Document.content_hash) as the
+default chunk ID.  The same file content always produces the same chunk IDs,
+making vector-store upserts idempotent:
+
+```python
+chunks1 = await pipeline.run(Path("report.docx"))
+chunks2 = await pipeline.run(Path("report.docx"))
+
+assert chunks1[0].id == chunks2[0].id  # always True for the same content
+```
+
+---
+
+## Scenario D — Concurrent processing and streaming
+
+### Processing many files
+
+`run_many` fans out across a list of paths and returns a
+[`PipelineResult`](../api/pipeline.md#PipelineResult) with all chunks
+aggregated:
+
+```python
+from pathlib import Path
+from ragdoc.pipeline import DocumentPipeline, TokenSplitter
+
+pipeline = DocumentPipeline(splitter=TokenSplitter())
+paths = list(Path("docs/").glob("**/*.docx"))
+
+result = await pipeline.run_many(paths, concurrency=8)
+print(f"Produced {len(result.chunks)} chunks from {len(paths)} files")
+```
+
+### Error handling
+
+By default errors propagate immediately (`on_error="raise"`).
+Use `on_error="skip"` to collect failures and continue:
+
+```python
+pipeline = DocumentPipeline(
+    splitter=TokenSplitter(),
+    on_error="skip",
+)
+result = await pipeline.run_many(paths)
+
+for path, exc in result.errors:
+    print(f"  FAILED {path}: {exc}")
+```
+
+### Streaming (memory-efficient)
+
+`stream` yields a batch of chunks per file as it completes, so you can hand
+off each batch (e.g. to a vector store) before the next file starts:
+
+```python
+async for batch in pipeline.stream(paths, concurrency=4):
+    await vector_store.upsert(batch)
+```
+
+---
+
+## TokenSplitter reference
+
+`max_tokens` controls retrieval chunk size, not LLM context-window fit.
+Chunks should typically be 1/50th to 1/10th of the context window — the right
+value depends on your retrieval quality requirements and should be tested
+empirically.
+
+```python
+TokenSplitter(
+    max_tokens=7000,    # token budget per split (retrieval-quality sizing, not context-window fit)
+    overlap_tokens=200, # overlap between consecutive splits
+    renderer=None,      # Renderer for token measurement; defaults to MARKDOWN + render_for_prompt
+    tokenizer=None,     # tiktoken cl100k_base by default
+)
+```
+
+---
+
+## Scenario B — Incremental update
+
+`VectorStorePipeline` wraps `DocumentPipeline` and adds hash-based change detection
+so that a corpus of documents can be kept in sync with a vector store
+incrementally — only changed or new files are re-processed.
+
+The **vector store is the single source of truth** for provenance.  Each chunk
+carries `source_id` and `source_hash` as first-class fields, so the pipeline
+can detect unchanged sources, clean up stale chunks, and discover orphans —
+all without any local state file.
+
+### Setup
+
+```python
+from pathlib import Path
+from ragdoc.pipeline import VectorStorePipeline, TokenSplitter
+
+vs_pipeline = VectorStorePipeline(
+    pipeline=DocumentPipeline(splitter=TokenSplitter()),
+    vector_store=my_vector_store,   # any VectorStore implementation
+)
+```
+
+### First run — all files processed
+
+```python
+paths = list(Path("docs/").glob("**/*.docx"))
+
+result = await vs_pipeline.run(paths)
+print(f"processed: {len(result.processed)}, skipped: {len(result.skipped)}")
+# processed: 42, skipped: 0
+```
+
+### Subsequent runs — unchanged files skipped
+
+If the raw file bytes have not changed since the last run, the file is skipped
+without parsing or uploading:
+
+```python
+result = await vs_pipeline.run(paths)
+# processed: 0, skipped: 42   (nothing changed)
+```
+
+### Handling modifications and deletions
+
+`VectorStorePipeline.run` handles all three cases automatically on every call:
+
+| Case | What happens |
+|------|-------------|
+| **New file** | Parsed, chunked, upserted; `source_id` and `source_hash` set on each chunk. |
+| **Modified file** (byte hash changed) | Old chunks deleted by `source_id`, file re-processed, new chunks upserted. |
+| **Removed file** (path no longer in source list) | All chunks deleted by `source_id`. |
+
+```python
+# Remove one file from the list — its chunks will be deleted automatically
+result = await vs_pipeline.run(paths[:-1])
+print(result.deleted)  # ["old_report.docx"]  (source IDs, not paths)
+```
+
+### Running against a directory
+
+Use `run_directory` to discover files automatically:
+
+```python
+result = await vs_pipeline.run_directory(Path("docs/"), glob="**/*.docx")
+```
+
+### Error handling
+
+Per-file exceptions are collected in `UpdateResult.errors` rather than propagated:
+
+```python
+result = await vs_pipeline.run(paths)
+for path, exc in result.errors:
+    print(f"FAILED {path}: {exc}")
+```
+
+---
+
+## Scenario C — Qdrant vector store
+
+[`QdrantVectorStore`](../api/integrations.md#QdrantVectorStore) is the built-in
+concrete implementation of `VectorStore`, backed by `qdrant-client`'s
+`AsyncQdrantClient`.
+
+Install the extra first:
+
+```bash
+uv add "ragdoc[qdrant]"
+```
+
+### Create a store and run incremental sync
+
+```python
+from pathlib import Path
+from qdrant_client import AsyncQdrantClient
+from ragdoc.integrations.vector_stores import QdrantVectorStore
+from ragdoc.pipeline import DocumentPipeline, VectorStorePipeline, TokenSplitter
+
+client = AsyncQdrantClient("http://localhost:6333")
+
+# create() creates the collection (and a source_id payload index) if it doesn't exist.
+# Safe to call on every startup — it is idempotent.
+store = await QdrantVectorStore.create(client, "my_docs", vector_size=1536)
+
+pipeline = DocumentPipeline(splitter=TokenSplitter(max_tokens=4000))
+vs_pipeline = VectorStorePipeline(pipeline=pipeline, vector_store=store)
+
+result = await vs_pipeline.run(list(Path("docs/").glob("**/*.docx")))
+print(f"processed: {len(result.processed)}, skipped: {len(result.skipped)}")
+```
+
+### Payload schema
+
+Each Qdrant point stores the full `Chunk` as payload.  The provenance fields
+(`source_id`, `source_hash`) live at the top level — they are **not** injected
+into the user-facing `metadata` dict:
+
+| Payload key | Chunk field | Purpose |
+|---|---|---|
+| `source_id` | `chunk.source_id` | Groups chunks by source for cleanup |
+| `source_hash` | `chunk.source_hash` | Detects whether the source has changed |
+| `source_path` | `chunk.source_path` | Full path to the source file |
+| `prompt_content` | `chunk.prompt_content` | Full-fidelity text for LLM context |
+| `embedding_content` | `chunk.embedding_content` | Text used to generate the embedding |
+| `metadata` | `chunk.metadata` | User-defined key/value data |
+| `created_at` | `chunk.created_at` | ISO 8601 creation timestamp |
+
+### Performance notes
+
+- `create()` adds a Qdrant payload index on `source_id`, turning filter operations
+  in `get_source_hash` and `delete_by_source` from O(n) scans into O(log n) lookups.
+- `upsert()` batches points in groups of 100 to avoid gRPC message size limits.
+- `list_source_ids()` uses scroll pagination (1000 points per page) so it works
+  correctly at any collection size.
+
+For a full production example including processors and `LLMChunker`, see the
+[Qdrant Pipeline notebook](../notebooks/qdrant_pipeline/).
+
+---
+
+### Implementing a custom VectorStore
+
+Any object implementing the `VectorStore` protocol satisfies the requirements.
+The protocol requires five async methods — implementations should index on
+`chunk.source_id` and `chunk.source_hash` (first-class fields, not
+`chunk.metadata`):
+
+```python
+class MyVectorStore:
+    async def upsert(self, chunks: list[Chunk]) -> list[str]:
+        ids = [await self._db.insert(c) for c in chunks]
+        return ids
+
+    async def delete(self, ids: list[str]) -> None:
+        for id_ in ids:
+            await self._db.remove(id_)
+
+    async def get_source_hash(self, source_id: str) -> str | None:
+        """Return the stored hash for source_id, or None if not present."""
+        row = await self._db.query_one(source_id=source_id)
+        return row.source_hash if row else None
+
+    async def delete_by_source(self, source_id: str) -> None:
+        """Delete all chunks whose source_id field equals source_id."""
+        await self._db.delete(source_id=source_id)
+
+    async def list_source_ids(self) -> set[str]:
+        """Return all distinct source_id values stored in this vector store."""
+        return await self._db.distinct_source_ids()
+```
+
+### Provenance fields
+
+Each chunk upserted by `VectorStorePipeline` has two first-class fields set
+before upsert — these are **not** injected into `chunk.metadata`:
+
+| Field | Value | Purpose |
+|-------|-------|---------|
+| `chunk.source_id` | `source_id_fn(path)` (default: `path.name`) | Groups chunks by source for cleanup |
+| `chunk.source_hash` | SHA-256 hex digest of file bytes | Detects whether the source has changed |
+
+To customise the source identity key, pass a `source_id_fn` to the constructor:
+
+```python
+vs_pipeline = VectorStorePipeline(
+    pipeline=pipeline,
+    vector_store=my_vector_store,
+    source_id_fn=lambda p: str(p.relative_to(base_dir)),  # portable multi-dir
+)
+```
+
+---
+
+## See Also
+
+- [API Reference: Pipeline](../api/pipeline.md)
+- [Chunking Guide](chunking.md) — `SimpleChunker`, `LLMChunker`
+- [Splitting Guide](splitting.md) — lower-level splitting API

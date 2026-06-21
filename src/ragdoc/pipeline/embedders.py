@@ -15,10 +15,12 @@ Usage::
         },
     )
 """
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from ragdoc.chunking.chunk import Chunk
@@ -44,10 +46,10 @@ class EmbedderConfig:
     """
 
     embedder: Embedder
-    text_fn: Callable[["Chunk"], str] = field(default=lambda chunk: chunk.embedding_content)
+    text_fn: Callable[[Chunk], str] = field(default=lambda chunk: chunk.embedding_content)
 
 
-def embedding_content_text(chunk: "Chunk") -> str:
+def embedding_content_text(chunk: Chunk) -> str:
     """Extract ``embedding_content`` from a chunk.
 
     This is the default text for dense embedders.  ``embedding_content`` is produced
@@ -61,7 +63,7 @@ def embedding_content_text(chunk: "Chunk") -> str:
     return chunk.embedding_content
 
 
-def prompt_content_text(chunk: "Chunk") -> str:
+def prompt_content_text(chunk: Chunk) -> str:
     """Extract ``prompt_content`` from a chunk.
 
     Use this as ``text_fn`` for sparse or keyword-based embedders (e.g. BM25, SPLADE).

@@ -1,0 +1,63 @@
+{
+  "tesla-q4-2024-update": {
+    "title": "Q4 and FY 2024 Update",
+    "footnotes": [],
+    "headings": {
+      "Profitability": 2,
+      "Cash": 2,
+      "Operations": 2,
+      "Revenue": 2
+    },
+    "tables": [],
+    "not_present_in_output_regex": [],
+    "present_in_output_regex": []
+  },
+  "attention-is-all-you-need": {
+    "title": "Attention Is All You Need",
+    "footnotes": [],
+    "headings": {
+      "Abstract": 1,
+      "1 Introduction": 1,
+      "2 Background": 1,
+      "3 Model Architecture": 1,
+      "3.1 Encoder and Decoder Stacks": 2,
+      "3.2 Attention": 2,
+      "3.2.1 Scaled Dot-Product Attention": 3,
+      "3.2.2 Multi-Head Attention": 3
+    },
+    "tables": [],
+    "not_present_in_output_regex": [],
+    "present_in_output_regex": []
+  },
+  "bert-paper": {
+    "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+    "footnotes": [],
+    "headings": {
+      "Abstract": 1,
+      "1 Introduction": 1,
+      "2 Related Work": 1,
+      "2.1 Unsupervised Feature-based Approaches": 2,
+      "2.2 Unsupervised Fine-tuning Approaches": 2,
+      "2.3 Transfer Learning from Supervised Data": 2,
+      "3 BERT": 1,
+      "3.1 Pre-training BERT": 2,
+      "3.2 Fine-tuning BERT": 2,
+      "4 Experiments": 1
+    },
+    "tables": [],
+    "not_present_in_output_regex": [],
+    "present_in_output_regex": []
+  },
+  "vw-sustainability-2023": {
+    "title": "Sustainability and ESG Are Part of the Group Strategy",
+    "footnotes": [],
+    "headings": {
+      "Contents": 1,
+      "Decarbonization": 2,
+      "Circular Economy": 2
+    },
+    "tables": [],
+    "not_present_in_output_regex": [],
+    "present_in_output_regex": []
+  }
+}

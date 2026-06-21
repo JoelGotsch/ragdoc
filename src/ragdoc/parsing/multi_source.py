@@ -25,8 +25,8 @@ Customize merge behavior via ``functools.partial`` on
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -82,10 +82,7 @@ class MultiSourceParser(Parser):
     secondary: Parser = Field(description="Secondary parser")
     secondary_resolver: SecondaryResolverFn | None = Field(
         default=None,
-        description=(
-            "Maps primary path to secondary file path. "
-            "None = both parsers receive the same path."
-        ),
+        description=("Maps primary path to secondary file path. None = both parsers receive the same path."),
     )
     merge: MergeFn | None = Field(
         default=None,
@@ -93,11 +90,9 @@ class MultiSourceParser(Parser):
     )
 
     @model_validator(mode="after")
-    def _derive_description(self) -> "MultiSourceParser":
+    def _derive_description(self) -> MultiSourceParser:
         if not self.description:
-            self.description = (
-                f"Merge of {self.primary.description} + {self.secondary.description}"
-            )
+            self.description = f"Merge of {self.primary.description} + {self.secondary.description}"
         return self
 
     async def __call__(self, path: Path) -> Document:

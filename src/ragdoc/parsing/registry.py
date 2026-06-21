@@ -23,7 +23,7 @@ class ParserRegistration(NamedTuple):
     """A single entry in the parser registry."""
 
     pattern: str
-    parser: "Parser"
+    parser: Parser
     priority: int
     name: str
 
@@ -31,7 +31,7 @@ class ParserRegistration(NamedTuple):
 _registry: list[ParserRegistration] = []
 
 
-def register_parser(parser: "Parser") -> None:
+def register_parser(parser: Parser) -> None:
     """Register a parser for all its declared patterns.
 
     Patterns, name, priority, and description are read from the parser instance.
@@ -70,7 +70,7 @@ def unregister_parser(pattern: str, name: str) -> None:
     raise ValueError(f"No parser registration found for pattern={pattern!r}, name={name!r}")
 
 
-def get_parser(name: str) -> "Parser":
+def get_parser(name: str) -> Parser:
     """Look up a registered parser by name.
 
     Useful for constructing :class:`~ragdoc.parsing.multi_source.MultiSourceParser`
@@ -142,7 +142,7 @@ def describe_registry() -> str:
     return "\n".join(lines)
 
 
-def _resolve_parser(path: Path, parser_name: str | None = None) -> "Parser":
+def _resolve_parser(path: Path, parser_name: str | None = None) -> Parser:
     """Find the best parser for a path.
 
     Resolution:
@@ -163,9 +163,7 @@ def _resolve_parser(path: Path, parser_name: str | None = None) -> "Parser":
     filename = path.name.lower()
     # Check preferences: longest matching preference pattern first
     if preferences:
-        matching_prefs = [
-            (pat, pname) for pat, pname in preferences.items() if filename.endswith(pat.lower())
-        ]
+        matching_prefs = [(pat, pname) for pat, pname in preferences.items() if filename.endswith(pat.lower())]
         if matching_prefs:
             matching_prefs.sort(key=lambda x: -len(x[0]))
             return get_parser(matching_prefs[0][1])
@@ -174,10 +172,7 @@ def _resolve_parser(path: Path, parser_name: str | None = None) -> "Parser":
     matches = [reg for reg in _registry if filename.endswith(reg.pattern.lower())]
     if not matches:
         available_patterns = sorted({r.pattern for r in _registry})
-        raise ValueError(
-            f"No parser registered for {path.name!r}. "
-            f"Available patterns: {available_patterns}"
-        )
+        raise ValueError(f"No parser registered for {path.name!r}. Available patterns: {available_patterns}")
 
     # Sort by longest pattern first, then highest priority
     matches.sort(key=lambda r: (-len(r.pattern), -r.priority))

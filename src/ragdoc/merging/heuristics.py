@@ -8,12 +8,12 @@ Both Approach A (element-alignment) and Approach B (render-merge-reparse) use
 these heuristics to pick the richer or more accurate element when two aligned
 elements differ.
 """
+
 from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
 from ragdoc.document import Document, Footnote, Heading, Paragraph, Table
-from ragdoc.processing.heading import extract_font_size, is_bold, is_centered
 
 # Tags whose presence signals rich inline markup (each occurrence adds 1 to the score).
 _RICH_TAGS = frozenset({"b", "strong", "em", "i", "math", "sub", "sup", "code"})

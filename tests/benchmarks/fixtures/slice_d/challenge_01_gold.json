@@ -1,0 +1,229 @@
+{
+  "_comment": "Golden truth for challenge_01.docx — Slice D (known-evil adversarial DOCX). Parser: pandoc (via pypandoc → HTML). Each challenge is described in challenge_descriptions. Sections marked with known_parser_limitations are EXPECTED failures in the current implementation.",
+  "_format_note": "Top-level fields (footnotes, headings, tables, …) describe the IDEAL target output a fully-correct parser should produce. They are NOT a snapshot of what the current parser produces. current_parser_output documents what pandoc actually produces today. Tests that assert the ideal target and currently fail are marked @pytest.mark.xfail.",
+  "challenge_01": {
+    "_note": "IDEAL target — what a perfect parser should produce from challenge_01.docx.",
+
+    "title": "The Footnote Gauntlet",
+
+    "footnotes": [
+      {
+        "text": "Published as IVC/2024/Report-7.",
+        "insertion_point": "published its annual report in March 2024"
+      },
+      {
+        "text": "Laboratories operated in Vienna, Geneva, and Tokyo respectively.",
+        "insertion_point": "findings from three independent laboratories"
+      },
+      {
+        "text": "See also Appendix C for the full dataset.",
+        "insertion_point": "compound\u2019s stability under pressure"
+      }
+    ],
+
+    "headings": {
+      "The Footnote Gauntlet": 1,
+      "Headings and Their Impostors": 1,
+      "The Heading Hierarchy": 2,
+      "Genuine Subsection": 3,
+      "The List Labyrinth": 1,
+      "Tables: Truth Versus Decoration": 1,
+      "Nested Structures": 1,
+      "The Caption Confusion": 1,
+      "The Chaos Zone": 1
+    },
+
+    "tables": [
+      "Annual Performance Summary",
+      "YoY Growth",
+      "North",
+      "South",
+      "Total",
+      "+14 units"
+    ],
+
+    "present_in_output_regex": [
+      "The Subcommittee on Subheadings",
+      "THIS ENTIRELY UPPERCASE PARAGRAPH COULD FOOL A NAIVE CLASSIFIER",
+      "Chaos line one",
+      "Chaos line three",
+      "Chaos line four",
+      "1\\. The first pseudo-item",
+      "2\\. The second pseudo-item",
+      "Alpha-level item",
+      "def analyse_report",
+      "Genuine first numbered item",
+      "\u03c3"
+    ],
+
+    "not_present_in_output_regex": [
+      "class=\"footnote-ref\"",
+      "doc-noteref",
+      "fnref1"
+    ],
+
+    "not_a_heading": [
+      "The Subcommittee on Subheadings",
+      "THIS ENTIRELY UPPERCASE PARAGRAPH COULD FOOL A NAIVE CLASSIFIER"
+    ],
+
+    "not_a_footnote_text": [
+      "Note on methodology: The seasonal correction factor was derived from a 10-year moving average"
+    ],
+
+    "fake_list_paragraphs": [
+      "1. The first pseudo-item stands alone as a plain paragraph.",
+      "2. The second pseudo-item looks numbered but lacks list formatting.",
+      "3. The third pseudo-item completes the impostor sequence.",
+      "a. This sub-item is also fake \u2014 just indented plain text."
+    ],
+
+    "normalization_labels": [
+      "fake_footnote_to_paragraph",
+      "layout_table_to_separator",
+      "layout_table_to_columns",
+      "indented_paragraph_to_code",
+      "orphan_caption_to_linked",
+      "manual_list_to_documentlist",
+      "drop_decorative_spacer",
+      "merge_broken_paragraph"
+    ],
+
+    "known_parser_limitations": {
+      "pandoc": [
+        {
+          "area": "footnotes",
+          "description": "OOXML footnotes are converted by pandoc to <section class='footnotes'><ol><li id='fn1'>...</li></ol></section>. The HTML parser's detect_html_footnotes() only handles <p id='footnote-N'> style — the pandoc output format is not handled. Result: 0 Footnote elements produced; footnote text silently dropped; inline <a href='#fn1'> anchors remain as raw HTML inside body Paragraph elements.",
+          "expected_footnote_count": 3,
+          "actual_footnote_count": 0
+        },
+        {
+          "area": "list_nesting",
+          "description": "python-docx creates separate numbering definitions for List Bullet / List Bullet 2 / List Bullet 3 paragraph styles. Pandoc converts these to separate <ul> blocks rather than a single nested <ul>. The HTML parser then produces one DocumentList per <ul>, yielding 5 separate bullet lists and 4 separate numbered lists instead of 1 nested bullet list and 1 nested numbered list.",
+          "expected_list_count": 2,
+          "actual_list_count": 9
+        },
+        {
+          "area": "heading_whitespace",
+          "description": "Long heading text is wrapped by pandoc at ~80 chars, injecting \\r\\n inside the heading HTML. BeautifulSoup preserves this whitespace when computing Heading.text. Result: 'Tables: Truth Versus\\r\\nDecoration' instead of 'Tables: Truth Versus Decoration'.",
+          "affected_headings": ["Tables: Truth Versus Decoration"]
+        }
+      ]
+    },
+
+    "challenge_descriptions": {
+      "mixed_footnotes": {
+        "summary": "Three real OOXML footnotes (IDs 1–3) coexist with a fourth 'footnote' that is plain body text with a Unicode superscript character.",
+        "real_footnotes": [
+          {"id": 1, "text": "Published as IVC/2024/Report-7.", "anchor": "published its annual report in March 2024"},
+          {"id": 2, "text": "Laboratories operated in Vienna, Geneva, and Tokyo respectively.", "anchor": "findings from three independent laboratories"},
+          {"id": 3, "text": "See also Appendix C for the full dataset.", "anchor": "compound\u2019s stability under pressure"}
+        ],
+        "fake_footnote": {
+          "marker_in_body": "Methodological note\u00a0\u2074: The sampling interval was adjusted…",
+          "definition_paragraph": "\u2074\u00a0Note on methodology: The seasonal correction factor was derived from a 10-year moving average…",
+          "expected_type": "Paragraph (NOT Footnote)"
+        }
+      },
+      "fake_headings": {
+        "summary": "Two visually prominent body paragraphs carry no heading paragraph style.",
+        "examples": [
+          {
+            "text": "The Subcommittee on Subheadings",
+            "appearance": "Bold, 14 pt, Normal paragraph style",
+            "expected_type": "Paragraph (NOT Heading)"
+          },
+          {
+            "text": "THIS ENTIRELY UPPERCASE PARAGRAPH COULD FOOL A NAIVE CLASSIFIER",
+            "appearance": "11 pt, Normal paragraph style, all-caps author typing",
+            "expected_type": "Paragraph (NOT Heading)"
+          }
+        ]
+      },
+      "heading_gap": {
+        "summary": "A Heading 3 ('Genuine Subsection') appears directly under a Heading 1 ('Headings and Their Impostors') with no Heading 2 in between. Parsers must NOT invent an intermediate H2.",
+        "h1": "Headings and Their Impostors",
+        "h2_expected": "The Heading Hierarchy (only)",
+        "h3": "Genuine Subsection"
+      },
+      "fake_list": {
+        "summary": "Four plain paragraphs are manually typed as '1.', '2.', '3.', 'a.' — no OOXML list numbering (<w:numPr>) applied. An ideal parser applying normalization would promote them to a DocumentList; a basic parser leaves them as Paragraphs.",
+        "items": [
+          "1. The first pseudo-item stands alone as a plain paragraph.",
+          "2. The second pseudo-item looks numbered but lacks list formatting.",
+          "3. The third pseudo-item completes the impostor sequence.",
+          "a. This sub-item is also fake \u2014 just indented plain text."
+        ],
+        "expected_type_basic": "Paragraph × 4",
+        "expected_type_smart": "DocumentList (after manual_list_to_documentlist normalization)"
+      },
+      "layout_tables": {
+        "summary": "Two tables carry no real tabular data.",
+        "separator_table": {
+          "structure": "1 row × 1 column, empty cell",
+          "visual_role": "decorative horizontal separator (thick blue border)",
+          "expected_normalization": "layout_table_to_separator (drop)",
+          "note": "Pandoc converts this to a <table> with no <thead> and an empty <tbody>."
+        },
+        "layout_table": {
+          "structure": "1 row × 2 columns, no visible borders",
+          "visual_role": "two-column text layout (Key Findings | Recommendations)",
+          "expected_normalization": "layout_table_to_columns (flatten to paragraphs in reading order)"
+        }
+      },
+      "nested_table": {
+        "summary": "A 2×2 outer table contains a 2×2 inner table inside cell (1,1). Parsers that do not recurse into table cells will miss the inner table.",
+        "outer_cells": {
+          "0,0": "Outer A1: project name",
+          "0,1": "Outer A2: lead analyst",
+          "1,0": "Outer B1: start date",
+          "1,1": "[contains inner 2×2 table]"
+        },
+        "inner_cells": {
+          "0,0": "Inner metric",
+          "0,1": "Inner value",
+          "1,0": "Throughput",
+          "1,1": "1 240 req/s"
+        }
+      },
+      "fake_code_block": {
+        "summary": "A single paragraph using Courier New font and tab indentation with w:br manual line breaks. Visually identical to a preformatted code block but carries no Code paragraph style.",
+        "content_preview": "def analyse_report(data: list[float]) -> dict:",
+        "style": "Normal (no Code style)",
+        "font": "Courier New 10pt",
+        "line_separator": "w:br (manual line break, NOT paragraph break)",
+        "expected_type_basic": "Paragraph",
+        "expected_type_smart": "RawText or specially tagged Paragraph (after indented_paragraph_to_code normalization)"
+      },
+      "unlinked_caption": {
+        "summary": "An italic paragraph follows the inline image but has no semantic link to it in the OOXML.",
+        "caption_text": "Figure 1: The document parsing and chunking pipeline as deployed in v2.3.",
+        "expected_normalization": "orphan_caption_to_linked (set as Image.summary or Table.caption)"
+      },
+      "chaos_paragraph": {
+        "summary": "ONE Word paragraph containing four logical sentences joined by w:br manual line breaks. Visually renders as four separate lines but is structurally a single paragraph.",
+        "lines": [
+          "Chaos line one: The plenary session commenced at 09:00 sharp.",
+          "Chaos line two: Attendance was recorded by the duty secretary.",
+          "Chaos line three: The minutes of the previous meeting were adopted without amendment.",
+          "Chaos line four: The session was adjourned sine die at 10:45."
+        ],
+        "expected_type": "Paragraph (single) — lines joined with newlines or space",
+        "expected_normalization": "merge_broken_paragraph (lines merged into one paragraph)"
+      },
+      "unicode_math": {
+        "summary": "Unicode mathematical symbols used inline in body text — not OfficeMath/OMML, just Unicode codepoints.",
+        "sample": "\u03c3\u00b2 = \u03a3(x\u1d62 \u2212 \u03bc)\u00b2\u00a0/\u00a0n = 14.3",
+        "expected": "Preserved verbatim in the Paragraph text"
+      },
+      "footer_in_body": {
+        "summary": "A small, grey, centred paragraph at the document end that visually mimics a page footer. It is NOT a Word footer (no <w:ftr> part) — it is plain body text.",
+        "text": "CONFIDENTIAL\u2003|\u2003Internal Use Only\u2003|\u2003Document Ref: TMP-2024-001\u2003|\u2003Page 12 of 15",
+        "formatting": "9pt, grey (RGB 0x888888), centred",
+        "expected_type_basic": "Paragraph (correctly in body)",
+        "expected_type_smart": "Drop (after detecting footer-pattern paragraph at document end)",
+        "confidence": "ambiguous — dropping body text is risky; mark with low confidence"
+      }
+    }
+  }
+}

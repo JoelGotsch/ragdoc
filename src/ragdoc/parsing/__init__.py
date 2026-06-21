@@ -16,13 +16,11 @@ import logging
 from pathlib import Path
 from typing import Union
 
-from ragdoc.parsing.base import load_file
-from ragdoc.parsing.azure_di import AzureAnalyzeRun, AzureJSONFile
-from ragdoc.parsing.xlsx import ExcelSource, ExcelPackage, ExcelConfig
-from ragdoc.parsing.textract import PDFFile, TextractJSONFile
-from ragdoc.parsing.html import HTMLSource, HTMLFile
-from ragdoc.parsing.pandoc import PandocFile, WordFile
 from ragdoc.document import Document
+from ragdoc.parsing.azure_di import AzureAnalyzeRun, AzureJSONFile
+from ragdoc.parsing.base import load_file
+from ragdoc.parsing.html import HTMLFile, HTMLSource
+from ragdoc.parsing.pandoc import PandocFile, WordFile
 from ragdoc.parsing.parser import Parser
 from ragdoc.parsing.registry import (
     ParserRegistration,
@@ -33,9 +31,10 @@ from ragdoc.parsing.registry import (
     register_parser,
     unregister_parser,
 )
+from ragdoc.parsing.xlsx import ExcelConfig, ExcelPackage, ExcelSource
 
 # Union of all concrete source types accepted by load_document / from_path
-DocumentSource = Union[HTMLSource, PandocFile, WordFile, ExcelSource, AzureJSONFile, AzureAnalyzeRun]
+DocumentSource = HTMLSource | PandocFile | WordFile | ExcelSource | AzureJSONFile | AzureAnalyzeRun
 
 logger = logging.getLogger(__name__)
 
@@ -44,21 +43,20 @@ logger = logging.getLogger(__name__)
 # Built-in parser registrations
 # ---------------------------------------------------------------------------
 
+
 def _register_builtin_parsers() -> None:
     """Register all built-in parsers. Called once at import time."""
-    from ragdoc.parsing.html import _register as _reg_html
-    from ragdoc.parsing.pandoc import _register as _reg_pandoc
-    from ragdoc.parsing.xlsx import _register as _reg_xlsx
     from ragdoc.parsing.azure_di import _register as _reg_azure_di
-    from ragdoc.parsing.textract import _register as _reg_textract
+    from ragdoc.parsing.html import _register as _reg_html
     from ragdoc.parsing.mineru import _register as _reg_mineru
+    from ragdoc.parsing.pandoc import _register as _reg_pandoc
     from ragdoc.parsing.ragdoc_json import _register as _reg_ragdoc_json
+    from ragdoc.parsing.xlsx import _register as _reg_xlsx
 
     _reg_html()
     _reg_pandoc()
     _reg_xlsx()
     _reg_azure_di()
-    _reg_textract()
     _reg_mineru()
     _reg_ragdoc_json()
 
@@ -69,6 +67,7 @@ _register_builtin_parsers()
 # ---------------------------------------------------------------------------
 # New unified entry point
 # ---------------------------------------------------------------------------
+
 
 async def load(path: Path | str, parser: str | None = None) -> Document:
     """Load a file into a Document.
@@ -100,6 +99,7 @@ async def load(path: Path | str, parser: str | None = None) -> Document:
 # ---------------------------------------------------------------------------
 # Legacy API (kept for backwards compatibility)
 # ---------------------------------------------------------------------------
+
 
 def load_document(source: DocumentSource) -> Document:
     """Load a Document from a typed DocumentSource.

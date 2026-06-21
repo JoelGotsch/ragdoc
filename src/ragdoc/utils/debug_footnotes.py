@@ -9,9 +9,7 @@ class OrphanFootnoteInfo(BaseModel):
     number: int = Field(description="Footnote number as it appears in the document.")
     text: str = Field(description="Plain text content of the footnote.")
     page: int | None = Field(description="Page number, or None if not set.")
-    preceding_heading: str | None = Field(
-        description="Plain text of the nearest heading before the footnote, or None."
-    )
+    preceding_heading: str | None = Field(description="Plain text of the nearest heading before the footnote, or None.")
 
 
 def _preceding_heading(document: Document, footnote: Footnote) -> str | None:

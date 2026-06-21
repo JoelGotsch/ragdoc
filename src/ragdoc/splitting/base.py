@@ -3,16 +3,16 @@ from __future__ import annotations
 import logging
 from typing import Protocol, runtime_checkable
 
-from ragdoc.document import Document, Heading, ExternalRef
+from ragdoc.document import Document, ExternalRef, Heading
 
 logger = logging.getLogger(__name__)
+
 
 @runtime_checkable
 class Splitter(Protocol):
     """Protocol for document splitters."""
 
-    def __call__(self, document: Document) -> list[Document]:
-        pass
+    def __call__(self, document: Document) -> list[Document]: ...
 
 
 def split_by_headings(document: Document) -> list[Document]:
@@ -64,4 +64,3 @@ def split_by_headings(document: Document) -> list[Document]:
         )
         for group in split_groups
     ]
-

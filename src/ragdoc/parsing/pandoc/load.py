@@ -1,21 +1,22 @@
+from __future__ import annotations
+
 import os
+from pathlib import Path
 
 from pypandoc import convert_file
 
-from ragdoc.parsing.html.load import generate_document as html_generate_document, HTML
-from ragdoc.document import Paragraph, Document, Table
+from ragdoc.document import Document
+from ragdoc.parsing.html.load import HTML, generate_document as html_generate_document
+
 
 class PandocHTML(HTML):
     @classmethod
-    def from_file(cls, path: str) -> str:
+    def from_file(cls, path: str | Path) -> PandocHTML:
 
         _, ext = os.path.splitext(path)
 
         content = convert_file(
-            source_file=path,
-            format=ext.lower().replace(".", ""),
-            to="html",
-            extra_args=("--embed-resources",)
+            source_file=str(path), format=ext.lower().replace(".", ""), to="html", extra_args=("--embed-resources",)
         )
 
         return cls(content=content)

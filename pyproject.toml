@@ -2,23 +2,66 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# Keep the wheel slim: only the library source ships. Tests, fixtures, docs,
+# notebooks, designs, plans, scripts, devcontainer config, and editor configs
+# are not part of the pip release — they're for repo contributors only.
+[tool.hatch.build.targets.wheel]
+packages = ["src/ragdoc"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/tests",
+  "/docs",
+  "/designs",
+  "/plans",
+  "/backup",
+  "/scripts",
+  "/.devcontainer",
+  "/.vscode",
+  "/.github",
+  "/.skills",
+  "/.claude",
+  "/CHANGELOG.md",
+  "/TODO",
+]
+
+# Pin uv to public PyPI as the default index. This makes `uv sync` work in any
+# environment without relying on an internal mirror — the prior `uv.lock` was
+# generated against an internal artifactory host that's not reachable outside
+# the corporate network. PyTorch CPU wheels are pulled from a secondary index.
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv]
+index-strategy = "unsafe-best-match"
+
 [project]
 name = "ragdoc"
 version = "0.1.0"
 description = "A library to assist with chunking and preprocessing of documents for usage in LLM usecases."
 readme = "README.md"
 license = {text = "Proprietary"}
-requires-python= ">=3.10,<4"
+requires-python = ">=3.10,<3.13"
 authors = [
     { name = "Joel GOTSCH", email = "contact@joelgotsch.com" },
 ]
 dependencies = [
-    "tiktoken>=0.4.0,<1.0.0",
+    # Floors are the true minimums: each has wheels on all supported Pythons
+    # (3.10–3.12) and provides the APIs the code uses. The CI `-lowest` leg runs
+    # on 3.10 to enforce this lower bound.
+    "tiktoken>=0.7.0,<1.0.0",  # 0.7 is the first with py3.12 wheels (Rust ext)
     "funcy>=2.0,<3",
-    "pandas>=2.0.3,<3",
-    "pandas-stubs>=2.0.3.230814,<3",
-    "numpy>=1.26.4,<3",
-    "transformers>=4.31.0,<6",
+    "pandas>=2.2.0,<3",  # py3.12 wheels land in pandas 2.1.1+
+    "pandas-stubs>=2.2.0.240218,<3",
+    "numpy>=1.26.4,<3",  # 1.26 has py3.12 wheels
+    "transformers>=4.40.0,<6",  # pulls tokenizers>=0.19 (py3.12 wheels)
     "openpyxl>=3.1.2,<4",
     "tabulate>=0.9.0,<1",
     "pypandoc-binary>=1.14,<2",
@@ -38,14 +81,18 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/joelgotsch/ragdoc"
 
+# Extra names use the PEP 685 canonical (hyphenated) form. `pip install
+# ragdoc[azure_di]` still resolves (consumers normalize), and hyphens avoid a
+# tox-uv mismatch where an underscore request fails to match the normalized
+# `Provides-Extra` in the built metadata.
 [project.optional-dependencies]
-azure_di = ["azure-ai-documentintelligence>=1.0.0"]
-pdf_mineru = [
+azure-di = ["azure-ai-documentintelligence>=1.0.0"]
+pdf-mineru = [
     "pylatexenc>=2.10,<3",
     "pydantic-settings>=2.13.0",
     "latex2mathml>=3.79.0",
 ]
-qdrant = ["qdrant-client>=1.9,<2"]
+qdrant = ["qdrant-client>=1.12,<2"]  # 1.12+ has models.Document server-side inference
     
 
 [dependency-groups]
@@ -62,21 +109,37 @@ dev = [
     "python-docx>=1.2.0",
     "types-aiofiles>=25.1.0.20260409",
     "nest-asyncio>=1.6.0",
+    "ruff>=0.8.0",
+    "basedpyright>=1.31.0",
 ]
 docs = [
-    "autodoc-pydantic>=2.2.0",
-    "myst-parser>=4.0.0",
-    "myst-nb>=1.1.1",
-    "sphinx-rtd-theme>=2.0.0",
-    "tomli>=2.0.1",
-    "ipykernel>=6.29.5",
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.7.6",
     "mkdocstrings[python]>=1.0.3",
-    "mkdocs-jupyter>=0.25.1",
     "mkdocs-autorefs>=1.4.4",
     "mike>=2.1.4",
     "marimo>=0.23.0",
+]
+# Dev-only group for regenerating parsing test fixtures via MinerU.
+#
+# We deliberately AVOID `mineru[all]` because it pulls `[gradio]`, whose
+# transitive cap on `aiofiles<25.0` conflicts with our base dep
+# `aiofiles>=25.1.0`. The web UI isn't needed for fixture regen anyway.
+#
+# Components installed:
+#   - [pipeline]: torch, torchvision, transformers, onnxruntime, shapely,
+#                 pyclipper, omegaconf, albumentations, ...  (used by the
+#                 hybrid_auto pipeline backend invoked by the script)
+#   - [vlm]:      torch, transformers, accelerate  (enables the VLM backend
+#                 in case you switch via `-b hybrid-auto-engine`)
+#   - [mlx]:      mlx, mlx-vlm  — Apple Silicon MPS acceleration for VLM;
+#                 gated to darwin since mlx is macOS-only.
+#
+# Activate with:  uv sync --group fixture_regen
+# Then run:       uv run python scripts/create_test_fixtures.py
+fixture_regen = [
+    "mineru[pipeline,vlm]>=3.1,<4",
+    "mineru[mlx]>=3.1,<4; sys_platform == 'darwin'",
 ]
 
 
@@ -93,7 +156,7 @@ addopts = [
 
 
 [tool.coverage.run]
-source = ["ragpill"]
+source = ["ragdoc"]
 branch = true
 omit = ["tests/*", "*/site-packages/*"]
 
@@ -110,25 +173,104 @@ exclude_lines = [
 [tool.coverage.paths]
 source = ["src/ragdoc", "*/site-packages/ragdoc"]
 
-[tool.black]
-line-length = 100
-target-version = ["py310"]
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+src = ["src", "tests"]
 
-[tool.isort]
-profile = "black"
-src_paths = ["src"]
-known_first_party = ["ragdoc"]
+[tool.ruff.lint]
+extend-select = ["Q", "RUF", "C90", "UP", "I"]
+mccabe = { max-complexity = 18 }
+ignore = [
+    # Ambiguous-unicode rules: this is a document-processing library that
+    # legitimately handles non-ASCII text (×, →, curly quotes, …) in strings,
+    # comments, and docstrings.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+    # Mutable class attributes: Pydantic models declare these via Field(...),
+    # which is the intended pattern and not an actual shared-mutable-default bug.
+    "RUF012",
+]
 
+[tool.ruff.lint.per-file-ignores]
+# __init__.py files intentionally re-export their submodules' public API,
+# and aggregate those re-exports below module-level version/docstring code.
+"__init__.py" = ["F401", "E402"]
+# Tests guard optional-dependency imports with pytest.importorskip(...), which
+# legitimately runs before the module-level imports it protects.
+"tests/**" = ["E402"]
 
-[tool.mypy]
-mypy_path = "src"
-disallow_untyped_defs = true
-disallow_any_unimported = true
-no_implicit_optional = true
-namespace_packages = true
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ["ragdoc"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.basedpyright]
+pythonVersion = "3.10"
+typeCheckingMode = "standard"
+reportUnnecessaryTypeIgnoreComment = true
+reportIgnoreCommentWithoutRule = true
+reportUnusedParameter = true
+reportIncompatibleUnannotatedOverride = true
+reportImplicitAbstractClass = true
+reportMissingTypeStubs = false
+reportMissingModuleSource = false
+include = ["src"]
 
 [tool.tox]
+legacy_tox_ini = """
+[tox]
+requires =
+    tox>=4.23
+    tox-uv>=1.17
+min_version = 4.0
+env_list =
+    lint
+    type
+    py{310,311,312}-highest
+    py310-lowest
 
-[tool.pylint]
+[testenv]
+runner = uv-venv-runner
+dependency_groups = dev
+extras =
+    azure-di
+    pdf-mineru
+    qdrant
+# marimo is needed by tests/test_notebooks.py (it imports and runs the marimo
+# notebooks under docs/notebooks/). It otherwise lives in the docs group.
+deps =
+    marimo>=0.23.0
+commands =
+    pytest {posargs}
 
-[tool.cruft]
+[testenv:py{310,311,312}-lowest]
+uv_resolution = lowest-direct
+# Marks the lowest-resolution leg so output-snapshot tests (exact pandoc markdown,
+# tokenizer-dependent chunk counts) can skip — the floors legitimately produce
+# different exact output; this leg verifies they install and the suite runs.
+set_env =
+    RAGDOC_RESOLUTION = lowest
+
+[testenv:lint]
+skip_install = true
+dependency_groups = dev
+commands =
+    ruff check src tests
+    ruff format --check src tests
+
+[testenv:type]
+dependency_groups = dev
+extras =
+    azure-di
+    pdf-mineru
+    qdrant
+commands =
+    basedpyright
+"""

@@ -1,0 +1,175 @@
+## In Progress
+
+
+
+## Open
+
+- [ ] **ADRs / decision records.** Establish where architecture decisions are recorded. Today
+  they are scattered across `designs/DESIGN-*.md` and `plans/PLAN-*.md` with no dedicated ADR
+  location or index. Decide on a home (e.g. `docs/adr/NNNN-*.md`) and format, then have an agent
+  walk the complete conversation/message history and back-fill ADRs for decisions made there that
+  aren't yet captured in a design/plan. Keep them topic-neutral — do not reference the original
+  source-document subject matter in any ADR.
+
+- [ ] All plans in the `plans/`
+- [ ] title and source_path should be in metadata, probably. filename on the other side is not providing value given source_path exists and can be dropped. source_id and source_hash should move to Document. their calculation should be handled by a user-provided function (passed down from Parser/ Pipeline) that takes the path only. Default should be the path as str for id and a sha-256 of the file for the hash. This way we can have consistent provenance across parsers and also allow users to inject custom logic (e.g. include content-based hash of the document, or use a different stable id source like a database record id). This is relevant for the vector store sync/update logic to determine what has changed.
+Also, per default the whole metadata should be included in render_for_prompt.
+- [ ] For BaseMetadata when dumping to json - which is used for self-query-retrieval mostly - think about annotating the fields with something like description as in pydantic Field. Maybe switch to pydantic?
+- [ ] Split guide/ into "*using" and "*build_your_own" per module. e.g. splitting.md and build_splitter.md, rendering.md and build_renderer.md, etc. The "using" guides are for users who just want to use the library with built-in components; the "build_your_own" guides are for users who want to implement custom parsers, processors, renderers, etc. This separation keeps the basic usage guides concise and approachable while still providing detailed instructions for advanced customization.
+- [ ] Think about logging. maybe use loguru. should already be an indirect dependency.
+- [ ] documentation searchable for llms: https://github.com/mensfeld/llm-docs-builder
+
+- [ ] Add pdf parser PaddleOCR-VL which is ranked 1st at https://opendatalab.com/omnidocbench https://github.com/PADDLEPADDLE/PADDLEOCR
+
+- [ ] Add https://github.com/opendataloader-project/opendataloader-pdf
+
+- [ ] Benchmarking (see PLAN_BENCHMARKING_PARSING.md): 
+    - [ ] against [score-bench](https://unstructured.io/blog/introducing-score-bench-an-open-benchmark-for-document-parsing)
+    - [ ] against READoc: https://github.com/icip-cas/READoc
+    - [ ] against [OmniDocBench](https://github.com/opendatalab/OmniDocBench)
+    - [ ] against [MistOCR](https://fr.anckalbi.net/mistocr/refine.html)
+    - [ ] against [RAG-Anything](https://github.com/HKUDS/RAG-Anything)
+    - [ ] against [AnythingMD](https://anythingmd.com/)
+    - [ ] against [RAGflow](https://github.com/infiniflow/ragflow)
+- [ ] Compare BaseElement coverage with available element types in other parsers (e.g. READoc, OmniDocBench, docling) and add new element types as needed to cover common content structures. But think critically: does code element really help? its fine if its parsed kinda correctly in the html paragraph for example.
+- [ ] Use late chunking for generic but still semantic splitting: [https://jina.ai/news/late-chunking-in-long-context-embedding-models/](https://jina.ai/news/late-chunking-in-long-context-embedding-models/)
+- [ ] Comparison with https://github.com/HKUDS/RAG-Anything
+- [ ] Rethink rendering of title and metadata. Maybe title is just a common metadata value? Is or should it be treated any differently from other metadata keys?
+Example from markdown:
+```
+---
+title: Example title
+date: today
+author: Me
+---
+```
+- [ ] Parsing docx with footnotes: [https://pandoc.org/demo/example33/8.19-footnotes.html](https://pandoc.org/demo/example33/8.19-footnotes.html)
+`pandoc -f docx -t markdown lancelot_andrewes.docx -o lancelot_andrewes.md --wrap=none --standalone`
+
+- [ ] Splitting based on Late Chunking: [https://jina.ai/news/late-chunking-in-long-context-embedding-models/](https://jina.ai/news/late-chunking-in-long-context-embedding-models/) (probably post-render_prompt, per sentence test? from that, rebuild the Document structure with html parser)
+
+### Low-priority:
+
+- [ ] **UpdateResult: distinguish skip reasons.** `VectorStorePipeline.UpdateResult.skipped` currently conflates "hash unchanged (ProvenanceProcessor returned None)" with "dropped by any other DocumentProcessor returning None". To separate these, the pipeline's return type would need a structured skip reason. See `DESIGN_VECTORSTORE_DECOMPOSITION.md` — Known limitation section.
+
+- [ ] Example of how to build a custom graph-rag from the outputs (events (time_relevant_from, time_relevant_to), entities (person, organisation, location, facility, ...), sources, relationships between entities (visits, )). Idea would be to be able to extract a flat timeline with filters for entity types, time ranges, etc.
+
+- [ ] Review the use of bounding boxes: https://medium.com/@michael71314/how-to-use-ocr-bounding-boxes-c00303bc11c4
+
+- [ ]Custom Parser Extension Points: Extend `from_path()` with a user-configurable extension registry so users can register
+  custom file extensions without modifying library code. `from_path()` should check the registry
+  before the built-in `match`, so user-registered extensions take precedence. (`parsing/__init__.py`)
+
+  ```python
+  _extension_registry: dict[str, Callable[[Path], DocumentSource]] = {}
+
+  def register_extension(ext: str, factory: Callable[[Path], DocumentSource]) -> None:
+      _extension_registry[ext.lower()] = factory
+  ```
+
+- [ ] Make `DocumentSource` a structural `Protocol` instead of a closed `Union` to remove
+  type errors when passing user-defined sources to `load_document()`. Runtime behaviour is
+  unchanged — `load_file` is already open via singledispatch. (`parsing/__init__.py`)
+
+---
+
+#### HTML Parser fixes
+
+- [ ] Fix the h>6 heading hack in `parsing/html/load.py`: the current workaround searches for
+  `<p class="heading">` tags to handle `<hN>` where N > 6 that pandoc may emit. This is
+  fragile — replace with a proper normalization step that rewrites out-of-range heading tags
+  to `<h6>` before parsing. (`parsing/html/load.py:171`)
+
+- [ ] Add a test case for `<p class="heading">` / h>6 heading parsing in the HTML parser test
+  suite. (`parsing/html/load.py:174`)
+
+- [ ] Improve heading section extraction: `_extract_heading_sections()` iterates all siblings
+  linearly; a cleaner approach is to find all headings first, then walk siblings between
+  consecutive headings. Also evaluate whether bare `<p>` tags before a heading (without
+  `class="heading"`) should be included or filtered. (`parsing/html/load.py:184`,
+  `parsing/html/load.py:178`)
+
+- [ ] Add logging on `requests.exceptions.ConnectionError` in the HTML image downloader
+  instead of silently returning `None`. (`parsing/html/load.py:110`)
+
+## Notes
+
+- Each task should follow TDD: write test first, then implement
+
+## Done
+
+
+- [x] think about removing render_for_embedding. The creation of embedding content is actually taken over by chunker now. (Done: removed render_for_embedding, BaseElement.summary, TableSummaryProcessor. Merged Image.summary into text_representation. Added decorative image skip logic.)
+- [x] Get rid of position marker — order is preserved in the list of elements.
+- [x] All BaseElements should have an html-interface: html property and html setter. It could
+  just be a passthrough to html_text or _html, but the setter should extract all the
+  element-specific information like alt text, width/height for images, etc.; level of headings.
+  This way we can easily convert any element to html and back without losing information.
+- [x] Create specialized BaseElement-renderers for prompt-content, embedding-content and
+  raw-data. All implemented via singledispatch with register/unregister functionality to swap
+  out the rendering logic for specific types easily.
+  (render_for_prompt, render_for_embedding, render_raw in rendering/elements.py)
+- [x] Delete RIXML parser and `test_rixml.py` — file is entirely commented out; RIXML parser tests should be re-written from scratch when the parser is re-integrated.
+- [x] Rename `test_footnote_processing.py` → `test_processing_footnote.py` to match
+  `src/ragdoc/processing/footnote.py`.
+- [x] Split `test_summary_processors.py` into one file per source module:
+  `test_processing_summary_base.py`, `test_processing_summary_image.py`,
+  `test_processing_summary_table.py`, `test_processing_summary_document.py`.
+- [x] Split `test_rendering.py` into `test_rendering_base.py`, `test_rendering_elements.py`,
+  and `test_rendering.py` (TestRenderer only).
+- [x] Merge `test_html_preface.py` (single test) into `test_html.py`, then delete the file.
+- [x] Merge `test_nested_images.py` (single test) into `test_pandoc.py`, then delete the file.
+- [x] Delete `test_aa_document_processing.py` — redundant importability test.
+
+
+- [x] Create DocumentProcessor for footnotes with extendable pattern matching for generating
+  FootnoteCandidates from elements.html. And easily swappable heuristic-generation logic for
+  ranking FootnoteCandidates. Current Ideas would be to use the surrounding text (commas,
+  sentence-ends, word-ends etc should increase likelihood in different amounts) and the
+  position of other footnotes (based on numbering) should be able to influence each footnote
+  candidates score as well.
+  Note: FootnoteProcessor, FootnoteCandidate, FootnoteResolver protocol, SimpleFootnoteResolver
+  and LLMFootnoteResolver are all implemented in processing/footnote.py. The resolver strategy
+  is already injectable. What remains is making the candidate-generation step pluggable (currently
+  find_footnote_candidates() is a standalone function, not swappable) and adding symbol-based
+  pattern matching alongside the existing number-based \b{number}\b pattern.
+
+- [x] HTML footnote parsing — detect anchor-link footnotes within the page (i.e. `<a href="#footnote-N">[N]</a>`
+  in body text, resolved to `<p id="footnote-N">...</p>` at page bottom). Add tests for:
+  - HTML with `<a href="#...">` in-page links as produced by pandoc or browser renders
+  - Markdown with pandoc-style in-document links (e.g. `[text][^ref]` converted to HTML anchors)
+  - Native pandoc markdown footnote syntax:
+    ```
+    Here is a footnote reference,[^1] and another.[^longnote]
+
+    [^1]: Here is the footnote.
+
+    [^longnote]: Here's one with multiple blocks.
+
+        Subsequent paragraphs are indented to show that they
+    belong to the previous footnote.
+
+            { some.code }
+    ```
+  Decide whether each footnote extraction strategy (anchor-link detection, pandoc markdown) should
+  be implemented as a `TSoupTransformer` (preprocessing step inside the HTML parser) or as a
+  `SyncDocumentProcessor` (post-parse stage). If soup transformer is the right fit, register it as
+  a default transformer in the HTML parser pipeline. Existing xfail tests in
+  `tests/parsing/test_html_anchor_footnotes.py` cover part of this.
+
+
+- [x] See PLAN_TEST_ROUNDTRIP.md: Think about a clean way to replace image-inline links with image data when rendering.
+  Maybe pass the baseelement-renderer to a document-renderer and this handles images + footnotes?
+  Note: The Renderer already resolves <ref id='...'/> placeholders via _resolve_inline_refs(),
+  so the rendering side is clean. The right pattern for embedding image data is a pre-render
+  DocumentProcessor that downloads remote URLs and stores base64 data on Image elements — not
+  logic inside the renderer itself. The Renderer then just calls render_raw/render_for_prompt
+  on the Image element, which can emit an <img src="data:..."> tag if data is present.
+
+- [x] See PLAN_PIPELINE.md: think about "multiple embeddings for one content" pattern. In the simple case, we let the user handle it. the question is how far we should go into the vector db interface anyways.
+But it might be really helpful to have a Document- summarizer generate a list of summaries per perceived topic (for retrieval purposes). Question is: should that produce one chunk (where somehow we have to solve that the embedding is calculated for each summary) or multiple chunks (where deduplication of content is handled by user later on)? 
+Actually, based on this writing, its pretty clear it should be multiple chunks.
+New Question: which thing should be responsible to create those multiple chunks from one document? Probably a different Chunker.
+This would mean: the Document-Summarizer becomes part of a "SimpleChunker", document doesnt need a summary field anymore and another "LLMChunker" would be responsible to call an LLM summarizer and create multiple summaries for a given document-content.
+
+- [x] [BIG FEATURE] merging: See PLAN_MERGE_HTML_PARITY.md Smart document merging across different parsers (mineru, azure_di, docx).

@@ -1,0 +1,17 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+  "mounts": [
+    "source=claude-code-config,target=/Users/joelgotsch/.claude,type=volume"
+  ],
+  "containerEnv": {
+    // Keep the devcontainer's uv venv separate from the host's .venv.
+    // The host (e.g. macOS) bind-mounts the workspace, and a venv built on
+    // one OS/arch is not executable on the other — they would clobber each
+    // other in the default `.venv` location. Point uv at .venv-devcontainer
+    // here so both can coexist.
+    "UV_PROJECT_ENVIRONMENT": ".venv-devcontainer"
+  }
+}

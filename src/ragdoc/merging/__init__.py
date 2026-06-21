@@ -47,6 +47,7 @@ Example::
     # Approach B — render-merge-reparse
     merged = merge_documents_html(doc_mineru, doc_html)
 """
+
 from ragdoc.merging.html_merge import merge_documents_html
 from ragdoc.merging.html_patch import DocumentHtmlPatch, HtmlMergeOperation, compute_html_patch
 from ragdoc.merging.merge import compute_patch, merge_documents
@@ -58,16 +59,16 @@ from ragdoc.merging.patch import (
 )
 
 __all__ = [
+    "DocumentHtmlPatch",
+    "DocumentPatch",
+    "HtmlMergeOperation",
+    "PatchOperation",
+    "PatchOperationType",
+    "compute_html_patch",
     # Approach A
     "compute_patch",
     "merge_documents",
-    "DocumentPatch",
-    "PatchOperation",
-    "PatchOperationType",
-    "validate_inline_refs",
     # Approach B
     "merge_documents_html",
-    "compute_html_patch",
-    "DocumentHtmlPatch",
-    "HtmlMergeOperation",
+    "validate_inline_refs",
 ]

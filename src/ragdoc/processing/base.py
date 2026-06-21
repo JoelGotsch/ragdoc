@@ -60,7 +60,7 @@ class DocumentProcessor(ABC):
     """
 
     @abstractmethod
-    async def process(self, document: "Document") -> "Document | None":
+    async def process(self, document: Document) -> Document | None:
         """
         Process a document and return the result.
 
@@ -73,7 +73,7 @@ class DocumentProcessor(ABC):
         """
         ...
 
-    async def __call__(self, document: "Document") -> "Document | None":
+    async def __call__(self, document: Document) -> Document | None:
         """Allow processors to be called directly."""
         return await self.process(document)
 
@@ -100,12 +100,12 @@ class ProcessingPipeline:
     ):
         self._processors: list[DocumentProcessor] = processors or []
 
-    def add(self, processor: DocumentProcessor) -> "ProcessingPipeline":
+    def add(self, processor: DocumentProcessor) -> ProcessingPipeline:
         """Add a processor to the pipeline.  Returns self for chaining."""
         self._processors.append(processor)
         return self
 
-    async def process(self, document: "Document") -> "Document | None":
+    async def process(self, document: Document) -> Document | None:
         """Run all processors in sequence.
 
         Short-circuits as soon as any processor returns ``None``, meaning the
@@ -125,15 +125,12 @@ class ProcessingPipeline:
             result = await processor.process(document)
             if result is None:
                 source = getattr(document, "source_path", None)
-                logger.debug(
-                    f"{type(processor).__name__} dropped document"
-                    + (f": {source}" if source else "")
-                )
+                logger.debug(f"{type(processor).__name__} dropped document" + (f": {source}" if source else ""))
                 return None
             document = result
         return document
 
-    async def __call__(self, document: "Document") -> "Document | None":
+    async def __call__(self, document: Document) -> Document | None:
         """Allow pipeline to be called directly."""
         return await self.process(document)
 

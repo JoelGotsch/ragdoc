@@ -67,13 +67,11 @@ async def parse_ragdoc_json(path: Path, provenance_mode: ProvenanceMode) -> Docu
     try:
         import aiofiles
 
-        async with aiofiles.open(path, "r", encoding="utf-8") as f:
+        async with aiofiles.open(path, encoding="utf-8") as f:
             content = await f.read()
         logger.debug(f"parse_ragdoc_json: read {path} via aiofiles")
     except Exception:
-        logger.debug(
-            f"parse_ragdoc_json: aiofiles unavailable or failed, falling back to sync read for {path}"
-        )
+        logger.debug(f"parse_ragdoc_json: aiofiles unavailable or failed, falling back to sync read for {path}")
         content = path.read_text(encoding="utf-8")
 
     document = Document.model_validate_json(content)
@@ -125,7 +123,7 @@ class RagdocJsonParser(Parser):
     provenance_mode: ProvenanceMode = Field(
         default=ProvenanceMode.ORIGINAL,
         description=(
-            "Controls how source_path, parser, and metadata[\"filename\"] are set on "
+            'Controls how source_path, parser, and metadata["filename"] are set on '
             "the deserialized Document. ORIGINAL preserves values from the JSON; "
             "JSON_FILE overwrites them to reflect the .ragdoc.json file itself."
         ),

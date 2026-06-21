@@ -12,6 +12,7 @@ The library is async-only.  Implement :meth:`chunk`::
     chunker = MyChunker()
     chunks = await chunker.chunk(doc)
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -29,6 +30,6 @@ class Chunker(ABC):
     """
 
     @abstractmethod
-    async def chunk(self, document: "Document") -> "list[Chunk]":
+    async def chunk(self, document: Document) -> list[Chunk]:
         """Convert *document* into one or more :class:`~ragdoc.chunking.chunk.Chunk` objects."""
         ...

@@ -8,13 +8,18 @@ repo_url: https://github.com/joelgotsch/ragdoc
 theme:
   name: material
   features:
+    - navigation.instant
+    - navigation.tracking
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
     - navigation.expand
+    - navigation.indexes
     - navigation.top
+    - toc.follow
     - search.suggest
     - search.highlight
+    - content.tabs.link
     - content.code.copy
     - content.code.annotate
   palette:
@@ -33,18 +38,25 @@ theme:
 
 plugins:
   - search
+  - mike:
+      alias_type: redirect
+      canonical_version: latest
   - mkdocstrings:
       handlers:
         python:
           paths: [src]
           options:
             docstring_style: google
+            docstring_section_style: table
             show_root_heading: true
             show_source: true
             show_signature_annotations: true
+            signature_crossrefs: true
             separate_signature: true
             merge_init_into_class: true
             show_if_no_docstring: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
 markdown_extensions:
   - admonition
   - pymdownx.details
@@ -94,3 +106,12 @@ nav:
   - Development:
       - Contributing: development/contributing.md
   - Tutorials: tutorials.md
+
+extra:
+  version:
+    provider: mike
+    default: latest
+    alias: true
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/joelgotsch/ragdoc
