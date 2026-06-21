@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="./favicon.ico" />
+    <!-- Preload is necessary because we show these images when we disconnect from the server,
+    but at that point we cannot load these images from the server -->
+    <link rel="preload" href="./assets/gradient-yHQUC_QB.png" as="image" />
+    <link rel="preload" href="./assets/noise-60BoTA8O.png" as="image" />
+    <!-- Preload the fonts -->
+    <link rel="preload" href="./assets/Lora-VariableFont_wght-CZceb_kH.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/PTSans-Regular-Bam3NpBI.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/PTSans-Bold-C_DwAp7Z.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Regular-CEsLFVD9.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Medium-D5MAsWEG.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Bold-C6PDArdf.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="a marimo app" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.json" />
+
+    <script data-marimo="true">
+      function __resizeIframe(obj) {
+        const scrollbarHeight = 20; // Max between windows, mac, and linux
+
+        function setHeight() {
+          // Guard against race condition where iframe isn't ready
+          if (!obj.contentWindow?.document?.documentElement) {
+            return;
+          }
+          const element = obj.contentWindow.document.documentElement;
+          // If there is no vertical scrollbar, we don't need to resize the iframe
+          if (element.scrollHeight === element.clientHeight) {
+            return;
+          }
+
+          // Create a new height that includes the scrollbar height if it's visible
+          const hasHorizontalScrollbar = element.scrollWidth > element.clientWidth;
+          const newHeight = element.scrollHeight + (hasHorizontalScrollbar ? scrollbarHeight : 0);
+
+          // Only update the height if it's different from the current height
+          if (obj.style.height !== `${newHeight}px`) {
+            obj.style.height = `${newHeight}px`;
+          }
+        }
+
+        // Resize the iframe to the height of the content and bottom scrollbar height
+        setHeight();
+
+        // Resize the iframe when the content changes
+        const resizeObserver = new ResizeObserver((_entries) => {
+          setHeight();
+        });
+        // Only observe if iframe content is ready
+        if (obj.contentWindow?.document?.body) {
+          resizeObserver.observe(obj.contentWindow.document.body);
+        }
+      }
+    </script>
+    <marimo-filename hidden>notebook.py</marimo-filename>
+    <!-- TODO(Trevor): Legacy, required by VS Code plugin. Remove when plugin is updated (see marimo/server/_templates/template.py) -->
+    <marimo-version data-version="{{ version }}" hidden></marimo-version>
+    <marimo-user-config data-config="{{ user_config }}" hidden></marimo-user-config>
+    <marimo-server-token data-token="{{ server_token }}" hidden></marimo-server-token>
+    <!-- /TODO -->
+    <title>splitting</title>
+    <script type="module" crossorigin src="./assets/index-fNBoXCyz.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/preload-helper-BPPi7vOr.js">
+    <link rel="modulepreload" crossorigin href="./assets/chunk-LvLJmgfZ.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-Bj1aDYRI.js">
+    <link rel="modulepreload" crossorigin href="./assets/compiler-runtime-B3qBwwSJ.js">
+    <link rel="modulepreload" crossorigin href="./assets/jsx-runtime-BqBOg78p.js">
+    <link rel="modulepreload" crossorigin href="./assets/useEventListener-DvoEXWke.js">
+    <link rel="modulepreload" crossorigin href="./assets/defaultLocale-BLUna9fQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/precisionRound-Cl9k9ZmS.js">
+    <link rel="modulepreload" crossorigin href="./assets/defaultLocale-DzliDDTm.js">
+    <link rel="modulepreload" crossorigin href="./assets/vega-loader.browser-C8wT63Va.js">
+    <link rel="modulepreload" crossorigin href="./assets/utils-DCL4n9wx.js">
+    <link rel="modulepreload" crossorigin href="./assets/clsx-Dz_KRrWq.js">
+    <link rel="modulepreload" crossorigin href="./assets/cn-DCUzRj2J.js">
+    <link rel="modulepreload" crossorigin href="./assets/badge-j3NGjqhR.js">
+    <link rel="modulepreload" crossorigin href="./assets/button-BbCh-29a.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-dom-CSu739Rf.js">
+    <link rel="modulepreload" crossorigin href="./assets/fullscreen-DFky0PAA.js">
+    <link rel="modulepreload" crossorigin href="./assets/menu-items-BP7Ju9ww.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-CWMKC7yO.js">
+    <link rel="modulepreload" crossorigin href="./assets/createLucideIcon-D5guW7EU.js">
+    <link rel="modulepreload" crossorigin href="./assets/check-BH35Ndha.js">
+    <link rel="modulepreload" crossorigin href="./assets/x-C-6liIBr.js">
+    <link rel="modulepreload" crossorigin href="./assets/select-6suE6YM2.js">
+    <link rel="modulepreload" crossorigin href="./assets/tooltip-B_PkSKN3.js">
+    <link rel="modulepreload" crossorigin href="./assets/use-toast-CJ1Tj2eC.js">
+    <link rel="modulepreload" crossorigin href="./assets/useEvent-D91BmmQi.js">
+    <link rel="modulepreload" crossorigin href="./assets/invariant-BUdrueMv.js">
+    <link rel="modulepreload" crossorigin href="./assets/isObject-DvLSfCY5.js">
+    <link rel="modulepreload" crossorigin href="./assets/_baseFor-DKD1r8uL.js">
+    <link rel="modulepreload" crossorigin href="./assets/merge-_9WLTEyt.js">
+    <link rel="modulepreload" crossorigin href="./assets/zod-H_cgTO0M.js">
+    <link rel="modulepreload" crossorigin href="./assets/utils-CvI-39U6.js">
+    <link rel="modulepreload" crossorigin href="./assets/Deferred-CP7vq682.js">
+    <link rel="modulepreload" crossorigin href="./assets/uuid-e9lSomwA.js">
+    <link rel="modulepreload" crossorigin href="./assets/DeferredRequestRegistry-CNldVcrP.js">
+    <link rel="modulepreload" crossorigin href="./assets/constants-DMpttj8Q.js">
+    <link rel="modulepreload" crossorigin href="./assets/session-0B5NBztP.js">
+    <link rel="modulepreload" crossorigin href="./assets/config-ClMcu_sV.js">
+    <link rel="modulepreload" crossorigin href="./assets/requests-DIwGYs0l.js">
+    <link rel="modulepreload" crossorigin href="./assets/useLifecycle-DieWOfXE.js">
+    <link rel="modulepreload" crossorigin href="./assets/useNonce-DfoVjkkH.js">
+    <link rel="modulepreload" crossorigin href="./assets/useTheme-CI2eq4XN.js">
+    <link rel="modulepreload" crossorigin href="./assets/arrays-DYDL-3-i.js">
+    <link rel="modulepreload" crossorigin href="./assets/strings-wdPMRf6Z.js">
+    <link rel="modulepreload" crossorigin href="./assets/once-DRroIaBz.js">
+    <link rel="modulepreload" crossorigin href="./assets/capabilities-A_KhFcGV.js">
+    <link rel="modulepreload" crossorigin href="./assets/createReducer-CI9qeK_X.js">
+    <link rel="modulepreload" crossorigin href="./assets/paths-D5zczhUD.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-D0HyMpgV.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-Bo13cFwO.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-DVkC-Qmw.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-rBRbke5D.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-RMRSa-Mj.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-BwnT-_gD.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-HyCgERnW.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-BURue7-e.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-YEXtMjTi.js">
+    <link rel="modulepreload" crossorigin href="./assets/stex-BGrE-q7N.js">
+    <link rel="modulepreload" crossorigin href="./assets/toDate-B5A0DFEz.js">
+    <link rel="modulepreload" crossorigin href="./assets/purify.es-B9KxLTTS.js">
+    <link rel="modulepreload" crossorigin href="./assets/cjs-BRGiG41H.js">
+    <link rel="modulepreload" crossorigin href="./assets/isSymbol-BT6B8Bon.js">
+    <link rel="modulepreload" crossorigin href="./assets/now-CsYTPAhW.js">
+    <link rel="modulepreload" crossorigin href="./assets/debounce-DhnxH9Rh.js">
+    <link rel="modulepreload" crossorigin href="./assets/database-zap-kIkTfzTX.js">
+    <link rel="modulepreload" crossorigin href="./assets/main-B0OX4z33.js">
+    <link rel="modulepreload" crossorigin href="./assets/cells-DOA0Gew8.js">
+    <link rel="modulepreload" crossorigin href="./assets/ErrorBoundary-DyYDV0HI.js">
+    <link rel="modulepreload" crossorigin href="./assets/kbd-CTUAEnEx.js">
+    <link rel="modulepreload" crossorigin href="./assets/useInstallPackage-GI6gu7_S.js">
+    <link rel="modulepreload" crossorigin href="./assets/alert-dialog-5BGIfskO.js">
+    <link rel="modulepreload" crossorigin href="./assets/dialog-DRnNAWYl.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDebounce-7xZwVnnu.js">
+    <link rel="modulepreload" crossorigin href="./assets/numbers-DGxQfQ-A.js">
+    <link rel="modulepreload" crossorigin href="./assets/SSRProvider-CkFAAHXw.js">
+    <link rel="modulepreload" crossorigin href="./assets/context-QkTujrKn.js">
+    <link rel="modulepreload" crossorigin href="./assets/useNumberFormatter-ByUv-u9o.js">
+    <link rel="modulepreload" crossorigin href="./assets/usePress-DQ_tAz5W.js">
+    <link rel="modulepreload" crossorigin href="./assets/input-DA8xlX70.js">
+    <link rel="modulepreload" crossorigin href="./assets/ImperativeModal-BW1dmntO.js">
+    <link rel="modulepreload" crossorigin href="./assets/cell-link-Bj4-yOIx.js">
+    <link rel="modulepreload" crossorigin href="./assets/multi-map-C4OANz8X.js">
+    <link rel="modulepreload" crossorigin href="./assets/alert-yTS3WpF4.js">
+    <link rel="modulepreload" crossorigin href="./assets/chevron-right-CG5QYXYk.js">
+    <link rel="modulepreload" crossorigin href="./assets/dropdown-menu-CZ4XbE-c.js">
+    <link rel="modulepreload" crossorigin href="./assets/links-D1JoyKTt.js">
+    <link rel="modulepreload" crossorigin href="./assets/useRunCells-cSZpNqnR.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-LK56fFow.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-BwrPA9zQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-icon-BuRdHNPA.js">
+    <link rel="modulepreload" crossorigin href="./assets/RenderHTML-BQ1PO4Wd.js">
+    <link rel="modulepreload" crossorigin href="./assets/datasource-CR6RRpTi.js">
+    <link rel="modulepreload" crossorigin href="./assets/state-BWM3qRkR.js">
+    <link rel="modulepreload" crossorigin href="./assets/package-Tv6ztuzw.js">
+    <link rel="modulepreload" crossorigin href="./assets/sparkles-lWUAsPhp.js">
+    <link rel="modulepreload" crossorigin href="./assets/MarimoErrorOutput-BH6hs0Ir.js">
+    <link rel="modulepreload" crossorigin href="./assets/eye-off-Cm6DdkeR.js">
+    <link rel="modulepreload" crossorigin href="./assets/refresh-cw-DHwG4Mac.js">
+    <link rel="modulepreload" crossorigin href="./assets/tree-actions-1KQDSu1H.js">
+    <link rel="modulepreload" crossorigin href="./assets/spinner-Bhir8k53.js">
+    <link rel="modulepreload" crossorigin href="./assets/html-to-image-CyAtzePO.js">
+    <link rel="modulepreload" crossorigin href="./assets/focus-Ldqh99xE.js">
+    <link rel="modulepreload" crossorigin href="./assets/useAsyncData-bgszE9F0.js">
+    <link rel="modulepreload" crossorigin href="./assets/LazyAnyLanguageCodeMirror-C7ALwTI_.js">
+    <link rel="modulepreload" crossorigin href="./assets/micromark-factory-space-bqhKsQDn.js">
+    <link rel="modulepreload" crossorigin href="./assets/chunk-5FQGJX7Z-D91x7QHS.js">
+    <link rel="modulepreload" crossorigin href="./assets/markdown-renderer-C9Ujvj0b.js">
+    <link rel="modulepreload" crossorigin href="./assets/command-BmOGG6-2.js">
+    <link rel="modulepreload" crossorigin href="./assets/field-DCdxnSKm.js">
+    <link rel="modulepreload" crossorigin href="./assets/popover-CNCYAwbC.js">
+    <link rel="modulepreload" crossorigin href="./assets/errors-D3F5g1xA.js">
+    <link rel="modulepreload" crossorigin href="./assets/download-DhxnAw14.js">
+    <link rel="modulepreload" crossorigin href="./assets/table-BGPSHfig.js">
+    <link rel="modulepreload" crossorigin href="./assets/useIframeCapabilities-CcI1zSdn.js">
+    <link rel="modulepreload" crossorigin href="./assets/error-banner-D0xvrLog.js">
+    <link rel="modulepreload" crossorigin href="./assets/formats-b7Sf6DAK.js">
+    <link rel="modulepreload" crossorigin href="./assets/en-US-Cb8rIK52.js">
+    <link rel="modulepreload" crossorigin href="./assets/isValid-CklTTytn.js">
+    <link rel="modulepreload" crossorigin href="./assets/dates-CTxr0EqQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/extends-BiFDv3jB.js">
+    <link rel="modulepreload" crossorigin href="./assets/emotion-is-prop-valid.esm-C59xfSYt.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDateFormatter-ICIDGgHf.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-icons.esm-BNzu6e7h.js">
+    <link rel="modulepreload" crossorigin href="./assets/RSPContexts-C3vBe8nL.js">
+    <link rel="modulepreload" crossorigin href="./assets/table-6NxtGaCm.js">
+    <link rel="modulepreload" crossorigin href="./assets/ellipsis-KAhMaCIV.js">
+    <link rel="modulepreload" crossorigin href="./assets/external-link-BTNxSavU.js">
+    <link rel="modulepreload" crossorigin href="./assets/message-circle-CWm2KnSx.js">
+    <link rel="modulepreload" crossorigin href="./assets/plus-BgB18UzY.js">
+    <link rel="modulepreload" crossorigin href="./assets/trash-2-rVklqqFF.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-resizable-panels.browser.esm-CV8-hvjx.js">
+    <link rel="modulepreload" crossorigin href="./assets/JsonOutput-DRNPZOvX.js">
+    <link rel="modulepreload" crossorigin href="./assets/chart-no-axes-column-nqk474t8.js">
+    <link rel="modulepreload" crossorigin href="./assets/square-function-uY_yJr5g.js">
+    <link rel="modulepreload" crossorigin href="./assets/spec-CPQR_o92.js">
+    <link rel="modulepreload" crossorigin href="./assets/column-preview-nu3Qo2OW.js">
+    <link rel="modulepreload" crossorigin href="./assets/icons-Ol38nIbL.js">
+    <link rel="modulepreload" crossorigin href="./assets/radio-group-D7rh6Zek.js">
+    <link rel="modulepreload" crossorigin href="./assets/floating-outline-BvHFWRoz.js">
+    <link rel="modulepreload" crossorigin href="./assets/objectWithoutPropertiesLoose-DfWeGRFv.js">
+    <link rel="modulepreload" crossorigin href="./assets/esm-xaw4Vy8N.js">
+    <link rel="modulepreload" crossorigin href="./assets/readonly-python-code-CvPx4CU_.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-headphone-BrQspHac.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-BrdxGLRX.js">
+    <link rel="modulepreload" crossorigin href="./assets/image-DQHXdEQn.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-icons-D2f3nfbq.js">
+    <link rel="modulepreload" crossorigin href="./assets/switch-Ac7CgLgh.js">
+    <link rel="modulepreload" crossorigin href="./assets/events-CPoJAfgx.js">
+    <link rel="modulepreload" crossorigin href="./assets/globals-BivClSmn.js">
+    <link rel="modulepreload" crossorigin href="./assets/share-mSf5FZIP.js">
+    <link rel="modulepreload" crossorigin href="./assets/blob-Bgnx1kuY.js">
+    <link rel="modulepreload" crossorigin href="./assets/memoize-Tp7rARFe.js">
+    <link rel="modulepreload" crossorigin href="./assets/get-C-qh_et5.js">
+    <link rel="modulepreload" crossorigin href="./assets/_baseSet-CxV9N1bc.js">
+    <link rel="modulepreload" crossorigin href="./assets/state-C8yHPSLN.js">
+    <link rel="modulepreload" crossorigin href="./assets/label-C2_YQRio.js">
+    <link rel="modulepreload" crossorigin href="./assets/textarea-bBuxbFm7.js">
+    <link rel="modulepreload" crossorigin href="./assets/refresh-ccw-C-n2VFP5.js">
+    <link rel="modulepreload" crossorigin href="./assets/form-CxBAInfg.js">
+    <link rel="modulepreload" crossorigin href="./assets/renderShortcut--ku7VECI.js">
+    <link rel="modulepreload" crossorigin href="./assets/useBoolean-CE6PfxGj.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDeepCompareMemoize-CVmg-GkP.js">
+    <link rel="modulepreload" crossorigin href="./assets/types-W8WWuumF.js">
+    <link rel="modulepreload" crossorigin href="./assets/semaphore-qUGKVeAE.js">
+    <link rel="modulepreload" crossorigin href="./assets/fileToBase64-D15LPv1Y.js">
+    <link rel="modulepreload" crossorigin href="./assets/pathUtils-DPJ-EgtH.js">
+    <link rel="modulepreload" crossorigin href="./assets/prop-types-DaaA-ptl.js">
+    <link rel="modulepreload" crossorigin href="./assets/es-By9LYOsD.js">
+    <link rel="modulepreload" crossorigin href="./assets/hasIn-DiS_ryrS.js">
+    <link rel="modulepreload" crossorigin href="./assets/flatten-Dl4V1ub3.js">
+    <link rel="modulepreload" crossorigin href="./assets/pick-DqWUNly1.js">
+    <link rel="modulepreload" crossorigin href="./assets/code-xml-CZN6vNxu.js">
+    <link rel="modulepreload" crossorigin href="./assets/house-mGK3v0Mm.js">
+    <link rel="modulepreload" crossorigin href="./assets/square-B5xWCt0a.js">
+    <link rel="modulepreload" crossorigin href="./assets/triangle-alert-D2p96PEF.js">
+    <link rel="modulepreload" crossorigin href="./assets/bundle.esm-DjhGJy4I.js">
+    <link rel="stylesheet" crossorigin href="./assets/cells-pu5xzE_v.css">
+    <link rel="stylesheet" crossorigin href="./assets/markdown-renderer-DdDKmWlR.css">
+    <link rel="stylesheet" crossorigin href="./assets/JsonOutput-B7vuddcd.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-BAYF7dcV.css">
+  <marimo-wasm hidden=""></marimo-wasm>
+    <script>
+        if (window.location.protocol === 'file:') {
+            alert('Warning: This file must be served by an HTTP server to function correctly.');
+        }
+    </script>
+    
+    <style>
+        #save-button {
+            display: none !important;
+        }
+        #filename-input {
+            display: none !important;
+        }
+    </style>
+    
+<script data-marimo="true">
+    Object.defineProperty(window, "__MARIMO_EXPORT_CONTEXT__", {
+        value: Object.freeze({
+            trusted: true,
+            notebookCode: "import marimo\n\n__generated_with = \"0.23.10\"\napp = marimo.App()\n\n\n@app.cell\ndef _():\n    import marimo as mo\n\n    return (mo,)\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    # Splitting\n\n    Splitting divides a single `Document` into multiple smaller documents, each representing\n    a logical section. It is the fourth stage of the pipeline, between processing and chunking.\n\n    ## Why split?\n\n    LLM context windows and vector store chunks have size limits. Splitting breaks a large\n    document into sections that are:\n\n    - Small enough to fit in a context window\n    - Semantically coherent (bounded by headings)\n    - Still structured `Document` objects (not plain text)\n\n    Each resulting document carries [`ExternalRef`][ragdoc.document.ExternalRef] entries\n    that record the parent-child relationship back to the source document.\n    \"\"\")\n    return\n\n\n@app.cell\ndef _():\n    # Build a sample document with headings to demonstrate splitting\n    from ragdoc.document import Document, Heading, Paragraph\n\n    sample_doc = Document(\n        title=\"Annual Report\",\n        elements=[\n            Heading(innerhtml=\"Introduction\", level=1),\n            Paragraph(html_content=\"\u003Cp\u003EOverview paragraph.\u003C/p\u003E\"),\n            Heading(innerhtml=\"Section A\", level=2),\n            Paragraph(html_content=\"\u003Cp\u003ESection A content.\u003C/p\u003E\"),\n            Heading(innerhtml=\"Section B\", level=2),\n            Paragraph(html_content=\"\u003Cp\u003ESection B content.\u003C/p\u003E\"),\n            Heading(innerhtml=\"Subsection B1\", level=3),\n            Paragraph(html_content=\"\u003Cp\u003ESubsection B1 content.\u003C/p\u003E\"),\n        ],\n        metadata={\"source\": \"annual_report.docx\"},\n    )\n    print(f\"Sample document: {len(sample_doc.elements)} elements, {len(sample_doc.headings)} headings\")\n    return (sample_doc,)\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Split functions\n\n    ### `split_by_headings`\n\n    Splits at every heading boundary, producing a flat list of documents. Use this when you\n    want uniform granularity \u2014 one section per heading regardless of depth.\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(sample_doc):\n    from ragdoc.splitting import split_by_headings\n\n    sections = split_by_headings(sample_doc)\n    print(f\"split_by_headings: {len(sections)} sections\")\n    for _i, _sec in enumerate(sections):\n        print(f\"  [{_i}] title={_sec.title!r}  elements={len(_sec.elements)}\")\n    return (split_by_headings,)\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ### `split_hierarchical`\n\n    Splits recursively by the lowest heading level that produces at least two parts. Use this\n    when you want larger, more self-contained sections that preserve sub-structure.\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(sample_doc):\n    from ragdoc.splitting import split_hierarchical\n\n    hierarchical_sections = split_hierarchical(sample_doc)\n    print(f\"split_hierarchical: {len(hierarchical_sections)} sections\")\n    for _i, _sec in enumerate(hierarchical_sections):\n        print(f\"  [{_i}] title={_sec.title!r}  elements={len(_sec.elements)}\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Parent-child relationships\n\n    After splitting, each child document has an `external_refs` entry pointing to its parent,\n    and the parent has entries pointing to all children.\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(sample_doc, split_by_headings):\n    sections_2 = split_by_headings(sample_doc)\n\n    for section in sections_2:\n        parent_refs = [r for r in section.external_refs if r.rel_type == \"external-parent\"]\n        child_refs = [r for r in section.external_refs if r.rel_type == \"external-child\"]\n        print(f\"Section {section.title!r}: parents={len(parent_refs)} children={len(child_refs)}\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Post-split processing\n\n    Because split results are still `Document` objects, you can run processors on them after\n    splitting. For example, use `ImageSummaryProcessor` to summarize images in each section,\n    or any custom `DocumentProcessor` to enrich focused sub-documents before chunking.\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(sample_doc, split_by_headings):\n    sections_3 = split_by_headings(sample_doc)\n\n    # Example: run a processor on each section after splitting\n    # from ragdoc.processing import ImageSummaryProcessor\n    # from openai import AsyncOpenAI\n    # processor = ImageSummaryProcessor(client=AsyncOpenAI())\n    # sections_3 = [await processor.process(s) for s in sections_3]\n\n    print(\"Post-split processing: run any DocumentProcessor on each section before chunking.\")\n    print(f\"Would process {len(sections_3)} sections.\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Reading order after retrieval\n\n    `split_document` writes `metadata[\"split_sequence\"]` (1-based position) and\n    `metadata[\"split_total\"]` (total split count) into every document it produces \u2014\n    including documents that fit within the budget (`split_sequence=1, split_total=1`).\n    The list is already in reading order, but these keys let you restore that order\n    after documents have been stored, retrieved, or reordered:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(sample_doc):\n    from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt\n    from ragdoc.splitting.token import split_document\n\n    _renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)\n    # max_tokens=20 forces the sample document to be split into multiple sections\n    splits = split_document(sample_doc, renderer=_renderer, max_tokens=20)\n    print(f\"split_document produced {len(splits)} split(s)\")\n    for _i, _d in enumerate(splits):\n        print(\n            f\"  [{_i}] split_sequence={_d.metadata.get('split_sequence')!r}\"\n            f\"  split_total={_d.metadata.get('split_total')!r}\"\n            f\"  elements={len(_d.elements)}\"\n        )\n    return (splits,)\n\n\n@app.cell\ndef _(splits):\n    restored = sorted(splits, key=lambda d: d.metadata[\"split_sequence\"])\n    assert restored == splits  # already in order in this example\n    return\n\n\n@app.cell\ndef test_sequence_assigned(splits):\n    assert all(\"split_sequence\" in d.metadata for d in splits), \\\n        \"split_document must set split_sequence in metadata for every split\"\n    assert [d.metadata[\"split_sequence\"] for d in splits] == list(range(1, len(splits) + 1)), \\\n        \"split_sequence must be contiguous starting from 1\"\n    assert all(d.metadata[\"split_total\"] == len(splits) for d in splits), \\\n        \"split_total must equal the number of splits for every split\"\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## See Also\n\n    - [API Reference: Splitting][ragdoc.splitting]\n    - [Chunking notebook](chunking.py) \u2014 materialize split documents into `Chunk`\n    - [Document Model notebook](document_model.py) \u2014 ExternalRef details\n    \"\"\")\n    return\n\n\nif __name__ == \"__main__\":\n    app.run()\n",
+        }),
+        writable: false,
+        configurable: false,
+    });
+</script>
+<marimo-code hidden="">import%20marimo%0A%0A__generated_with%20%3D%20%220.23.10%22%0Aapp%20%3D%20marimo.App()%0A%0A%0A%40app.cell%0Adef%20_()%3A%0A%20%20%20%20import%20marimo%20as%20mo%0A%0A%20%20%20%20return%20(mo%2C)%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%20Splitting%0A%0A%20%20%20%20Splitting%20divides%20a%20single%20%60Document%60%20into%20multiple%20smaller%20documents%2C%20each%20representing%0A%20%20%20%20a%20logical%20section.%20It%20is%20the%20fourth%20stage%20of%20the%20pipeline%2C%20between%20processing%20and%20chunking.%0A%0A%20%20%20%20%23%23%20Why%20split%3F%0A%0A%20%20%20%20LLM%20context%20windows%20and%20vector%20store%20chunks%20have%20size%20limits.%20Splitting%20breaks%20a%20large%0A%20%20%20%20document%20into%20sections%20that%20are%3A%0A%0A%20%20%20%20-%20Small%20enough%20to%20fit%20in%20a%20context%20window%0A%20%20%20%20-%20Semantically%20coherent%20(bounded%20by%20headings)%0A%20%20%20%20-%20Still%20structured%20%60Document%60%20objects%20(not%20plain%20text)%0A%0A%20%20%20%20Each%20resulting%20document%20carries%20%5B%60ExternalRef%60%5D%5Bragdoc.document.ExternalRef%5D%20entries%0A%20%20%20%20that%20record%20the%20parent-child%20relationship%20back%20to%20the%20source%20document.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_()%3A%0A%20%20%20%20%23%20Build%20a%20sample%20document%20with%20headings%20to%20demonstrate%20splitting%0A%20%20%20%20from%20ragdoc.document%20import%20Document%2C%20Heading%2C%20Paragraph%0A%0A%20%20%20%20sample_doc%20%3D%20Document(%0A%20%20%20%20%20%20%20%20title%3D%22Annual%20Report%22%2C%0A%20%20%20%20%20%20%20%20elements%3D%5B%0A%20%20%20%20%20%20%20%20%20%20%20%20Heading(innerhtml%3D%22Introduction%22%2C%20level%3D1)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Paragraph(html_content%3D%22%3Cp%3EOverview%20paragraph.%3C%2Fp%3E%22)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Heading(innerhtml%3D%22Section%20A%22%2C%20level%3D2)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Paragraph(html_content%3D%22%3Cp%3ESection%20A%20content.%3C%2Fp%3E%22)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Heading(innerhtml%3D%22Section%20B%22%2C%20level%3D2)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Paragraph(html_content%3D%22%3Cp%3ESection%20B%20content.%3C%2Fp%3E%22)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Heading(innerhtml%3D%22Subsection%20B1%22%2C%20level%3D3)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Paragraph(html_content%3D%22%3Cp%3ESubsection%20B1%20content.%3C%2Fp%3E%22)%2C%0A%20%20%20%20%20%20%20%20%5D%2C%0A%20%20%20%20%20%20%20%20metadata%3D%7B%22source%22%3A%20%22annual_report.docx%22%7D%2C%0A%20%20%20%20)%0A%20%20%20%20print(f%22Sample%20document%3A%20%7Blen(sample_doc.elements)%7D%20elements%2C%20%7Blen(sample_doc.headings)%7D%20headings%22)%0A%20%20%20%20return%20(sample_doc%2C)%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Split%20functions%0A%0A%20%20%20%20%23%23%23%20%60split_by_headings%60%0A%0A%20%20%20%20Splits%20at%20every%20heading%20boundary%2C%20producing%20a%20flat%20list%20of%20documents.%20Use%20this%20when%20you%0A%20%20%20%20want%20uniform%20granularity%20%E2%80%94%20one%20section%20per%20heading%20regardless%20of%20depth.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(sample_doc)%3A%0A%20%20%20%20from%20ragdoc.splitting%20import%20split_by_headings%0A%0A%20%20%20%20sections%20%3D%20split_by_headings(sample_doc)%0A%20%20%20%20print(f%22split_by_headings%3A%20%7Blen(sections)%7D%20sections%22)%0A%20%20%20%20for%20_i%2C%20_sec%20in%20enumerate(sections)%3A%0A%20%20%20%20%20%20%20%20print(f%22%20%20%5B%7B_i%7D%5D%20title%3D%7B_sec.title!r%7D%20%20elements%3D%7Blen(_sec.elements)%7D%22)%0A%20%20%20%20return%20(split_by_headings%2C)%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%23%20%60split_hierarchical%60%0A%0A%20%20%20%20Splits%20recursively%20by%20the%20lowest%20heading%20level%20that%20produces%20at%20least%20two%20parts.%20Use%20this%0A%20%20%20%20when%20you%20want%20larger%2C%20more%20self-contained%20sections%20that%20preserve%20sub-structure.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(sample_doc)%3A%0A%20%20%20%20from%20ragdoc.splitting%20import%20split_hierarchical%0A%0A%20%20%20%20hierarchical_sections%20%3D%20split_hierarchical(sample_doc)%0A%20%20%20%20print(f%22split_hierarchical%3A%20%7Blen(hierarchical_sections)%7D%20sections%22)%0A%20%20%20%20for%20_i%2C%20_sec%20in%20enumerate(hierarchical_sections)%3A%0A%20%20%20%20%20%20%20%20print(f%22%20%20%5B%7B_i%7D%5D%20title%3D%7B_sec.title!r%7D%20%20elements%3D%7Blen(_sec.elements)%7D%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Parent-child%20relationships%0A%0A%20%20%20%20After%20splitting%2C%20each%20child%20document%20has%20an%20%60external_refs%60%20entry%20pointing%20to%20its%20parent%2C%0A%20%20%20%20and%20the%20parent%20has%20entries%20pointing%20to%20all%20children.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(sample_doc%2C%20split_by_headings)%3A%0A%20%20%20%20sections_2%20%3D%20split_by_headings(sample_doc)%0A%0A%20%20%20%20for%20section%20in%20sections_2%3A%0A%20%20%20%20%20%20%20%20parent_refs%20%3D%20%5Br%20for%20r%20in%20section.external_refs%20if%20r.rel_type%20%3D%3D%20%22external-parent%22%5D%0A%20%20%20%20%20%20%20%20child_refs%20%3D%20%5Br%20for%20r%20in%20section.external_refs%20if%20r.rel_type%20%3D%3D%20%22external-child%22%5D%0A%20%20%20%20%20%20%20%20print(f%22Section%20%7Bsection.title!r%7D%3A%20parents%3D%7Blen(parent_refs)%7D%20children%3D%7Blen(child_refs)%7D%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Post-split%20processing%0A%0A%20%20%20%20Because%20split%20results%20are%20still%20%60Document%60%20objects%2C%20you%20can%20run%20processors%20on%20them%20after%0A%20%20%20%20splitting.%20For%20example%2C%20use%20%60ImageSummaryProcessor%60%20to%20summarize%20images%20in%20each%20section%2C%0A%20%20%20%20or%20any%20custom%20%60DocumentProcessor%60%20to%20enrich%20focused%20sub-documents%20before%20chunking.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(sample_doc%2C%20split_by_headings)%3A%0A%20%20%20%20sections_3%20%3D%20split_by_headings(sample_doc)%0A%0A%20%20%20%20%23%20Example%3A%20run%20a%20processor%20on%20each%20section%20after%20splitting%0A%20%20%20%20%23%20from%20ragdoc.processing%20import%20ImageSummaryProcessor%0A%20%20%20%20%23%20from%20openai%20import%20AsyncOpenAI%0A%20%20%20%20%23%20processor%20%3D%20ImageSummaryProcessor(client%3DAsyncOpenAI())%0A%20%20%20%20%23%20sections_3%20%3D%20%5Bawait%20processor.process(s)%20for%20s%20in%20sections_3%5D%0A%0A%20%20%20%20print(%22Post-split%20processing%3A%20run%20any%20DocumentProcessor%20on%20each%20section%20before%20chunking.%22)%0A%20%20%20%20print(f%22Would%20process%20%7Blen(sections_3)%7D%20sections.%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Reading%20order%20after%20retrieval%0A%0A%20%20%20%20%60split_document%60%20writes%20%60metadata%5B%22split_sequence%22%5D%60%20(1-based%20position)%20and%0A%20%20%20%20%60metadata%5B%22split_total%22%5D%60%20(total%20split%20count)%20into%20every%20document%20it%20produces%20%E2%80%94%0A%20%20%20%20including%20documents%20that%20fit%20within%20the%20budget%20(%60split_sequence%3D1%2C%20split_total%3D1%60).%0A%20%20%20%20The%20list%20is%20already%20in%20reading%20order%2C%20but%20these%20keys%20let%20you%20restore%20that%20order%0A%20%20%20%20after%20documents%20have%20been%20stored%2C%20retrieved%2C%20or%20reordered%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(sample_doc)%3A%0A%20%20%20%20from%20ragdoc.rendering%20import%20OutputFormat%2C%20Renderer%2C%20render_for_prompt%0A%20%20%20%20from%20ragdoc.splitting.token%20import%20split_document%0A%0A%20%20%20%20_renderer%20%3D%20Renderer(format%3DOutputFormat.MARKDOWN%2C%20element_renderer%3Drender_for_prompt)%0A%20%20%20%20%23%20max_tokens%3D20%20forces%20the%20sample%20document%20to%20be%20split%20into%20multiple%20sections%0A%20%20%20%20splits%20%3D%20split_document(sample_doc%2C%20renderer%3D_renderer%2C%20max_tokens%3D20)%0A%20%20%20%20print(f%22split_document%20produced%20%7Blen(splits)%7D%20split(s)%22)%0A%20%20%20%20for%20_i%2C%20_d%20in%20enumerate(splits)%3A%0A%20%20%20%20%20%20%20%20print(%0A%20%20%20%20%20%20%20%20%20%20%20%20f%22%20%20%5B%7B_i%7D%5D%20split_sequence%3D%7B_d.metadata.get('split_sequence')!r%7D%22%0A%20%20%20%20%20%20%20%20%20%20%20%20f%22%20%20split_total%3D%7B_d.metadata.get('split_total')!r%7D%22%0A%20%20%20%20%20%20%20%20%20%20%20%20f%22%20%20elements%3D%7Blen(_d.elements)%7D%22%0A%20%20%20%20%20%20%20%20)%0A%20%20%20%20return%20(splits%2C)%0A%0A%0A%40app.cell%0Adef%20_(splits)%3A%0A%20%20%20%20restored%20%3D%20sorted(splits%2C%20key%3Dlambda%20d%3A%20d.metadata%5B%22split_sequence%22%5D)%0A%20%20%20%20assert%20restored%20%3D%3D%20splits%20%20%23%20already%20in%20order%20in%20this%20example%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20test_sequence_assigned(splits)%3A%0A%20%20%20%20assert%20all(%22split_sequence%22%20in%20d.metadata%20for%20d%20in%20splits)%2C%20%5C%0A%20%20%20%20%20%20%20%20%22split_document%20must%20set%20split_sequence%20in%20metadata%20for%20every%20split%22%0A%20%20%20%20assert%20%5Bd.metadata%5B%22split_sequence%22%5D%20for%20d%20in%20splits%5D%20%3D%3D%20list(range(1%2C%20len(splits)%20%2B%201))%2C%20%5C%0A%20%20%20%20%20%20%20%20%22split_sequence%20must%20be%20contiguous%20starting%20from%201%22%0A%20%20%20%20assert%20all(d.metadata%5B%22split_total%22%5D%20%3D%3D%20len(splits)%20for%20d%20in%20splits)%2C%20%5C%0A%20%20%20%20%20%20%20%20%22split_total%20must%20equal%20the%20number%20of%20splits%20for%20every%20split%22%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20See%20Also%0A%0A%20%20%20%20-%20%5BAPI%20Reference%3A%20Splitting%5D%5Bragdoc.splitting%5D%0A%20%20%20%20-%20%5BChunking%20notebook%5D(chunking.py)%20%E2%80%94%20materialize%20split%20documents%20into%20%60Chunk%60%0A%20%20%20%20-%20%5BDocument%20Model%20notebook%5D(document_model.py)%20%E2%80%94%20ExternalRef%20details%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20app.run()%0A</marimo-code></head>
+  <body>
+    <div id="root"></div>
+    <!-- This is a portal for the data editor to render in -->
+    <div id="portal" data-testid="glide-portal" style="position: fixed; left: 0; top: 0; z-index: 9999"></div>
+    <script data-marimo="true">
+      Object.defineProperty(window, "__MARIMO_MOUNT_CONFIG__", {
+        value: Object.freeze({
+            "filename": "notebook.py",
+            "cwd": "",
+            "lspWorkspace": null,
+            "mode": "read",
+            "version": "0.23.10",
+            "serverToken": "unused",
+            "config": {"ai": {"custom_providers": {}, "enabled": true, "models": {"custom_models": [], "displayed_models": []}}, "completion": {"activate_on_typing": true, "auto_close_pairs": true, "copilot": false, "signature_hint_on_typing": false}, "diagnostics": {"sql_linter": true}, "display": {"cell_output": "below", "code_editor_font_size": 14, "dataframes": "rich", "default_table_max_columns": 50, "default_table_page_size": 10, "default_width": "medium", "reference_highlighting": true, "theme": "light"}, "formatting": {"line_length": 79}, "keymap": {"overrides": {}, "preset": "default"}, "language_servers": {"pylsp": {"enable_flake8": false, "enable_mypy": true, "enable_pydocstyle": false, "enable_pyflakes": false, "enable_pylint": false, "enable_ruff": true, "enabled": false}}, "mcp": {"mcpServers": {}, "presets": []}, "package_management": {"manager": "uv"}, "runtime": {"auto_instantiate": false, "auto_reload": "off", "default_csv_encoding": "utf-8", "default_sql_output": "auto", "on_cell_change": "autorun", "output_max_bytes": 8000000, "reactive_tests": true, "show_tracebacks": false, "std_stream_max_bytes": 1000000, "watcher_on_save": "lazy"}, "save": {"autosave": "off", "autosave_delay": 1000, "format_on_save": false}, "server": {"browser": "default", "follow_symlink": false}, "snippets": {"custom_paths": [], "include_default_snippets": true}},
+            "configOverrides": {},
+            "appConfig": {"sql_output": "auto", "width": "compact"},
+            "view": {"showAppCode": false},
+            "notebook": null,
+            "session": null,
+            "runtimeConfig": null,
+        }),
+        writable: false,
+        configurable: false,
+      });
+    </script>
+  </body>
+</html>

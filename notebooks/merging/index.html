@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="./favicon.ico" />
+    <!-- Preload is necessary because we show these images when we disconnect from the server,
+    but at that point we cannot load these images from the server -->
+    <link rel="preload" href="./assets/gradient-yHQUC_QB.png" as="image" />
+    <link rel="preload" href="./assets/noise-60BoTA8O.png" as="image" />
+    <!-- Preload the fonts -->
+    <link rel="preload" href="./assets/Lora-VariableFont_wght-CZceb_kH.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/PTSans-Regular-Bam3NpBI.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/PTSans-Bold-C_DwAp7Z.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Regular-CEsLFVD9.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Medium-D5MAsWEG.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Bold-C6PDArdf.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="a marimo app" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.json" />
+
+    <script data-marimo="true">
+      function __resizeIframe(obj) {
+        const scrollbarHeight = 20; // Max between windows, mac, and linux
+
+        function setHeight() {
+          // Guard against race condition where iframe isn't ready
+          if (!obj.contentWindow?.document?.documentElement) {
+            return;
+          }
+          const element = obj.contentWindow.document.documentElement;
+          // If there is no vertical scrollbar, we don't need to resize the iframe
+          if (element.scrollHeight === element.clientHeight) {
+            return;
+          }
+
+          // Create a new height that includes the scrollbar height if it's visible
+          const hasHorizontalScrollbar = element.scrollWidth > element.clientWidth;
+          const newHeight = element.scrollHeight + (hasHorizontalScrollbar ? scrollbarHeight : 0);
+
+          // Only update the height if it's different from the current height
+          if (obj.style.height !== `${newHeight}px`) {
+            obj.style.height = `${newHeight}px`;
+          }
+        }
+
+        // Resize the iframe to the height of the content and bottom scrollbar height
+        setHeight();
+
+        // Resize the iframe when the content changes
+        const resizeObserver = new ResizeObserver((_entries) => {
+          setHeight();
+        });
+        // Only observe if iframe content is ready
+        if (obj.contentWindow?.document?.body) {
+          resizeObserver.observe(obj.contentWindow.document.body);
+        }
+      }
+    </script>
+    <marimo-filename hidden>notebook.py</marimo-filename>
+    <!-- TODO(Trevor): Legacy, required by VS Code plugin. Remove when plugin is updated (see marimo/server/_templates/template.py) -->
+    <marimo-version data-version="{{ version }}" hidden></marimo-version>
+    <marimo-user-config data-config="{{ user_config }}" hidden></marimo-user-config>
+    <marimo-server-token data-token="{{ server_token }}" hidden></marimo-server-token>
+    <!-- /TODO -->
+    <title>merging</title>
+    <script type="module" crossorigin src="./assets/index-fNBoXCyz.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/preload-helper-BPPi7vOr.js">
+    <link rel="modulepreload" crossorigin href="./assets/chunk-LvLJmgfZ.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-Bj1aDYRI.js">
+    <link rel="modulepreload" crossorigin href="./assets/compiler-runtime-B3qBwwSJ.js">
+    <link rel="modulepreload" crossorigin href="./assets/jsx-runtime-BqBOg78p.js">
+    <link rel="modulepreload" crossorigin href="./assets/useEventListener-DvoEXWke.js">
+    <link rel="modulepreload" crossorigin href="./assets/defaultLocale-BLUna9fQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/precisionRound-Cl9k9ZmS.js">
+    <link rel="modulepreload" crossorigin href="./assets/defaultLocale-DzliDDTm.js">
+    <link rel="modulepreload" crossorigin href="./assets/vega-loader.browser-C8wT63Va.js">
+    <link rel="modulepreload" crossorigin href="./assets/utils-DCL4n9wx.js">
+    <link rel="modulepreload" crossorigin href="./assets/clsx-Dz_KRrWq.js">
+    <link rel="modulepreload" crossorigin href="./assets/cn-DCUzRj2J.js">
+    <link rel="modulepreload" crossorigin href="./assets/badge-j3NGjqhR.js">
+    <link rel="modulepreload" crossorigin href="./assets/button-BbCh-29a.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-dom-CSu739Rf.js">
+    <link rel="modulepreload" crossorigin href="./assets/fullscreen-DFky0PAA.js">
+    <link rel="modulepreload" crossorigin href="./assets/menu-items-BP7Ju9ww.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-CWMKC7yO.js">
+    <link rel="modulepreload" crossorigin href="./assets/createLucideIcon-D5guW7EU.js">
+    <link rel="modulepreload" crossorigin href="./assets/check-BH35Ndha.js">
+    <link rel="modulepreload" crossorigin href="./assets/x-C-6liIBr.js">
+    <link rel="modulepreload" crossorigin href="./assets/select-6suE6YM2.js">
+    <link rel="modulepreload" crossorigin href="./assets/tooltip-B_PkSKN3.js">
+    <link rel="modulepreload" crossorigin href="./assets/use-toast-CJ1Tj2eC.js">
+    <link rel="modulepreload" crossorigin href="./assets/useEvent-D91BmmQi.js">
+    <link rel="modulepreload" crossorigin href="./assets/invariant-BUdrueMv.js">
+    <link rel="modulepreload" crossorigin href="./assets/isObject-DvLSfCY5.js">
+    <link rel="modulepreload" crossorigin href="./assets/_baseFor-DKD1r8uL.js">
+    <link rel="modulepreload" crossorigin href="./assets/merge-_9WLTEyt.js">
+    <link rel="modulepreload" crossorigin href="./assets/zod-H_cgTO0M.js">
+    <link rel="modulepreload" crossorigin href="./assets/utils-CvI-39U6.js">
+    <link rel="modulepreload" crossorigin href="./assets/Deferred-CP7vq682.js">
+    <link rel="modulepreload" crossorigin href="./assets/uuid-e9lSomwA.js">
+    <link rel="modulepreload" crossorigin href="./assets/DeferredRequestRegistry-CNldVcrP.js">
+    <link rel="modulepreload" crossorigin href="./assets/constants-DMpttj8Q.js">
+    <link rel="modulepreload" crossorigin href="./assets/session-0B5NBztP.js">
+    <link rel="modulepreload" crossorigin href="./assets/config-ClMcu_sV.js">
+    <link rel="modulepreload" crossorigin href="./assets/requests-DIwGYs0l.js">
+    <link rel="modulepreload" crossorigin href="./assets/useLifecycle-DieWOfXE.js">
+    <link rel="modulepreload" crossorigin href="./assets/useNonce-DfoVjkkH.js">
+    <link rel="modulepreload" crossorigin href="./assets/useTheme-CI2eq4XN.js">
+    <link rel="modulepreload" crossorigin href="./assets/arrays-DYDL-3-i.js">
+    <link rel="modulepreload" crossorigin href="./assets/strings-wdPMRf6Z.js">
+    <link rel="modulepreload" crossorigin href="./assets/once-DRroIaBz.js">
+    <link rel="modulepreload" crossorigin href="./assets/capabilities-A_KhFcGV.js">
+    <link rel="modulepreload" crossorigin href="./assets/createReducer-CI9qeK_X.js">
+    <link rel="modulepreload" crossorigin href="./assets/paths-D5zczhUD.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-D0HyMpgV.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-Bo13cFwO.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-DVkC-Qmw.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-rBRbke5D.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-RMRSa-Mj.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-BwnT-_gD.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-HyCgERnW.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-BURue7-e.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-YEXtMjTi.js">
+    <link rel="modulepreload" crossorigin href="./assets/stex-BGrE-q7N.js">
+    <link rel="modulepreload" crossorigin href="./assets/toDate-B5A0DFEz.js">
+    <link rel="modulepreload" crossorigin href="./assets/purify.es-B9KxLTTS.js">
+    <link rel="modulepreload" crossorigin href="./assets/cjs-BRGiG41H.js">
+    <link rel="modulepreload" crossorigin href="./assets/isSymbol-BT6B8Bon.js">
+    <link rel="modulepreload" crossorigin href="./assets/now-CsYTPAhW.js">
+    <link rel="modulepreload" crossorigin href="./assets/debounce-DhnxH9Rh.js">
+    <link rel="modulepreload" crossorigin href="./assets/database-zap-kIkTfzTX.js">
+    <link rel="modulepreload" crossorigin href="./assets/main-B0OX4z33.js">
+    <link rel="modulepreload" crossorigin href="./assets/cells-DOA0Gew8.js">
+    <link rel="modulepreload" crossorigin href="./assets/ErrorBoundary-DyYDV0HI.js">
+    <link rel="modulepreload" crossorigin href="./assets/kbd-CTUAEnEx.js">
+    <link rel="modulepreload" crossorigin href="./assets/useInstallPackage-GI6gu7_S.js">
+    <link rel="modulepreload" crossorigin href="./assets/alert-dialog-5BGIfskO.js">
+    <link rel="modulepreload" crossorigin href="./assets/dialog-DRnNAWYl.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDebounce-7xZwVnnu.js">
+    <link rel="modulepreload" crossorigin href="./assets/numbers-DGxQfQ-A.js">
+    <link rel="modulepreload" crossorigin href="./assets/SSRProvider-CkFAAHXw.js">
+    <link rel="modulepreload" crossorigin href="./assets/context-QkTujrKn.js">
+    <link rel="modulepreload" crossorigin href="./assets/useNumberFormatter-ByUv-u9o.js">
+    <link rel="modulepreload" crossorigin href="./assets/usePress-DQ_tAz5W.js">
+    <link rel="modulepreload" crossorigin href="./assets/input-DA8xlX70.js">
+    <link rel="modulepreload" crossorigin href="./assets/ImperativeModal-BW1dmntO.js">
+    <link rel="modulepreload" crossorigin href="./assets/cell-link-Bj4-yOIx.js">
+    <link rel="modulepreload" crossorigin href="./assets/multi-map-C4OANz8X.js">
+    <link rel="modulepreload" crossorigin href="./assets/alert-yTS3WpF4.js">
+    <link rel="modulepreload" crossorigin href="./assets/chevron-right-CG5QYXYk.js">
+    <link rel="modulepreload" crossorigin href="./assets/dropdown-menu-CZ4XbE-c.js">
+    <link rel="modulepreload" crossorigin href="./assets/links-D1JoyKTt.js">
+    <link rel="modulepreload" crossorigin href="./assets/useRunCells-cSZpNqnR.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-LK56fFow.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-BwrPA9zQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-icon-BuRdHNPA.js">
+    <link rel="modulepreload" crossorigin href="./assets/RenderHTML-BQ1PO4Wd.js">
+    <link rel="modulepreload" crossorigin href="./assets/datasource-CR6RRpTi.js">
+    <link rel="modulepreload" crossorigin href="./assets/state-BWM3qRkR.js">
+    <link rel="modulepreload" crossorigin href="./assets/package-Tv6ztuzw.js">
+    <link rel="modulepreload" crossorigin href="./assets/sparkles-lWUAsPhp.js">
+    <link rel="modulepreload" crossorigin href="./assets/MarimoErrorOutput-BH6hs0Ir.js">
+    <link rel="modulepreload" crossorigin href="./assets/eye-off-Cm6DdkeR.js">
+    <link rel="modulepreload" crossorigin href="./assets/refresh-cw-DHwG4Mac.js">
+    <link rel="modulepreload" crossorigin href="./assets/tree-actions-1KQDSu1H.js">
+    <link rel="modulepreload" crossorigin href="./assets/spinner-Bhir8k53.js">
+    <link rel="modulepreload" crossorigin href="./assets/html-to-image-CyAtzePO.js">
+    <link rel="modulepreload" crossorigin href="./assets/focus-Ldqh99xE.js">
+    <link rel="modulepreload" crossorigin href="./assets/useAsyncData-bgszE9F0.js">
+    <link rel="modulepreload" crossorigin href="./assets/LazyAnyLanguageCodeMirror-C7ALwTI_.js">
+    <link rel="modulepreload" crossorigin href="./assets/micromark-factory-space-bqhKsQDn.js">
+    <link rel="modulepreload" crossorigin href="./assets/chunk-5FQGJX7Z-D91x7QHS.js">
+    <link rel="modulepreload" crossorigin href="./assets/markdown-renderer-C9Ujvj0b.js">
+    <link rel="modulepreload" crossorigin href="./assets/command-BmOGG6-2.js">
+    <link rel="modulepreload" crossorigin href="./assets/field-DCdxnSKm.js">
+    <link rel="modulepreload" crossorigin href="./assets/popover-CNCYAwbC.js">
+    <link rel="modulepreload" crossorigin href="./assets/errors-D3F5g1xA.js">
+    <link rel="modulepreload" crossorigin href="./assets/download-DhxnAw14.js">
+    <link rel="modulepreload" crossorigin href="./assets/table-BGPSHfig.js">
+    <link rel="modulepreload" crossorigin href="./assets/useIframeCapabilities-CcI1zSdn.js">
+    <link rel="modulepreload" crossorigin href="./assets/error-banner-D0xvrLog.js">
+    <link rel="modulepreload" crossorigin href="./assets/formats-b7Sf6DAK.js">
+    <link rel="modulepreload" crossorigin href="./assets/en-US-Cb8rIK52.js">
+    <link rel="modulepreload" crossorigin href="./assets/isValid-CklTTytn.js">
+    <link rel="modulepreload" crossorigin href="./assets/dates-CTxr0EqQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/extends-BiFDv3jB.js">
+    <link rel="modulepreload" crossorigin href="./assets/emotion-is-prop-valid.esm-C59xfSYt.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDateFormatter-ICIDGgHf.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-icons.esm-BNzu6e7h.js">
+    <link rel="modulepreload" crossorigin href="./assets/RSPContexts-C3vBe8nL.js">
+    <link rel="modulepreload" crossorigin href="./assets/table-6NxtGaCm.js">
+    <link rel="modulepreload" crossorigin href="./assets/ellipsis-KAhMaCIV.js">
+    <link rel="modulepreload" crossorigin href="./assets/external-link-BTNxSavU.js">
+    <link rel="modulepreload" crossorigin href="./assets/message-circle-CWm2KnSx.js">
+    <link rel="modulepreload" crossorigin href="./assets/plus-BgB18UzY.js">
+    <link rel="modulepreload" crossorigin href="./assets/trash-2-rVklqqFF.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-resizable-panels.browser.esm-CV8-hvjx.js">
+    <link rel="modulepreload" crossorigin href="./assets/JsonOutput-DRNPZOvX.js">
+    <link rel="modulepreload" crossorigin href="./assets/chart-no-axes-column-nqk474t8.js">
+    <link rel="modulepreload" crossorigin href="./assets/square-function-uY_yJr5g.js">
+    <link rel="modulepreload" crossorigin href="./assets/spec-CPQR_o92.js">
+    <link rel="modulepreload" crossorigin href="./assets/column-preview-nu3Qo2OW.js">
+    <link rel="modulepreload" crossorigin href="./assets/icons-Ol38nIbL.js">
+    <link rel="modulepreload" crossorigin href="./assets/radio-group-D7rh6Zek.js">
+    <link rel="modulepreload" crossorigin href="./assets/floating-outline-BvHFWRoz.js">
+    <link rel="modulepreload" crossorigin href="./assets/objectWithoutPropertiesLoose-DfWeGRFv.js">
+    <link rel="modulepreload" crossorigin href="./assets/esm-xaw4Vy8N.js">
+    <link rel="modulepreload" crossorigin href="./assets/readonly-python-code-CvPx4CU_.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-headphone-BrQspHac.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-BrdxGLRX.js">
+    <link rel="modulepreload" crossorigin href="./assets/image-DQHXdEQn.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-icons-D2f3nfbq.js">
+    <link rel="modulepreload" crossorigin href="./assets/switch-Ac7CgLgh.js">
+    <link rel="modulepreload" crossorigin href="./assets/events-CPoJAfgx.js">
+    <link rel="modulepreload" crossorigin href="./assets/globals-BivClSmn.js">
+    <link rel="modulepreload" crossorigin href="./assets/share-mSf5FZIP.js">
+    <link rel="modulepreload" crossorigin href="./assets/blob-Bgnx1kuY.js">
+    <link rel="modulepreload" crossorigin href="./assets/memoize-Tp7rARFe.js">
+    <link rel="modulepreload" crossorigin href="./assets/get-C-qh_et5.js">
+    <link rel="modulepreload" crossorigin href="./assets/_baseSet-CxV9N1bc.js">
+    <link rel="modulepreload" crossorigin href="./assets/state-C8yHPSLN.js">
+    <link rel="modulepreload" crossorigin href="./assets/label-C2_YQRio.js">
+    <link rel="modulepreload" crossorigin href="./assets/textarea-bBuxbFm7.js">
+    <link rel="modulepreload" crossorigin href="./assets/refresh-ccw-C-n2VFP5.js">
+    <link rel="modulepreload" crossorigin href="./assets/form-CxBAInfg.js">
+    <link rel="modulepreload" crossorigin href="./assets/renderShortcut--ku7VECI.js">
+    <link rel="modulepreload" crossorigin href="./assets/useBoolean-CE6PfxGj.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDeepCompareMemoize-CVmg-GkP.js">
+    <link rel="modulepreload" crossorigin href="./assets/types-W8WWuumF.js">
+    <link rel="modulepreload" crossorigin href="./assets/semaphore-qUGKVeAE.js">
+    <link rel="modulepreload" crossorigin href="./assets/fileToBase64-D15LPv1Y.js">
+    <link rel="modulepreload" crossorigin href="./assets/pathUtils-DPJ-EgtH.js">
+    <link rel="modulepreload" crossorigin href="./assets/prop-types-DaaA-ptl.js">
+    <link rel="modulepreload" crossorigin href="./assets/es-By9LYOsD.js">
+    <link rel="modulepreload" crossorigin href="./assets/hasIn-DiS_ryrS.js">
+    <link rel="modulepreload" crossorigin href="./assets/flatten-Dl4V1ub3.js">
+    <link rel="modulepreload" crossorigin href="./assets/pick-DqWUNly1.js">
+    <link rel="modulepreload" crossorigin href="./assets/code-xml-CZN6vNxu.js">
+    <link rel="modulepreload" crossorigin href="./assets/house-mGK3v0Mm.js">
+    <link rel="modulepreload" crossorigin href="./assets/square-B5xWCt0a.js">
+    <link rel="modulepreload" crossorigin href="./assets/triangle-alert-D2p96PEF.js">
+    <link rel="modulepreload" crossorigin href="./assets/bundle.esm-DjhGJy4I.js">
+    <link rel="stylesheet" crossorigin href="./assets/cells-pu5xzE_v.css">
+    <link rel="stylesheet" crossorigin href="./assets/markdown-renderer-DdDKmWlR.css">
+    <link rel="stylesheet" crossorigin href="./assets/JsonOutput-B7vuddcd.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-BAYF7dcV.css">
+  <marimo-wasm hidden=""></marimo-wasm>
+    <script>
+        if (window.location.protocol === 'file:') {
+            alert('Warning: This file must be served by an HTTP server to function correctly.');
+        }
+    </script>
+    
+    <style>
+        #save-button {
+            display: none !important;
+        }
+        #filename-input {
+            display: none !important;
+        }
+    </style>
+    
+<script data-marimo="true">
+    Object.defineProperty(window, "__MARIMO_EXPORT_CONTEXT__", {
+        value: Object.freeze({
+            trusted: true,
+            notebookCode: "import marimo\n\n__generated_with = \"0.23.10\"\napp = marimo.App()\n\n\n@app.cell\ndef _():\n    import marimo as mo\n\n    return (mo,)\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    # Document Merging\n\n    When the same document is parsed by two different parsers (e.g. MinerU for layout and\n    Azure DI for text accuracy), the outputs typically complement each other. The merging API\n    combines both into a single, higher-quality `Document`.\n    \"\"\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Two approaches\n\n    | | Approach A | Approach B |\n    |---|---|---|\n    | Function | `merge_documents` / `compute_patch` | `merge_documents_html` / `compute_html_patch` |\n    | Mechanism | Aligns structured elements directly | Render \u2192 HTML diff \u2192 reparse |\n    | Inspectable intermediate | `DocumentPatch` (typed operations) | `DocumentHtmlPatch` (HTML strings) |\n    | Page / bounding-box metadata | preserved | lost (architectural) |\n\n    Use **Approach A** when you need to inspect or override individual merge decisions, or\n    when page numbers / bounding boxes must be retained.\n\n    Use **Approach B** when you want a simple drop-in merge with no extra configuration.\n    \"\"\")\n    return\n\n\n@app.cell\ndef _():\n    # Build two sample documents representing the same content from different parsers\n    from ragdoc.document import Document, Heading, Paragraph, Table\n\n    doc_a = Document(\n        elements=[\n            Heading(innerhtml=\"Introduction\", level=1),\n            Paragraph(html_content=\"\u003Cp\u003ERevenue \u003Cem\u003Egrew\u003C/em\u003E significantly.\u003C/p\u003E\"),\n            Table(html_content=\"\u003Ctable\u003E\u003Ctr\u003E\u003Cth\u003EYear\u003C/th\u003E\u003Cth\u003ERevenue\u003C/th\u003E\u003C/tr\u003E\u003Ctr\u003E\u003Ctd\u003E2024\u003C/td\u003E\u003Ctd\u003E$11M\u003C/td\u003E\u003C/tr\u003E\u003C/table\u003E\"),\n        ],\n        metadata={\"source\": \"report_mineru\"},\n        parser=\"mineru\",\n    )\n\n    doc_b = Document(\n        elements=[\n            Heading(innerhtml=\"Introduction\", level=1),\n            Paragraph(html_content=\"\u003Cp\u003ERevenue grew \u003Cstrong\u003Esignificantly\u003C/strong\u003E in Q3.\u003C/p\u003E\"),\n            Table(html_content=\"\u003Ctable\u003E\u003Ctr\u003E\u003Cth\u003EYear\u003C/th\u003E\u003Cth\u003ERevenue\u003C/th\u003E\u003C/tr\u003E\u003Ctr\u003E\u003Ctd\u003E2024\u003C/td\u003E\u003Ctd\u003E$11.2M\u003C/td\u003E\u003C/tr\u003E\u003C/table\u003E\"),\n        ],\n        metadata={\"source\": \"report_azure_di\"},\n        parser=\"azure_di\",\n    )\n\n    print(f\"doc_a: parser={doc_a.parser!r}  elements={len(doc_a.elements)}\")\n    print(f\"doc_b: parser={doc_b.parser!r}  elements={len(doc_b.elements)}\")\n    return doc_a, doc_b\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Quick start\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(doc_a, doc_b):\n    from ragdoc.merging import merge_documents, merge_documents_html\n\n    # Approach A (element-alignment)\n    merged_a = merge_documents(doc_a, doc_b)\n\n    # Approach B (render-merge-reparse)\n    merged_b = merge_documents_html(doc_a, doc_b)\n\n    print(f\"Approach A: parser={merged_a.parser!r}  metadata={merged_a.metadata}\")\n    print(f\"Approach B: parser={merged_b.parser!r}  metadata={merged_b.metadata}\")\n    return merge_documents_html, merged_a\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Controlling what gets merged\n\n    Both approaches accept the same two control parameters.\n\n    ### `prefer_source`\n\n    Force specific element types to always come from one document:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(doc_a, doc_b, merge_documents_html):\n    from ragdoc.document import ElementTypeEnum\n\n    merged_prefer = merge_documents_html(\n        doc_a, doc_b,\n        prefer_source={\n            ElementTypeEnum.HEADING: \"b\",   # always take headings from doc_b\n            ElementTypeEnum.TABLE: \"a\",     # always take tables from doc_a\n        },\n    )\n    print(f\"Merged with prefer_source: {len(merged_prefer.elements)} elements\")\n    for el in merged_prefer.elements:\n        print(f\"  {type(el).__name__}: {el.text[:60]}\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ### `allow_insertions_from_b`\n\n    Control whether elements that appear only in `doc_b` are included:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(doc_a, doc_b, merge_documents_html):\n    # Include everything from doc_b (default)\n    merged_all = merge_documents_html(doc_a, doc_b, allow_insertions_from_b=True)\n\n    # Suppress all doc_b-only elements\n    merged_no_b = merge_documents_html(doc_a, doc_b, allow_insertions_from_b=False)\n\n    print(f\"allow_insertions_from_b=True:  {len(merged_all.elements)} elements\")\n    print(f\"allow_insertions_from_b=False: {len(merged_no_b.elements)} elements\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Approach A \u2014 Element-alignment\n\n    `compute_patch()` returns a `DocumentPatch` whose operations you can inspect and override\n    before applying:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(doc_a, doc_b):\n    from ragdoc.merging import compute_patch, PatchOperationType\n\n    patch_a = compute_patch(doc_a, doc_b)\n\n    print(f\"source_parser_a={patch_a.source_parser_a!r}\")\n    print(f\"source_parser_b={patch_a.source_parser_b!r}\")\n    print(f\"\\n{len(patch_a.operations)} patch operations:\")\n    for _op in patch_a.operations:\n        print(f\"  {_op.op!r:20}  {_op.reason!r}\")\n    return (patch_a,)\n\n\n@app.cell\ndef _(patch_a):\n    # Optionally override a decision before applying\n    # patch_a.operations[2].resolved_elements = [Paragraph(html_content=\"\u003Cp\u003ECustom\u003C/p\u003E\")]\n\n    merged_from_patch = patch_a.apply()\n    print(f\"Applied patch: {len(merged_from_patch.elements)} elements, parser={merged_from_patch.parser!r}\")\n\n    # DocumentPatch is JSON-serializable\n    json_str = patch_a.model_dump_json()\n    print(f\"Patch JSON length: {len(json_str)} chars\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Approach B \u2014 Render-merge-reparse\n\n    `compute_html_patch()` returns a `DocumentHtmlPatch` with HTML-string operations you can\n    inspect and override:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(doc_a, doc_b):\n    from ragdoc.merging import compute_html_patch\n\n    patch_b = compute_html_patch(doc_a, doc_b)\n\n    print(f\"{len(patch_b.operations)} HTML patch operations:\")\n    for _op in patch_b.operations:\n        _selected_preview = str(_op.selected)[:60]\n        print(f\"  {_op.opcode!r:10}  {_selected_preview}\")\n    return (patch_b,)\n\n\n@app.cell\ndef _(patch_b):\n    # Override before applying:\n    # patch_b.operations[0].selected = [\"\u003Ch1\u003ECustom Title\u003C/h1\u003E\"]\n\n    merged_html = patch_b.apply()\n    print(f\"Applied HTML patch: {len(merged_html.elements)} elements\")\n\n    # merge_documents_html is equivalent to compute_html_patch(...).apply()\n    json_b = patch_b.model_dump_json()\n    print(f\"HTML patch JSON length: {len(json_b)} chars\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Validating the merged document\n\n    `validate_inline_refs` returns a list of target IDs for which no matching element exists\n    in the document:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(merged_a):\n    from ragdoc.merging import validate_inline_refs\n\n    broken = validate_inline_refs(merged_a)\n    if broken:\n        print(\"Broken inline refs:\", broken)\n    else:\n        print(\"All inline refs resolved.\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## See Also\n\n    - [API Reference: Merging][ragdoc.merging]\n    - [Parsing notebook](parsing.py) \u2014 available parsers\n    - [Document Model notebook](document_model.py) \u2014 element types and inline refs\n    \"\"\")\n    return\n\n\nif __name__ == \"__main__\":\n    app.run()\n",
+        }),
+        writable: false,
+        configurable: false,
+    });
+</script>
+<marimo-code hidden="">import%20marimo%0A%0A__generated_with%20%3D%20%220.23.10%22%0Aapp%20%3D%20marimo.App()%0A%0A%0A%40app.cell%0Adef%20_()%3A%0A%20%20%20%20import%20marimo%20as%20mo%0A%0A%20%20%20%20return%20(mo%2C)%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%20Document%20Merging%0A%0A%20%20%20%20When%20the%20same%20document%20is%20parsed%20by%20two%20different%20parsers%20(e.g.%20MinerU%20for%20layout%20and%0A%20%20%20%20Azure%20DI%20for%20text%20accuracy)%2C%20the%20outputs%20typically%20complement%20each%20other.%20The%20merging%20API%0A%20%20%20%20combines%20both%20into%20a%20single%2C%20higher-quality%20%60Document%60.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Two%20approaches%0A%0A%20%20%20%20%7C%20%7C%20Approach%20A%20%7C%20Approach%20B%20%7C%0A%20%20%20%20%7C---%7C---%7C---%7C%0A%20%20%20%20%7C%20Function%20%7C%20%60merge_documents%60%20%2F%20%60compute_patch%60%20%7C%20%60merge_documents_html%60%20%2F%20%60compute_html_patch%60%20%7C%0A%20%20%20%20%7C%20Mechanism%20%7C%20Aligns%20structured%20elements%20directly%20%7C%20Render%20%E2%86%92%20HTML%20diff%20%E2%86%92%20reparse%20%7C%0A%20%20%20%20%7C%20Inspectable%20intermediate%20%7C%20%60DocumentPatch%60%20(typed%20operations)%20%7C%20%60DocumentHtmlPatch%60%20(HTML%20strings)%20%7C%0A%20%20%20%20%7C%20Page%20%2F%20bounding-box%20metadata%20%7C%20preserved%20%7C%20lost%20(architectural)%20%7C%0A%0A%20%20%20%20Use%20**Approach%20A**%20when%20you%20need%20to%20inspect%20or%20override%20individual%20merge%20decisions%2C%20or%0A%20%20%20%20when%20page%20numbers%20%2F%20bounding%20boxes%20must%20be%20retained.%0A%0A%20%20%20%20Use%20**Approach%20B**%20when%20you%20want%20a%20simple%20drop-in%20merge%20with%20no%20extra%20configuration.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_()%3A%0A%20%20%20%20%23%20Build%20two%20sample%20documents%20representing%20the%20same%20content%20from%20different%20parsers%0A%20%20%20%20from%20ragdoc.document%20import%20Document%2C%20Heading%2C%20Paragraph%2C%20Table%0A%0A%20%20%20%20doc_a%20%3D%20Document(%0A%20%20%20%20%20%20%20%20elements%3D%5B%0A%20%20%20%20%20%20%20%20%20%20%20%20Heading(innerhtml%3D%22Introduction%22%2C%20level%3D1)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Paragraph(html_content%3D%22%3Cp%3ERevenue%20%3Cem%3Egrew%3C%2Fem%3E%20significantly.%3C%2Fp%3E%22)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Table(html_content%3D%22%3Ctable%3E%3Ctr%3E%3Cth%3EYear%3C%2Fth%3E%3Cth%3ERevenue%3C%2Fth%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3E2024%3C%2Ftd%3E%3Ctd%3E%2411M%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E%22)%2C%0A%20%20%20%20%20%20%20%20%5D%2C%0A%20%20%20%20%20%20%20%20metadata%3D%7B%22source%22%3A%20%22report_mineru%22%7D%2C%0A%20%20%20%20%20%20%20%20parser%3D%22mineru%22%2C%0A%20%20%20%20)%0A%0A%20%20%20%20doc_b%20%3D%20Document(%0A%20%20%20%20%20%20%20%20elements%3D%5B%0A%20%20%20%20%20%20%20%20%20%20%20%20Heading(innerhtml%3D%22Introduction%22%2C%20level%3D1)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Paragraph(html_content%3D%22%3Cp%3ERevenue%20grew%20%3Cstrong%3Esignificantly%3C%2Fstrong%3E%20in%20Q3.%3C%2Fp%3E%22)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Table(html_content%3D%22%3Ctable%3E%3Ctr%3E%3Cth%3EYear%3C%2Fth%3E%3Cth%3ERevenue%3C%2Fth%3E%3C%2Ftr%3E%3Ctr%3E%3Ctd%3E2024%3C%2Ftd%3E%3Ctd%3E%2411.2M%3C%2Ftd%3E%3C%2Ftr%3E%3C%2Ftable%3E%22)%2C%0A%20%20%20%20%20%20%20%20%5D%2C%0A%20%20%20%20%20%20%20%20metadata%3D%7B%22source%22%3A%20%22report_azure_di%22%7D%2C%0A%20%20%20%20%20%20%20%20parser%3D%22azure_di%22%2C%0A%20%20%20%20)%0A%0A%20%20%20%20print(f%22doc_a%3A%20parser%3D%7Bdoc_a.parser!r%7D%20%20elements%3D%7Blen(doc_a.elements)%7D%22)%0A%20%20%20%20print(f%22doc_b%3A%20parser%3D%7Bdoc_b.parser!r%7D%20%20elements%3D%7Blen(doc_b.elements)%7D%22)%0A%20%20%20%20return%20doc_a%2C%20doc_b%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Quick%20start%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(doc_a%2C%20doc_b)%3A%0A%20%20%20%20from%20ragdoc.merging%20import%20merge_documents%2C%20merge_documents_html%0A%0A%20%20%20%20%23%20Approach%20A%20(element-alignment)%0A%20%20%20%20merged_a%20%3D%20merge_documents(doc_a%2C%20doc_b)%0A%0A%20%20%20%20%23%20Approach%20B%20(render-merge-reparse)%0A%20%20%20%20merged_b%20%3D%20merge_documents_html(doc_a%2C%20doc_b)%0A%0A%20%20%20%20print(f%22Approach%20A%3A%20parser%3D%7Bmerged_a.parser!r%7D%20%20metadata%3D%7Bmerged_a.metadata%7D%22)%0A%20%20%20%20print(f%22Approach%20B%3A%20parser%3D%7Bmerged_b.parser!r%7D%20%20metadata%3D%7Bmerged_b.metadata%7D%22)%0A%20%20%20%20return%20merge_documents_html%2C%20merged_a%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Controlling%20what%20gets%20merged%0A%0A%20%20%20%20Both%20approaches%20accept%20the%20same%20two%20control%20parameters.%0A%0A%20%20%20%20%23%23%23%20%60prefer_source%60%0A%0A%20%20%20%20Force%20specific%20element%20types%20to%20always%20come%20from%20one%20document%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(doc_a%2C%20doc_b%2C%20merge_documents_html)%3A%0A%20%20%20%20from%20ragdoc.document%20import%20ElementTypeEnum%0A%0A%20%20%20%20merged_prefer%20%3D%20merge_documents_html(%0A%20%20%20%20%20%20%20%20doc_a%2C%20doc_b%2C%0A%20%20%20%20%20%20%20%20prefer_source%3D%7B%0A%20%20%20%20%20%20%20%20%20%20%20%20ElementTypeEnum.HEADING%3A%20%22b%22%2C%20%20%20%23%20always%20take%20headings%20from%20doc_b%0A%20%20%20%20%20%20%20%20%20%20%20%20ElementTypeEnum.TABLE%3A%20%22a%22%2C%20%20%20%20%20%23%20always%20take%20tables%20from%20doc_a%0A%20%20%20%20%20%20%20%20%7D%2C%0A%20%20%20%20)%0A%20%20%20%20print(f%22Merged%20with%20prefer_source%3A%20%7Blen(merged_prefer.elements)%7D%20elements%22)%0A%20%20%20%20for%20el%20in%20merged_prefer.elements%3A%0A%20%20%20%20%20%20%20%20print(f%22%20%20%7Btype(el).__name__%7D%3A%20%7Bel.text%5B%3A60%5D%7D%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%23%20%60allow_insertions_from_b%60%0A%0A%20%20%20%20Control%20whether%20elements%20that%20appear%20only%20in%20%60doc_b%60%20are%20included%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(doc_a%2C%20doc_b%2C%20merge_documents_html)%3A%0A%20%20%20%20%23%20Include%20everything%20from%20doc_b%20(default)%0A%20%20%20%20merged_all%20%3D%20merge_documents_html(doc_a%2C%20doc_b%2C%20allow_insertions_from_b%3DTrue)%0A%0A%20%20%20%20%23%20Suppress%20all%20doc_b-only%20elements%0A%20%20%20%20merged_no_b%20%3D%20merge_documents_html(doc_a%2C%20doc_b%2C%20allow_insertions_from_b%3DFalse)%0A%0A%20%20%20%20print(f%22allow_insertions_from_b%3DTrue%3A%20%20%7Blen(merged_all.elements)%7D%20elements%22)%0A%20%20%20%20print(f%22allow_insertions_from_b%3DFalse%3A%20%7Blen(merged_no_b.elements)%7D%20elements%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Approach%20A%20%E2%80%94%20Element-alignment%0A%0A%20%20%20%20%60compute_patch()%60%20returns%20a%20%60DocumentPatch%60%20whose%20operations%20you%20can%20inspect%20and%20override%0A%20%20%20%20before%20applying%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(doc_a%2C%20doc_b)%3A%0A%20%20%20%20from%20ragdoc.merging%20import%20compute_patch%2C%20PatchOperationType%0A%0A%20%20%20%20patch_a%20%3D%20compute_patch(doc_a%2C%20doc_b)%0A%0A%20%20%20%20print(f%22source_parser_a%3D%7Bpatch_a.source_parser_a!r%7D%22)%0A%20%20%20%20print(f%22source_parser_b%3D%7Bpatch_a.source_parser_b!r%7D%22)%0A%20%20%20%20print(f%22%5Cn%7Blen(patch_a.operations)%7D%20patch%20operations%3A%22)%0A%20%20%20%20for%20_op%20in%20patch_a.operations%3A%0A%20%20%20%20%20%20%20%20print(f%22%20%20%7B_op.op!r%3A20%7D%20%20%7B_op.reason!r%7D%22)%0A%20%20%20%20return%20(patch_a%2C)%0A%0A%0A%40app.cell%0Adef%20_(patch_a)%3A%0A%20%20%20%20%23%20Optionally%20override%20a%20decision%20before%20applying%0A%20%20%20%20%23%20patch_a.operations%5B2%5D.resolved_elements%20%3D%20%5BParagraph(html_content%3D%22%3Cp%3ECustom%3C%2Fp%3E%22)%5D%0A%0A%20%20%20%20merged_from_patch%20%3D%20patch_a.apply()%0A%20%20%20%20print(f%22Applied%20patch%3A%20%7Blen(merged_from_patch.elements)%7D%20elements%2C%20parser%3D%7Bmerged_from_patch.parser!r%7D%22)%0A%0A%20%20%20%20%23%20DocumentPatch%20is%20JSON-serializable%0A%20%20%20%20json_str%20%3D%20patch_a.model_dump_json()%0A%20%20%20%20print(f%22Patch%20JSON%20length%3A%20%7Blen(json_str)%7D%20chars%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Approach%20B%20%E2%80%94%20Render-merge-reparse%0A%0A%20%20%20%20%60compute_html_patch()%60%20returns%20a%20%60DocumentHtmlPatch%60%20with%20HTML-string%20operations%20you%20can%0A%20%20%20%20inspect%20and%20override%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(doc_a%2C%20doc_b)%3A%0A%20%20%20%20from%20ragdoc.merging%20import%20compute_html_patch%0A%0A%20%20%20%20patch_b%20%3D%20compute_html_patch(doc_a%2C%20doc_b)%0A%0A%20%20%20%20print(f%22%7Blen(patch_b.operations)%7D%20HTML%20patch%20operations%3A%22)%0A%20%20%20%20for%20_op%20in%20patch_b.operations%3A%0A%20%20%20%20%20%20%20%20_selected_preview%20%3D%20str(_op.selected)%5B%3A60%5D%0A%20%20%20%20%20%20%20%20print(f%22%20%20%7B_op.opcode!r%3A10%7D%20%20%7B_selected_preview%7D%22)%0A%20%20%20%20return%20(patch_b%2C)%0A%0A%0A%40app.cell%0Adef%20_(patch_b)%3A%0A%20%20%20%20%23%20Override%20before%20applying%3A%0A%20%20%20%20%23%20patch_b.operations%5B0%5D.selected%20%3D%20%5B%22%3Ch1%3ECustom%20Title%3C%2Fh1%3E%22%5D%0A%0A%20%20%20%20merged_html%20%3D%20patch_b.apply()%0A%20%20%20%20print(f%22Applied%20HTML%20patch%3A%20%7Blen(merged_html.elements)%7D%20elements%22)%0A%0A%20%20%20%20%23%20merge_documents_html%20is%20equivalent%20to%20compute_html_patch(...).apply()%0A%20%20%20%20json_b%20%3D%20patch_b.model_dump_json()%0A%20%20%20%20print(f%22HTML%20patch%20JSON%20length%3A%20%7Blen(json_b)%7D%20chars%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Validating%20the%20merged%20document%0A%0A%20%20%20%20%60validate_inline_refs%60%20returns%20a%20list%20of%20target%20IDs%20for%20which%20no%20matching%20element%20exists%0A%20%20%20%20in%20the%20document%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(merged_a)%3A%0A%20%20%20%20from%20ragdoc.merging%20import%20validate_inline_refs%0A%0A%20%20%20%20broken%20%3D%20validate_inline_refs(merged_a)%0A%20%20%20%20if%20broken%3A%0A%20%20%20%20%20%20%20%20print(%22Broken%20inline%20refs%3A%22%2C%20broken)%0A%20%20%20%20else%3A%0A%20%20%20%20%20%20%20%20print(%22All%20inline%20refs%20resolved.%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20See%20Also%0A%0A%20%20%20%20-%20%5BAPI%20Reference%3A%20Merging%5D%5Bragdoc.merging%5D%0A%20%20%20%20-%20%5BParsing%20notebook%5D(parsing.py)%20%E2%80%94%20available%20parsers%0A%20%20%20%20-%20%5BDocument%20Model%20notebook%5D(document_model.py)%20%E2%80%94%20element%20types%20and%20inline%20refs%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20app.run()%0A</marimo-code></head>
+  <body>
+    <div id="root"></div>
+    <!-- This is a portal for the data editor to render in -->
+    <div id="portal" data-testid="glide-portal" style="position: fixed; left: 0; top: 0; z-index: 9999"></div>
+    <script data-marimo="true">
+      Object.defineProperty(window, "__MARIMO_MOUNT_CONFIG__", {
+        value: Object.freeze({
+            "filename": "notebook.py",
+            "cwd": "",
+            "lspWorkspace": null,
+            "mode": "read",
+            "version": "0.23.10",
+            "serverToken": "unused",
+            "config": {"ai": {"custom_providers": {}, "enabled": true, "models": {"custom_models": [], "displayed_models": []}}, "completion": {"activate_on_typing": true, "auto_close_pairs": true, "copilot": false, "signature_hint_on_typing": false}, "diagnostics": {"sql_linter": true}, "display": {"cell_output": "below", "code_editor_font_size": 14, "dataframes": "rich", "default_table_max_columns": 50, "default_table_page_size": 10, "default_width": "medium", "reference_highlighting": true, "theme": "light"}, "formatting": {"line_length": 79}, "keymap": {"overrides": {}, "preset": "default"}, "language_servers": {"pylsp": {"enable_flake8": false, "enable_mypy": true, "enable_pydocstyle": false, "enable_pyflakes": false, "enable_pylint": false, "enable_ruff": true, "enabled": false}}, "mcp": {"mcpServers": {}, "presets": []}, "package_management": {"manager": "uv"}, "runtime": {"auto_instantiate": false, "auto_reload": "off", "default_csv_encoding": "utf-8", "default_sql_output": "auto", "on_cell_change": "autorun", "output_max_bytes": 8000000, "reactive_tests": true, "show_tracebacks": false, "std_stream_max_bytes": 1000000, "watcher_on_save": "lazy"}, "save": {"autosave": "off", "autosave_delay": 1000, "format_on_save": false}, "server": {"browser": "default", "follow_symlink": false}, "snippets": {"custom_paths": [], "include_default_snippets": true}},
+            "configOverrides": {},
+            "appConfig": {"sql_output": "auto", "width": "compact"},
+            "view": {"showAppCode": false},
+            "notebook": null,
+            "session": null,
+            "runtimeConfig": null,
+        }),
+        writable: false,
+        configurable: false,
+      });
+    </script>
+  </body>
+</html>

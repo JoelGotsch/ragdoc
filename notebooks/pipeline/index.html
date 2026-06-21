@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="./favicon.ico" />
+    <!-- Preload is necessary because we show these images when we disconnect from the server,
+    but at that point we cannot load these images from the server -->
+    <link rel="preload" href="./assets/gradient-yHQUC_QB.png" as="image" />
+    <link rel="preload" href="./assets/noise-60BoTA8O.png" as="image" />
+    <!-- Preload the fonts -->
+    <link rel="preload" href="./assets/Lora-VariableFont_wght-CZceb_kH.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/PTSans-Regular-Bam3NpBI.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/PTSans-Bold-C_DwAp7Z.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Regular-CEsLFVD9.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Medium-D5MAsWEG.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Bold-C6PDArdf.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="a marimo app" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.json" />
+
+    <script data-marimo="true">
+      function __resizeIframe(obj) {
+        const scrollbarHeight = 20; // Max between windows, mac, and linux
+
+        function setHeight() {
+          // Guard against race condition where iframe isn't ready
+          if (!obj.contentWindow?.document?.documentElement) {
+            return;
+          }
+          const element = obj.contentWindow.document.documentElement;
+          // If there is no vertical scrollbar, we don't need to resize the iframe
+          if (element.scrollHeight === element.clientHeight) {
+            return;
+          }
+
+          // Create a new height that includes the scrollbar height if it's visible
+          const hasHorizontalScrollbar = element.scrollWidth > element.clientWidth;
+          const newHeight = element.scrollHeight + (hasHorizontalScrollbar ? scrollbarHeight : 0);
+
+          // Only update the height if it's different from the current height
+          if (obj.style.height !== `${newHeight}px`) {
+            obj.style.height = `${newHeight}px`;
+          }
+        }
+
+        // Resize the iframe to the height of the content and bottom scrollbar height
+        setHeight();
+
+        // Resize the iframe when the content changes
+        const resizeObserver = new ResizeObserver((_entries) => {
+          setHeight();
+        });
+        // Only observe if iframe content is ready
+        if (obj.contentWindow?.document?.body) {
+          resizeObserver.observe(obj.contentWindow.document.body);
+        }
+      }
+    </script>
+    <marimo-filename hidden>notebook.py</marimo-filename>
+    <!-- TODO(Trevor): Legacy, required by VS Code plugin. Remove when plugin is updated (see marimo/server/_templates/template.py) -->
+    <marimo-version data-version="{{ version }}" hidden></marimo-version>
+    <marimo-user-config data-config="{{ user_config }}" hidden></marimo-user-config>
+    <marimo-server-token data-token="{{ server_token }}" hidden></marimo-server-token>
+    <!-- /TODO -->
+    <title>pipeline</title>
+    <script type="module" crossorigin src="./assets/index-fNBoXCyz.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/preload-helper-BPPi7vOr.js">
+    <link rel="modulepreload" crossorigin href="./assets/chunk-LvLJmgfZ.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-Bj1aDYRI.js">
+    <link rel="modulepreload" crossorigin href="./assets/compiler-runtime-B3qBwwSJ.js">
+    <link rel="modulepreload" crossorigin href="./assets/jsx-runtime-BqBOg78p.js">
+    <link rel="modulepreload" crossorigin href="./assets/useEventListener-DvoEXWke.js">
+    <link rel="modulepreload" crossorigin href="./assets/defaultLocale-BLUna9fQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/precisionRound-Cl9k9ZmS.js">
+    <link rel="modulepreload" crossorigin href="./assets/defaultLocale-DzliDDTm.js">
+    <link rel="modulepreload" crossorigin href="./assets/vega-loader.browser-C8wT63Va.js">
+    <link rel="modulepreload" crossorigin href="./assets/utils-DCL4n9wx.js">
+    <link rel="modulepreload" crossorigin href="./assets/clsx-Dz_KRrWq.js">
+    <link rel="modulepreload" crossorigin href="./assets/cn-DCUzRj2J.js">
+    <link rel="modulepreload" crossorigin href="./assets/badge-j3NGjqhR.js">
+    <link rel="modulepreload" crossorigin href="./assets/button-BbCh-29a.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-dom-CSu739Rf.js">
+    <link rel="modulepreload" crossorigin href="./assets/fullscreen-DFky0PAA.js">
+    <link rel="modulepreload" crossorigin href="./assets/menu-items-BP7Ju9ww.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-CWMKC7yO.js">
+    <link rel="modulepreload" crossorigin href="./assets/createLucideIcon-D5guW7EU.js">
+    <link rel="modulepreload" crossorigin href="./assets/check-BH35Ndha.js">
+    <link rel="modulepreload" crossorigin href="./assets/x-C-6liIBr.js">
+    <link rel="modulepreload" crossorigin href="./assets/select-6suE6YM2.js">
+    <link rel="modulepreload" crossorigin href="./assets/tooltip-B_PkSKN3.js">
+    <link rel="modulepreload" crossorigin href="./assets/use-toast-CJ1Tj2eC.js">
+    <link rel="modulepreload" crossorigin href="./assets/useEvent-D91BmmQi.js">
+    <link rel="modulepreload" crossorigin href="./assets/invariant-BUdrueMv.js">
+    <link rel="modulepreload" crossorigin href="./assets/isObject-DvLSfCY5.js">
+    <link rel="modulepreload" crossorigin href="./assets/_baseFor-DKD1r8uL.js">
+    <link rel="modulepreload" crossorigin href="./assets/merge-_9WLTEyt.js">
+    <link rel="modulepreload" crossorigin href="./assets/zod-H_cgTO0M.js">
+    <link rel="modulepreload" crossorigin href="./assets/utils-CvI-39U6.js">
+    <link rel="modulepreload" crossorigin href="./assets/Deferred-CP7vq682.js">
+    <link rel="modulepreload" crossorigin href="./assets/uuid-e9lSomwA.js">
+    <link rel="modulepreload" crossorigin href="./assets/DeferredRequestRegistry-CNldVcrP.js">
+    <link rel="modulepreload" crossorigin href="./assets/constants-DMpttj8Q.js">
+    <link rel="modulepreload" crossorigin href="./assets/session-0B5NBztP.js">
+    <link rel="modulepreload" crossorigin href="./assets/config-ClMcu_sV.js">
+    <link rel="modulepreload" crossorigin href="./assets/requests-DIwGYs0l.js">
+    <link rel="modulepreload" crossorigin href="./assets/useLifecycle-DieWOfXE.js">
+    <link rel="modulepreload" crossorigin href="./assets/useNonce-DfoVjkkH.js">
+    <link rel="modulepreload" crossorigin href="./assets/useTheme-CI2eq4XN.js">
+    <link rel="modulepreload" crossorigin href="./assets/arrays-DYDL-3-i.js">
+    <link rel="modulepreload" crossorigin href="./assets/strings-wdPMRf6Z.js">
+    <link rel="modulepreload" crossorigin href="./assets/once-DRroIaBz.js">
+    <link rel="modulepreload" crossorigin href="./assets/capabilities-A_KhFcGV.js">
+    <link rel="modulepreload" crossorigin href="./assets/createReducer-CI9qeK_X.js">
+    <link rel="modulepreload" crossorigin href="./assets/paths-D5zczhUD.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-D0HyMpgV.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-Bo13cFwO.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-DVkC-Qmw.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-rBRbke5D.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-RMRSa-Mj.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-BwnT-_gD.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-HyCgERnW.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-BURue7-e.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-YEXtMjTi.js">
+    <link rel="modulepreload" crossorigin href="./assets/stex-BGrE-q7N.js">
+    <link rel="modulepreload" crossorigin href="./assets/toDate-B5A0DFEz.js">
+    <link rel="modulepreload" crossorigin href="./assets/purify.es-B9KxLTTS.js">
+    <link rel="modulepreload" crossorigin href="./assets/cjs-BRGiG41H.js">
+    <link rel="modulepreload" crossorigin href="./assets/isSymbol-BT6B8Bon.js">
+    <link rel="modulepreload" crossorigin href="./assets/now-CsYTPAhW.js">
+    <link rel="modulepreload" crossorigin href="./assets/debounce-DhnxH9Rh.js">
+    <link rel="modulepreload" crossorigin href="./assets/database-zap-kIkTfzTX.js">
+    <link rel="modulepreload" crossorigin href="./assets/main-B0OX4z33.js">
+    <link rel="modulepreload" crossorigin href="./assets/cells-DOA0Gew8.js">
+    <link rel="modulepreload" crossorigin href="./assets/ErrorBoundary-DyYDV0HI.js">
+    <link rel="modulepreload" crossorigin href="./assets/kbd-CTUAEnEx.js">
+    <link rel="modulepreload" crossorigin href="./assets/useInstallPackage-GI6gu7_S.js">
+    <link rel="modulepreload" crossorigin href="./assets/alert-dialog-5BGIfskO.js">
+    <link rel="modulepreload" crossorigin href="./assets/dialog-DRnNAWYl.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDebounce-7xZwVnnu.js">
+    <link rel="modulepreload" crossorigin href="./assets/numbers-DGxQfQ-A.js">
+    <link rel="modulepreload" crossorigin href="./assets/SSRProvider-CkFAAHXw.js">
+    <link rel="modulepreload" crossorigin href="./assets/context-QkTujrKn.js">
+    <link rel="modulepreload" crossorigin href="./assets/useNumberFormatter-ByUv-u9o.js">
+    <link rel="modulepreload" crossorigin href="./assets/usePress-DQ_tAz5W.js">
+    <link rel="modulepreload" crossorigin href="./assets/input-DA8xlX70.js">
+    <link rel="modulepreload" crossorigin href="./assets/ImperativeModal-BW1dmntO.js">
+    <link rel="modulepreload" crossorigin href="./assets/cell-link-Bj4-yOIx.js">
+    <link rel="modulepreload" crossorigin href="./assets/multi-map-C4OANz8X.js">
+    <link rel="modulepreload" crossorigin href="./assets/alert-yTS3WpF4.js">
+    <link rel="modulepreload" crossorigin href="./assets/chevron-right-CG5QYXYk.js">
+    <link rel="modulepreload" crossorigin href="./assets/dropdown-menu-CZ4XbE-c.js">
+    <link rel="modulepreload" crossorigin href="./assets/links-D1JoyKTt.js">
+    <link rel="modulepreload" crossorigin href="./assets/useRunCells-cSZpNqnR.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-LK56fFow.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-BwrPA9zQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-icon-BuRdHNPA.js">
+    <link rel="modulepreload" crossorigin href="./assets/RenderHTML-BQ1PO4Wd.js">
+    <link rel="modulepreload" crossorigin href="./assets/datasource-CR6RRpTi.js">
+    <link rel="modulepreload" crossorigin href="./assets/state-BWM3qRkR.js">
+    <link rel="modulepreload" crossorigin href="./assets/package-Tv6ztuzw.js">
+    <link rel="modulepreload" crossorigin href="./assets/sparkles-lWUAsPhp.js">
+    <link rel="modulepreload" crossorigin href="./assets/MarimoErrorOutput-BH6hs0Ir.js">
+    <link rel="modulepreload" crossorigin href="./assets/eye-off-Cm6DdkeR.js">
+    <link rel="modulepreload" crossorigin href="./assets/refresh-cw-DHwG4Mac.js">
+    <link rel="modulepreload" crossorigin href="./assets/tree-actions-1KQDSu1H.js">
+    <link rel="modulepreload" crossorigin href="./assets/spinner-Bhir8k53.js">
+    <link rel="modulepreload" crossorigin href="./assets/html-to-image-CyAtzePO.js">
+    <link rel="modulepreload" crossorigin href="./assets/focus-Ldqh99xE.js">
+    <link rel="modulepreload" crossorigin href="./assets/useAsyncData-bgszE9F0.js">
+    <link rel="modulepreload" crossorigin href="./assets/LazyAnyLanguageCodeMirror-C7ALwTI_.js">
+    <link rel="modulepreload" crossorigin href="./assets/micromark-factory-space-bqhKsQDn.js">
+    <link rel="modulepreload" crossorigin href="./assets/chunk-5FQGJX7Z-D91x7QHS.js">
+    <link rel="modulepreload" crossorigin href="./assets/markdown-renderer-C9Ujvj0b.js">
+    <link rel="modulepreload" crossorigin href="./assets/command-BmOGG6-2.js">
+    <link rel="modulepreload" crossorigin href="./assets/field-DCdxnSKm.js">
+    <link rel="modulepreload" crossorigin href="./assets/popover-CNCYAwbC.js">
+    <link rel="modulepreload" crossorigin href="./assets/errors-D3F5g1xA.js">
+    <link rel="modulepreload" crossorigin href="./assets/download-DhxnAw14.js">
+    <link rel="modulepreload" crossorigin href="./assets/table-BGPSHfig.js">
+    <link rel="modulepreload" crossorigin href="./assets/useIframeCapabilities-CcI1zSdn.js">
+    <link rel="modulepreload" crossorigin href="./assets/error-banner-D0xvrLog.js">
+    <link rel="modulepreload" crossorigin href="./assets/formats-b7Sf6DAK.js">
+    <link rel="modulepreload" crossorigin href="./assets/en-US-Cb8rIK52.js">
+    <link rel="modulepreload" crossorigin href="./assets/isValid-CklTTytn.js">
+    <link rel="modulepreload" crossorigin href="./assets/dates-CTxr0EqQ.js">
+    <link rel="modulepreload" crossorigin href="./assets/extends-BiFDv3jB.js">
+    <link rel="modulepreload" crossorigin href="./assets/emotion-is-prop-valid.esm-C59xfSYt.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDateFormatter-ICIDGgHf.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-icons.esm-BNzu6e7h.js">
+    <link rel="modulepreload" crossorigin href="./assets/RSPContexts-C3vBe8nL.js">
+    <link rel="modulepreload" crossorigin href="./assets/table-6NxtGaCm.js">
+    <link rel="modulepreload" crossorigin href="./assets/ellipsis-KAhMaCIV.js">
+    <link rel="modulepreload" crossorigin href="./assets/external-link-BTNxSavU.js">
+    <link rel="modulepreload" crossorigin href="./assets/message-circle-CWm2KnSx.js">
+    <link rel="modulepreload" crossorigin href="./assets/plus-BgB18UzY.js">
+    <link rel="modulepreload" crossorigin href="./assets/trash-2-rVklqqFF.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-resizable-panels.browser.esm-CV8-hvjx.js">
+    <link rel="modulepreload" crossorigin href="./assets/JsonOutput-DRNPZOvX.js">
+    <link rel="modulepreload" crossorigin href="./assets/chart-no-axes-column-nqk474t8.js">
+    <link rel="modulepreload" crossorigin href="./assets/square-function-uY_yJr5g.js">
+    <link rel="modulepreload" crossorigin href="./assets/spec-CPQR_o92.js">
+    <link rel="modulepreload" crossorigin href="./assets/column-preview-nu3Qo2OW.js">
+    <link rel="modulepreload" crossorigin href="./assets/icons-Ol38nIbL.js">
+    <link rel="modulepreload" crossorigin href="./assets/radio-group-D7rh6Zek.js">
+    <link rel="modulepreload" crossorigin href="./assets/floating-outline-BvHFWRoz.js">
+    <link rel="modulepreload" crossorigin href="./assets/objectWithoutPropertiesLoose-DfWeGRFv.js">
+    <link rel="modulepreload" crossorigin href="./assets/esm-xaw4Vy8N.js">
+    <link rel="modulepreload" crossorigin href="./assets/readonly-python-code-CvPx4CU_.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-headphone-BrQspHac.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-BrdxGLRX.js">
+    <link rel="modulepreload" crossorigin href="./assets/image-DQHXdEQn.js">
+    <link rel="modulepreload" crossorigin href="./assets/file-icons-D2f3nfbq.js">
+    <link rel="modulepreload" crossorigin href="./assets/switch-Ac7CgLgh.js">
+    <link rel="modulepreload" crossorigin href="./assets/events-CPoJAfgx.js">
+    <link rel="modulepreload" crossorigin href="./assets/globals-BivClSmn.js">
+    <link rel="modulepreload" crossorigin href="./assets/share-mSf5FZIP.js">
+    <link rel="modulepreload" crossorigin href="./assets/blob-Bgnx1kuY.js">
+    <link rel="modulepreload" crossorigin href="./assets/memoize-Tp7rARFe.js">
+    <link rel="modulepreload" crossorigin href="./assets/get-C-qh_et5.js">
+    <link rel="modulepreload" crossorigin href="./assets/_baseSet-CxV9N1bc.js">
+    <link rel="modulepreload" crossorigin href="./assets/state-C8yHPSLN.js">
+    <link rel="modulepreload" crossorigin href="./assets/label-C2_YQRio.js">
+    <link rel="modulepreload" crossorigin href="./assets/textarea-bBuxbFm7.js">
+    <link rel="modulepreload" crossorigin href="./assets/refresh-ccw-C-n2VFP5.js">
+    <link rel="modulepreload" crossorigin href="./assets/form-CxBAInfg.js">
+    <link rel="modulepreload" crossorigin href="./assets/renderShortcut--ku7VECI.js">
+    <link rel="modulepreload" crossorigin href="./assets/useBoolean-CE6PfxGj.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDeepCompareMemoize-CVmg-GkP.js">
+    <link rel="modulepreload" crossorigin href="./assets/types-W8WWuumF.js">
+    <link rel="modulepreload" crossorigin href="./assets/semaphore-qUGKVeAE.js">
+    <link rel="modulepreload" crossorigin href="./assets/fileToBase64-D15LPv1Y.js">
+    <link rel="modulepreload" crossorigin href="./assets/pathUtils-DPJ-EgtH.js">
+    <link rel="modulepreload" crossorigin href="./assets/prop-types-DaaA-ptl.js">
+    <link rel="modulepreload" crossorigin href="./assets/es-By9LYOsD.js">
+    <link rel="modulepreload" crossorigin href="./assets/hasIn-DiS_ryrS.js">
+    <link rel="modulepreload" crossorigin href="./assets/flatten-Dl4V1ub3.js">
+    <link rel="modulepreload" crossorigin href="./assets/pick-DqWUNly1.js">
+    <link rel="modulepreload" crossorigin href="./assets/code-xml-CZN6vNxu.js">
+    <link rel="modulepreload" crossorigin href="./assets/house-mGK3v0Mm.js">
+    <link rel="modulepreload" crossorigin href="./assets/square-B5xWCt0a.js">
+    <link rel="modulepreload" crossorigin href="./assets/triangle-alert-D2p96PEF.js">
+    <link rel="modulepreload" crossorigin href="./assets/bundle.esm-DjhGJy4I.js">
+    <link rel="stylesheet" crossorigin href="./assets/cells-pu5xzE_v.css">
+    <link rel="stylesheet" crossorigin href="./assets/markdown-renderer-DdDKmWlR.css">
+    <link rel="stylesheet" crossorigin href="./assets/JsonOutput-B7vuddcd.css">
+    <link rel="stylesheet" crossorigin href="./assets/index-BAYF7dcV.css">
+  <marimo-wasm hidden=""></marimo-wasm>
+    <script>
+        if (window.location.protocol === 'file:') {
+            alert('Warning: This file must be served by an HTTP server to function correctly.');
+        }
+    </script>
+    
+    <style>
+        #save-button {
+            display: none !important;
+        }
+        #filename-input {
+            display: none !important;
+        }
+    </style>
+    
+<script data-marimo="true">
+    Object.defineProperty(window, "__MARIMO_EXPORT_CONTEXT__", {
+        value: Object.freeze({
+            trusted: true,
+            notebookCode: "import marimo\n\n__generated_with = \"0.23.10\"\napp = marimo.App()\n\n\n@app.cell\ndef _():\n    import marimo as mo\n\n    return (mo,)\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    # Pipeline\n\n    The `ragdoc.pipeline` module provides a high-level facade that wires together all four\n    stages \u2014 **parse \u2192 process \u2192 split \u2192 chunk** \u2014 into a single call.\n\n    Use `DocumentPipeline` when you want to go from a file on disk to `Chunk` objects in one\n    step. Use the individual stage APIs when you need fine-grained control \u2014 custom parsers,\n    partial re-processing, or stage-level debugging.\n    \"\"\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Scenario A \u2014 Linear pipeline\n\n    ### Minimal example\n\n    `DocumentPipeline` defaults:\n\n    | Stage | Default |\n    |-------|---------|\n    | Parser | `AutoParser` \u2014 picks parser from file extension |\n    | Processors | none (identity pass-through) |\n    | Splitter | none \u2014 whole document \u2192 one chunk |\n    | Chunker | `SimpleChunker` \u2014 one chunk per document |\n    \"\"\")\n    return\n\n\n@app.cell\ndef _():\n    from pathlib import Path\n    from ragdoc.pipeline import DocumentPipeline\n\n    pipeline = DocumentPipeline()\n    # chunks = await pipeline.run(Path(\"report.docx\"))\n    # print(f\"Produced {len(chunks)} chunks\")\n    print(\"DocumentPipeline() ready \u2014 call await pipeline.run(Path('report.docx')) to run\")\n    return DocumentPipeline, Path\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ### Adding a splitter\n\n    To split documents into retrieval-sized chunks, pass a\n    [`TokenSplitter`][ragdoc.pipeline.TokenSplitter].\n    Chunk size is independent of your LLM's context window \u2014 chunks are sized\n    for retrieval quality, typically 1/50th to 1/10th of the context window.\n    Test different `max_tokens` values for your use case:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(DocumentPipeline):\n    from ragdoc.pipeline import TokenSplitter\n\n    pipeline_with_split = DocumentPipeline(\n        splitter=TokenSplitter(max_tokens=4000),\n    )\n    # chunks = await pipeline_with_split.run(Path(\"annual_report.docx\"))\n    print(\"Pipeline with TokenSplitter(max_tokens=4000) ready\")\n    return (TokenSplitter,)\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ### Adding processors\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(DocumentPipeline, TokenSplitter):\n    from ragdoc.processing import HeadingLevelProcessor, TitleDetectionProcessor\n\n    pipeline_with_processors = DocumentPipeline(\n        processors=[\n            HeadingLevelProcessor(),\n            TitleDetectionProcessor(),\n        ],\n        splitter=TokenSplitter(max_tokens=4000),\n    )\n    print(\"Pipeline with HeadingLevelProcessor + TitleDetectionProcessor ready\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ### Custom parser\n\n    Any callable `(Path) -\u003E Document` satisfies the `Parser` protocol:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(DocumentPipeline, Path):\n    from ragdoc.document import Document\n\n    def my_parser(path: Path) -\u003E Document:\n        # e.g. call an internal API, parse a custom format, \u2026\n        return Document()\n\n    pipeline_custom = DocumentPipeline(parser=my_parser)\n    print(\"Pipeline with custom parser callable ready\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ### Deterministic chunk IDs\n\n    `SimpleChunker` uses `Document.content_hash()` as the default chunk ID. The same file\n    content always produces the same chunk IDs, making vector-store upserts idempotent.\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(DocumentPipeline, TokenSplitter):\n    pipeline_idem = DocumentPipeline(splitter=TokenSplitter())\n    # chunks1 = await pipeline_idem.run(Path(\"report.docx\"))\n    # chunks2 = await pipeline_idem.run(Path(\"report.docx\"))\n    # assert chunks1[0].id == chunks2[0].id  # always True for same content\n    print(\"Chunk IDs are deterministic: same content \u2192 same ID on every run\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ---\n\n    ## Scenario D \u2014 Concurrent processing and streaming\n\n    ### Processing many files\n\n    `run_many` fans out across a list of paths and returns a `PipelineResult` with all chunks\n    aggregated:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(DocumentPipeline, Path, TokenSplitter):\n    pipeline_many = DocumentPipeline(splitter=TokenSplitter())\n    paths: list[Path] = []  # list(Path(\"docs/\").glob(\"**/*.docx\"))\n\n    # result = await pipeline_many.run_many(paths, concurrency=8)\n    # print(f\"Produced {len(result.chunks)} chunks from {len(paths)} files\")\n    print(\"run_many fans out across multiple files with bounded concurrency\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ### Error handling\n\n    By default errors propagate immediately (`on_error=\"raise\"`).\n    Use `on_error=\"skip\"` to collect failures and continue:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(DocumentPipeline, TokenSplitter):\n    pipeline_skip = DocumentPipeline(\n        splitter=TokenSplitter(),\n        on_error=\"skip\",\n    )\n    # result = await pipeline_skip.run_many(paths)\n    # for path, exc in result.errors:\n    #     print(f\"  FAILED {path}: {exc}\")\n    print(\"on_error='skip' collects failures into result.errors without stopping processing\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ### Streaming (memory-efficient)\n\n    `stream` yields a batch of chunks per file as it completes, so you can hand off each\n    batch to a vector store before the next file starts:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _():\n    # async for batch in pipeline_skip.stream(paths, concurrency=4):\n    #     await vector_store.upsert(batch)\n    print(\"stream() yields one batch per file \u2014 memory-efficient for large corpora\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## TokenSplitter reference\n\n    ```python\n    TokenSplitter(\n        max_tokens=7000,    # token budget per split\n        overlap_tokens=200, # overlap between consecutive splits\n        renderer=None,      # Renderer for token measurement; defaults to MARKDOWN + render_for_prompt\n        tokenizer=None,     # tiktoken cl100k_base by default\n    )\n    ```\n\n    ---\n\n    ## Scenario B \u2014 Incremental update\n\n    `VectorStorePipeline` wraps `DocumentPipeline` and adds hash-based change detection\n    so that a corpus of documents can be kept in sync with a vector store incrementally \u2014\n    only changed or new files are re-processed.\n    \"\"\")\n    return\n\n\n@app.cell\ndef _():\n    from ragdoc.pipeline import VectorStorePipeline\n\n    # vs_pipeline = VectorStorePipeline(\n    #     pipeline=DocumentPipeline(splitter=TokenSplitter()),\n    #     vector_store=my_vector_store,\n    # )\n    print(\"VectorStorePipeline adds hash-based change detection on top of DocumentPipeline\")\n    print(\"The vector store is the single source of truth \u2014 no local state file needed\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ### Two-hash design\n\n    | Hash | What it covers | Purpose |\n    |------|---------------|---------|\n    | `source_hash` | Raw file bytes | Cheap change detection before parsing |\n    | `chunk.id` | Rendered document content | Stable, idempotent chunk IDs for the vector store |\n\n    These are orthogonal. `source_hash` is never exposed as a chunk ID.\n\n    ### What the pipeline handles automatically\n\n    | Case | What happens |\n    |------|-------------|\n    | **New file** | Parsed, chunked, upserted; state saved. |\n    | **Modified file** (byte hash changed) | Old chunks deleted, file re-processed, new chunks upserted. |\n    | **Removed file** (path no longer in source list) | Old chunks deleted; entry removed from state. |\n\n    ## See Also\n\n    - [API Reference: Pipeline][ragdoc.pipeline]\n    - [Qdrant Pipeline](qdrant_pipeline.py) \u2014 full production setup: MinerU + processors + LLMChunker + QdrantVectorStore\n    - [Pipeline Walkthrough](pipeline_walkthrough.py) \u2014 stage-by-stage walkthrough with intermediate output\n    - [Chunking notebook](chunking.py) \u2014 `SimpleChunker`, `LLMChunker`\n    - [Splitting notebook](splitting.py) \u2014 lower-level splitting API\n    \"\"\")\n    return\n\n\nif __name__ == \"__main__\":\n    app.run()\n",
+        }),
+        writable: false,
+        configurable: false,
+    });
+</script>
+<marimo-code hidden="">import%20marimo%0A%0A__generated_with%20%3D%20%220.23.10%22%0Aapp%20%3D%20marimo.App()%0A%0A%0A%40app.cell%0Adef%20_()%3A%0A%20%20%20%20import%20marimo%20as%20mo%0A%0A%20%20%20%20return%20(mo%2C)%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%20Pipeline%0A%0A%20%20%20%20The%20%60ragdoc.pipeline%60%20module%20provides%20a%20high-level%20facade%20that%20wires%20together%20all%20four%0A%20%20%20%20stages%20%E2%80%94%20**parse%20%E2%86%92%20process%20%E2%86%92%20split%20%E2%86%92%20chunk**%20%E2%80%94%20into%20a%20single%20call.%0A%0A%20%20%20%20Use%20%60DocumentPipeline%60%20when%20you%20want%20to%20go%20from%20a%20file%20on%20disk%20to%20%60Chunk%60%20objects%20in%20one%0A%20%20%20%20step.%20Use%20the%20individual%20stage%20APIs%20when%20you%20need%20fine-grained%20control%20%E2%80%94%20custom%20parsers%2C%0A%20%20%20%20partial%20re-processing%2C%20or%20stage-level%20debugging.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Scenario%20A%20%E2%80%94%20Linear%20pipeline%0A%0A%20%20%20%20%23%23%23%20Minimal%20example%0A%0A%20%20%20%20%60DocumentPipeline%60%20defaults%3A%0A%0A%20%20%20%20%7C%20Stage%20%7C%20Default%20%7C%0A%20%20%20%20%7C-------%7C---------%7C%0A%20%20%20%20%7C%20Parser%20%7C%20%60AutoParser%60%20%E2%80%94%20picks%20parser%20from%20file%20extension%20%7C%0A%20%20%20%20%7C%20Processors%20%7C%20none%20(identity%20pass-through)%20%7C%0A%20%20%20%20%7C%20Splitter%20%7C%20none%20%E2%80%94%20whole%20document%20%E2%86%92%20one%20chunk%20%7C%0A%20%20%20%20%7C%20Chunker%20%7C%20%60SimpleChunker%60%20%E2%80%94%20one%20chunk%20per%20document%20%7C%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_()%3A%0A%20%20%20%20from%20pathlib%20import%20Path%0A%20%20%20%20from%20ragdoc.pipeline%20import%20DocumentPipeline%0A%0A%20%20%20%20pipeline%20%3D%20DocumentPipeline()%0A%20%20%20%20%23%20chunks%20%3D%20await%20pipeline.run(Path(%22report.docx%22))%0A%20%20%20%20%23%20print(f%22Produced%20%7Blen(chunks)%7D%20chunks%22)%0A%20%20%20%20print(%22DocumentPipeline()%20ready%20%E2%80%94%20call%20await%20pipeline.run(Path('report.docx'))%20to%20run%22)%0A%20%20%20%20return%20DocumentPipeline%2C%20Path%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%23%20Adding%20a%20splitter%0A%0A%20%20%20%20To%20split%20documents%20into%20retrieval-sized%20chunks%2C%20pass%20a%0A%20%20%20%20%5B%60TokenSplitter%60%5D%5Bragdoc.pipeline.TokenSplitter%5D.%0A%20%20%20%20Chunk%20size%20is%20independent%20of%20your%20LLM's%20context%20window%20%E2%80%94%20chunks%20are%20sized%0A%20%20%20%20for%20retrieval%20quality%2C%20typically%201%2F50th%20to%201%2F10th%20of%20the%20context%20window.%0A%20%20%20%20Test%20different%20%60max_tokens%60%20values%20for%20your%20use%20case%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(DocumentPipeline)%3A%0A%20%20%20%20from%20ragdoc.pipeline%20import%20TokenSplitter%0A%0A%20%20%20%20pipeline_with_split%20%3D%20DocumentPipeline(%0A%20%20%20%20%20%20%20%20splitter%3DTokenSplitter(max_tokens%3D4000)%2C%0A%20%20%20%20)%0A%20%20%20%20%23%20chunks%20%3D%20await%20pipeline_with_split.run(Path(%22annual_report.docx%22))%0A%20%20%20%20print(%22Pipeline%20with%20TokenSplitter(max_tokens%3D4000)%20ready%22)%0A%20%20%20%20return%20(TokenSplitter%2C)%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%23%20Adding%20processors%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(DocumentPipeline%2C%20TokenSplitter)%3A%0A%20%20%20%20from%20ragdoc.processing%20import%20HeadingLevelProcessor%2C%20TitleDetectionProcessor%0A%0A%20%20%20%20pipeline_with_processors%20%3D%20DocumentPipeline(%0A%20%20%20%20%20%20%20%20processors%3D%5B%0A%20%20%20%20%20%20%20%20%20%20%20%20HeadingLevelProcessor()%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20TitleDetectionProcessor()%2C%0A%20%20%20%20%20%20%20%20%5D%2C%0A%20%20%20%20%20%20%20%20splitter%3DTokenSplitter(max_tokens%3D4000)%2C%0A%20%20%20%20)%0A%20%20%20%20print(%22Pipeline%20with%20HeadingLevelProcessor%20%2B%20TitleDetectionProcessor%20ready%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%23%20Custom%20parser%0A%0A%20%20%20%20Any%20callable%20%60(Path)%20-%3E%20Document%60%20satisfies%20the%20%60Parser%60%20protocol%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(DocumentPipeline%2C%20Path)%3A%0A%20%20%20%20from%20ragdoc.document%20import%20Document%0A%0A%20%20%20%20def%20my_parser(path%3A%20Path)%20-%3E%20Document%3A%0A%20%20%20%20%20%20%20%20%23%20e.g.%20call%20an%20internal%20API%2C%20parse%20a%20custom%20format%2C%20%E2%80%A6%0A%20%20%20%20%20%20%20%20return%20Document()%0A%0A%20%20%20%20pipeline_custom%20%3D%20DocumentPipeline(parser%3Dmy_parser)%0A%20%20%20%20print(%22Pipeline%20with%20custom%20parser%20callable%20ready%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%23%20Deterministic%20chunk%20IDs%0A%0A%20%20%20%20%60SimpleChunker%60%20uses%20%60Document.content_hash()%60%20as%20the%20default%20chunk%20ID.%20The%20same%20file%0A%20%20%20%20content%20always%20produces%20the%20same%20chunk%20IDs%2C%20making%20vector-store%20upserts%20idempotent.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(DocumentPipeline%2C%20TokenSplitter)%3A%0A%20%20%20%20pipeline_idem%20%3D%20DocumentPipeline(splitter%3DTokenSplitter())%0A%20%20%20%20%23%20chunks1%20%3D%20await%20pipeline_idem.run(Path(%22report.docx%22))%0A%20%20%20%20%23%20chunks2%20%3D%20await%20pipeline_idem.run(Path(%22report.docx%22))%0A%20%20%20%20%23%20assert%20chunks1%5B0%5D.id%20%3D%3D%20chunks2%5B0%5D.id%20%20%23%20always%20True%20for%20same%20content%0A%20%20%20%20print(%22Chunk%20IDs%20are%20deterministic%3A%20same%20content%20%E2%86%92%20same%20ID%20on%20every%20run%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20---%0A%0A%20%20%20%20%23%23%20Scenario%20D%20%E2%80%94%20Concurrent%20processing%20and%20streaming%0A%0A%20%20%20%20%23%23%23%20Processing%20many%20files%0A%0A%20%20%20%20%60run_many%60%20fans%20out%20across%20a%20list%20of%20paths%20and%20returns%20a%20%60PipelineResult%60%20with%20all%20chunks%0A%20%20%20%20aggregated%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(DocumentPipeline%2C%20Path%2C%20TokenSplitter)%3A%0A%20%20%20%20pipeline_many%20%3D%20DocumentPipeline(splitter%3DTokenSplitter())%0A%20%20%20%20paths%3A%20list%5BPath%5D%20%3D%20%5B%5D%20%20%23%20list(Path(%22docs%2F%22).glob(%22**%2F*.docx%22))%0A%0A%20%20%20%20%23%20result%20%3D%20await%20pipeline_many.run_many(paths%2C%20concurrency%3D8)%0A%20%20%20%20%23%20print(f%22Produced%20%7Blen(result.chunks)%7D%20chunks%20from%20%7Blen(paths)%7D%20files%22)%0A%20%20%20%20print(%22run_many%20fans%20out%20across%20multiple%20files%20with%20bounded%20concurrency%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%23%20Error%20handling%0A%0A%20%20%20%20By%20default%20errors%20propagate%20immediately%20(%60on_error%3D%22raise%22%60).%0A%20%20%20%20Use%20%60on_error%3D%22skip%22%60%20to%20collect%20failures%20and%20continue%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(DocumentPipeline%2C%20TokenSplitter)%3A%0A%20%20%20%20pipeline_skip%20%3D%20DocumentPipeline(%0A%20%20%20%20%20%20%20%20splitter%3DTokenSplitter()%2C%0A%20%20%20%20%20%20%20%20on_error%3D%22skip%22%2C%0A%20%20%20%20)%0A%20%20%20%20%23%20result%20%3D%20await%20pipeline_skip.run_many(paths)%0A%20%20%20%20%23%20for%20path%2C%20exc%20in%20result.errors%3A%0A%20%20%20%20%23%20%20%20%20%20print(f%22%20%20FAILED%20%7Bpath%7D%3A%20%7Bexc%7D%22)%0A%20%20%20%20print(%22on_error%3D'skip'%20collects%20failures%20into%20result.errors%20without%20stopping%20processing%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%23%20Streaming%20(memory-efficient)%0A%0A%20%20%20%20%60stream%60%20yields%20a%20batch%20of%20chunks%20per%20file%20as%20it%20completes%2C%20so%20you%20can%20hand%20off%20each%0A%20%20%20%20batch%20to%20a%20vector%20store%20before%20the%20next%20file%20starts%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_()%3A%0A%20%20%20%20%23%20async%20for%20batch%20in%20pipeline_skip.stream(paths%2C%20concurrency%3D4)%3A%0A%20%20%20%20%23%20%20%20%20%20await%20vector_store.upsert(batch)%0A%20%20%20%20print(%22stream()%20yields%20one%20batch%20per%20file%20%E2%80%94%20memory-efficient%20for%20large%20corpora%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20TokenSplitter%20reference%0A%0A%20%20%20%20%60%60%60python%0A%20%20%20%20TokenSplitter(%0A%20%20%20%20%20%20%20%20max_tokens%3D7000%2C%20%20%20%20%23%20token%20budget%20per%20split%0A%20%20%20%20%20%20%20%20overlap_tokens%3D200%2C%20%23%20overlap%20between%20consecutive%20splits%0A%20%20%20%20%20%20%20%20renderer%3DNone%2C%20%20%20%20%20%20%23%20Renderer%20for%20token%20measurement%3B%20defaults%20to%20MARKDOWN%20%2B%20render_for_prompt%0A%20%20%20%20%20%20%20%20tokenizer%3DNone%2C%20%20%20%20%20%23%20tiktoken%20cl100k_base%20by%20default%0A%20%20%20%20)%0A%20%20%20%20%60%60%60%0A%0A%20%20%20%20---%0A%0A%20%20%20%20%23%23%20Scenario%20B%20%E2%80%94%20Incremental%20update%0A%0A%20%20%20%20%60VectorStorePipeline%60%20wraps%20%60DocumentPipeline%60%20and%20adds%20hash-based%20change%20detection%0A%20%20%20%20so%20that%20a%20corpus%20of%20documents%20can%20be%20kept%20in%20sync%20with%20a%20vector%20store%20incrementally%20%E2%80%94%0A%20%20%20%20only%20changed%20or%20new%20files%20are%20re-processed.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_()%3A%0A%20%20%20%20from%20ragdoc.pipeline%20import%20VectorStorePipeline%0A%0A%20%20%20%20%23%20vs_pipeline%20%3D%20VectorStorePipeline(%0A%20%20%20%20%23%20%20%20%20%20pipeline%3DDocumentPipeline(splitter%3DTokenSplitter())%2C%0A%20%20%20%20%23%20%20%20%20%20vector_store%3Dmy_vector_store%2C%0A%20%20%20%20%23%20)%0A%20%20%20%20print(%22VectorStorePipeline%20adds%20hash-based%20change%20detection%20on%20top%20of%20DocumentPipeline%22)%0A%20%20%20%20print(%22The%20vector%20store%20is%20the%20single%20source%20of%20truth%20%E2%80%94%20no%20local%20state%20file%20needed%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%23%20Two-hash%20design%0A%0A%20%20%20%20%7C%20Hash%20%7C%20What%20it%20covers%20%7C%20Purpose%20%7C%0A%20%20%20%20%7C------%7C---------------%7C---------%7C%0A%20%20%20%20%7C%20%60source_hash%60%20%7C%20Raw%20file%20bytes%20%7C%20Cheap%20change%20detection%20before%20parsing%20%7C%0A%20%20%20%20%7C%20%60chunk.id%60%20%7C%20Rendered%20document%20content%20%7C%20Stable%2C%20idempotent%20chunk%20IDs%20for%20the%20vector%20store%20%7C%0A%0A%20%20%20%20These%20are%20orthogonal.%20%60source_hash%60%20is%20never%20exposed%20as%20a%20chunk%20ID.%0A%0A%20%20%20%20%23%23%23%20What%20the%20pipeline%20handles%20automatically%0A%0A%20%20%20%20%7C%20Case%20%7C%20What%20happens%20%7C%0A%20%20%20%20%7C------%7C-------------%7C%0A%20%20%20%20%7C%20**New%20file**%20%7C%20Parsed%2C%20chunked%2C%20upserted%3B%20state%20saved.%20%7C%0A%20%20%20%20%7C%20**Modified%20file**%20(byte%20hash%20changed)%20%7C%20Old%20chunks%20deleted%2C%20file%20re-processed%2C%20new%20chunks%20upserted.%20%7C%0A%20%20%20%20%7C%20**Removed%20file**%20(path%20no%20longer%20in%20source%20list)%20%7C%20Old%20chunks%20deleted%3B%20entry%20removed%20from%20state.%20%7C%0A%0A%20%20%20%20%23%23%20See%20Also%0A%0A%20%20%20%20-%20%5BAPI%20Reference%3A%20Pipeline%5D%5Bragdoc.pipeline%5D%0A%20%20%20%20-%20%5BQdrant%20Pipeline%5D(qdrant_pipeline.py)%20%E2%80%94%20full%20production%20setup%3A%20MinerU%20%2B%20processors%20%2B%20LLMChunker%20%2B%20QdrantVectorStore%0A%20%20%20%20-%20%5BPipeline%20Walkthrough%5D(pipeline_walkthrough.py)%20%E2%80%94%20stage-by-stage%20walkthrough%20with%20intermediate%20output%0A%20%20%20%20-%20%5BChunking%20notebook%5D(chunking.py)%20%E2%80%94%20%60SimpleChunker%60%2C%20%60LLMChunker%60%0A%20%20%20%20-%20%5BSplitting%20notebook%5D(splitting.py)%20%E2%80%94%20lower-level%20splitting%20API%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20app.run()%0A</marimo-code></head>
+  <body>
+    <div id="root"></div>
+    <!-- This is a portal for the data editor to render in -->
+    <div id="portal" data-testid="glide-portal" style="position: fixed; left: 0; top: 0; z-index: 9999"></div>
+    <script data-marimo="true">
+      Object.defineProperty(window, "__MARIMO_MOUNT_CONFIG__", {
+        value: Object.freeze({
+            "filename": "notebook.py",
+            "cwd": "",
+            "lspWorkspace": null,
+            "mode": "read",
+            "version": "0.23.10",
+            "serverToken": "unused",
+            "config": {"ai": {"custom_providers": {}, "enabled": true, "models": {"custom_models": [], "displayed_models": []}}, "completion": {"activate_on_typing": true, "auto_close_pairs": true, "copilot": false, "signature_hint_on_typing": false}, "diagnostics": {"sql_linter": true}, "display": {"cell_output": "below", "code_editor_font_size": 14, "dataframes": "rich", "default_table_max_columns": 50, "default_table_page_size": 10, "default_width": "medium", "reference_highlighting": true, "theme": "light"}, "formatting": {"line_length": 79}, "keymap": {"overrides": {}, "preset": "default"}, "language_servers": {"pylsp": {"enable_flake8": false, "enable_mypy": true, "enable_pydocstyle": false, "enable_pyflakes": false, "enable_pylint": false, "enable_ruff": true, "enabled": false}}, "mcp": {"mcpServers": {}, "presets": []}, "package_management": {"manager": "uv"}, "runtime": {"auto_instantiate": false, "auto_reload": "off", "default_csv_encoding": "utf-8", "default_sql_output": "auto", "on_cell_change": "autorun", "output_max_bytes": 8000000, "reactive_tests": true, "show_tracebacks": false, "std_stream_max_bytes": 1000000, "watcher_on_save": "lazy"}, "save": {"autosave": "off", "autosave_delay": 1000, "format_on_save": false}, "server": {"browser": "default", "follow_symlink": false}, "snippets": {"custom_paths": [], "include_default_snippets": true}},
+            "configOverrides": {},
+            "appConfig": {"sql_output": "auto", "width": "compact"},
+            "view": {"showAppCode": false},
+            "notebook": null,
+            "session": null,
+            "runtimeConfig": null,
+        }),
+        writable: false,
+        configurable: false,
+      });
+    </script>
+  </body>
+</html>
