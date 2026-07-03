@@ -45,7 +45,7 @@
   Uses `MARKDOWN + render_for_prompt` by default.  Subclass and override to
   incorporate provenance (e.g. file path) or switch renderer.
 
-### Changed
+### Breaking
 
 - **`SimpleChunker` default `id_fn`** _(breaking)_ — changed from `uuid.uuid4()` to
   `document.content_hash()`.  The same document content now always produces the same
