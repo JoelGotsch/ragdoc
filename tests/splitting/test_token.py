@@ -65,7 +65,8 @@ def tok() -> CharTokenizer:
 
 
 def h(level: int, text: str = "") -> Heading:
-    return Heading(innerhtml=text or f"H{level}", level=level)
+    inner = text or f"H{level}"
+    return Heading(html=f"<h{level}>{inner}</h{level}>")
 
 
 def p(text: str) -> Paragraph:
@@ -374,6 +375,48 @@ def test_split_by_elements_no_heading_only_chunks():
         assert len(non_headings) >= 1
 
 
+def test_split_by_elements_no_trailing_heading_only_split_after_oversized():
+    """Regression: a document ENDING in an oversized delegation must not flush the
+    re-seeded heading context as a content-free trailing split."""
+    h1 = h(1, "Title")
+    big_para = p("X" * 300)
+    doc = Document(elements=[h1, big_para])
+    r = rdr()
+    max_t = (measured(big_para, r) + measured(h1, r)) // 2
+    result = split_by_elements(doc, r, tok(), max_tokens=max_t, overlap_tokens=_OVERLAP)
+    assert len(result) >= 2
+    for chunk in result:
+        assert any(not isinstance(e, Heading) for e in chunk.elements), (
+            "content-free heading-only split produced after oversized delegation"
+        )
+
+
+def test_split_by_elements_trailing_heading_after_oversized_is_kept():
+    """A NEW heading appearing after the oversized delegation exists nowhere else —
+    it must survive into the final split (conservation), even though that split is
+    heading-only."""
+    h1 = h(1, "Title")
+    big_para = p("X" * 300)
+    h2 = h(2, "Closing heading")
+    doc = Document(elements=[h1, big_para, h2])
+    r = rdr()
+    max_t = (measured(big_para, r) + measured(h1, r)) // 2
+    result = split_by_elements(doc, r, tok(), max_tokens=max_t, overlap_tokens=_OVERLAP)
+    all_ids = {e.id for chunk in result for e in chunk.elements}
+    assert h2.id in all_ids, "trailing heading lost"
+
+
+def test_split_by_elements_heading_only_document_still_splits():
+    """A document consisting solely of headings (no oversized delegation) keeps flushing."""
+    headings = [h(2, f"Heading number {i} with several words of text") for i in range(30)]
+    doc = Document(elements=headings)
+    r = rdr()
+    total = measured(doc, r)
+    result = split_by_elements(doc, r, tok(), max_tokens=total // 2, overlap_tokens=_OVERLAP)
+    all_ids = {e.id for chunk in result for e in chunk.elements}
+    assert {el.id for el in headings} <= all_ids
+
+
 def test_split_by_elements_oversized_single_element_further_split():
     h1 = h(1, "Title")
     big_para = p("X" * 300)
@@ -519,10 +562,15 @@ def test_split_by_elements_split_shifts_earlier_when_ref_inflates_group_size():
 # ---------------------------------------------------------------------------
 
 
-def test_split_document_fits_returns_original():
+def test_split_document_fits_returns_copy_with_sequence():
     doc = Document(elements=[p("short")])
     result = split_document(doc, rdr(), tok(), max_tokens=10_000, overlap_tokens=_OVERLAP)
-    assert result == [doc]
+    assert len(result) == 1
+    assert result[0].elements == doc.elements  # elements shared by reference
+    assert result[0].metadata["split_sequence"] == 1
+    assert result[0].metadata["split_total"] == 1
+    # the input document is never mutated
+    assert "split_sequence" not in doc.metadata
 
 
 def test_split_document_uses_hierarchical_split_when_possible():
@@ -712,3 +760,84 @@ def test_split_html_tags_splits_table_rows():
     )
     assert result is not None
     assert len(result) >= 2
+
+
+# ---------------------------------------------------------------------------
+# _token_slice seam correctness (fable-review Phase 0, bug 8)
+# ---------------------------------------------------------------------------
+
+
+class _SeamTokenizer:
+    """Whitespace tokenizer that merges the pair (CTXEND, FIRSTWORD) into ONE token,
+    modelling a BPE merge across the overhead/content render seam. Pre-fix, slicing the
+    combined token stream by the separately-rendered overhead's token count dropped
+    FIRSTWORD; the fix tokenizes content-only text, so no seam exists."""
+
+    def _words(self, text: str) -> list[str]:
+        words = text.split()
+        merged: list[str] = []
+        i = 0
+        while i < len(words):
+            if i + 1 < len(words) and words[i] == "CTXEND" and words[i + 1] == "FIRSTWORD":
+                merged.append("CTXEND FIRSTWORD")
+                i += 2
+            else:
+                merged.append(words[i])
+                i += 1
+        return merged
+
+    def __call__(self, text: str) -> list[str]:  # token "ids" are the words themselves
+        return self._words(text)
+
+    def decode(self, tokens: list[str]) -> str:
+        return " ".join(tokens)
+
+    def truncate(self, text: str, max_tokens: int) -> str:
+        return self.decode(self._words(text)[:max_tokens])
+
+    def count(self, text: str) -> int:
+        return len(self._words(text))
+
+
+def _token_slice_setup(content_words: list[str], tokenizer):
+    from ragdoc.document import ExternalRef
+    from ragdoc.splitting.token import _token_slice
+
+    heading = Heading(html="<h1>CTXEND</h1>")
+    content = Paragraph(html=f"<p>{' '.join(content_words)}</p>")
+    chunk_doc = Document(elements=[heading, content])
+    renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
+    overhead_tokens = tokenizer.count(renderer.render(Document(elements=[heading])))
+    parent_ref = ExternalRef(target_id=chunk_doc.id, rel_type="external-parent")
+    return _token_slice(
+        chunk_doc=chunk_doc,
+        renderer=renderer,
+        tokenizer=tokenizer,
+        max_tokens=200 + overhead_tokens,
+        overlap_tokens=0,
+        overhead_tokens=overhead_tokens,
+        heading_ctx=[heading],
+        doc_title=None,
+        doc_metadata={},
+        parent_ref=parent_ref,
+        doc_source_path="",
+    )
+
+
+def test_token_slice_does_not_drop_boundary_text():
+    """The first content word must survive into the first output chunk."""
+    words = ["FIRSTWORD"] + [f"w{i}" for i in range(50)]
+    docs = _token_slice_setup(words, _SeamTokenizer())
+    assert docs, "expected at least one output chunk"
+    first_text = docs[0].elements[-1].text
+    assert "FIRSTWORD" in first_text
+
+
+def test_token_slice_conserves_all_content_words():
+    """With overlap_tokens=0, every content word appears exactly once across output chunks."""
+    words = [f"unique{i}" for i in range(450)]
+    docs = _token_slice_setup(words, _SeamTokenizer())
+    assert len(docs) >= 2, "content sized to force multiple chunks"
+    combined = " ".join(d.elements[-1].text for d in docs).split()
+    for w in words:
+        assert combined.count(w) == 1, f"{w} appeared {combined.count(w)} times"

@@ -16,13 +16,15 @@ import base64
 import io
 
 import pytest
+
+pytest.importorskip("PIL", reason="llm extra (pillow) not installed")
 from PIL import Image as PILImage
 
 from ragdoc.document import Document, Footnote, Image, Paragraph
-from ragdoc.processing._concurrency import _fan_out, _resolve_semaphore
 from ragdoc.processing.footnote import FootnoteProcessor
 from ragdoc.processing.summary_base import ImageSummary
 from ragdoc.processing.summary_image import ImageSummaryProcessor
+from ragdoc.utils.concurrency import fan_out, resolve_semaphore
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -46,7 +48,7 @@ def _make_doc_with_footnotes(n: int) -> Document:
     footnotes: list[Footnote] = []
     for i in range(1, n + 1):
         # Page must match footnote.page for same_page_only=True to find them.
-        elements.append(Paragraph(html_content=f"<p>Text reference{i}.</p>", page=1))
+        elements.append(Paragraph(html=f"<p>Text reference{i}.</p>", page=1))
         footnotes.append(Footnote(number=i, innerhtml=f"<p>Footnote {i}</p>", page=1))
     elements.extend(footnotes)
     return Document(elements=elements)
@@ -58,13 +60,13 @@ def _make_doc_with_footnotes(n: int) -> Document:
 
 
 def test_resolve_semaphore_int_creates_new():
-    sem = _resolve_semaphore(3)
+    sem = resolve_semaphore(3)
     assert isinstance(sem, asyncio.Semaphore)
 
 
 def test_resolve_semaphore_passthrough():
     original = asyncio.Semaphore(2)
-    assert _resolve_semaphore(original) is original
+    assert resolve_semaphore(original) is original
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +81,7 @@ async def test_fan_out_sequential_runs_all():
     async def _task(n: int) -> None:
         results.append(n)
 
-    await _fan_out([_task(i) for i in range(5)], concurrency=1)
+    await fan_out([_task(i) for i in range(5)], concurrency=1)
     assert results == list(range(5))
 
 
@@ -90,7 +92,7 @@ async def test_fan_out_sequential_preserves_order():
     async def _task(n: int) -> None:
         order.append(n)
 
-    await _fan_out([_task(i) for i in range(4)], concurrency=1)
+    await fan_out([_task(i) for i in range(4)], concurrency=1)
     assert order == [0, 1, 2, 3]
 
 
@@ -101,7 +103,7 @@ async def test_fan_out_parallel_runs_all():
     async def _task(n: int) -> None:
         results.append(n)
 
-    await _fan_out([_task(i) for i in range(5)], concurrency=2)
+    await fan_out([_task(i) for i in range(5)], concurrency=2)
     assert sorted(results) == list(range(5))
 
 
@@ -117,7 +119,7 @@ async def test_fan_out_parallel_respects_cap():
         await asyncio.sleep(0)
         concurrent -= 1
 
-    await _fan_out([_task() for _ in range(6)], concurrency=2)
+    await fan_out([_task() for _ in range(6)], concurrency=2)
     assert max_concurrent <= 2
 
 
@@ -136,8 +138,8 @@ async def test_fan_out_shared_semaphore_respected():
         concurrent -= 1
 
     await asyncio.gather(
-        _fan_out([_task() for _ in range(3)], concurrency=shared),
-        _fan_out([_task() for _ in range(3)], concurrency=shared),
+        fan_out([_task() for _ in range(3)], concurrency=shared),
+        fan_out([_task() for _ in range(3)], concurrency=shared),
     )
     assert max_concurrent <= 1
 

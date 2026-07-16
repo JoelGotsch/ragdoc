@@ -15,7 +15,7 @@ document into sections that are:
 - Semantically coherent (bounded by headings)
 - Still structured `Document` objects (not plain text)
 
-Each resulting document carries [`ExternalRef`](../api/document.md#ExternalRef) entries
+Each resulting document carries [`ExternalRef`](../api/document.md#externalref) entries
 that record the parent-child relationship back to the source document.
 
 ## Split functions
@@ -74,10 +74,11 @@ splitting. For example, enrich each section independently with any `DocumentProc
 ```python
 from ragdoc.splitting import split_by_headings
 from ragdoc.processing import ImageSummaryProcessor
+from ragdoc.processing.summary_image import openai_image_summarizer
 
 sections = split_by_headings(document)
 
-processor = ImageSummaryProcessor(client=openai_client)
+processor = ImageSummaryProcessor(summarize=openai_image_summarizer(openai_client))
 sections = [await processor.process(section) for section in sections]
 ```
 
@@ -96,7 +97,7 @@ splits = split_document(doc, renderer=renderer, max_tokens=5000)
 ordered = sorted(splits, key=lambda d: d.metadata["split_sequence"])
 ```
 
-Both keys propagate automatically to [`Chunk.metadata`](../api/chunking.md#Chunk)
+Both keys propagate automatically to [`Chunk.metadata`](../api/chunking.md#chunk)
 via the chunker's `metadata_fn`, so no extra work is needed after chunking.
 
 `split_total` makes each chunk self-describing: a retrieval client can determine

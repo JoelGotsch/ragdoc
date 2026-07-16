@@ -25,7 +25,9 @@ def _(mo):
 def _():
     from ragdoc.parsing.mineru import MinerUParser
 
-    return
+    parser = MinerUParser()
+    print(f"MinerUParser ready — parses MinerU _middle.json files, sets document.parser={'mineru'!r}")
+    return (MinerUParser, parser)
 
 
 if __name__ == "__main__":

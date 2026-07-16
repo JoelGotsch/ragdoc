@@ -177,3 +177,80 @@ def test_builtin_parsers_registered():
     assert "html" in names
     assert "pandoc" in names
     assert "xlsx" in names
+
+
+# ---------------------------------------------------------------------------
+# is_available() resolution filtering (Phase 8, D8)
+# ---------------------------------------------------------------------------
+
+
+def _make_unavailable_parser(name: str, patterns: list[str], priority: int = 0, reason: str = "") -> Parser:
+    _name, _patterns, _priority, _reason = name, patterns, priority, reason
+
+    class _P(Parser):
+        name: str = _name
+        patterns: list[str] = _patterns
+        priority: int = _priority
+
+        def is_available(self) -> bool:
+            return False
+
+        def unavailable_reason(self) -> str:
+            return _reason
+
+        async def __call__(self, path: Path) -> Document:
+            return Document()
+
+    return _P()
+
+
+def test_resolve_skips_unavailable_parser_in_favor_of_lower_priority():
+    """An unavailable high-priority parser must not shadow an available lower-priority one."""
+    unavailable = _make_unavailable_parser("fancy", [".pdf"], priority=40)
+    available = _make_parser("basic", [".pdf"], priority=10)
+    register_parser(unavailable)
+    register_parser(available)
+    assert _resolve_parser(Path("x.pdf")) is available
+
+
+def test_resolve_all_unavailable_raises_actionable_error():
+    """When every matching parser is unavailable the error names the reasons and the pdf extras."""
+    register_parser(
+        _make_unavailable_parser(
+            "azure_di",
+            [".pdf"],
+            priority=40,
+            reason="azure_di: install 'ragdoc[azure-di]' and configure azure_key/azure_endpoint "
+            "via ragdoc.configure(RagdocConfig(...))",
+        )
+    )
+    with pytest.raises(ValueError, match=r"No usable parser for 'x\.pdf'") as excinfo:
+        _resolve_parser(Path("x.pdf"))
+    message = str(excinfo.value)
+    assert "ragdoc[pdf]" in message
+    assert "azure_key" in message
+
+
+def test_real_pdf_resolution_without_creds_is_actionable_at_resolve_time():
+    """With the builtin registrations, no azure creds, and pdf_basic unavailable, resolving a
+    .pdf raises the actionable ValueError at resolve time (before any credential/network use)."""
+    from ragdoc.parsing import _register_builtin_parsers
+    from ragdoc.parsing.registry import _registry
+
+    _register_builtin_parsers()
+    # Force-unavailable every .pdf parser (the test env has pymupdf installed).
+    for reg in list(_registry):
+        if reg.pattern == ".pdf":
+            unregister_parser(reg.pattern, reg.name)
+            register_parser(
+                _make_unavailable_parser(reg.name, [".pdf"], priority=reg.priority, reason=f"{reg.name}: unavailable")
+            )
+    with pytest.raises(ValueError, match=r"ragdoc\[pdf\]"):
+        _resolve_parser(Path("report.pdf"))
+
+
+def test_explicit_parser_name_bypasses_availability():
+    """parser= by name returns the parser even when unavailable (the guard raises at call time)."""
+    unavailable = _make_unavailable_parser("needs_extra", [".foo"])
+    register_parser(unavailable)
+    assert get_parser("needs_extra") is unavailable

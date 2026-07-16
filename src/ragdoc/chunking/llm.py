@@ -27,21 +27,24 @@ Customising the prompt::
 
 from __future__ import annotations
 
+import asyncio
 import logging
-import uuid
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
 from ragdoc.chunking.base import Chunker
 from ragdoc.chunking.chunk import Chunk
+from ragdoc.chunking.provenance import resolve_chunk_provenance
+from ragdoc.llm import ChatClient, call_structured, resolve_openai_client
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
 
     from ragdoc.document import Document
     from ragdoc.rendering import Renderer
+    from ragdoc.utils import Tokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +106,7 @@ def build_topic_summary_messages(
         user_message: Override the default user instruction.
 
     Returns:
-        A ``messages`` list suitable for ``client.beta.chat.completions.parse``.
+        A ``messages`` list suitable for ``client.chat.completions.parse``.
     """
     return [
         {"role": "system", "content": system_prompt},
@@ -131,7 +134,9 @@ class LLMChunker(Chunker):
 
     Args:
         client: Async OpenAI-compatible client.  Falls back to
-            ``get_config().openai_client`` when ``None``.
+            ``get_config().openai_client`` when ``None``; raises
+            :class:`~ragdoc.llm.LLMNotConfiguredError` at construction when
+            neither is available (fail-loud — never a ``None`` crash at chunk time).
         model: The model to use.  ``None`` reads ``get_config().default_llm_model``
             at init time.
         prompt_renderer: Renderer for ``prompt_content``.
@@ -140,75 +145,113 @@ class LLMChunker(Chunker):
             rendered text.  Signature: ``(rendered_text: str) -> list``.
             Defaults to :func:`build_topic_summary_messages`.
         metadata_fn: Called with the document to build ``Chunk.metadata``.
-            Defaults to using the document's metadata.
-        id_fn: Called with the document and topic index to produce each
-            ``Chunk.id``.  Defaults to a new UUID per chunk.  For stable chunk
-            IDs across re-runs, provide a custom ``id_fn`` or use
-            :class:`SimpleChunker`.
+            Defaults to using the document's metadata (copied per chunk — the
+            N chunks never share one metadata dict object).
+        request_timeout: Per-request LLM timeout in seconds (``None`` uses the
+            client default).
+        max_prompt_tokens: When set, the rendered text sent to the **LLM** is
+            truncated to this many tokens (one WARNING per over-budget document).
+            The emitted chunks keep the full rendered text as ``prompt_content`` —
+            truncation applies to the LLM input only.
+        tokenizer: Tokenizer used for the ``max_prompt_tokens`` budget.
+            ``None`` uses :class:`~ragdoc.utils.GPTTokenizer`.
+
+    Raises:
+        LLMNotConfiguredError: No client passed and none configured.
+
+    Note:
+        Chunkers leave ``Chunk.id`` at its uuid4 default —
+        :meth:`~ragdoc.pipeline.ChunkPipeline.run` mints
+        deterministic ids via :func:`~ragdoc.chunking.provenance.mint_chunk_id`.
+        Ids are stable across runs only while the model returns the same number
+        of summaries for the same content.
     """
 
     def __init__(
         self,
-        client: Any | None = None,
+        client: ChatClient | None = None,
         model: str | None = None,
         prompt_renderer: Renderer | None = None,
         create_messages: Callable[[str], list[ChatCompletionMessageParam]] = build_topic_summary_messages,
         metadata_fn: Callable[[Document], dict] | None = None,
-        id_fn: Callable[[Document, int], str] | None = None,
+        request_timeout: float | None = None,
+        max_prompt_tokens: int | None = None,
+        tokenizer: Tokenizer | None = None,
     ) -> None:
         from ragdoc.config import get_config
 
         config = get_config()
-        self._client: Any = client if client is not None else config.openai_client
+        self._client: ChatClient = resolve_openai_client(client)
         self._model = model if model is not None else config.default_llm_model
         self._prompt_renderer = prompt_renderer
         self._create_messages = create_messages
         self._metadata_fn: Callable[[Document], dict] = metadata_fn or (lambda doc: doc.metadata)
-        self._id_fn: Callable[[Document, int], str] = id_fn or (lambda _doc, _i: str(uuid.uuid4()))
+        self._request_timeout = request_timeout
+        self._max_prompt_tokens = max_prompt_tokens
+        self._tokenizer = tokenizer
 
     def _get_prompt_renderer(self) -> Renderer:
-        if self._prompt_renderer is not None:
-            return self._prompt_renderer
-        from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
+        from ragdoc.rendering import resolve_renderer
 
-        return Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
+        return resolve_renderer(self._prompt_renderer)
+
+    def _get_tokenizer(self) -> Tokenizer:
+        from ragdoc.utils import resolve_tokenizer
+
+        return resolve_tokenizer(self._tokenizer)
+
+    def _budget_llm_input(self, rendered: str, doc_label: str) -> str:
+        """Truncate the LLM input to ``max_prompt_tokens`` (chunks keep the full text)."""
+        if self._max_prompt_tokens is None:
+            return rendered
+        tokenizer = self._get_tokenizer()
+        n_tokens = tokenizer.count(rendered)
+        if n_tokens <= self._max_prompt_tokens:
+            return rendered
+        logger.warning(
+            f"LLMChunker: {doc_label} renders to {n_tokens} tokens, over "
+            f"max_prompt_tokens={self._max_prompt_tokens}; truncating the LLM input "
+            "(emitted chunks keep the full prompt_content)."
+        )
+        return tokenizer.truncate(rendered, self._max_prompt_tokens)
 
     async def chunk(self, document: Document) -> list[Chunk]:
         from pathlib import Path
 
         doc_label = f"{Path(document.source_path).name} ({document.id})" if document.source_path else document.id
-        rendered = self._get_prompt_renderer().render(document)
+        # Rendering is CPU-bound and may fork a pandoc subprocess (non-HTML formats).
+        rendered = await asyncio.to_thread(self._get_prompt_renderer().render, document)
         logger.debug(f"LLMChunker: rendered document: {len(rendered)} chars")
-        messages = self._create_messages(rendered)
+        messages = self._create_messages(self._budget_llm_input(rendered, doc_label))
 
-        response = await self._client.beta.chat.completions.parse(
+        # A refusal raises LLMRefusalError — a chunker with no output is an error, not a degrade.
+        topic_summaries = await call_structured(
+            self._client,
             model=self._model,
             messages=messages,
             response_format=DocumentTopicSummaries,
-            temperature=0,
+            temperature=0.0,
+            timeout=self._request_timeout,
+            log_prefix="LLMChunker",
         )
-        topic_summaries: DocumentTopicSummaries = response.choices[0].message.parsed
         logger.info(
             f"LLMChunker: generating topic summaries (model={self._model})"
             f" -> {len(topic_summaries.summaries)} summaries"
         )
 
         metadata = self._metadata_fn(document)
-        content_hash = document.content_hash()
-        source_id = document.source_id or document.source_path or document.id
-        source_hash = document.source_hash or content_hash
+        prov = resolve_chunk_provenance(document)
         chunks = [
             Chunk(
-                id=self._id_fn(document, i),
                 source_path=document.source_path or None,
-                source_id=source_id,
-                source_hash=source_hash,
-                content_hash=content_hash,
+                source_id=prov.source_id,
+                source_hash=prov.source_hash,
+                content_hash=prov.content_hash,
                 prompt_content=rendered,
                 embedding_content=summary,
-                metadata=metadata,  # type: ignore[reportArgumentType]  # metadata_fn returns MetadataDict
+                metadata=dict(metadata),  # type: ignore[reportArgumentType]  # fresh dict per chunk
             )
-            for i, summary in enumerate(topic_summaries.summaries)
+            for summary in topic_summaries.summaries
         ]
         logger.info(f"LLMChunker: {doc_label} -> {len(topic_summaries.summaries)} embedding contents")
         logger.debug(f"LLMChunker: {doc_label} topics: {[s[:80] for s in topic_summaries.summaries]}")

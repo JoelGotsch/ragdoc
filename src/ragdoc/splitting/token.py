@@ -50,7 +50,7 @@ from typing import cast
 from bs4 import BeautifulSoup, Tag
 
 from ragdoc.document import BaseElement, Document, ElementType, ExternalRef, Heading, RawText
-from ragdoc.metadata import BaseMetadata
+from ragdoc.metadata import BaseMetadata, copy_metadata
 from ragdoc.rendering import Renderer
 from ragdoc.splitting.groups import ElementGroup, build_element_groups
 from ragdoc.splitting.hierarchical import split_hierarchical
@@ -58,9 +58,22 @@ from ragdoc.utils import GPTTokenizer, Tokenizer
 
 logger = logging.getLogger(__name__)
 
-_default_tokenizer = GPTTokenizer()
+_default_tokenizer: GPTTokenizer | None = None
 DEFAULT_OVERLAP_TOKENS = 200
 DEFAULT_MAX_TOKENS = 7_000
+
+
+def _get_default_tokenizer() -> GPTTokenizer:
+    """Memoized default tokenizer.
+
+    tiktoken's BPE load (network on a cold cache) must not run at import time —
+    the instance is created on first use and reused afterwards.
+    """
+    global _default_tokenizer
+    if _default_tokenizer is None:
+        _default_tokenizer = GPTTokenizer()
+    return _default_tokenizer
+
 
 # TODO: evaluate if split-helpers could operate on a Document
 # so its possible for them to be used standalone.
@@ -136,7 +149,7 @@ def split_at_sentences(
                 elements=full_elements,
                 title=doc_title,
                 source_path=doc_source_path,
-                metadata=doc_metadata,
+                metadata=copy_metadata(doc_metadata),
                 external_refs=[parent_ref],
             )
         ]
@@ -154,10 +167,10 @@ def split_at_sentences(
 
     def make_chunk(text: str) -> Document:
         return Document(
-            elements=[*heading_ctx, RawText(innerhtml=text)],
+            elements=[*heading_ctx, RawText(html=text)],
             title=doc_title,
             source_path=doc_source_path,
-            metadata=doc_metadata,
+            metadata=copy_metadata(doc_metadata),
             external_refs=[parent_ref],
         )
 
@@ -240,12 +253,12 @@ def split_at_html_tags(
         return f"<{outer_tag}>{inner}</{outer_tag}>"
 
     def _make_doc(child_htmls: list[str], extra_els: list[BaseElement]) -> Document:
-        raw = RawText(innerhtml=_wrap(child_htmls))
+        raw = RawText(html=_wrap(child_htmls))
         return Document(
             elements=cast("list[ElementType]", [*heading_ctx, raw, *extra_els]),
             title=doc_title,
             source_path=doc_source_path,
-            metadata=doc_metadata,
+            metadata=copy_metadata(doc_metadata),
             external_refs=[parent_ref],
         )
 
@@ -272,7 +285,7 @@ def split_at_html_tags(
 
         # Sub-chunk still too big: try tier 2 (sentence split on rendered)
         sub = split_at_sentences(
-            elements=[RawText(innerhtml=_wrap(children_html)), *extra],
+            elements=[RawText(html=_wrap(children_html)), *extra],
             heading_ctx=heading_ctx,
             renderer=renderer,
             tokenizer=tokenizer,
@@ -342,10 +355,13 @@ def _token_slice(
 ) -> list[Document]:
     """Split ``chunk_doc`` by slicing its rendered token sequence with overlap.
 
-    Renders the full document first (inline refs are resolved — no raw
-    ``<ref/>`` tags remain), then slices the content-token window.
+    Renders and tokenizes ONLY the content elements (inline refs are resolved —
+    no raw ``<ref/>`` tags remain). The heading context is deliberately excluded
+    from the tokenized text: slicing a combined render by the token *count* of a
+    separately rendered overhead document is unsound (BPE merges across the seam
+    drop or duplicate boundary text). ``overhead_tokens`` still sizes the budget,
+    because ``make_chunk`` re-attaches ``heading_ctx`` to every output chunk.
     """
-    rendered = renderer.render(chunk_doc)
     content_budget = max_tokens - overhead_tokens
 
     if content_budget - overlap_tokens <= 100:
@@ -354,15 +370,17 @@ def _token_slice(
             "too little room for content. Reduce overlap_tokens or increase max_tokens."
         )
 
-    token_ids = tokenizer(rendered)
-    content_tokens = token_ids[overhead_tokens:]
+    heading_ids = {h.id for h in heading_ctx}
+    content_elements = [el for el in chunk_doc.elements if el.id not in heading_ids]
+    rendered = renderer.render(Document(elements=content_elements))
+    content_tokens = tokenizer(rendered)
 
     def make_chunk(text: str) -> Document:
         return Document(
-            elements=[*heading_ctx, RawText(innerhtml=text)],
+            elements=[*heading_ctx, RawText(html=text)],
             title=doc_title,
             source_path=doc_source_path,
-            metadata=doc_metadata,
+            metadata=copy_metadata(doc_metadata),
             external_refs=[parent_ref],
         )
 
@@ -423,7 +441,7 @@ def split_oversized_element(
         List of Documents in reading order.  Returns ``[document]`` when no
         split is needed.
     """
-    tokenizer = tokenizer or _default_tokenizer
+    tokenizer = tokenizer or _get_default_tokenizer()
 
     if tokenizer.count(renderer.render(document)) <= max_tokens:
         return [document]
@@ -444,7 +462,7 @@ def split_oversized_element(
         Document(
             elements=cast("list[ElementType]", heading_ctx),
             title=document.title,
-            metadata=document.metadata,
+            metadata=copy_metadata(document.metadata),
         ),
         renderer,
         tokenizer,
@@ -495,7 +513,7 @@ def split_oversized_element(
         elements=cast("list[ElementType]", heading_ctx + group.all_elements),
         title=document.title,
         source_path=document.source_path,
-        metadata=document.metadata,
+        metadata=copy_metadata(document.metadata),
     )
     return _token_slice(
         chunk_doc=full_doc,
@@ -549,7 +567,7 @@ def split_by_elements(
         Does not set ``split_sequence`` / ``split_total`` in metadata. Call
         :func:`split_document` for reading-order numbering.
     """
-    tokenizer = tokenizer or _default_tokenizer
+    tokenizer = tokenizer or _get_default_tokenizer()
     doc_label = f"{Path(document.source_path).name} ({document.id})" if document.source_path else document.id
 
     if not document.elements:
@@ -588,6 +606,11 @@ def split_by_elements(
     result: list[Document] = []
     current: list[BaseElement] = []
     current_tokens: int = 0
+    # True while `current` holds only the heading context re-seeded after an oversized-group
+    # delegation. Those headings already lead every delegated sub-split, so flushing them as
+    # a *final* split would emit a content-free heading-only chunk. Any subsequent append
+    # (a new heading or a group's elements) clears the flag — new material must survive.
+    reseeded_ctx_only = False
 
     def flush() -> None:
         nonlocal current, current_tokens
@@ -597,7 +620,7 @@ def split_by_elements(
                     elements=cast("list[ElementType]", list(current)),
                     title=document.title,
                     source_path=document.source_path,
-                    metadata=document.metadata,
+                    metadata=copy_metadata(document.metadata),
                     external_refs=[parent_ref],
                 )
             )
@@ -608,6 +631,7 @@ def split_by_elements(
         if isinstance(item, Heading):
             current.append(item)
             current_tokens += el_tokens.get(item.id, 0)
+            reseeded_ctx_only = False
             if item.level not in ctx_level_order:
                 ctx_level_order.append(item.level)
             heading_ctx[item.level] = item
@@ -627,7 +651,7 @@ def split_by_elements(
                 elements=cast("list[ElementType]", ctx + item.all_elements),
                 title=document.title,
                 source_path=document.source_path,
-                metadata=document.metadata,
+                metadata=copy_metadata(document.metadata),
             )
             sub_splits = split_oversized_element(
                 oversized_doc,
@@ -640,6 +664,7 @@ def split_by_elements(
             result.extend(sub_splits)
             current = list(ctx)
             current_tokens = ctx_tokens
+            reseeded_ctx_only = True
 
         elif has_content and current_tokens + tokens > max_tokens:
             flush()
@@ -647,12 +672,15 @@ def split_by_elements(
             ctx_tokens = get_ctx_tokens()
             current = list(ctx) + item.all_elements
             current_tokens = ctx_tokens + tokens
+            reseeded_ctx_only = False
 
         else:
             current.extend(item.all_elements)
             current_tokens += tokens
+            reseeded_ctx_only = False
 
-    flush()
+    if not reseeded_ctx_only:
+        flush()
     final = result if result else [document]
     logger.debug(f"split_by_elements: {doc_label} produced {len(final)} sub-documents")
     return final
@@ -692,14 +720,15 @@ def split_document(
         Useful for sorting after retrieval:
         ``sorted(splits, key=lambda d: d.metadata["split_sequence"])``.
     """
-    tokenizer = tokenizer or _default_tokenizer
+    tokenizer = tokenizer or _get_default_tokenizer()
     doc_label = f"{Path(document.source_path).name} ({document.id})" if document.source_path else document.id
 
     if tokenizer.count(renderer.render(document)) <= max_tokens:
         logger.debug(f"split_document: {doc_label} fits within {max_tokens} tokens, no split needed")
-        document.metadata["split_sequence"] = 1
-        document.metadata["split_total"] = 1
-        return [document]
+        # Never mutate the input document: return a shallow copy owning a fresh metadata dict.
+        # Elements stay shared by reference — consistent with split behavior generally.
+        doc = document.model_copy(update={"metadata": {**document.metadata, "split_sequence": 1, "split_total": 1}})
+        return [doc]
 
     splits = split_hierarchical(document)
 
@@ -715,12 +744,12 @@ def split_document(
 
     # Write reading-order provenance into metadata. Only split_document does this —
     # individual splitters leave split_sequence/split_total absent so the outermost
-    # call owns the numbering.  Create a new metadata dict per doc because splitters
-    # propagate metadata by reference (all splits share the parent's dict object); in-place
-    # mutation would leave every split with the last iteration's value.
+    # call owns the numbering. Each split owns its metadata dict (copied at construction),
+    # so in-place stamping is safe.
     if len(result) > 1:
         total = len(result)
         for i, doc in enumerate(result):
-            doc.metadata = {**doc.metadata, "split_sequence": i + 1, "split_total": total}
+            doc.metadata["split_sequence"] = i + 1
+            doc.metadata["split_total"] = total
 
     return result

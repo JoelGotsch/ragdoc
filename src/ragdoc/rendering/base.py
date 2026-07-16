@@ -21,6 +21,7 @@ while the Renderer handles structural concerns.
 
 from __future__ import annotations
 
+import html as html_stdlib
 import math
 import re
 from collections.abc import Callable
@@ -85,7 +86,7 @@ class ExternalRefProvider(Protocol):
         # Or custom provider
         class DBProvider:
             def get(self, id: str) -> Document | None:
-                return db.load_document(id)
+                return db.get_document(id)
 
             def __getitem__(self, id: str) -> Document:
                 doc = self.get(id)
@@ -217,9 +218,6 @@ class DocumentMetadata(dict[str, MetadataValue]):
     """
 
 
-# Union of types accepted by element renderer functions
-Renderable = "BaseElement | DocumentMetadata"
-
 # Type for element render functions
 # Element renderers ALWAYS return HTML - format conversion is done by Renderer
 # The `inline` parameter indicates whether the element is being rendered for
@@ -237,7 +235,9 @@ class Renderer:
 
     Design Rationale:
     -----------------
-    The Renderer is SYNCHRONOUS - there's no I/O involved in rendering.
+    The Renderer is synchronous and CPU-bound: non-HTML output formats fork a
+    pandoc subprocess per render. From async code, call it via
+    ``asyncio.to_thread``.
 
     Instead of separate renderer classes for different purposes (prompt,
     embedding, raw), we use a single Renderer class with pluggable element
@@ -381,7 +381,7 @@ class Renderer:
         parts = list(filter(lambda x: x is not None and x.strip() != "", parts))
         # Resolve inline references
         html = "\n".join(parts)
-        html = self._resolve_inline_refs(html, inline_rendered, rendered_elements)
+        html = self._resolve_inline_refs(html, inline_rendered)
 
         return self._convert(html)
 
@@ -389,19 +389,16 @@ class Renderer:
         self,
         html: str,
         inline_rendered: dict[str, str],
-        fallback_rendered: dict[str, str],  # pyright: ignore[reportUnusedParameter] # documented fallback slot
     ) -> str:
         """
         Replace <ref id="..."/> tags with rendered element content.
 
         Uses inline-rendered versions when available (compact format for
-        footnotes, placeholders for images). Falls back to standard rendering
-        if inline version not found.
+        footnotes, placeholders for images).
 
         Args:
             html: HTML string containing <ref id="..."/> tags
             inline_rendered: Dict mapping element IDs to inline-rendered HTML
-            fallback_rendered: Dict mapping element IDs to standard-rendered HTML
 
         Returns:
             HTML with refs replaced by rendered content
@@ -455,11 +452,14 @@ class Renderer:
             head_parts: list[str] = []
             h1 = header.find("h1")
             if h1:
-                head_parts.append(f"<title>{h1.get_text()}</title>")
+                head_parts.append(f"<title>{html_stdlib.escape(h1.get_text())}</title>")
             dl = header.find("dl")
             if dl:
-                for dt, dd in zip(dl.find_all("dt"), dl.find_all("dd")):
-                    head_parts.append(f'<meta name="{dt.get_text()}" content="{dd.get_text()}"/>')
+                for dt, dd in zip(dl.find_all("dt"), dl.find_all("dd"), strict=False):
+                    head_parts.append(
+                        f'<meta name="{html_stdlib.escape(dt.get_text(), quote=True)}" '
+                        f'content="{html_stdlib.escape(dd.get_text(), quote=True)}"/>'
+                    )
             header.extract()
             full_html = f"<html><head>{''.join(head_parts)}</head><body>{soup}</body></html>"
             result = convert_text(full_html, to=self.format.value, format="html", extra_args=["--standalone"])

@@ -22,6 +22,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from ragdoc.llm import EmbeddingResponse, EmbeddingsClient, retry_llm
+
 if TYPE_CHECKING:
     from ragdoc.chunking.chunk import Chunk
 
@@ -33,6 +35,70 @@ class Embedder(Protocol):
     async def embed(self, texts: list[str]) -> list[list[float]]:
         """Embed *texts* and return one vector per input, in order."""
         ...
+
+
+class OpenAIEmbedder:
+    """Concrete :class:`Embedder` backed by an OpenAI-compatible embeddings endpoint.
+
+    Requests run under the library-wide LLM retry policy (:func:`ragdoc.llm.retry_llm`):
+    rate limits, connection/timeout errors, and 5xx are retried with backoff; other errors
+    raise immediately.
+
+    Args:
+        client: An ``AsyncOpenAI``-compatible client — anything satisfying
+            :class:`ragdoc.llm.EmbeddingsClient` (OpenAI, Azure OpenAI, or a compatible
+            gateway). The caller owns its lifecycle.
+        model: Embedding model name (e.g. ``"text-embedding-3-small"``).
+        dimensions: Optional output dimensionality for models that support truncation
+            (``text-embedding-3-*``). ``None`` uses the model's default size.
+        timeout: Per-request timeout in seconds. ``None`` uses the client default.
+        max_retries: Maximum additional attempts on retryable transport failures.
+
+    Example:
+        ```python
+        from openai import AsyncOpenAI
+        from ragdoc.pipeline import EmbedderConfig, OpenAIEmbedder
+
+        embedder = OpenAIEmbedder(AsyncOpenAI(), model="text-embedding-3-small")
+        config = EmbedderConfig(embedder)   # use in VectorStorePipeline(embedders={...})
+        ```
+    """
+
+    def __init__(
+        self,
+        client: EmbeddingsClient,
+        model: str = "text-embedding-3-small",
+        dimensions: int | None = None,
+        timeout: float | None = None,
+        max_retries: int = 2,
+    ) -> None:
+        self._client = client
+        self._model = model
+        self._dimensions = dimensions
+        self._timeout = timeout
+        self._max_retries = max_retries
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        """Embed *texts* in one request; returns one vector per input, in input order."""
+        if not texts:
+            return []
+
+        async def _create() -> EmbeddingResponse:
+            # dimensions/timeout are forwarded only when set — the OpenAI SDK treats an
+            # explicit None differently from an omitted parameter.
+            if self._dimensions is not None and self._timeout is not None:
+                return await self._client.embeddings.create(
+                    model=self._model, input=texts, dimensions=self._dimensions, timeout=self._timeout
+                )
+            if self._dimensions is not None:
+                return await self._client.embeddings.create(model=self._model, input=texts, dimensions=self._dimensions)
+            if self._timeout is not None:
+                return await self._client.embeddings.create(model=self._model, input=texts, timeout=self._timeout)
+            return await self._client.embeddings.create(model=self._model, input=texts)
+
+        response = await retry_llm(_create, max_retries=self._max_retries, log_prefix="OpenAIEmbedder")
+        # OpenAI returns embeddings keyed by input index — sort to guarantee input order.
+        return [item.embedding for item in sorted(response.data, key=lambda d: d.index)]
 
 
 @dataclass

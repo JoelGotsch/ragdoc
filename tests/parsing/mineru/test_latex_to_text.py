@@ -3,7 +3,7 @@
 import pytest
 
 pytest.importorskip("pylatexenc", reason="pdf_mineru extra not installed")
-from ragdoc.parsing.mineru.base import _latex_to_text
+from tests.latex_text import latex_to_text
 
 
 @pytest.mark.parametrize(
@@ -34,4 +34,4 @@ from ragdoc.parsing.mineru.base import _latex_to_text
     ],
 )
 def test_latex_to_text(latex: str, expected: str) -> None:
-    assert _latex_to_text(latex) == expected
+    assert latex_to_text(latex) == expected

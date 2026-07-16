@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from ragdoc.document import Document
-from ragdoc.parsing import PandocFile, load_file
+from ragdoc.parsing.pandoc import load_pandoc
 from ragdoc.splitting import split_by_headings
 
 
@@ -14,7 +14,7 @@ def replace_whitespace(s: str) -> str:
 
 @pytest.fixture
 def pandoc_document(docx_file_path: Path) -> Document:
-    return load_file(PandocFile(file_path=str(docx_file_path)))
+    return load_pandoc(docx_file_path)
 
 
 def test_document_headings(pandoc_document: Document):
@@ -38,8 +38,9 @@ def test_h1_content(pandoc_document: Document):
     assert "I am just text under the first paragraph" in paragraphs[0].text
     assert "What it should however provide " in paragraphs[1].text
     assert "And checking how it looks if certain text" in paragraphs[2].text
-    assert Path(pandoc_document.source_path).match("*/tests/data/test.DOCX")
-    assert pandoc_document.metadata["filename"] == "test.DOCX"
+    # Provenance (source_path / metadata["filename"]) is stamped by parsing.load(),
+    # not by load_pandoc — see tests/parsing/test_parser_contract.py.
+    assert pandoc_document.parser == "pandoc"
 
 
 expected_table_markdown = """
@@ -140,7 +141,7 @@ expected_nested_image_list = """
 
 @pytest.fixture
 def nested_image_document(nested_image_file_path) -> Document:
-    return split_by_headings(load_file(PandocFile(file_path=str(nested_image_file_path))))[0]
+    return split_by_headings(load_pandoc(nested_image_file_path))[0]
 
 
 def test_nested_images(nested_image_document):

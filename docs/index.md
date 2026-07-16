@@ -38,26 +38,14 @@ distinct `embedding_content` by generating topic summaries via an LLM.
 ## Quick example
 
 ```python
-from ragdoc.parsing import load
-from ragdoc.rendering import Renderer, render_for_prompt, OutputFormat
-from ragdoc.splitting import split_by_headings
-from ragdoc.chunking import Chunk
+from pathlib import Path
+from ragdoc.pipeline import DocumentPipeline, TokenSplitter
 
-# 1. Parse
-document = await load("report.docx")
+pipeline = DocumentPipeline(splitter=TokenSplitter(max_tokens=4000))
+chunks = await pipeline.run(Path("report.docx"))
 
-# 2. Split
-sections = split_by_headings(document)
-
-# 3. Chunk
-renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
-chunks = [
-    Chunk(
-        prompt_content=renderer.render(doc),
-        metadata=doc.metadata,
-    )
-    for doc in sections
-]
+print(f"Produced {len(chunks)} chunks")
+print(chunks[0].prompt_content[:500])
 ```
 
 ## Navigate the docs

@@ -6,8 +6,8 @@ Integration helpers for third-party frameworks.
 
 ## Vector Stores
 
-Concrete implementations of the [`VectorStore`](pipeline.md#VectorStore) protocol.
-See the [Pipeline Guide — Qdrant](../guide/pipeline.md#scenario-c--qdrant-vector-store)
+Concrete implementations of the [`VectorStore`](pipeline.md#vectorstore) protocol.
+See the [Pipeline Guide — Qdrant](../guide/pipeline.md#scenario-c-qdrant-vector-store)
 for usage examples.
 
 ### QdrantVectorStore
@@ -26,6 +26,14 @@ for usage examples.
       show_source: true
       heading_level: 4
 
+### ServerSideVector
+
+::: ragdoc.integrations.vector_stores.qdrant.ServerSideVector
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
 ### register_indexes_from_type
 
 ::: ragdoc.integrations.vector_stores.qdrant.register_indexes_from_type
@@ -36,21 +44,55 @@ for usage examples.
 
 ---
 
-## LlamaIndex
+## Document Stores
 
-Helpers for converting between `Chunk` and LlamaIndex node dictionaries.
+Concrete implementations of the [`DocumentStore`](pipeline.md#documentstore) protocol.
+See the [Pipeline Guide — Scenario E](../guide/pipeline.md#scenario-e-two-stage-with-a-documentstore).
 
-### node_dict_to_document_fragment
+### QdrantDocumentStore
 
-::: ragdoc.integrations.llama_index.node_dict_to_document_fragment
+::: ragdoc.integrations.document_stores.qdrant.QdrantDocumentStore
     options:
       show_root_heading: true
       show_source: true
       heading_level: 4
 
-### document_fragment_to_node_dict
+### DocumentTooLargeError
 
-::: ragdoc.integrations.llama_index.document_fragment_to_node_dict
+::: ragdoc.integrations.document_stores.qdrant.DocumentTooLargeError
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+---
+
+## Extraction Stores
+
+Qdrant adapters for the extraction-layer store protocols
+([`MentionStore`](extraction.md#mentionstore), [`EntityStore`](extraction.md#entitystore),
+[`GraphStore`](extraction.md#graphstore)). See the
+[Extraction Guide](../guide/extraction.md).
+
+### QdrantMentionStore
+
+::: ragdoc.integrations.mention_stores.qdrant.QdrantMentionStore
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### QdrantEntityStore
+
+::: ragdoc.integrations.entity_stores.qdrant.QdrantEntityStore
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### QdrantGraphStore
+
+::: ragdoc.integrations.graph_stores.qdrant.QdrantGraphStore
     options:
       show_root_heading: true
       show_source: true

@@ -19,15 +19,15 @@ from ragdoc.parsing.mineru.base import (
     BlockType,
     DiscardedBlockType,
     MinerUMiddleDocument,
-    _latex_to_text,
     parse_directory_middle_jsons,
 )
-from ragdoc.utils.helpers import _normalize_text
+from ragdoc.utils.helpers import normalize_text
+from tests.latex_text import latex_to_text
 
 
-def _normalize_text_and_spaces(text: str) -> str:
+def normalize_text_and_spaces(text: str) -> str:
     """Normalize text and also remove whitespaces."""
-    normalized = _normalize_text(_latex_to_text(text))
+    normalized = normalize_text(latex_to_text(text))
     return re.sub(r"\s+", "", normalized).strip()
 
 
@@ -151,7 +151,7 @@ def test_middle_document_contains_headings(test_case_name: str) -> None:
     """Test that expected headings exist as TitleBlocks in the raw MinerUMiddleDocument.
 
     Verifies that the MinerU OCR output already contains the expected heading texts
-    before any middleware processing. Uses _normalize_text_and_spaces for lenient matching.
+    before any middleware processing. Uses normalize_text_and_spaces for lenient matching.
     """
     expected = TEST_CASES[test_case_name]
     expected_headings = expected.get("headings", {})
@@ -162,12 +162,12 @@ def test_middle_document_contains_headings(test_case_name: str) -> None:
 
     # Collect all title block texts from the raw document
     title_blocks = doc.get_all_blocks_by_type(BlockType.TITLE)
-    title_texts = [_normalize_text_and_spaces(_extract_block_text(b)) for b in title_blocks]
+    title_texts = [normalize_text_and_spaces(_extract_block_text(b)) for b in title_blocks]
 
     assert len(title_texts) > 0, f"[{test_case_name}] No title blocks found in MinerUMiddleDocument"
 
     for heading_name in expected_headings:
-        needle = _normalize_text_and_spaces(heading_name)
+        needle = normalize_text_and_spaces(heading_name)
         found = any(needle in t or t in needle for t in title_texts)
         assert found, (
             f"[{test_case_name}] Expected heading not found in raw title blocks: "
@@ -184,7 +184,7 @@ def test_middle_document_contains_footnotes(test_case_name: str) -> None:
     """Test that expected footnotes exist as PAGE_FOOTNOTE discarded blocks in the raw MinerUMiddleDocument.
 
     Verifies that the MinerU OCR output already contains the expected footnote texts
-    in discarded_blocks before any middleware processing. Uses _normalize_text_and_spaces for
+    in discarded_blocks before any middleware processing. Uses normalize_text_and_spaces for
     lenient matching.
     """
     expected = TEST_CASES[test_case_name]
@@ -199,14 +199,14 @@ def test_middle_document_contains_footnotes(test_case_name: str) -> None:
     for page in doc.pdf_info:
         for block in page.discarded_blocks:
             if block.type == DiscardedBlockType.PAGE_FOOTNOTE or block.type == DiscardedBlockType.FOOTER:
-                footnote_texts.append(_normalize_text_and_spaces(_extract_block_text(block)))
+                footnote_texts.append(normalize_text_and_spaces(_extract_block_text(block)))
 
     assert len(footnote_texts) > 0, (
         f"[{test_case_name}] No page_footnote discarded blocks found in MinerUMiddleDocument"
     )
 
     for fn in expected_footnotes:
-        needle = _normalize_text_and_spaces(fn["text"])
+        needle = normalize_text_and_spaces(fn["text"])
         found = any(needle in ft or ft in needle for ft in footnote_texts)
         assert found, (
             f"[{test_case_name}] Expected footnote not found in raw discarded blocks: "

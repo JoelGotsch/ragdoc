@@ -46,7 +46,7 @@ except ImportError:
 
 from ragdoc.document import Document, Footnote
 from ragdoc.parsing.mineru.base import MinerUMiddleDocument, _latex_to_text
-from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUParser
+from ragdoc.parsing.mineru.parser import CoreExtractor, MinerUExtractor as MinerUParser
 from ragdoc.processing.footnote import (
     FootnoteCandidate,
     SimpleFootnoteResolver,
@@ -270,8 +270,8 @@ async def diagnose_document(
     with open(middle_path, encoding="utf-8") as f:
         middle = MinerUMiddleDocument.model_validate(json.load(f))
 
-    parser = MinerUParser(use_default_middlewares=False)
-    parser.use(CoreExtractionMiddleware())
+    parser = MinerUParser(use_default_stages=False)
+    parser.use(CoreExtractor())
     doc = await parser.parse(middle)
 
     print(f"  Parsed: {len(doc.elements)} elements, {len(doc.footnotes)} footnote(s)")

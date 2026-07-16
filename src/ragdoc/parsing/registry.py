@@ -16,7 +16,34 @@ from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
+    from ragdoc.document import Document
     from ragdoc.parsing.parser import Parser
+
+
+def stamp_provenance(document: Document, source: Path, parser_name: str) -> Document:
+    """Stamp parser provenance onto *document* — the single stamping site, called by ``load()``.
+
+    Fills ``document.parser``, ``document.source_path``, and ``metadata["filename"]`` only
+    when the parser left them unset, so parsers with special provenance semantics (e.g.
+    ``ragdoc_json``'s ``ProvenanceMode.ORIGINAL``, which preserves the original document's
+    provenance) keep their values.  Individual parsers no longer stamp these fields
+    themselves; they set only parser-specific extras.
+
+    Args:
+        document: The freshly parsed document.
+        source: The file the parser was invoked on.
+        parser_name: The resolved parser's registry name.
+
+    Returns:
+        The same document, mutated in place (returned for chaining).
+    """
+    if document.parser is None:
+        document.parser = parser_name
+    if not document.source_path:
+        document.source_path = str(source)
+    if "filename" not in document.metadata:
+        document.metadata["filename"] = source.name
+    return document
 
 
 class ParserRegistration(NamedTuple):
@@ -176,7 +203,15 @@ def _resolve_parser(path: Path, parser_name: str | None = None) -> Parser:
 
     # Sort by longest pattern first, then highest priority
     matches.sort(key=lambda r: (-len(r.pattern), -r.priority))
-    return matches[0].parser
+    usable = [r for r in matches if r.parser.is_available()]
+    if not usable:
+        reasons = "; ".join(sorted({r.parser.unavailable_reason() or r.name for r in matches}))
+        raise ValueError(
+            f"No usable parser for {path.name!r}. Matching parsers are unavailable: {reasons}. "
+            "For PDFs: install 'ragdoc[pdf]' for the basic local parser, or 'ragdoc[pdf-mineru]' / "
+            "'ragdoc[azure-di]' for higher fidelity."
+        )
+    return usable[0].parser
 
 
 def _clear_registry() -> None:

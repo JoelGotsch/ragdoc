@@ -2,12 +2,16 @@
 
 A sync pipeline's ``plan()`` returns a :class:`ChangeSet` describing what would change; the
 user may inspect or edit it (drop items, move source_ids into ``to_delete``) before
-``apply()`` writes it to the store.  ``run()`` is simply ``apply(plan(...))``.
+``apply()`` writes it to the store.  ``run()`` consumes the same event stream ``plan()``
+buffers; it produces the same end state, differing only in scheduling (per-source
+pre-write-and-write versus whole-corpus pre-write-first — see
+:class:`~ragdoc.pipeline.sync.SyncEngine`).
 
-The type parameter is the payload carried per source:
+The type parameter is the payload carried per source (any Pydantic model):
 
 * ``ChangeSet[Document]`` — produced by ``DocumentStorePipeline`` (Boundary 1).
 * ``ChangeSet[Chunk]`` — produced by ``VectorStorePipeline`` (direct path / Boundary 2).
+* ``ChangeSet[Mention[P]]`` — produced by ``MentionStorePipeline``.
 
 ``ChangeSet`` is a Pydantic generic model.  Call :meth:`load` on the **concrete**
 parametrization so Pydantic can resolve ``list[T]``::
@@ -23,10 +27,7 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
-from ragdoc.chunking import Chunk
-from ragdoc.document import Document
-
-T = TypeVar("T", Document, Chunk)
+T = TypeVar("T", bound=BaseModel)
 
 
 class SourceChange(BaseModel, Generic[T]):
@@ -36,7 +37,8 @@ class SourceChange(BaseModel, Generic[T]):
         source_id: The source identity key.
         source_hash: File-byte hash recorded for this source.
         content_hash: Document content hash (``None`` on the direct path when unknown).
-        items: The payload for this source — ``list[Document]`` or ``list[Chunk]``.
+        items: The payload for this source (e.g. ``list[Document]``, ``list[Chunk]``,
+            ``list[Mention[P]]``). May be empty — "this source now yields nothing".
     """
 
     source_id: str
@@ -54,9 +56,13 @@ class ChangeSet(BaseModel, Generic[T]):
         to_delete: source_ids to remove (orphans); empty unless ``delete_orphans=True``.
     """
 
-    to_add: list[SourceChange[T]] = Field(default_factory=list)
-    to_update: list[SourceChange[T]] = Field(default_factory=list)
-    to_delete: list[str] = Field(default_factory=list)
+    to_add: list[SourceChange[T]] = Field(default_factory=list, description="Sources new to the target store.")
+    to_update: list[SourceChange[T]] = Field(
+        default_factory=list, description="Sources whose change token differs; their stale entries are replaced."
+    )
+    to_delete: list[str] = Field(
+        default_factory=list, description="source_ids to remove (orphans); empty unless delete_orphans=True."
+    )
 
     def save(self, path: Path) -> None:
         """Write this ChangeSet to *path* as indented JSON."""

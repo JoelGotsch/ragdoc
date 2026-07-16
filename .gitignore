@@ -208,9 +208,8 @@ cython_debug/
 
 # lock files should not be committed for libraries
 *.lock
-.claude/
-docs/notebooks/document_model.py
-docs/notebooks/pipeline_walkthrough.py
+.claude/*
+!.claude/skills/
 
 # create_test_fixtures.py PDF download cache
 scripts/.fixture_pdfs/
@@ -222,6 +221,8 @@ scripts/output/
 # Design docs and implementation plans are local-only working notes
 plans/
 designs/
+feature-requests/
+fable-review.md
 
 
 # Auto-generated devcontainer feature lock (regenerates; pins the claude-code feature)

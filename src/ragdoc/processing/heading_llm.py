@@ -14,14 +14,14 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from openai import AsyncOpenAI
 from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from ragdoc.config import get_config
 from ragdoc.document import Heading, Paragraph
-from ragdoc.processing._concurrency import _fan_out
+from ragdoc.llm import ChatClient, call_structured
 from ragdoc.processing.base import DocumentProcessor
+from ragdoc.utils.concurrency import fan_out
 
 if TYPE_CHECKING:
     from ragdoc.document import Document
@@ -119,12 +119,15 @@ class LLMHeadingResolverSettings(BaseSettings):
         extra="ignore",
     )
 
-    model_name: str = Field(default="gpt-4o-mini")
-    base_url: str | None = Field(default=None)
-    api_key: SecretStr | None = Field(default=None)
-    temperature: float = Field(default=0.0)
-    max_retries: int = Field(default=2)
-    batch_size: int | None = Field(default=None)
+    model_name: str = Field(default="gpt-4o-mini", description="Model used for heading level determination.")
+    base_url: str | None = Field(default=None, description="API base URL (None for default OpenAI).")
+    api_key: SecretStr | None = Field(default=None, description="API key for authentication (None for default).")
+    temperature: float = Field(default=0.0, description="Sampling temperature (lower = more deterministic).")
+    max_retries: int = Field(default=2, description="Maximum retries on retryable LLM transport failures.")
+    batch_size: int | None = Field(default=None, description="Max headings per LLM call (None = all at once).")
+    request_timeout: float | None = Field(
+        default=None, description="Per-request timeout in seconds (None uses the client default)."
+    )
 
 
 class LLMHeadingResolver(DocumentProcessor):
@@ -181,7 +184,7 @@ Guidelines:
 
     def __init__(
         self,
-        client: AsyncOpenAI | None = None,  # AsyncOpenAI or compatible
+        client: ChatClient | None = None,
         model_name: str | None = None,
         settings: LLMHeadingResolverSettings | None = None,
         remove_title_from_elements: bool = True,
@@ -195,7 +198,8 @@ Guidelines:
         1. Explicit argument
         2. From env variables (LLM_HEADING_RESOLVER_*)
 
-        Order of client and model_name resolution:
+        Order of client and model_name resolution (the settings-based factory is a documented
+        layer above :func:`ragdoc.llm.resolve_openai_client`'s explicit → config policy):
         1. Explicit argument
         2. From settings (see above; base_url and api_key must be provided)
         3. Default client from global config (get_config().openai_client)
@@ -204,6 +208,9 @@ Guidelines:
             client: AsyncOpenAI client instance or compatible
             model_name: Model name to use (e.g., "gpt-4o"). Overrides settings and config.
             settings: Optional settings object. Can also be configured via environment variables.
+            remove_title_from_elements: Remove the detected title element from the document.
+            remove_elements_before_title: Remove all elements preceding the detected title.
+            concurrency: Max concurrent LLM calls across batches (int or shared semaphore).
         """
         self.settings = settings or LLMHeadingResolverSettings()
         config = get_config()
@@ -211,14 +218,21 @@ Guidelines:
         resolved_client = client or self._create_client_from_settings() or config.openai_client
         if resolved_client is None:
             raise ValueError("No client provided and could not create one from settings or config.")
-        self.client: AsyncOpenAI = resolved_client
+        self.client: ChatClient = resolved_client
         self.remove_title_from_elements = remove_title_from_elements
         self.remove_elements_before_title = remove_elements_before_title
         self._concurrency = concurrency
 
-    def _create_client_from_settings(self) -> AsyncOpenAI | None:
+    def _create_client_from_settings(self) -> ChatClient | None:
         """Create an AsyncOpenAI client from settings if base_url and api_key are provided."""
         if self.settings.base_url and self.settings.api_key and self.settings.api_key.get_secret_value():
+            try:
+                from openai import AsyncOpenAI  # lazy: openai lives behind the 'llm' extra
+            except ImportError as exc:
+                raise ImportError(
+                    "LLMHeadingResolver's settings-based client requires the 'llm' extra: pip install 'ragdoc[llm]'"
+                ) from exc
+
             return AsyncOpenAI(
                 base_url=self.settings.base_url,
                 api_key=self.settings.api_key.get_secret_value(),
@@ -226,7 +240,14 @@ Guidelines:
         return None
 
     async def process(self, document: Document) -> Document:
-        """Analyze all headings using LLM and update their levels."""
+        """Analyze all headings using LLM and update their levels.
+
+        Heading-*level* resolution always runs — parsers like html (``<title>``) and mineru
+        (``document_title``) set ``document.title`` on first parse, and that must not disable
+        level resolution. Only the title-assignment step respects an existing title (see
+        :meth:`_apply_levels`): the title is never overwritten and the destructive
+        title-element removal steps are skipped, which keeps re-runs non-destructive.
+        """
 
         # Collect heading information
         heading_infos = self._collect_heading_infos(document)
@@ -300,33 +321,32 @@ Guidelines:
         return "\n".join(lines)
 
     async def _get_heading_levels(self, heading_infos: list[HeadingInfo]) -> list[HeadingJudgment]:
-        """Query the LLM to determine heading levels using structured output."""
+        """Query the LLM to determine heading levels using structured output.
+
+        Degrades to ``[]`` (headings left unchanged) on any final failure — transport retries
+        with backoff happen inside :func:`ragdoc.llm.call_structured`; deterministic errors
+        (4xx, refusal) are not retried.
+        """
         prompt = self._build_prompt(heading_infos)
 
-        for attempt in range(self.settings.max_retries + 1):
-            try:
-                response = await self.client.beta.chat.completions.parse(
-                    model=self.settings.model_name,
-                    messages=[
-                        {"role": "system", "content": self.SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt},
-                    ],
-                    temperature=self.settings.temperature,
-                    response_format=HeadingResponse,
-                )
-                result = response.choices[0].message.parsed
-                if result is None:
-                    logger.warning("LLMHeadingResolver: LLM refused to provide judgments")
-                    raise ValueError("LLM refused to provide judgments")
-                return result.judgments
-            except Exception as exc:
-                logger.error(
-                    f"LLMHeadingResolver: API call failed "
-                    f"(attempt {attempt + 1}/{self.settings.max_retries + 1}): {exc}"
-                )
-                if attempt == self.settings.max_retries:
-                    return []
-        return []
+        try:
+            result = await call_structured(
+                self.client,
+                model=self.settings.model_name,
+                messages=[
+                    {"role": "system", "content": self.SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                response_format=HeadingResponse,
+                temperature=self.settings.temperature,
+                timeout=self.settings.request_timeout,
+                max_retries=self.settings.max_retries,
+                log_prefix="LLMHeadingResolver",
+            )
+        except Exception as exc:  # noqa: BLE001 -- site degrade semantics: no judgments, headings unchanged
+            logger.error(f"LLMHeadingResolver: giving up on heading batch: {exc}")
+            return []
+        return result.judgments
 
     async def _process_in_batches(self, heading_infos: list[HeadingInfo]) -> list[HeadingJudgment]:
         """Process headings in batches, with bounded concurrency across batches."""
@@ -346,7 +366,7 @@ Guidelines:
         coros: list[Awaitable[None]] = [
             _process_batch(idx, offset, batch) for idx, (offset, batch) in enumerate(batches)
         ]
-        await _fan_out(coros, self._concurrency)
+        await fan_out(coros, self._concurrency)
 
         return [j for r in results for j in r]
 
@@ -363,6 +383,10 @@ Guidelines:
         - NOT_DETERMINABLE → same as absent, left unchanged.
         - NOT_HEADING → element converted to Paragraph; ``llm_heading_level = "none"`` in metadata.
         - DOCUMENT_TITLE → ``document.title`` set; metadata marks the element as the title.
+          When the document *already* has a title (parser-set, or a previous run of this or
+          another title processor), the judgment is ignored: the title is never overwritten
+          and the title-element removal steps are skipped (idempotency guard — re-detecting
+          a different "title" and re-stripping elements before it would corrupt the document).
         - H1-H6 → ``element.level`` updated; ``llm_heading_level`` set in metadata.
         """
         judgment_by_id = {j.id: j for j in judgments}
@@ -382,14 +406,20 @@ Guidelines:
                 # Explicitly not a heading — convert Heading to Paragraph in place
                 font_size_css = f"font-size: {info.font_size}pt; " if info.font_size is not None else ""
                 align_css = "text-align: center;" if info.is_centered else "text-align: left;"
-                new_elem = Paragraph(html_content=f'<p style="{font_size_css}{align_css}">{element.innerhtml}</p>')
+                new_elem = Paragraph(html=f'<p style="{font_size_css}{align_css}">{element.innerhtml}</p>')
                 new_elem.metadata["llm_heading_level"] = "none"
                 document.elements[info.index] = new_elem
             elif judgment.level == HeadingLevel.DOCUMENT_TITLE:
-                document.title = element.text
-                element.metadata["llm_heading_level"] = "document-title"
-                element.metadata["is_document_title"] = True
-                title_element_idx = info.index
+                if document.title:
+                    logger.debug(
+                        "LLMHeadingResolver: document already has a title, keeping %r (heading left unchanged)",
+                        document.title,
+                    )
+                else:
+                    document.title = element.text
+                    element.metadata["llm_heading_level"] = "document-title"
+                    element.metadata["is_document_title"] = True
+                    title_element_idx = info.index
             else:
                 # Standard h1-h6
                 level_num = int(judgment.level.value[1])

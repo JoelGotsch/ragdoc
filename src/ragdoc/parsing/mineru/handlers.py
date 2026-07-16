@@ -12,11 +12,11 @@ Typical customisation::
         handle_discarded_as_raw_text,
     )
     from ragdoc.parsing.mineru.base import DiscardedBlockType
-    from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware
+    from ragdoc.parsing.mineru.parser import CoreExtractor
 
     config = ExtractionConfig()
     config.discarded_handlers[DiscardedBlockType.HEADER] = handle_discarded_as_raw_text
-    middleware = CoreExtractionMiddleware(config=config)
+    stage = CoreExtractor(config=config)
 """
 
 from __future__ import annotations
@@ -119,7 +119,7 @@ def _css_from_block(
 
 
 # ---------------------------------------------------------------------------
-# Heading HTML builder (public so middlewares can reuse it)
+# Heading HTML builder (public so extraction stages can reuse it)
 # ---------------------------------------------------------------------------
 
 
@@ -147,7 +147,7 @@ def handle_title_block(block: TitleBlock, page: PageInfo, context: ParseContext)
         return []
     level: int = context.metadata.get("_default_heading_level", 1)
     heading = Heading(
-        html_content=build_heading_html(text, block, page, level),
+        html=build_heading_html(text, block, page, level),
         bounding_box=_get_bounding_box(block),
         page=page.page_idx + 1,
     )
@@ -179,8 +179,8 @@ def handle_text_block(
     text = extract_text_from_lines(block.lines).strip()
     if not text:
         return []
-    paragraph = Paragraph.from_html(
-        build_text_html(text, block, page),
+    paragraph = Paragraph(
+        html=build_text_html(text, block, page),
         bounding_box=_get_bounding_box(block),
         page=page.page_idx + 1,
     )
@@ -202,8 +202,8 @@ def handle_list_block(
     all_lines = [line for item in block.blocks for line in item.lines]
     css = _css_from_block(block, page, all_lines)
     style_attr = f' style="{css}"' if css else ""
-    doc_list = DocumentList.from_html(
-        f"<ul{style_attr}>{''.join(items)}</ul>",
+    doc_list = DocumentList(
+        html=f"<ul{style_attr}>{''.join(items)}</ul>",
         bounding_box=_get_bounding_box(block),
         page=page.page_idx + 1,
     )
@@ -229,8 +229,8 @@ def handle_code_block(
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph.from_html(
-                        f"<p>{caption_text}</p>",
+                    element=Paragraph(
+                        html=f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(block.code_caption),
                         page=page_number,
                     ),
@@ -245,7 +245,7 @@ def handle_code_block(
             results.append(
                 ParsedElement(
                     element=RawText(
-                        innerhtml=code_text,
+                        html=code_text,
                         bounding_box=_get_bounding_box(block),
                         page=page_number,
                     ),
@@ -277,8 +277,8 @@ def handle_table_block(
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph.from_html(
-                        f"<p>{caption_text}</p>",
+                    element=Paragraph(
+                        html=f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(table_caption),
                         page=page_number,
                     ),
@@ -297,7 +297,7 @@ def handle_table_block(
             results.append(
                 ParsedElement(
                     element=Table(
-                        html_content=table_span.html.strip(),
+                        html=table_span.html.strip(),
                         bounding_box=_get_bounding_box(block),
                         page=page_number,
                     ),
@@ -313,7 +313,7 @@ def handle_table_block(
             results.append(
                 ParsedElement(
                     element=RawText(
-                        innerhtml=fn_text,
+                        html=fn_text,
                         bounding_box=_get_bounding_box(table_footnote),
                         page=page_number,
                     ),
@@ -355,8 +355,8 @@ def handle_chart_block(
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph.from_html(
-                        f"<p>{caption_text}</p>",
+                    element=Paragraph(
+                        html=f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(chart_caption),
                         page=page_number,
                     ),
@@ -373,11 +373,11 @@ def handle_chart_block(
         )
         if chart_span is not None and chart_span.content.strip():
             try:
-                html_content = _pandoc_convert(chart_span.content, to="html", format="markdown")
+                chart_html = _pandoc_convert(chart_span.content, to="html", format="markdown")
                 results.append(
                     ParsedElement(
                         element=Table(
-                            html_content=html_content.strip(),
+                            html=chart_html.strip(),
                             bounding_box=_get_bounding_box(block),
                             page=page_number,
                         ),
@@ -385,7 +385,7 @@ def handle_chart_block(
                         source_page=page,
                     )
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- malformed chart content degrades to skipped body
                 logger.warning(
                     "Could not convert chart markdown to HTML on page %d (%s: %s); "
                     "chart body skipped. Content prefix: %r",
@@ -402,7 +402,7 @@ def handle_chart_block(
             results.append(
                 ParsedElement(
                     element=RawText(
-                        innerhtml=fn_text,
+                        html=fn_text,
                         bounding_box=_get_bounding_box(chart_footnote),
                         page=page_number,
                     ),
@@ -431,7 +431,7 @@ def _load_image_bytes(path: Path) -> tuple[str, str, int, int] | None:
             img.save(buf, format=img.format or "PNG")
             data = base64.b64encode(buf.getvalue()).decode("utf-8")
             return data, fmt, width, height
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 -- any decode failure degrades to image-less block
         logger.warning("Could not load image %s: %s", path, exc)
         return None
 
@@ -502,8 +502,8 @@ def handle_image_block(block: ImageBlock, page: PageInfo, context: ParseContext)
         if caption_text:
             results.append(
                 ParsedElement(
-                    element=Paragraph.from_html(
-                        f"<p>{caption_text}</p>",
+                    element=Paragraph(
+                        html=f"<p>{caption_text}</p>",
                         bounding_box=_get_bounding_box(caption),
                         page=page_number,
                     ),
@@ -606,7 +606,7 @@ def handle_discarded_as_raw_text(
     return [
         ParsedElement(
             element=RawText(
-                innerhtml=text,
+                html=text,
                 bounding_box=_get_bounding_box(block),
                 page=page.page_idx + 1,
             ),
@@ -626,8 +626,8 @@ def handle_discarded_as_metadata(block: DiscardedBlock, page: PageInfo, context:
     dicts.
 
     This handler does **not** propagate data to ``Document.metadata`` on its
-    own.  It is intended for custom middleware authors who need to read
-    accumulated values from ``context.metadata`` in a later middleware step.
+    own.  It is intended for custom extraction-stage authors who need to read
+    accumulated values from ``context.metadata`` in a later extraction stage.
     """
     text = extract_text_from_lines(block.lines).strip()
     if not text:
@@ -669,12 +669,12 @@ def _default_discarded_handlers() -> dict[DiscardedBlockType, DiscardedBlockHand
 @dataclass
 class ExtractionConfig:
     """
-    Handler table for :class:`~ragdoc.parsing.mineru.parser.CoreExtractionMiddleware`.
+    Handler table for :class:`~ragdoc.parsing.mineru.parser.CoreExtractor`.
 
     Every field is a callable with the signature
     ``(block, page, context) -> list[ParsedElement]``.  Set any field to change
     how that block type is converted without subclassing or modifying the
-    middleware.
+    extraction stage.
 
     **Para-block handlers** are typed to their specific MinerU block class so
     that static type checkers can verify that custom handlers receive the right
@@ -730,13 +730,13 @@ class ExtractionConfig:
       a :class:`~ragdoc.document.Footnote` element; drops the block with a
       warning when the format does not match.
     - :func:`handle_discarded_as_metadata` — accumulate text in
-      ``context.metadata`` for use by a subsequent custom middleware; does not
+      ``context.metadata`` for use by a subsequent custom extraction stage; does not
       produce document elements and does not propagate to
       ``Document.metadata``.
 
     ``default_heading_level`` sets the heading level assigned to every
     :class:`~ragdoc.parsing.mineru.base.TitleBlock` before downstream
-    middlewares (e.g. ``HeadingLevelProcessor``) refine it.
+    processors (e.g. ``HeadingLevelProcessor``) refine it.
     """
 
     handle_title: Callable[[TitleBlock, PageInfo, ParseContext], list[ParsedElement]] = field(

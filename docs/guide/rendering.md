@@ -18,7 +18,7 @@ displayed directly.
 
 ## Using the Renderer
 
-[`Renderer`](../api/rendering.md#Renderer) combines an element renderer with a target
+[`Renderer`](../api/rendering.md#renderer) combines an element renderer with a target
 output format:
 
 ```python
@@ -35,7 +35,7 @@ prompt_text = prompt_renderer.render(document)
 
 ## Output formats
 
-[`OutputFormat`](../api/rendering.md#OutputFormat) controls the final text format.
+[`OutputFormat`](../api/rendering.md#outputformat) controls the final text format.
 Element renderers always output HTML internally; the `Renderer` handles conversion:
 
 | Format | Description |
@@ -74,7 +74,7 @@ are skipped during the main rendering pass to avoid duplication.
 
 ## Cross-document references
 
-Pass an [`ExternalRefProvider`](../api/rendering.md#ExternalRefProvider) to access parent
+Pass an [`ExternalRefProvider`](../api/rendering.md#externalrefprovider) to access parent
 documents and siblings during rendering. A plain `dict[str, Document]` works:
 
 ```python

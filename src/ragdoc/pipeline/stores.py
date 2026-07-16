@@ -34,7 +34,7 @@ class SourceState:
     Attributes:
         source_hash: SHA-256 of the original source file bytes (Boundary-1 /
             direct-path change detection).
-        content_hash: Renderer-stable Document content hash
+        content_hash: Canonical-content Document hash (pandoc-free)
             (``Document.content_hash()``) used for Boundary-2
             (DocumentStore -> VectorStore) change detection.  ``None`` is treated
             as "always changed".
@@ -51,13 +51,10 @@ class VectorStore(Protocol):
     Implementations must support:
 
     * **upsert / delete** — basic CRUD by chunk ID.
-    * **get_source_hash** — query the stored hash for a given source_id (legacy
-      single-source query; superseded by ``list_source_state`` and slated for
-      removal once all pipelines use the bulk API).
     * **delete_by_source** — remove all chunks for a given source_id,
       enabling cleanup by source identity rather than tracked chunk IDs.
-    * **list_source_ids** — enumerate all distinct source identifiers,
-      enabling orphan detection when sources are removed.
+    * **list_source_ids** — enumerate all distinct source identifiers
+      (consumer-facing; the sync engine itself uses ``list_source_state``).
     * **list_source_state** — bulk-read every source's change-detection hashes
       (``source_hash`` + ``content_hash``) in one round-trip.
 
@@ -87,14 +84,6 @@ class VectorStore(Protocol):
         """
         ...
 
-    async def get_source_hash(self, source_id: str) -> str | None:
-        """Return the stored hash for *source_id*, or ``None`` if not present.
-
-        Legacy single-source query retained until every pipeline uses
-        :meth:`list_source_state`.
-        """
-        ...
-
     async def delete_by_source(self, source_id: str) -> None:
         """Delete all chunks whose ``source_id`` field equals *source_id*.
 
@@ -106,8 +95,8 @@ class VectorStore(Protocol):
     async def list_source_ids(self) -> set[str]:
         """Return all distinct ``source_id`` values stored in this vector store.
 
-        Used to discover which sources have chunks present, enabling orphan
-        detection when sources are removed from the sync list.
+        Not used by the sync engine (which reads :meth:`list_source_state`);
+        provided for consumers doing their own orphan/reporting logic.
 
         Returns:
             Set of source identity strings.
@@ -155,7 +144,11 @@ class DocumentStore(Protocol):
         ...
 
     async def list_source_ids(self) -> set[str]:
-        """Return all distinct ``source_id`` values stored here."""
+        """Return all distinct ``source_id`` values stored here.
+
+        Not used by the sync engine (which reads :meth:`list_source_state`);
+        provided for consumers doing their own orphan/reporting logic.
+        """
         ...
 
     async def list_source_state(self) -> dict[str, SourceState]:

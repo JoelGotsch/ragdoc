@@ -12,11 +12,11 @@ from ragdoc.merging.patch import PatchOperationType, validate_inline_refs
 def test_heading_level_html_parser_wins_over_mineru():
     """html parser is in trust_parsers -> its heading level takes precedence."""
     doc_a = Document(
-        elements=[Heading(html_content="<h3>Introduction</h3>")],
+        elements=[Heading(html="<h3>Introduction</h3>")],
         parser="mineru",
     )
     doc_b = Document(
-        elements=[Heading(html_content="<h2>Introduction</h2>")],
+        elements=[Heading(html="<h2>Introduction</h2>")],
         parser="html",
     )
     result = merge_documents(doc_a, doc_b)
@@ -26,8 +26,8 @@ def test_heading_level_html_parser_wins_over_mineru():
 
 
 def test_heading_level_prefer_source_b_forces_heading_from_b():
-    doc_a = Document(elements=[Heading(html_content="<h1>Title</h1>")])
-    doc_b = Document(elements=[Heading(html_content="<h2>Title</h2>")])
+    doc_a = Document(elements=[Heading(html="<h1>Title</h1>")])
+    doc_b = Document(elements=[Heading(html="<h2>Title</h2>")])
     result = merge_documents(doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "b"})
     assert result.headings[0].level == 2
 
@@ -36,16 +36,16 @@ def test_heading_level_prefer_source_b_forces_heading_from_b():
 
 
 def test_inline_markup_em_paragraph_from_b_preserved():
-    doc_a = Document(elements=[Paragraph(html_content="<p>plain body text</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p><em>italic</em> body text</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>plain body text</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p><em>italic</em> body text</p>")])
     result = merge_documents(doc_a, doc_b)
     assert len(result.paragraphs) == 1
     assert "<em>" in result.paragraphs[0].html
 
 
 def test_inline_markup_math_formula_from_b_preferred():
-    doc_a = Document(elements=[Paragraph(html_content="<p>E equals mc squared</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>E = <math>mc<sup>2</sup></math></p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>E equals mc squared</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>E = <math>mc<sup>2</sup></math></p>")])
     result = merge_documents(doc_a, doc_b)
     para_html = result.paragraphs[0].html
     assert "<math>" in para_html or "<sup>" in para_html
@@ -57,8 +57,8 @@ def test_inline_markup_math_formula_from_b_preferred():
 def test_footnote_element_in_output_when_referenced():
     """If doc_b has a footnote referenced in a paragraph, it ends up in output."""
     fn = Footnote(number=1, innerhtml="Detailed footnote text.")
-    para = Paragraph(html_content=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>')
-    doc_a = Document(elements=[Paragraph(html_content="<p>Body text.</p>")])
+    para = Paragraph(html=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>')
+    doc_a = Document(elements=[Paragraph(html="<p>Body text.</p>")])
     doc_b = Document(elements=[para, fn], parser="html")
 
     result = merge_documents(doc_a, doc_b)
@@ -71,8 +71,8 @@ def test_footnote_element_in_output_when_referenced():
 def test_image_inline_ref_intact():
     """Image element and its inline ref survive the merge."""
     img = Image(image=None, image_type="png", alt="Chart")
-    para = Paragraph(html_content=f'<p>See <ref id="{img.id}" rel="image"/> for details.</p>')
-    doc_a = Document(elements=[Paragraph(html_content="<p>See diagram for details.</p>")])
+    para = Paragraph(html=f'<p>See <ref id="{img.id}" rel="image"/> for details.</p>')
+    doc_a = Document(elements=[Paragraph(html="<p>See diagram for details.</p>")])
     doc_b = Document(elements=[para, img], parser="html")
 
     result = merge_documents(doc_a, doc_b)
@@ -84,11 +84,11 @@ def test_image_inline_ref_intact():
 
 def test_per_type_allow_insertions_false_no_extra_elements():
     """Extra elements from doc_b are suppressed."""
-    doc_a = Document(elements=[Paragraph(html_content="<p>Shared</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Shared</p>")])
     doc_b = Document(
         elements=[
-            Paragraph(html_content="<p>Shared</p>"),
-            Paragraph(html_content="<p>Extra only in B</p>"),
+            Paragraph(html="<p>Shared</p>"),
+            Paragraph(html="<p>Extra only in B</p>"),
         ]
     )
     result = merge_documents(doc_a, doc_b, allow_insertions_from_b=False)
@@ -100,14 +100,14 @@ def test_per_type_prefer_source_a_for_all_headings():
     """prefer_source forces all headings to come from doc_a."""
     doc_a = Document(
         elements=[
-            Heading(html_content="<h1>Main Title</h1>"),
-            Paragraph(html_content="<p>Content</p>"),
+            Heading(html="<h1>Main Title</h1>"),
+            Paragraph(html="<p>Content</p>"),
         ]
     )
     doc_b = Document(
         elements=[
-            Heading(html_content="<h2>Main Title</h2>"),
-            Paragraph(html_content="<p><em>Content</em></p>"),
+            Heading(html="<h2>Main Title</h2>"),
+            Paragraph(html="<p><em>Content</em></p>"),
         ]
     )
     result = merge_documents(doc_a, doc_b, prefer_source={ElementTypeEnum.HEADING: "a"})
@@ -121,8 +121,8 @@ def test_per_type_prefer_source_a_for_all_headings():
 
 
 def test_compute_patch_returns_document_patch():
-    doc_a = Document(elements=[Paragraph(html_content="<p>Hello</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>Hello</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Hello</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>Hello</p>")])
     patch = compute_patch(doc_a, doc_b)
     assert len(patch.operations) > 0
 
@@ -136,9 +136,9 @@ def test_compute_patch_source_parsers_set():
 
 
 def test_compute_patch_manual_override_honored():
-    p_custom = Paragraph(html_content="<p>custom override</p>")
-    doc_a = Document(elements=[Paragraph(html_content="<p>From A</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>From B</p>")])
+    p_custom = Paragraph(html="<p>custom override</p>")
+    doc_a = Document(elements=[Paragraph(html="<p>From A</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>From B</p>")])
     patch = compute_patch(doc_a, doc_b)
     # Override the first operation's resolved_elements
     patch.operations[0].resolved_elements = [p_custom]
@@ -147,16 +147,16 @@ def test_compute_patch_manual_override_honored():
 
 
 def test_compute_patch_merged_document_parser_is_merged():
-    doc_a = Document(elements=[Paragraph(html_content="<p>x</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>x</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>x</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>x</p>")])
     result = merge_documents(doc_a, doc_b)
     assert result.parser == "merged"
 
 
 def test_compute_patch_serializable():
     """DocumentPatch is JSON-serializable."""
-    doc_a = Document(elements=[Paragraph(html_content="<p>text</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>text</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>text</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>text</p>")])
     patch = compute_patch(doc_a, doc_b)
     json_str = patch.model_dump_json()
     assert "operations" in json_str
@@ -165,19 +165,19 @@ def test_compute_patch_serializable():
 def test_compute_patch_delete_a_operation_recorded():
     doc_a = Document(
         elements=[
-            Paragraph(html_content="<p>Only in A — unique content here</p>"),
-            Paragraph(html_content="<p>Shared content</p>"),
+            Paragraph(html="<p>Only in A — unique content here</p>"),
+            Paragraph(html="<p>Shared content</p>"),
         ]
     )
-    doc_b = Document(elements=[Paragraph(html_content="<p>Shared content</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>Shared content</p>")])
     patch = compute_patch(doc_a, doc_b)
     op_types = {op.op for op in patch.operations}
     assert PatchOperationType.DELETE_A in op_types
 
 
 def test_compute_patch_output_is_valid_inline_refs():
-    doc_a = Document(elements=[Paragraph(html_content="<p>Body text.</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p><em>Body</em> text.</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Body text.</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p><em>Body</em> text.</p>")])
     result = merge_documents(doc_a, doc_b)
     assert validate_inline_refs(result) == []
 
@@ -218,7 +218,7 @@ def test_real_world_structured_doc_wins_and_inline_refs_intact(
     first = result.elements[0]
     assert first.element_type == ElementTypeEnum.PARAGRAPH
     assert first.footnote_ids == [fn.id]
-    assert "<strong>text</strong>" in first.html_content
+    assert "<strong>text</strong>" in first.html
 
     # Second element: doc_a's unique "Some additional text" preserved
     assert result.elements[1].element_type == ElementTypeEnum.RAW_TEXT
@@ -226,7 +226,7 @@ def test_real_world_structured_doc_wins_and_inline_refs_intact(
 
     # Third element: doc_b's "Some text in the middle" paragraph
     assert result.elements[2].element_type == ElementTypeEnum.PARAGRAPH
-    assert result.elements[2].html_content == para2.html_content
+    assert result.elements[2].html == para2.html
 
     # Fourth and fifth: Image and Footnote from doc_b (trailing para2)
     assert result.elements[3].element_type == ElementTypeEnum.IMAGE
@@ -241,9 +241,9 @@ def test_real_world_image_and_footnote_from_b_survive_merge():
     """Even when doc_a has no counterparts, Image and Footnote from doc_b are inserted."""
     fn = Footnote(number=1, innerhtml="This is the footnote text")
     img = Image(image=None, image_type="png", alt="Figure 1")
-    para1 = Paragraph(html_content=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>')
+    para1 = Paragraph(html=f'<p>Body text<ref id="{fn.id}" rel="footnote"/>.</p>')
     doc_a = Document(
-        elements=[RawText(innerhtml="Body text1.")],
+        elements=[RawText(html="Body text1.")],
         parser="mineru",
     )
     doc_b = Document(elements=[para1, img, fn], parser="html")
@@ -259,8 +259,8 @@ def test_real_world_image_and_footnote_from_b_survive_merge():
 
 
 def test_parity_returns_document():
-    doc_a = Document(elements=[Paragraph(html_content="<p>Hello</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>Hello</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Hello</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>Hello</p>")])
     result = merge_documents(doc_a, doc_b)
     assert isinstance(result, Document)
 
@@ -272,8 +272,8 @@ def test_parity_empty_docs_return_empty_document():
 
 def test_parity_richer_paragraph_from_a_wins():
     """Richness selection is symmetric: A can win over B."""
-    doc_a = Document(elements=[Paragraph(html_content="<p><b>bold</b> text here</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>plain text here</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p><b>bold</b> text here</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>plain text here</p>")])
     result = merge_documents(doc_a, doc_b)
     assert "<b>" in result.paragraphs[0].html
 
@@ -289,11 +289,11 @@ def test_parity_metadata_records_source_parsers():
 
 def test_parity_insertions_enabled_includes_extra_b_elements():
     """Explicit positive case: allow_insertions_from_b=True includes B-only elements."""
-    doc_a = Document(elements=[Paragraph(html_content="<p>Shared content</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Shared content</p>")])
     doc_b = Document(
         elements=[
-            Paragraph(html_content="<p>Shared content</p>"),
-            Paragraph(html_content="<p>Extra only in B</p>"),
+            Paragraph(html="<p>Shared content</p>"),
+            Paragraph(html="<p>Extra only in B</p>"),
         ]
     )
     result = merge_documents(doc_a, doc_b, allow_insertions_from_b=True)

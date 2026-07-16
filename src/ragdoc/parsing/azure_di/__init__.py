@@ -5,11 +5,12 @@ from pydantic import BaseModel, Field
 
 from ragdoc.document import Document
 from ragdoc.parsing.azure_di.load import AzureDIBundle, generate_document_azure_di
-from ragdoc.parsing.base import load_file
 from ragdoc.parsing.parser import Parser
 
 
 class AzureJSONFile(BaseModel):
+    """Internal model describing an Azure DI JSON result file on disk (not part of the public API)."""
+
     file_path: str | Path
     source_path: str | Path | None = Field(
         default=None, description="Path to the source pdf file which lead to this json being produced"
@@ -17,26 +18,27 @@ class AzureJSONFile(BaseModel):
 
 
 class AzureAnalyzeRun(BaseModel):
+    """Internal model carrying an in-memory Azure DI analyze payload (not part of the public API)."""
+
     analyze_dict: dict
     source_path: str | Path | None = Field(
         default=None, description="Path to the source pdf file which lead to this json being produced"
     )
 
 
-@load_file.register
 def load_azure_json(file_obj: AzureJSONFile) -> Document:
-    """Parse an Azure DI JSON result file into a Document. Sets ``source_path`` and ``metadata["filename"]``."""
+    """Parse an Azure DI JSON result file into a Document.
+
+    Provenance (``source_path``, ``metadata["filename"]``) is stamped centrally by
+    :func:`ragdoc.parsing.load` — not here.
+    """
     file_path = Path(file_obj.file_path)
     bundle_source = Path(file_obj.source_path) if file_obj.source_path is not None else None
     with open(file_path) as fh:
         azure_bundle = AzureDIBundle(analyze_result=json.load(fh), source_path=bundle_source)
-    document = generate_document_azure_di(azure_bundle)
-    document.metadata["filename"] = file_path.name
-    document.source_path = str(file_path)
-    return document
+    return generate_document_azure_di(azure_bundle)
 
 
-@load_file.register
 def load_azure_analyze_result(analyze_run: AzureAnalyzeRun) -> Document:
     """Parse an in-memory Azure DI analyze result into a Document. Sets ``source_path`` and ``metadata["filename"]`` from ``source_path``."""
     source_path = Path(analyze_run.source_path) if analyze_run.source_path is not None else None
@@ -84,6 +86,25 @@ class AzureDIParser(Parser):
     patterns: list[str] = [".pdf"]
     priority: int = 40
     description: str = "PDF via Azure Document Intelligence"
+
+    def is_available(self) -> bool:
+        import importlib.util
+
+        from ragdoc.config import get_config
+
+        try:
+            if importlib.util.find_spec("azure.ai.documentintelligence") is None:
+                return False
+        except ModuleNotFoundError:  # a parent 'azure' namespace package is absent entirely
+            return False
+        cfg = get_config()
+        return bool(cfg.azure_key and cfg.azure_endpoint)
+
+    def unavailable_reason(self) -> str:
+        return (
+            "azure_di: install 'ragdoc[azure-di]' and configure azure_key/azure_endpoint "
+            "via ragdoc.configure(RagdocConfig(...))"
+        )
 
     async def __call__(self, path: Path) -> Document:
         return parse_pdf_azure_di(path)

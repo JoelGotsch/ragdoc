@@ -33,7 +33,11 @@ def _(mo):
     ## 1. Define a Custom Element
 
     `BaseElement.element_type` is typed as `str`, so any subclass can define its own `Literal` value.
-    No changes to `ElementTypeEnum` are needed.
+
+    Note: `Document.elements` is a **closed discriminated union** over the built-in element
+    types (`ElementType`), so a custom element cannot be stored inside a `Document` directly.
+    Custom elements shine as parser-side intermediates: parse into your custom model, then
+    map it onto the built-in element vocabulary (step 3 below) before building the `Document`.
     """)
     return
 
@@ -41,7 +45,9 @@ def _(mo):
 @app.cell
 def _():
     from typing import Literal
+
     from pydantic import Field
+
     from ragdoc.document import BaseElement
 
 
@@ -79,8 +85,8 @@ def _(mo):
 
 @app.cell
 def _(CalloutElement):
-    from ragdoc.rendering.elements import render_for_prompt
     from ragdoc.rendering.base import RenderContext
+    from ragdoc.rendering.elements import render_for_prompt
 
 
     @render_for_prompt.register(CalloutElement)
@@ -92,7 +98,7 @@ def _(CalloutElement):
             return f"<span>[{element.kind.upper()}: {element.title}]</span>"
         return element.html
 
-    return (render_for_prompt,)
+    return (RenderContext, render_for_prompt)
 
 
 @app.cell(hide_code=True)
@@ -104,6 +110,9 @@ def _(mo):
     A parser reads the source format and directly instantiates the appropriate element class.
 
     Below is a minimal parser for a made-up `.callout` format (one callout per line: `kind|title|body`).
+    It parses each line into a `CalloutElement`, then maps it onto the built-in vocabulary
+    (`RawText` carrying the callout's HTML) — because `Document.elements` only accepts the
+    built-in element types.
 
     ### 3a. Define a Parser subclass
 
@@ -117,7 +126,8 @@ def _(mo):
 @app.cell
 def _(CalloutElement):
     from pathlib import Path
-    from ragdoc.document import Document
+
+    from ragdoc.document import Document, RawText
     from ragdoc.parsing import register_parser
     from ragdoc.parsing.parser import Parser
 
@@ -132,19 +142,21 @@ def _(CalloutElement):
 
         async def __call__(self, path: Path) -> Document:
             elements = []
-            for line in path.read_text().splitlines():
+            for line in path.read_text().splitlines():  # noqa: ASYNC240 — doc example; sync read is fine here
                 line = line.strip()
                 if not line or line.startswith("#"):
                     continue
                 kind, title, body = line.split("|", maxsplit=2)
-                elements.append(CalloutElement(kind=kind.strip(), title=title.strip(), body=body.strip()))
+                callout = CalloutElement(kind=kind.strip(), title=title.strip(), body=body.strip())
+                # Document.elements is a closed union — store the callout's HTML as RawText
+                elements.append(RawText(html=callout.html))
 
             return Document(elements=elements, parser="callout")
 
 
     register_parser(CalloutParser())
 
-    return CalloutParser, Path, register_parser
+    return CalloutParser, Document, Path, register_parser
 
 
 @app.cell(hide_code=True)
@@ -157,23 +169,31 @@ def _(mo):
 
 @app.cell
 async def _(
+    CalloutElement,
+    Document,
     Path,
+    RenderContext,
     render_for_prompt,
 ):
     import tempfile
+
     from ragdoc.parsing import load
-    from ragdoc.rendering import Renderer, OutputFormat
-    sample = '# Sample callout file\ntip    | Use type hints      | Always annotate function signatures for better IDE support.\nwarning| Avoid mutable defaults | Never use a mutable default argument like `def f(x=[]):`.\n'
-    with tempfile.NamedTemporaryFile(suffix='.callout', mode='w', delete=False) as f:
+    from ragdoc.rendering import OutputFormat, Renderer
+    sample = "# Sample callout file\ntip    | Use type hints      | Always annotate function signatures for better IDE support.\nwarning| Avoid mutable defaults | Never use a mutable default argument like `def f(x=[]):`.\n"
+    with tempfile.NamedTemporaryFile(suffix=".callout", mode="w", delete=False) as f:
         f.write(sample)
         tmp_path = Path(f.name)
     # load() resolves to our registered CalloutParser via the .callout extension
     document = await load(tmp_path)
     print(f"Parsed {len(document.elements)} elements, parser='{document.parser}'")
     renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
-    print('\n--- PROMPT CONTENT ---')
+    print("\n--- PROMPT CONTENT ---")
     print(renderer.render(document))
-    return
+    # The registered singledispatch renderer also handles CalloutElement instances directly:
+    callout = CalloutElement(kind="note", title="Direct rendering", body="Custom elements render outside a Document too.")
+    print("\n--- DIRECT CalloutElement RENDER ---")
+    print(render_for_prompt(callout, RenderContext(document=Document())))
+    return (callout, document, renderer, tmp_path)
 
 
 @app.cell(hide_code=True)
@@ -183,8 +203,12 @@ def _(mo):
 
     To add a custom element type and parser:
 
-    1. **Subclass `BaseElement`** with a custom `element_type: Literal[...]` discriminator.
-    2. **Register renderers** via `render_for_prompt.register(YourElement)`.
+    1. **Subclass `BaseElement`** with a custom `element_type: Literal[...]` discriminator —
+       useful as a parser-side intermediate; `Document.elements` itself only accepts the
+       built-in element types, so map custom elements onto that vocabulary before building
+       the `Document`.
+    2. **Register renderers** via `render_for_prompt.register(YourElement)` for rendering
+       custom elements directly.
     3. **Subclass `Parser`** and call `register_parser()` — then `load()` picks it up automatically.
     """)
     return

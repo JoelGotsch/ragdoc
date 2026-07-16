@@ -113,3 +113,34 @@ async def test_configure_async_isolation_across_tasks():
         assert result == "parent-key"
 
     assert get_config().azure_key is None
+
+
+# =============================================================================
+# LLM client field (Phase 7: typed protocol instead of Any)
+# =============================================================================
+
+
+def test_openai_client_accepts_protocol_stub():
+    """Any object with chat + embeddings attributes satisfies the LLMClient protocol field."""
+    from unittest.mock import MagicMock
+
+    class _Stub:
+        chat = MagicMock()
+        embeddings = MagicMock()
+
+    config = RagdocConfig(openai_client=_Stub())
+    assert config.openai_client is not None
+
+
+def test_openai_client_rejects_non_client():
+    """An object with neither chat nor embeddings fails LLMClient validation."""
+    with pytest.raises(Exception, match=r"LLMClient|openai_client"):
+        RagdocConfig(openai_client=object())  # pyright: ignore[reportArgumentType]
+
+
+def test_default_models_bumped():
+    """Pin the current model defaults so the next drift is a conscious decision (gpt-4.x only:
+    every call site pins temperature=0.0, which reasoning-family models reject)."""
+    config = RagdocConfig()
+    assert config.default_llm_model == "gpt-4.1"
+    assert config.default_image_llm_model == "gpt-4.1"

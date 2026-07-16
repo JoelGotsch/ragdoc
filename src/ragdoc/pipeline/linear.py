@@ -1,8 +1,16 @@
-"""DocumentPipeline: linear facade over parse → process → split → chunk.
+"""IngestPipeline / ChunkPipeline and their direct-path composition, DocumentPipeline.
 
-:class:`DocumentPipeline` is the entry point for Scenario A (linear pipeline)
-and Scenario D (concurrent / streaming processing).  It wires together all
-four pipeline stages behind a single async interface.
+The pipeline is split at the two sync boundaries:
+
+* :class:`IngestPipeline` — Boundary 1 and the front of the direct path:
+  parse → process → stamp ``source_id``.  Cannot carry a splitter or chunker.
+* :class:`ChunkPipeline` — Boundary 2 and the back of the direct path:
+  split → chunk → mint chunk ids.  Cannot carry a parser or processors.
+* :class:`DocumentPipeline` — the direct path: ``IngestPipeline`` ∘ ``ChunkPipeline``,
+  plus fan-out (:meth:`DocumentPipeline.run_many` / :meth:`DocumentPipeline.stream`).
+
+Misplacing a stage is therefore a ``TypeError`` at construction (there is no parameter
+for it), not a runtime rejection.
 
 All methods are async.  For one-off synchronous use::
 
@@ -36,16 +44,43 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
+from ragdoc.chunking.provenance import resolve_chunk_provenance
 from ragdoc.metadata import TMetadata
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable
+
     from ragdoc.chunking import Chunk, Chunker
+    from ragdoc.chunking.provenance import ChunkIdFn
     from ragdoc.document import Document
-    from ragdoc.pipeline.parser import Parser
     from ragdoc.pipeline.splitter import TokenSplitter
     from ragdoc.processing.base import DocumentProcessor, ProcessingPipeline
+
+
+def required_metadata_keys(metadata_type: type[TMetadata]) -> frozenset[str]:
+    """Required keys of a metadata TypedDict, robust to PEP 563 stringified annotations.
+
+    Under ``from __future__ import annotations`` a ``Required[...]`` marker is stored as a
+    string, so ``__required_keys__`` computed at class creation misses it (and, dually, a
+    stringified ``NotRequired[...]`` in a ``total=True`` TypedDict is wrongly included).
+    Resolving the type hints recovers the true set.
+
+    Args:
+        metadata_type: A :class:`~ragdoc.metadata.BaseMetadata` subclass (TypedDict).
+
+    Returns:
+        The keys a document's metadata must contain to satisfy *metadata_type*.
+    """
+    from typing import get_origin
+
+    from typing_extensions import NotRequired, Required, get_type_hints
+
+    hints = get_type_hints(metadata_type, include_extras=True)
+    required_marked = {key for key, hint in hints.items() if get_origin(hint) is Required}
+    not_required_marked = {key for key, hint in hints.items() if get_origin(hint) is NotRequired}
+    return frozenset((set(metadata_type.__required_keys__) | required_marked) - not_required_marked)
 
 
 @dataclass
@@ -63,58 +98,43 @@ class PipelineResult:
     errors: list[tuple[Path, BaseException]] = field(default_factory=list)
 
 
-class DocumentPipeline(Generic[TMetadata]):
-    """Linear facade over parse → process → split → chunk.
+class IngestPipeline(Generic[TMetadata]):
+    """Boundary 1 + front of the direct path: parse → process → stamp ``source_id``.
 
-    Each call to :meth:`run` executes the four stages in sequence for a single
-    file.  :meth:`run_many` fans out across multiple files with an
-    :class:`asyncio.Semaphore`-based concurrency limit.  :meth:`stream` is a
-    memory-efficient alternative that yields chunk batches as each file
-    completes.
+    Produces whole :class:`~ragdoc.document.Document` objects — it has **no** splitter or
+    chunker parameter, so a Boundary-2 stage cannot be misconfigured onto it
+    (``TypeError`` at construction).  Used standalone by
+    :class:`~ragdoc.pipeline.document_store_pipeline.DocumentStorePipeline` and composed
+    into :class:`DocumentPipeline` for the direct path.
 
     Args:
-        parser: Converts a :class:`~pathlib.Path` to a
+        parser: Async callable converting a :class:`~pathlib.Path` to a
             :class:`~ragdoc.document.Document`.  Defaults to
-            :class:`~ragdoc.pipeline.parser.AutoParser`.
+            :func:`~ragdoc.parsing.load` (registry-based parser selection).
         processors: List of processors **or** a
             :class:`~ragdoc.processing.ProcessingPipeline`.  Optional — omit
             when no processing is needed.
-        splitter: Splits a :class:`~ragdoc.document.Document` into
-            sub-documents.  Optional — when ``None`` the whole document
-            becomes one chunk.  :class:`~ragdoc.pipeline.splitter.TokenSplitter`
-            is the recommended default.
-        chunker: Converts a :class:`~ragdoc.document.Document` to
-            :class:`~ragdoc.chunking.Chunk` (s).  Defaults to
-            :class:`~ragdoc.chunking.SimpleChunker`.
-        concurrency: Max files processed in parallel by :meth:`run_many` and
-            :meth:`stream` (default ``1`` — sequential).
-        on_error: ``"raise"`` (default) re-raises exceptions immediately.
-            ``"skip"`` catches per-file exceptions and collects them in
-            :attr:`PipelineResult.errors`.
+        source_id_fn: ``Path -> source_id`` identity function stamped onto every
+            parsed document (default: ``p.name``).
     """
 
     def __init__(
         self,
-        parser: Parser | None = None,
+        parser: Callable[[Path], Awaitable[Document]] | None = None,
         processors: list[DocumentProcessor] | ProcessingPipeline | None = None,
-        splitter: TokenSplitter | None = None,
-        chunker: Chunker | None = None,
-        source_id_fn: Callable[[Path], str] = lambda p: p.name,
-        concurrency: int = 1,
-        on_error: Literal["raise", "skip"] = "raise",
-        metadata_type: type[TMetadata] | None = None,
+        source_id_fn: Callable[[Path], str] | None = None,
     ) -> None:
-        from ragdoc.chunking import SimpleChunker
-        from ragdoc.pipeline.parser import AutoParser
         from ragdoc.processing.base import ProcessingPipeline as PP
 
-        self._parser: Parser | AutoParser = parser or AutoParser()
-        self._splitter = splitter
-        self._chunker: Chunker = chunker or SimpleChunker()
-        self._source_id_fn = source_id_fn
-        self._concurrency = concurrency
-        self._on_error = on_error
-        self._metadata_type = metadata_type
+        if parser is None:
+            from ragdoc.parsing import load
+
+            self._parser: Callable[[Path], Awaitable[Document]] = load
+            self._parser_name = "load"
+        else:
+            self._parser = parser
+            self._parser_name = getattr(parser, "__name__", None) or type(parser).__name__
+        self._source_id_fn: Callable[[Path], str] = source_id_fn if source_id_fn is not None else (lambda p: p.name)
 
         if processors is None:
             self._processing_pipeline: ProcessingPipeline = PP()
@@ -127,11 +147,223 @@ class DocumentPipeline(Generic[TMetadata]):
     def source_id_fn(self) -> Callable[[Path], str]:
         """The Path -> source_id function this pipeline stamps onto documents.
 
-        Read by sync pipelines (``VectorStorePipeline`` / ``DocumentStorePipeline``) so the
-        pre-parse collision/orphan checks use the same identity function — single source of
-        truth, no drift.
+        Read by the sync pipelines (``VectorStorePipeline`` / ``DocumentStorePipeline`` /
+        ``MentionStorePipeline``) so the pre-parse collision/orphan checks use the same
+        identity function — single source of truth, no drift.
         """
         return self._source_id_fn
+
+    async def run(self, source: Path) -> Document | None:
+        """Parse + process one file into a Document; ``None`` if a processor drops it.
+
+        Provenance (``document.parser`` / ``source_path`` / ``metadata["filename"]``) is
+        stamped via :func:`~ragdoc.parsing.registry.stamp_provenance` so the explicit-parser
+        path and the default :func:`~ragdoc.parsing.load` path produce identical provenance
+        (stamping fills only fields the parser left unset — a no-op after ``load()``).
+        ``source_id`` is stamped from ``source_id_fn`` (a pure function of the path); the
+        file-byte ``source_hash`` is a sync concern stamped by the sync pipelines.
+        """
+        from ragdoc.parsing.registry import stamp_provenance
+
+        logger.debug(f"Parsing {source.name}")
+        doc = await self._parser(source)
+        logger.debug(f"Parsed {source.name}: {len(doc.elements)} elements")
+        stamp_provenance(doc, source, self._parser_name)
+        doc.source_id = self._source_id_fn(source)
+        return await self._processing_pipeline.process(doc)
+
+
+class ChunkPipeline(Generic[TMetadata]):
+    """Boundary 2 + back of the direct path: split → chunk an already-processed Document.
+
+    Consumes :class:`~ragdoc.document.Document` objects that were parsed and processed
+    elsewhere (the direct path's :class:`IngestPipeline`, or a
+    :class:`~ragdoc.pipeline.stores.DocumentStore` at Boundary 2) — it has **no** parser
+    or processors parameter, so re-running the (destructive, non-idempotent) processor
+    chain on an already-processed document cannot be misconfigured (``TypeError`` at
+    construction).
+
+    Args:
+        splitter: Splits a :class:`~ragdoc.document.Document` into sub-documents.
+            Optional — when ``None`` the whole document becomes one chunk.
+            :class:`~ragdoc.pipeline.splitter.TokenSplitter` is the recommended default.
+        chunker: Converts a :class:`~ragdoc.document.Document` to
+            :class:`~ragdoc.chunking.Chunk` (s).  Defaults to
+            :class:`~ragdoc.chunking.SimpleChunker`.
+        chunk_id_fn: ``(source_id, split_sequence, chunk_ordinal, content_hash) -> id``
+            minted onto every chunk by :meth:`run`.  Defaults to
+            :func:`~ragdoc.chunking.provenance.mint_chunk_id` (deterministic,
+            collision-free across splits).
+        metadata_type: Optional TypedDict subclass of
+            :class:`~ragdoc.metadata.BaseMetadata`; when set, :meth:`run` validates that
+            all ``Required`` keys are present on the document's metadata.
+    """
+
+    def __init__(
+        self,
+        splitter: TokenSplitter | None = None,
+        chunker: Chunker | None = None,
+        chunk_id_fn: ChunkIdFn | None = None,
+        metadata_type: type[TMetadata] | None = None,
+    ) -> None:
+        from ragdoc.chunking import SimpleChunker
+        from ragdoc.chunking.provenance import mint_chunk_id
+
+        self._splitter = splitter
+        self._chunker: Chunker = chunker or SimpleChunker()
+        self._chunk_id_fn: ChunkIdFn = chunk_id_fn or mint_chunk_id
+        self._metadata_type = metadata_type
+
+    async def run(self, document: Document) -> list[Chunk[TMetadata]]:
+        """Split → chunk an already parsed-and-processed Document (no parsing, no processing).
+
+        Back half of :meth:`DocumentPipeline.run` and the Boundary-2 entry point for
+        re-chunking a Document read back from a
+        :class:`~ragdoc.pipeline.stores.DocumentStore`
+        (``VectorStorePipeline.from_document_store``).
+
+        **Processing is the caller's responsibility, not this method's.** The processor chain
+        runs exactly once — at ingest time on the direct path (:class:`IngestPipeline`) or at
+        Boundary 1 (:class:`~ragdoc.pipeline.document_store_pipeline.DocumentStorePipeline`).
+        This class deliberately cannot re-run it: doing so on an already-processed document is
+        both wasteful and **destructive**, because non-idempotent processors corrupt it (e.g.
+        ``LLMHeadingResolver(remove_elements_before_title=True)`` re-detects a title and strips
+        most elements; ``FootnoteProcessor`` re-resolves already-anchored footnotes onto the
+        wrong numerals, inserting duplicate refs).
+
+        Provenance is materialized **uniformly** here via
+        :func:`~ragdoc.chunking.provenance.resolve_chunk_provenance`: ``content_hash`` is
+        computed once from *document* and stamped on every chunk, and ``source_id`` /
+        ``source_hash`` are propagated to each split so a multi-split source produces chunks
+        that share one ``content_hash`` (required for Boundary-2 change detection).
+        ``source_hash`` may be ``None`` — it is never faked from the content hash.
+
+        **Chunk ids are minted here** (single id authority), by ``chunk_id_fn`` (default
+        :func:`~ragdoc.chunking.provenance.mint_chunk_id`) over ``(source_id,
+        split_sequence, chunk_ordinal, content_hash)``.  ``split_sequence`` comes from
+        positional enumeration of the splitter output (1-based — equal to
+        ``metadata["split_sequence"]`` whenever the splitter is ``split_document``, and
+        defined for any custom splitter); ``chunk_ordinal`` is the 0-based chunk index
+        within a split.  Identical-content splits of one source therefore get distinct ids.
+
+        Args:
+            document: A parsed, processed, and (optionally) provenance-stamped Document.
+
+        Returns:
+            List of chunks (one or more per split, depending on the chunker).
+        """
+        doc = document
+
+        if self._metadata_type is not None:
+            required = required_metadata_keys(self._metadata_type)
+            missing = required - set(doc.metadata.keys())
+            if missing:
+                raise ValueError(
+                    f"Document metadata is missing required fields: {sorted(missing)}. "
+                    f"Expected by {self._metadata_type.__name__} "
+                    "(parsers stamp 'filename'; processors must set custom Required keys)."
+                )
+
+        # Source-level provenance (uniform across all of this document's chunks).
+        prov = resolve_chunk_provenance(doc)
+
+        typed_doc: Document[TMetadata] = cast("Document[TMetadata]", doc)
+
+        # Splitting renders per element/group to measure token budgets — a pandoc-subprocess
+        # storm for non-HTML formats. Splitters are sync callables, so hop off the event loop
+        # at this orchestration boundary.
+        splits = await asyncio.to_thread(self._splitter, typed_doc) if self._splitter else [typed_doc]
+        logger.debug(f"Split into {len(splits)} sub-documents")
+
+        chunks: list[Chunk[TMetadata]] = []
+        for seq, split in enumerate(splits, 1):
+            split.source_id = prov.source_id
+            split.source_hash = prov.source_hash
+            split_chunks = await self._chunker.chunk(split)
+            for ordinal, chunk in enumerate(split_chunks):
+                chunk.content_hash = prov.content_hash
+                chunk.id = self._chunk_id_fn(prov.source_id, seq, ordinal, prov.content_hash)
+            chunks.extend(cast("list[Chunk[TMetadata]]", split_chunks))
+        logger.info(f"Chunked document {prov.source_id}: {len(chunks)} chunks produced")
+        return chunks
+
+
+class DocumentPipeline(Generic[TMetadata]):
+    """Direct path: :class:`IngestPipeline` ∘ :class:`ChunkPipeline`, plus fan-out.
+
+    Each call to :meth:`run` executes parse → process (``self.ingest``) then
+    split → chunk (``self.chunk``) for a single file.  :meth:`run_many` fans out across
+    multiple files with an :class:`asyncio.Semaphore`-based concurrency limit.
+    :meth:`stream` is a memory-efficient alternative that yields chunk batches as each
+    file completes.
+
+    Construct either from the two sub-pipelines (``ingest=`` / ``chunk=``) or from the
+    flat per-stage kwargs, which delegate into freshly built sub-pipelines.  Mixing a
+    sub-pipeline with its own stages' flat kwargs is a ``TypeError``.
+
+    Args:
+        ingest: Pre-built :class:`IngestPipeline` (parse → process).  Mutually exclusive
+            with ``parser`` / ``processors`` / ``source_id_fn``.
+        chunk: Pre-built :class:`ChunkPipeline` (split → chunk).  Mutually exclusive with
+            ``splitter`` / ``chunker`` / ``chunk_id_fn`` / ``metadata_type``.
+        parser: See :class:`IngestPipeline`.
+        processors: See :class:`IngestPipeline`.
+        source_id_fn: See :class:`IngestPipeline`.
+        splitter: See :class:`ChunkPipeline`.
+        chunker: See :class:`ChunkPipeline`.
+        chunk_id_fn: See :class:`ChunkPipeline`.
+        metadata_type: See :class:`ChunkPipeline`.
+        concurrency: Max files processed in parallel by :meth:`run_many` and
+            :meth:`stream` (default ``1`` — sequential).
+        on_error: ``"raise"`` (default) re-raises exceptions immediately.
+            ``"skip"`` catches per-file exceptions and collects them in
+            :attr:`PipelineResult.errors`.
+    """
+
+    def __init__(
+        self,
+        ingest: IngestPipeline[TMetadata] | None = None,
+        chunk: ChunkPipeline[TMetadata] | None = None,
+        *,
+        parser: Callable[[Path], Awaitable[Document]] | None = None,
+        processors: list[DocumentProcessor] | ProcessingPipeline | None = None,
+        source_id_fn: Callable[[Path], str] | None = None,
+        splitter: TokenSplitter | None = None,
+        chunker: Chunker | None = None,
+        chunk_id_fn: ChunkIdFn | None = None,
+        metadata_type: type[TMetadata] | None = None,
+        concurrency: int = 1,
+        on_error: Literal["raise", "skip"] = "raise",
+    ) -> None:
+        if ingest is not None and not (parser is None and processors is None and source_id_fn is None):
+            raise TypeError(
+                "DocumentPipeline: parser/processors/source_id_fn belong to the IngestPipeline — "
+                "configure them on the ingest= sub-pipeline, not alongside it."
+            )
+        if chunk is not None and not (
+            splitter is None and chunker is None and chunk_id_fn is None and metadata_type is None
+        ):
+            raise TypeError(
+                "DocumentPipeline: splitter/chunker/chunk_id_fn/metadata_type belong to the ChunkPipeline — "
+                "configure them on the chunk= sub-pipeline, not alongside it."
+            )
+        self.ingest: IngestPipeline[TMetadata] = (
+            ingest
+            if ingest is not None
+            else IngestPipeline(parser=parser, processors=processors, source_id_fn=source_id_fn)
+        )
+        self.chunk: ChunkPipeline[TMetadata] = (
+            chunk
+            if chunk is not None
+            else ChunkPipeline(splitter=splitter, chunker=chunker, chunk_id_fn=chunk_id_fn, metadata_type=metadata_type)
+        )
+        self._concurrency = concurrency
+        self._on_error = on_error
+
+    @property
+    def source_id_fn(self) -> Callable[[Path], str]:
+        """The Path -> source_id function (delegates to :attr:`ingest`)."""
+        return self.ingest.source_id_fn
 
     async def run(self, source: Path) -> list[Chunk[TMetadata]]:
         """Parse, process, split, and chunk a single file.
@@ -140,9 +372,14 @@ class DocumentPipeline(Generic[TMetadata]):
             source: Path to the source file.
 
         Returns:
-            List of :class:`~ragdoc.chunking.Chunk` objects.
+            List of :class:`~ragdoc.chunking.Chunk` objects (empty if a processor
+            filtered the document out).
         """
-        return await self._process_one(source)
+        doc = await self.ingest.run(source)
+        if doc is None:
+            logger.info("Document filtered out by processing pipeline")
+            return []
+        return await self.chunk.run(doc)
 
     async def run_many(
         self,
@@ -171,7 +408,7 @@ class DocumentPipeline(Generic[TMetadata]):
             nonlocal completed
             async with semaphore:
                 try:
-                    chunks = await self._process_one(path)
+                    chunks = await self.run(path)
                     result.chunks.extend(chunks)
                 except BaseException as exc:
                     if isinstance(exc, asyncio.CancelledError):
@@ -223,84 +460,17 @@ class DocumentPipeline(Generic[TMetadata]):
 
         async def _run_one(path: Path) -> list[Chunk]:
             async with semaphore:
-                return await self._process_one(path)
+                return await self.run(path)
 
         tasks = [asyncio.create_task(_run_one(p)) for p in source_list]
-        for coro in asyncio.as_completed(tasks):
-            batch = await coro
-            logger.debug(f"Stream batch yielded: {len(batch)} chunks")
-            yield batch
-
-    async def parse_and_process(self, source: Path) -> Document | None:
-        """Parse + process a file into a Document, **without** splitting or chunking.
-
-        Boundary-1 entry point for :class:`~ragdoc.pipeline.DocumentStorePipeline`, which
-        stores Documents (not chunks).  Returns ``None`` if a processor drops the document.
-        """
-        return await self._processing_pipeline.process(await self._parser(source))
-
-    async def _process_one(self, source: Path) -> list[Chunk[TMetadata]]:
-        logger.debug(f"Parsing {source.name}")
-        doc = await self._parser(source)
-        logger.debug(f"Parsed {source.name}: {len(doc.elements)} elements")
-        if not doc.source_path:
-            logger.warning(
-                f"Parser did not set source_path on document from {source}. "
-                "Set doc.source_path in your parser function."
-            )
-
-        # source_id is a pure function of the path (no I/O); set before chunking so it
-        # propagates onto every chunk. The file-byte source_hash is a sync concern and is
-        # stamped by the sync pipeline (VectorStorePipeline / DocumentStorePipeline).
-        doc.source_id = self._source_id_fn(source)
-        return await self.chunk_document(doc)
-
-    async def chunk_document(self, document: Document) -> list[Chunk[TMetadata]]:
-        """Process → split → chunk an already-parsed Document (skips parsing).
-
-        Shared tail of :meth:`run` and the entry point for re-chunking a Document read
-        back from a :class:`~ragdoc.pipeline.stores.DocumentStore` (Mode 2).
-
-        Provenance is materialized **uniformly** here: ``content_hash`` is computed once
-        from *document* and stamped on every chunk, and ``source_id`` / ``source_hash`` are
-        propagated to each split so a multi-split source produces chunks that share one
-        ``content_hash`` (required for Boundary-2 change detection).
-
-        Args:
-            document: A parsed (and optionally provenance-stamped) Document.
-
-        Returns:
-            List of chunks, or ``[]`` if the document is dropped by processing.
-        """
-        doc = await self._processing_pipeline.process(document)
-        if doc is None:
-            logger.info("Document filtered out by processing pipeline")
-            return []
-
-        if self._metadata_type is not None:
-            required = self._metadata_type.__required_keys__ - {"filename"}
-            missing = required - set(doc.metadata.keys())
-            if missing:
-                raise ValueError(
-                    f"Processors did not set required metadata fields: {missing}. "
-                    f"Expected by {self._metadata_type.__name__}."
-                )
-
-        # Source-level provenance (uniform across all of this document's chunks).
-        content_hash = doc.content_hash()
-        source_id = doc.source_id or doc.source_path or doc.id
-        source_hash = doc.source_hash or content_hash
-
-        typed_doc: Document[TMetadata] = cast("Document[TMetadata]", doc)
-
-        splits = self._splitter(typed_doc) if self._splitter else [typed_doc]
-        logger.debug(f"Split into {len(splits)} sub-documents")
-        for split in splits:
-            split.source_id = source_id
-            split.source_hash = source_hash
-
-        chunks: list[Chunk[TMetadata]] = [c for split in splits for c in await self._chunker.chunk(split)]
-        for chunk in chunks:
-            chunk.content_hash = content_hash
-        logger.info(f"Chunked document {source_id}: {len(chunks)} chunks produced")
-        return chunks
+        try:
+            for coro in asyncio.as_completed(tasks):
+                batch = await coro
+                logger.debug(f"Stream batch yielded: {len(batch)} chunks")
+                yield batch
+        finally:
+            # If the consumer stops iterating early or a task raises, the remaining
+            # tasks must not be abandoned: cancel and await them all.
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)

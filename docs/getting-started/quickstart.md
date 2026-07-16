@@ -7,94 +7,56 @@ This guide walks through a complete parsing → splitting → chunking pipeline.
 ## Minimal example
 
 ```python
-from ragdoc.parsing import load
-from ragdoc.rendering import Renderer, render_for_prompt, OutputFormat
-from ragdoc.splitting import split_by_headings
-from ragdoc.chunking import Chunk
+from pathlib import Path
+from ragdoc.pipeline import DocumentPipeline, TokenSplitter
 
-# 1. Parse — infers parser from extension
-document = await load("report.docx")
-
-# 2. Split into sections at heading boundaries
-sections = split_by_headings(document)
-
-# 3. Render and chunk
-renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
-
-chunks = [
-    Chunk(
-        prompt_content=renderer.render(doc),
-        embedding_content=renderer.render(doc),
-        filename=doc.filename,
-        source_path=doc.source_path,
-        metadata=doc.metadata,
-    )
-    for doc in sections
-]
+pipeline = DocumentPipeline(splitter=TokenSplitter(max_tokens=4000))
+chunks = await pipeline.run(Path("report.docx"))
 
 print(f"Produced {len(chunks)} chunks")
 print(chunks[0].prompt_content[:500])
 ```
 
-> **Tip:** For the full pipeline in one call — including concurrent processing, error
-> handling, and incremental vector-store sync — use
-> [`DocumentPipeline`](../guide/pipeline.md).
+`DocumentPipeline` wires together parse → process → split → chunk in one call: the parser
+is inferred from the file extension, `TokenSplitter` splits at heading boundaries within a
+token budget, and the default `SimpleChunker` renders each split into a `Chunk`
+(with `embedding_content = prompt_content`).
+
+> **Tip:** For concurrent multi-file processing, error handling, and incremental
+> vector-store sync, see the [Pipeline guide](../guide/pipeline.md).
 
 ## With LLM enrichment
 
 Add processing steps between parsing and splitting to enrich the document:
 
 ```python
-from ragdoc.parsing import load
-from ragdoc.rendering import Renderer, render_for_prompt, OutputFormat
-from ragdoc.config import configure, RagdocConfig
-from ragdoc.processing import (
-    ProcessingPipeline,
-    HeadingLevelProcessor,
-    TitleDetectionProcessor,
-    ImageSummaryProcessor,
-)
-from ragdoc.splitting import split_by_headings
-from ragdoc.chunking import Chunk
-from openai import AsyncOpenAI
 import asyncio
+from pathlib import Path
+
+from openai import AsyncOpenAI
+
+from ragdoc.chunking import Chunk
+from ragdoc.pipeline import DocumentPipeline, TokenSplitter
+from ragdoc.processing import (
+    HeadingLevelProcessor,
+    ImageSummaryProcessor,
+    TitleDetectionProcessor,
+    openai_image_summarizer,
+)
 
 
 async def build_chunks(file_path: str) -> list[Chunk]:
-    config = RagdocConfig(
-        openai_client=AsyncOpenAI(),
-        default_llm_model="gpt-4o-mini",
-        default_image_llm_model="gpt-4o",
+    client = AsyncOpenAI()  # reads OPENAI_API_KEY from the environment
+
+    pipeline = DocumentPipeline(
+        processors=[
+            HeadingLevelProcessor(),
+            TitleDetectionProcessor(),
+            ImageSummaryProcessor(summarize=openai_image_summarizer(client, model="gpt-4o")),
+        ],
+        splitter=TokenSplitter(max_tokens=4000),
     )
-
-    with configure(config):
-        # 1. Parse
-        document = await load(file_path)
-
-        # 2. Process: refine headings, detect title, summarize images
-        pipeline = ProcessingPipeline()
-        pipeline.add(HeadingLevelProcessor())
-        pipeline.add(TitleDetectionProcessor())
-        pipeline.add(ImageSummaryProcessor())
-
-        document = await pipeline.process(document)
-
-        # 3. Split
-        sections = split_by_headings(document)
-
-        # 4. Chunk — SimpleChunker sets embedding_content = prompt_content
-        renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
-
-        chunks = [
-            Chunk(
-                prompt_content=renderer.render(doc),
-                embedding_content=renderer.render(doc),
-                metadata=doc.metadata,
-            )
-            for doc in sections
-        ]
-
-    return chunks
+    return await pipeline.run(Path(file_path))
 
 
 chunks = asyncio.run(build_chunks("report.docx"))

@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-import requests
+import httpx
 from bs4 import BeautifulSoup, Tag
 from bs4.element import NavigableString
 
@@ -143,9 +143,10 @@ def generate_image(image: Tag) -> Image | None:
         return Image(image=content, image_type=image_type, **kwargs)
     elif download_images and (image_src.startswith("https://") or image_src.startswith("http://")):
         try:
-            response = requests.get(image_src)
-        except requests.exceptions.ConnectionError:
-            logger.warning(f"Failed to download image {image_src}: connection error")
+            response = httpx.get(image_src, timeout=10.0, follow_redirects=True)
+        except httpx.HTTPError:
+            # Covers connect errors AND timeouts — a dead host must not hang the parse.
+            logger.warning(f"Failed to download image {image_src}: transport error")
             return None
         if response.status_code == 200:
             content = base64.b64encode(response.content).decode("utf-8")
@@ -177,17 +178,17 @@ def handle_tag(element: Tag, document: Document) -> None:
     match element.name:
         case "p" | "div":
             images = _handle_images(element)
-            document_paragraph = Paragraph(html_content=str(element).strip())
+            document_paragraph = Paragraph(html=str(element))
             document.elements.append(document_paragraph)
             document.elements.extend(images)
         case "table":
             images = _handle_images(element)
-            document.elements.append(Table(html_content=str(element).strip()))
+            document.elements.append(Table(html=str(element)))
             document.elements.extend(images)
 
         case "ul" | "ol" | "dl":
             images = _handle_images(element)
-            document.elements.append(DocumentList(html_content=str(element).strip()))
+            document.elements.append(DocumentList(html=str(element)))
             document.elements.extend(images)
         case "img":
             document_image = generate_image(element)
@@ -215,9 +216,9 @@ def _reconstruct_footnote_refs(document: Document) -> None:
     if not id_to_fn:
         return
     for element in document.elements:
-        if not hasattr(element, "html_content"):
+        if not isinstance(element, (Heading, Paragraph, Table, DocumentList)):
             continue
-        soup = BeautifulSoup(getattr(element, "html_content"), "html.parser")
+        soup = BeautifulSoup(element.html, "html.parser")
         changed = False
         for a in soup.find_all("a", href=True):
             href = str(a.get("href", ""))
@@ -228,7 +229,7 @@ def _reconstruct_footnote_refs(document: Document) -> None:
                     a.replace_with(BeautifulSoup(fn.placeholder_html, "html.parser"))
                     changed = True
         if changed:
-            setattr(element, "html_content", str(soup))
+            element.html = str(soup)
 
 
 def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | None = None) -> Document:
@@ -268,11 +269,9 @@ def generate_document(html: HTML, soup_transformers: list[TSoupTransformer] | No
             element.name == "p" and "class" in element.attrs and "heading" in element.attrs["class"]
         ):
             heading_innerhtml = element.decode_contents(formatter="html")
-            heading_level = int("6" if element.name == "p" else element.name.replace("h", ""))
-            # Heading accepts innerhtml/level via a pydantic model_validator(mode="before") (see document.py).
-            document.elements.append(
-                Heading(innerhtml=heading_innerhtml, level=heading_level)  # type: ignore[call-arg]
-            )
+            # h7+ tags (a pandoc docx artifact) are clamped to level 6, matching p.heading handling.
+            heading_level = min(int("6" if element.name == "p" else element.name.replace("h", "")), 6)
+            document.elements.append(Heading(html=f"<h{heading_level}>{heading_innerhtml}</h{heading_level}>"))
         else:
             handle_tag(element, document)
     document.parser = "html"

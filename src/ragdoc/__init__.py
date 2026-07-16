@@ -1,28 +1,68 @@
+"""ragdoc — parse, process, split, and chunk documents for LLM/RAG pipelines."""
+
 import logging
 
 logging.getLogger("ragdoc").addHandler(logging.NullHandler())
 
-from ragdoc.chunking import Chunk
-from ragdoc.document import Document
-from ragdoc.metadata import (
-    BaseMetadata,
-    MetadataDict,
-    MetadataValue,
-    TMetadata,
-    metadata_json_schema,
+from ragdoc.chunking import Chunk, LLMChunker, SimpleChunker
+from ragdoc.config import RagdocConfig, configure
+from ragdoc.document import (
+    BaseElement,
+    Document,
+    DocumentList,
+    ExternalRef,
+    Footnote,
+    Heading,
+    Image,
+    InlineRef,
+    Paragraph,
+    RawText,
+    Table,
 )
-from ragdoc.parsing import (
-    AzureAnalyzeRun,
-    AzureJSONFile,
-    DocumentSource,
-    ExcelSource,
-    HTMLSource,
-    PandocFile,
-    WordFile,
-    from_path,
-    load_document,
+from ragdoc.llm import ChatClient, EmbeddingsClient, LLMClient
+from ragdoc.metadata import BaseMetadata
+from ragdoc.parsing import load
+from ragdoc.pipeline import (
+    ChangeSet,
+    ChunkPipeline,
+    DocumentPipeline,
+    DocumentStorePipeline,
+    IngestPipeline,
+    TokenSplitter,
+    UpdateResult,
+    VectorStorePipeline,
 )
-from ragdoc.processing.base import DocumentProcessor, ProcessingPipeline
-from ragdoc.processing.heading import HeadingLevelProcessor, TitleDetectionProcessor
-from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt, render_raw
-from ragdoc.splitting import split_by_headings, split_hierarchical
+from ragdoc.splitting import split_document
+
+__all__ = [
+    "BaseElement",
+    "BaseMetadata",
+    "ChangeSet",
+    "ChatClient",
+    "Chunk",
+    "ChunkPipeline",
+    "Document",
+    "DocumentList",
+    "DocumentPipeline",
+    "DocumentStorePipeline",
+    "EmbeddingsClient",
+    "ExternalRef",
+    "Footnote",
+    "Heading",
+    "Image",
+    "IngestPipeline",
+    "InlineRef",
+    "LLMChunker",
+    "LLMClient",
+    "Paragraph",
+    "RagdocConfig",
+    "RawText",
+    "SimpleChunker",
+    "Table",
+    "TokenSplitter",
+    "UpdateResult",
+    "VectorStorePipeline",
+    "configure",
+    "load",
+    "split_document",
+]

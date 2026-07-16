@@ -1,7 +1,7 @@
 """Unit tests for HTML parsing functions (generate_document, unwrap_structural, etc.).
 
 These tests call generate_document directly with test HTML files rather than
-going through load_file, making them lower-level unit tests.
+going through load(), making them lower-level unit tests.
 """
 
 from ragdoc.parsing.html.load import HTML, generate_document, unwrap_structural
@@ -153,3 +153,43 @@ def test_no_heading(html_data_path):
     assert "I kind of should be a heading" in combined_text
     assert "Footer content" in combined_text
     assert document.title == "Aribrary nested document"
+
+
+def test_generate_image_transport_error_returns_none(monkeypatch, caplog):
+    """A dead/hanging image host must yield None (not hang or crash) — Phase 0, bug 5."""
+    import logging
+
+    import httpx
+    from bs4 import BeautifulSoup
+
+    from ragdoc.parsing.html.load import generate_image
+
+    def raise_timeout(url, **kwargs):
+        raise httpx.ConnectTimeout("timed out")
+
+    monkeypatch.setattr("ragdoc.parsing.html.load.httpx.get", raise_timeout)
+    tag = BeautifulSoup('<img src="https://dead.example/x.png"/>', "html.parser").find("img")
+    with caplog.at_level(logging.WARNING):
+        assert generate_image(tag) is None
+    assert any("Failed to download" in r.message for r in caplog.records)
+
+
+def test_generate_image_passes_explicit_timeout(monkeypatch):
+    """The image download must always carry an explicit timeout — Phase 0, bug 5."""
+    from types import SimpleNamespace
+
+    from bs4 import BeautifulSoup
+
+    from ragdoc.parsing.html.load import generate_image
+
+    seen: dict = {}
+
+    def fake_get(url, **kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(status_code=200, content=b"abc")
+
+    monkeypatch.setattr("ragdoc.parsing.html.load.httpx.get", fake_get)
+    tag = BeautifulSoup('<img src="https://example.com/x.png"/>', "html.parser").find("img")
+    image = generate_image(tag)
+    assert image is not None
+    assert seen.get("timeout") is not None

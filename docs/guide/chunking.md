@@ -3,32 +3,34 @@
 > Run interactively: `marimo edit docs/notebooks/chunking.py`
 
 Chunking is the final stage of the pipeline. It materializes a [`Document`](document-model.md)
-(or split section) into a [`Chunk`](../api/chunking.md#Chunk) — a
+(or split section) into a [`Chunk`](../api/chunking.md#chunk) — a
 flat, self-contained record ready to be loaded into a vector store.
 
 ## What is a Chunk?
 
-A [`Chunk`](../api/chunking.md#Chunk) is a Pydantic model with:
+A [`Chunk`](../api/chunking.md#chunk) is a Pydantic model with:
 
 | Field | Description |
 |-------|-------------|
-| `id` | Unique identifier (UUID string) |
+| `id` | Unique identifier (UUID string; minted deterministically by `ChunkPipeline.run`) |
 | `prompt_content` | Full-fidelity text for LLM context windows and BM25 search |
 | `embedding_content` | Compact semantic text for dense vector search |
-| `metadata["filename"]` | Name of the source file (set by parsers in `document.metadata`) |
 | `source_path` | Full path to the source file (propagated from `Document.source_path`) |
-| `metadata` | Key-value metadata from the source document |
-| `embedding` | Optional pre-computed embedding vector (list[float]) |
+| `source_id` | Stable source identity used for incremental sync (from `IngestPipeline`'s `source_id_fn`) |
+| `source_hash` | SHA-256 of the raw source-file bytes (`None` outside the sync pipelines) |
+| `content_hash` | Canonical-JSON hash of the parsed document content |
+| `metadata` | Key-value metadata from the source document (includes `metadata["filename"]`, set by parsers) |
+| `named_embeddings` | Embedding vectors keyed by embedder name (populated by `VectorStorePipeline`) |
 | `created_at` | Timestamp of creation |
 
 For `SimpleChunker`, `embedding_content` equals `prompt_content`. Only `LLMChunker` produces distinct `embedding_content` per topic.
 
 ## Creating chunks
 
-Combine the [`Renderer`](../api/rendering.md#Renderer) with `Chunk`:
+Combine the [`Renderer`](../api/rendering.md#renderer) with `Chunk`:
 
 ```python
-from ragdoc import Renderer, render_for_prompt, OutputFormat
+from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
 from ragdoc.chunking import Chunk
 from ragdoc.splitting import split_by_headings
 
@@ -41,12 +43,11 @@ renderer = Renderer(
     metadata_keys=["source", "date"],
 )
 
-# SimpleChunker sets embedding_content = prompt_content
+# SimpleChunker does exactly this: embedding_content = prompt_content
 chunks = [
     Chunk(
-        prompt_content=renderer.render(section),
-        embedding_content=renderer.render(section),
-        filename=section.filename,
+        prompt_content=(rendered := renderer.render(section)),
+        embedding_content=rendered,
         source_path=section.source_path,
         metadata=section.metadata,
     )
@@ -54,11 +55,21 @@ chunks = [
 ]
 ```
 
+In practice, prefer `SimpleChunker` (or a `ChunkPipeline`, which also mints deterministic
+chunk ids and stamps provenance) over constructing `Chunk` objects by hand:
+
+```python
+from ragdoc.chunking import SimpleChunker
+
+chunker = SimpleChunker(prompt_renderer=renderer)
+chunks = [chunk for section in sections for chunk in await chunker.chunk(section)]
+```
+
 ## Provenance fields
 
-`filename` and `source_path` are explicit first-class fields on `Chunk` (not stored in
-`metadata`). They are propagated automatically through splitting, so every split section
-already carries them — chunkers just forward them:
+`source_path`, `source_id`, `source_hash`, and `content_hash` are explicit first-class
+fields on `Chunk`; the bare filename lives in `metadata["filename"]` (written by parsers
+onto the `Document` and propagated automatically through splitting):
 
 ```python
 # Parsers set these; they propagate through splits automatically:
@@ -70,6 +81,7 @@ chunk = Chunk(
     prompt_content=...,
     embedding_content=...,
     source_path=section.source_path,
+    metadata=section.metadata,  # carries metadata["filename"]
 )
 ```
 
@@ -87,14 +99,9 @@ document.metadata["year"] = 2024
 
 ## Loading into a vector store
 
-`Chunk` is designed to map directly to vector store document schemas.
-For LlamaIndex, use the integration helper:
-
-```python
-from ragdoc.integrations.llama_index import document_fragment_to_node_dict
-
-node_dicts = [document_fragment_to_node_dict(f) for f in chunks]
-```
+`Chunk` is designed to map directly to vector store document schemas. Use
+[`VectorStorePipeline`](../api/pipeline.md#vectorstorepipeline) to embed and
+upsert chunks with incremental change detection.
 
 ## Prompt vs embedding content
 
@@ -111,6 +118,6 @@ but shared `prompt_content`.
 ## See Also
 
 - [API Reference: Chunking](../api/chunking.md)
-- [API Reference: Integrations](../api/integrations.md) — LlamaIndex helpers
+- [API Reference: Integrations](../api/integrations.md) — vector store integrations
 - [Rendering Guide](rendering.md) — understanding the rendering system
 - [Splitting Guide](splitting.md) — preparing documents before chunking

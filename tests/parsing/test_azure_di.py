@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from ragdoc.parsing import AzureJSONFile, load_file
+from ragdoc.parsing.azure_di import AzureJSONFile, load_azure_json
 
 
 def test_load_json_file(azure_test_pdf_json_file_path: Path, data_path: Path):
     # Test loading azure json file without adding a source pdf
-    document = load_file(AzureJSONFile(file_path=azure_test_pdf_json_file_path))
+    document = load_azure_json(AzureJSONFile(file_path=azure_test_pdf_json_file_path))
 
     assert document.name == "New super amazing Document"
     assert len(document.paragraphs) == 18
@@ -13,7 +13,9 @@ def test_load_json_file(azure_test_pdf_json_file_path: Path, data_path: Path):
     assert len(document.images) == 0
 
     # Test loading azure json file with adding a source pdf
-    document = load_file(AzureJSONFile(file_path=azure_test_pdf_json_file_path, source_path=data_path / "test.pdf"))
+    document = load_azure_json(
+        AzureJSONFile(file_path=azure_test_pdf_json_file_path, source_path=data_path / "test.pdf")
+    )
 
     assert document.name == "New super amazing Document"
     assert len(document.headings) == 5
@@ -33,7 +35,7 @@ TO SEND TO YOUR FRIENDS
 
 def test_load_json_file_no_figures(azure_test_pdf_json_file_path_no_figures: Path, data_path: Path):
     # Test loading azure json file with adding a source pdf
-    document = load_file(
+    document = load_azure_json(
         AzureJSONFile(file_path=azure_test_pdf_json_file_path_no_figures, source_path=data_path / "test.pdf")
     )
 
@@ -46,7 +48,9 @@ def test_load_json_file_no_figures(azure_test_pdf_json_file_path_no_figures: Pat
 
 def test_recovered_heading_information(azure_test_pdf_json_file_path: Path, data_path: Path):
     # Test loading azure json file with adding a source pdf
-    document = load_file(AzureJSONFile(file_path=azure_test_pdf_json_file_path, source_path=data_path / "test.pdf"))
+    document = load_azure_json(
+        AzureJSONFile(file_path=azure_test_pdf_json_file_path, source_path=data_path / "test.pdf")
+    )
 
     headings = [h.text for h in document.headings]
     assert headings == [
@@ -61,22 +65,21 @@ def test_recovered_heading_information(azure_test_pdf_json_file_path: Path, data
 
 
 def test_azure_json_metadata(azure_test_pdf_json_file_path: Path):
-    """Test document source fields are correctly set from AzureJSONFile."""
-    document = load_file(AzureJSONFile(file_path=azure_test_pdf_json_file_path))
-    assert document.metadata["filename"] == "test_pdf_azure_di.json"
-    assert Path(document.source_path).match("*/tests/data/test_pdf_azure_di.json")
+    """load_azure_json sets only parser-specific fields; provenance is stamped by parsing.load()."""
+    document = load_azure_json(AzureJSONFile(file_path=azure_test_pdf_json_file_path))
+    assert document.source_path == ""
+    assert "filename" not in document.metadata
 
 
 def test_azure_analyze_run_metadata(azure_test_pdf_json_file_path: Path, data_path: Path):
     """Test document source fields use source_path when provided."""
     import json
 
-    from ragdoc.parsing import load_file
-    from ragdoc.parsing.azure_di import AzureAnalyzeRun
+    from ragdoc.parsing.azure_di import AzureAnalyzeRun, load_azure_analyze_result
 
     with open(azure_test_pdf_json_file_path) as fh:
         analyze_dict = json.load(fh)
     source = data_path / "test.pdf"
-    document = load_file(AzureAnalyzeRun(analyze_dict=analyze_dict, source_path=source))
+    document = load_azure_analyze_result(AzureAnalyzeRun(analyze_dict=analyze_dict, source_path=source))
     assert document.metadata["filename"] == "test.pdf"
     assert Path(document.source_path).match("*/tests/data/test.pdf")

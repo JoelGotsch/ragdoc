@@ -211,7 +211,7 @@ def _render_footnote_raw(
 # =============================================================================
 
 
-def serialize_metadata_value(value: MetadataValue) -> str:
+def format_metadata_value(value: MetadataValue) -> str:
     """Serialize a single metadata value to a plain string for HTML/YAML output.
 
     Delegates to ``ragdoc.metadata.serialize_metadata_value`` for the canonical
@@ -243,15 +243,15 @@ def _metadata_to_html(data: DocumentMetadata) -> str:
     class "document-metadata" so _convert() can locate it when building
     a full HTML document for pandoc's --standalone mode.
 
-    Values are serialized via serialize_metadata_value() and HTML-escaped.
+    Values are formatted via format_metadata_value() and HTML-escaped.
     None values are skipped.
     """
     parts: list[str] = []
     if (raw_title := data.get("title")) is not None:
-        parts.append(f"<h1>{escape(serialize_metadata_value(raw_title))}</h1>")
+        parts.append(f"<h1>{escape(format_metadata_value(raw_title))}</h1>")
     other = {k: v for k, v in data.items() if k != "title" and v is not None}
     if other:
-        dt_dd = "".join(f"<dt>{escape(k)}</dt><dd>{escape(serialize_metadata_value(v))}</dd>" for k, v in other.items())
+        dt_dd = "".join(f"<dt>{escape(k)}</dt><dd>{escape(format_metadata_value(v))}</dd>" for k, v in other.items())
         parts.append(f"<dl>{dt_dd}</dl>")
     return f'<header class="document-metadata">{"".join(parts)}</header>' if parts else ""
 

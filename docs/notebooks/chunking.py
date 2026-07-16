@@ -32,6 +32,8 @@ def _(mo):
     | Field | Description |
     |-------|-------------|
     | `id` | Unique identifier (UUID string) |
+    | `source_id` | Sync identity key of the source document (required) |
+    | `source_hash` | SHA-256 of the source file bytes (required; chunkers fall back to `Document.content_hash()`) |
     | `prompt_content` | Full-fidelity text for LLM context windows and BM25 search |
     | `embedding_content` | Compact semantic text for dense vector search |
     | `metadata` | Key-value metadata from the source document |
@@ -51,10 +53,10 @@ def _():
     sample_doc = Document(
         title="Q3 Report",
         elements=[
-            Heading(innerhtml="Q3 Report", level=1),
-            Paragraph(html_content="<p>Revenue increased by 12% year-over-year.</p>"),
-            Heading(innerhtml="Financial Summary", level=2),
-            Table(html_content=(
+            Heading(html="<h1>Q3 Report</h1>"),
+            Paragraph(html="<p>Revenue increased by 12% year-over-year.</p>"),
+            Heading(html="<h2>Financial Summary</h2>"),
+            Table(html=(
                 "<table>"
                 "<tr><th>Metric</th><th>Q3 2023</th><th>Q3 2024</th></tr>"
                 "<tr><td>Revenue</td><td>$10M</td><td>$11.2M</td></tr>"
@@ -82,8 +84,8 @@ def _(mo):
 
 @app.cell
 def _(sample_doc):
-    from ragdoc import Renderer, render_for_prompt, OutputFormat
     from ragdoc.chunking import Chunk
+    from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
     from ragdoc.splitting import split_by_headings
 
     sections = split_by_headings(sample_doc)
@@ -100,6 +102,10 @@ def _(sample_doc):
         Chunk(
             prompt_content=renderer.render(section),
             embedding_content=renderer.render(section),
+            # source_id / source_hash are required: DocumentPipeline stamps them from the
+            # source path; when building chunks by hand, fall back to document identity.
+            source_id="q3_report.docx",
+            source_hash=section.content_hash(),
             metadata=section.metadata,
         )
         for section in sections
@@ -160,15 +166,14 @@ def _(mo):
     mo.md(r"""
     ## Loading into a vector store
 
-    `Chunk` is designed to map directly to vector store document schemas. For LlamaIndex:
+    `Chunk` is designed to map directly to vector store document schemas. Use
+    `VectorStorePipeline` to embed and upsert chunks with incremental change detection.
     """)
     return
 
 
 @app.cell
 def _(chunks):
-    # from ragdoc.integrations.llama_index import document_fragment_to_node_dict
-    # node_dicts = [document_fragment_to_node_dict(c) for c in chunks]
     print(f"Chunks ready for upsert: {len(chunks)}")
     print(f"First chunk id: {chunks[0].id}")
     return
@@ -180,7 +185,7 @@ def _(mo):
     ## See Also
 
     - [API Reference: Chunking][ragdoc.chunking]
-    - [API Reference: Integrations][ragdoc.integrations] — LlamaIndex helpers
+    - [API Reference: Integrations][ragdoc.integrations] — vector store integrations
     - [Rendering notebook](rendering.py) — understanding the two rendering paths
     - [Splitting notebook](splitting.py) — preparing documents before chunking
     """)

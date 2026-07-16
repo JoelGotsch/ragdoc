@@ -30,7 +30,7 @@ from ragdoc.merging.heuristics import (
     select_table,
 )
 from ragdoc.merging.patch import PatchOperation, PatchOperationType
-from ragdoc.utils.helpers import _normalize_text
+from ragdoc.utils.helpers import normalize_text
 
 # Primary element types that drive alignment (text-bearing elements)
 _PRIMARY_TYPES = frozenset(
@@ -49,7 +49,7 @@ def alignment_key(element: ElementType) -> str:
 
     - ``Image`` → unique per-element sentinel (never auto-aligned)
     - ``Footnote`` → ``"__footnote__{number}"`` (aligned by footnote number)
-    - All others → ``_normalize_text(element.text)``
+    - All others → ``normalize_text(element.text)``
 
     Args:
         element: Element to produce a key for.
@@ -61,7 +61,7 @@ def alignment_key(element: ElementType) -> str:
         return f"__image__{element.id}"
     if isinstance(element, Footnote):
         return f"__footnote__{element.number}"
-    return _normalize_text(element.text)
+    return normalize_text(element.text)
 
 
 def _is_insertion_allowed(
@@ -113,7 +113,7 @@ def _group_with_trailing(
             # Secondary element
             if current_anchor is None:
                 # Before first primary — create a dummy anchor
-                current_anchor = RawText(innerhtml="")
+                current_anchor = RawText(html="")
             current_trailing.append(element)
 
     if current_anchor is not None:
@@ -133,10 +133,12 @@ def _with_injected_markup(winner: ElementType, loser: ElementType) -> ElementTyp
     new_html = inject_inline_markup(winner.html, loser.html)
     if new_html == winner.html:
         return winner
-    if isinstance(winner, Paragraph):
-        return winner.model_copy(update={"html_content": new_html})
-    if isinstance(winner, Heading):
-        return winner.model_copy(update={"innerhtml": new_html})
+    if isinstance(winner, (Paragraph, Heading)):
+        # Copy-then-assign: assignment routes through the normalizing html field validator.
+        # Never model_copy(update={"html": ...}) — update= bypasses field validators.
+        updated = winner.model_copy()
+        updated.html = new_html
+        return updated
     return winner  # unsupported type — return as-is
 
 
@@ -260,7 +262,7 @@ def align_elements(  # noqa: C901  (inherently branchy alignment/merge algorithm
 
     for opcode, i1, i2, j1, j2 in matcher.get_opcodes():
         if opcode == "equal":
-            for idx_a, idx_b in zip(range(i1, i2), range(j1, j2)):
+            for idx_a, idx_b in zip(range(i1, i2), range(j1, j2), strict=True):
                 anchor_a, trailing_a = groups_a[idx_a]
                 anchor_b, trailing_b = groups_b[idx_b]
                 etype = ElementTypeEnum(anchor_a.element_type)
@@ -313,7 +315,7 @@ def align_elements(  # noqa: C901  (inherently branchy alignment/merge algorithm
             if ratio >= similarity_threshold or (len_a == len_b == 1):
                 if len_a == len_b:
                     # Equal-length groups: 1:1 element-wise merge
-                    for idx_a, idx_b in zip(range(i1, i2), range(j1, j2)):
+                    for idx_a, idx_b in zip(range(i1, i2), range(j1, j2), strict=True):
                         anchor_a, trailing_a = groups_a[idx_a]
                         anchor_b, trailing_b = groups_b[idx_b]
                         ea = [anchor_a, *trailing_a]

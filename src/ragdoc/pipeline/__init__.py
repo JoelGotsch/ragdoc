@@ -1,5 +1,9 @@
 """ragdoc.pipeline — high-level pipeline facade.
 
+The pipeline is split at the two sync boundaries: :class:`IngestPipeline`
+(parse → process; Boundary 1) and :class:`ChunkPipeline` (split → chunk;
+Boundary 2).  :class:`DocumentPipeline` composes both for the direct path.
+
 Scenario A: linear pipeline
     :class:`DocumentPipeline` composes parse → process → split → chunk into a
     single async call.
@@ -29,33 +33,58 @@ Quick start::
     result = await pipeline.run_many(paths, concurrency=4)
 """
 
+from ragdoc.llm import EmbeddingsClient
+from ragdoc.parsing.parser import Parser
 from ragdoc.pipeline.changeset import ChangeSet, SourceChange
 from ragdoc.pipeline.document_store_pipeline import DocumentStorePipeline
-from ragdoc.pipeline.embedders import Embedder, EmbedderConfig, embedding_content_text, prompt_content_text
-from ragdoc.pipeline.linear import DocumentPipeline, PipelineResult
+from ragdoc.pipeline.embedders import (
+    Embedder,
+    EmbedderConfig,
+    OpenAIEmbedder,
+    embedding_content_text,
+    prompt_content_text,
+)
+from ragdoc.pipeline.linear import ChunkPipeline, DocumentPipeline, IngestPipeline, PipelineResult
 from ragdoc.pipeline.local_document_store import LocalDocumentStore
-from ragdoc.pipeline.parser import AutoParser, Parser
 from ragdoc.pipeline.splitter import TokenSplitter
 from ragdoc.pipeline.stores import DocumentStore, SourceState, VectorStore
-from ragdoc.pipeline.vectorstore import UpdateResult, VectorStorePipeline
+from ragdoc.pipeline.sync import (
+    SourceOutcome,
+    SourceSyncStore,
+    SyncEngine,
+    SyncPlanInput,
+    SyncSource,
+    UpdateResult,
+    file_hash,
+)
+from ragdoc.pipeline.vectorstore import VectorStorePipeline
 
 __all__ = [
-    "AutoParser",
     "ChangeSet",
+    "ChunkPipeline",
     "DocumentPipeline",
     "DocumentStore",
     "DocumentStorePipeline",
     "Embedder",
     "EmbedderConfig",
+    "EmbeddingsClient",
+    "IngestPipeline",
     "LocalDocumentStore",
+    "OpenAIEmbedder",
     "Parser",
     "PipelineResult",
     "SourceChange",
+    "SourceOutcome",
     "SourceState",
+    "SourceSyncStore",
+    "SyncEngine",
+    "SyncPlanInput",
+    "SyncSource",
     "TokenSplitter",
     "UpdateResult",
     "VectorStore",
     "VectorStorePipeline",
     "embedding_content_text",
+    "file_hash",
     "prompt_content_text",
 ]

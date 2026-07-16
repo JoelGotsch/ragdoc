@@ -15,30 +15,8 @@ from pathlib import Path
 from typing import Annotated, Any, Literal, Protocol, TypeVar
 
 from pydantic import BaseModel, Field
-from pylatexenc.latex2text import LatexNodes2Text
 
 from ragdoc.document import ElementType
-
-_LATEX2TEXT = LatexNodes2Text(math_mode="text")
-
-
-def _latex_to_text(latex: str) -> str:
-    """Convert a LaTeX string to plain text using pylatexenc.
-
-    Handles commands like ``\\mathrm{H_2O}`` → ``H2O``,
-    ``\\mathrm { C O } _ { 2 }`` → ``CO2``, etc.
-
-    Sub/superscript markers (``_`` / ``^``) are stripped so that
-    chemical formulae and isotope names read naturally as plain text.
-
-    Only used internally to normalize text for content-based comparisons in tests.
-    """
-    result = _LATEX2TEXT.latex_to_text(latex).strip()
-    # Strip sub/superscript markers left by pylatexenc
-    result = _re.sub(r"[_^]", "", result)
-    # Collapse whitespace
-    result = _re.sub(r"\s+", " ", result).strip()
-    return result
 
 
 def normalize_math_spaces(latex: str) -> str:
@@ -86,7 +64,12 @@ def latex_to_mathml(latex: str, display: bool = False) -> str:
     if not latex:
         return ""
 
-    from latex2mathml.converter import convert
+    try:
+        from latex2mathml.converter import convert
+    except ImportError as exc:
+        raise ImportError(
+            "MinerU LaTeX conversion requires the 'pdf-mineru' extra: pip install 'ragdoc[pdf-mineru]'"
+        ) from exc
 
     display_mode = "block" if display else "inline"
     return convert(normalize_math_spaces(latex), display=display_mode)
@@ -913,7 +896,7 @@ class ParsedElement:
     """
     Wrapper linking a parsed document element to its source block and page.
 
-    This is the core data structure that enables the middleware pipeline to:
+    This is the core data structure that enables the extraction pipeline to:
     - Access the original MinerU block data for any element
     - Modify elements in place while preserving source linkage
     - Filter elements by type for specialized processing
@@ -925,10 +908,10 @@ class ParsedElement:
 
     1. Preserves document order naturally (all elements in reading order)
     2. Provides uniform access to source data for any element type
-    3. Simplifies middleware implementation (filter by type, access source)
+    3. Simplifies stage implementation (filter by type, access source)
     4. Makes it easy to add new element types without changing the context
 
-    The source_block and source_page fields enable middlewares to make decisions
+    The source_block and source_page fields enable extraction stages to make decisions
     based on visual properties (font size, position, centering) that aren't
     captured in the parsed element itself.
 
@@ -936,7 +919,7 @@ class ParsedElement:
         element: The parsed document element (Heading, Paragraph, etc.)
         source_block: The original MinerU block this element was extracted from
         source_page: The page containing the source block
-        metadata: Optional metadata dictionary for middlewares to store additional info (usually for other middlewares).
+        metadata: Optional metadata dictionary for extraction stages to store additional info (usually for other stages).
           e.g. if heading is centered, its average height, etc.
     """
 
@@ -947,7 +930,7 @@ class ParsedElement:
 
 
 # =============================================================================
-# Parsing Context - Shared State Between Middlewares
+# Parsing Context - Shared State Between Extraction Stages
 # =============================================================================
 
 
@@ -957,7 +940,7 @@ class ParseContext:
     Context object passed through the parsing pipeline.
 
     The context maintains a unified list of ParsedElement wrappers, preserving
-    document order and source linkage. Middlewares can:
+    document order and source linkage. Extraction stages can:
     - Filter elements by type using helper methods
     - Modify elements in place
     - Access source blocks for visual property analysis
@@ -968,15 +951,15 @@ class ParseContext:
     The single `elements` list (vs. separate typed lists) ensures:
     - Document order is preserved naturally
     - Source linkage is always available
-    - Middlewares can be written generically or for specific types
+    - Stages can be written generically or for specific types
     - Adding new element types doesn't require context changes
 
     Attributes:
         source: The original MinerU document being parsed
         elements: All parsed elements with source linkage (in document order)
-        metadata: Accumulated metadata from middlewares thats not block-specific
+        metadata: Accumulated metadata from extraction stages thats not block-specific
         warnings: Errors/warnings collected during parsing
-        document_title: The detected document title (set by TitleDetectionMiddleware)
+        document_title: The detected document title
     """
 
     # Source document
@@ -991,7 +974,7 @@ class ParseContext:
     # Errors/warnings collected during parsing
     warnings: list[str] = field(default_factory=list)
 
-    # Document title detected during parsing (set by TitleDetectionMiddleware)
+    # Document title detected during parsing
     document_title: str | None = None
 
     # -------------------------------------------------------------------------
@@ -1091,7 +1074,7 @@ class ParseContext:
 
 
 # =============================================================================
-# Middleware Protocol
+# Extraction-stage Protocol
 # =============================================================================
 
 
@@ -1099,11 +1082,11 @@ class ParseContext:
 AsyncCallNext = Callable[[ParseContext], Awaitable[ParseContext]]
 
 
-class ParserMiddleware(Protocol):
+class ExtractionStage(Protocol):
     """
-    Protocol for parser middlewares (async-first).
+    Protocol for MinerU extraction stages (async-first).
 
-    Middlewares can modify the ParseContext during parsing.
+    Stages can modify the ParseContext during parsing.
     They receive the context and an async `call_next` function to continue the chain.
     """
 
@@ -1113,11 +1096,11 @@ class ParserMiddleware(Protocol):
         call_next: AsyncCallNext,
     ) -> ParseContext:
         """
-        Process the context and optionally call the next middleware.
+        Process the context and optionally call the next stage.
 
         Args:
             context: The parsing context with accumulated state
-            call_next: Async function to call the next middleware in the chain
+            call_next: Async function to call the next stage in the chain
 
         Returns:
             The (possibly modified) ParseContext
@@ -1126,12 +1109,12 @@ class ParserMiddleware(Protocol):
 
 
 # =============================================================================
-# Base Middleware Classes
+# Base extraction-stage class
 # =============================================================================
 
 
-class BaseMiddleware(ABC):
-    """Abstract base class for middlewares with common functionality (async-first)."""
+class BaseExtractionStage(ABC):
+    """Abstract base class for extraction stages with common functionality (async-first)."""
 
     @abstractmethod
     async def process(self, context: ParseContext) -> ParseContext:
@@ -1143,18 +1126,6 @@ class BaseMiddleware(ABC):
         context: ParseContext,
         call_next: AsyncCallNext,
     ) -> ParseContext:
-        """Execute this middleware and continue the chain."""
+        """Execute this stage and continue the chain."""
         context = await self.process(context)
         return await call_next(context)
-
-
-class PreProcessingMiddleware(BaseMiddleware, ABC):
-    """Middleware that runs before the main extraction."""
-
-    pass
-
-
-class PostProcessingMiddleware(BaseMiddleware, ABC):
-    """Middleware that runs after the main extraction."""
-
-    pass

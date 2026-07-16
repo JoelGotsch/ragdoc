@@ -21,8 +21,8 @@ def make_document(title: str = "Doc", body: str = "Content.") -> Document:
     return Document(
         title=title,
         elements=[
-            Heading(innerhtml=title, level=1),
-            Paragraph(html_content=f"<p>{body}</p>"),
+            Heading(html=f"<h1>{title}</h1>"),
+            Paragraph(html=f"<p>{body}</p>"),
         ],
     )
 
@@ -79,12 +79,6 @@ class MemoryVectorStore:
         self.delete_calls.append(list(ids))
         for id_ in ids:
             self.stored.pop(id_, None)
-
-    async def get_source_hash(self, source_id: str) -> str | None:
-        for chunk in self.stored.values():
-            if chunk.source_id == source_id:
-                return chunk.source_hash
-        return None
 
     async def delete_by_source(self, source_id: str) -> None:
         to_delete = [cid for cid, chunk in self.stored.items() if chunk.source_id == source_id]

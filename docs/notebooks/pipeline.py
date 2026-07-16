@@ -36,7 +36,7 @@ def _(mo):
 
     | Stage | Default |
     |-------|---------|
-    | Parser | `AutoParser` — picks parser from file extension |
+    | Parser | `load` — picks parser from file extension via the registry |
     | Processors | none (identity pass-through) |
     | Splitter | none — whole document → one chunk |
     | Chunker | `SimpleChunker` — one chunk per document |
@@ -47,6 +47,7 @@ def _(mo):
 @app.cell
 async def _():
     from pathlib import Path
+
     from ragdoc.pipeline import DocumentPipeline
 
     pipeline = DocumentPipeline()

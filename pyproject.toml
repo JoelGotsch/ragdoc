@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 # Keep the wheel slim: only the library source ships. Tests, fixtures, docs,
@@ -47,53 +47,65 @@ name = "ragdoc"
 version = "0.1.0"
 description = "A library to assist with chunking and preprocessing of documents for usage in LLM usecases."
 readme = "README.md"
-license = {text = "Proprietary"}
-requires-python = ">=3.10,<3.13"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.10,<3.14"
 authors = [
     { name = "Joel GOTSCH", email = "contact@joelgotsch.com" },
 ]
 dependencies = [
-    # Floors are the true minimums: each has wheels on all supported Pythons
-    # (3.10–3.12) and provides the APIs the code uses. The CI `-lowest` leg runs
-    # on 3.10 to enforce this lower bound.
-    "tiktoken>=0.7.0,<1.0.0",  # 0.7 is the first with py3.12 wheels (Rust ext)
-    "funcy>=2.0,<3",
-    "pandas>=2.2.0,<3",  # py3.12 wheels land in pandas 2.1.1+
-    "pandas-stubs>=2.2.0.240218,<3",
-    "numpy>=1.26.4,<3",  # 1.26 has py3.12 wheels
-    "transformers>=4.40.0,<6",  # pulls tokenizers>=0.19 (py3.12 wheels)
-    "openpyxl>=3.1.2,<4",
-    "tabulate>=0.9.0,<1",
-    "pypandoc-binary>=1.14,<2",
-    "beautifulsoup4>=4.12.3,<5",
-    "pymupdf>=1.24.3,<2",
-    "markdownify>=0.12.1,<1",
+    # Base install is deliberately lean: parse HTML/pandoc formats, process,
+    # split, and chunk with zero heavyweight ML dependencies. Everything else
+    # (LLM features, transformers tokenizers, Excel, PDF, Qdrant, extraction)
+    # lives behind extras. Floors are the true minimums: each has wheels on all
+    # supported Pythons (3.10–3.13) and provides the APIs the code uses. The CI
+    # `-lowest` leg runs on 3.10 to enforce this lower bound.
     "pydantic>=2.10.2,<3",
-    "lxml>=5.3.0,<6",
-    "click>=8.1.7,<9",
-    "orjson>=3.10.11,<4",
-    "openai>=1.54.5,<3",
-    #     "pillow>=12.1.1",
-    "pillow>=11.1.1",
+    "pydantic-settings>=2.13.0",  # base: processing/summary_document.py imports it top-level
+    "beautifulsoup4>=4.12.3,<5",
+    "pypandoc-binary>=1.14,<2",
+    "tiktoken>=0.7.0,<1.0.0",  # 0.7 is the first with py3.12 wheels (Rust ext)
     "aiofiles>=25.1.0",
+    "markdownify>=0.12.1,<1",
+    "click>=8.1.7,<9",
+    "httpx>=0.27,<1",
 ]
 
 [project.urls]
 Homepage = "https://github.com/joelgotsch/ragdoc"
+
+[project.scripts]
+ragdoc = "ragdoc.cli:cli"
 
 # Extra names use the PEP 685 canonical (hyphenated) form. `pip install
 # ragdoc[azure_di]` still resolves (consumers normalize), and hyphens avoid a
 # tox-uv mismatch where an underscore request fails to match the normalized
 # `Provides-Extra` in the built metadata.
 [project.optional-dependencies]
-azure-di = ["azure-ai-documentintelligence>=1.0.0"]
+llm = [
+    "openai>=1.92.0,<3",  # 1.92.0: first with the non-beta chat.completions.parse namespace
+    "pillow>=11.1.1",  # image transformations in ImageSummaryProcessor
+]
+tokenizers = ["transformers>=4.40.0,<6"]  # RerankerTokenizer (pulls tokenizers>=0.19)
+xlsx = [
+    "pandas>=2.2.0,<3",  # py3.12 wheels land in pandas 2.1.1+
+    "openpyxl>=3.1.2,<4",  # pandas read_excel engine
+]
+pdf = ["pymupdf>=1.24.3,<2"]  # basic local PDF parser (pdf_basic)
+azure-di = [
+    "azure-ai-documentintelligence>=1.0.0",
+    "pymupdf>=1.24.3,<2",  # figure extraction from the source PDF
+]
 pdf-mineru = [
     "pylatexenc>=2.10,<3",
-    "pydantic-settings>=2.13.0",
     "latex2mathml>=3.79.0",
 ]
 qdrant = ["qdrant-client>=1.12,<2"]  # 1.12+ has models.Document server-side inference
-    
+extraction = [
+    "edtf>=5.0,<6",  # EDTF (Extended Date/Time Format) parsing for FuzzyDate
+    "numpy>=1.26.4,<3",  # cosine-similarity blocking in EntityResolutionPipeline
+]
+
 
 [dependency-groups]
 dev = [
@@ -109,8 +121,11 @@ dev = [
     "python-docx>=1.2.0",
     "types-aiofiles>=25.1.0.20260409",
     "nest-asyncio>=1.6.0",
+    "pytest-timeout>=2.3.0",
     "ruff>=0.8.0",
     "basedpyright>=1.31.0",
+    "pandas-stubs>=2.2.0.240218,<3",  # type stubs for the xlsx extra (basedpyright)
+    "numpy>=1.26.4,<3",  # tests touching extraction/resolution
 ]
 docs = [
     "mkdocs>=1.6.1",
@@ -145,14 +160,12 @@ fixture_regen = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+xfail_strict = true
 addopts = [
     "-ra",
-    "-v",
     "--tb=short",
-    "--cov=ragdoc",
-    "--cov-report=term-missing",
-    "--cov-report=xml",
 ]
+timeout = 300
 
 
 [tool.coverage.run]
@@ -179,7 +192,7 @@ target-version = "py310"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-extend-select = ["Q", "RUF", "C90", "UP", "I"]
+extend-select = ["Q", "RUF", "C90", "UP", "I", "B", "ASYNC", "BLE"]
 mccabe = { max-complexity = 18 }
 ignore = [
     # Ambiguous-unicode rules: this is a document-processing library that
@@ -199,10 +212,7 @@ ignore = [
 "__init__.py" = ["F401", "E402"]
 # Tests guard optional-dependency imports with pytest.importorskip(...), which
 # legitimately runs before the module-level imports it protects.
-"tests/**" = ["E402"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
+"tests/**" = ["E402", "ASYNC230", "ASYNC240"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
@@ -233,7 +243,7 @@ min_version = 4.0
 env_list =
     lint
     type
-    py{310,311,312}-highest
+    py{310,311,312,313}-highest
     py310-lowest
 
 [testenv]
@@ -243,12 +253,17 @@ extras =
     azure-di
     pdf-mineru
     qdrant
+    extraction
+    llm
+    tokenizers
+    xlsx
+    pdf
 # marimo is needed by tests/test_notebooks.py (it imports and runs the marimo
 # notebooks under docs/notebooks/). It otherwise lives in the docs group.
 deps =
     marimo>=0.23.0
 commands =
-    pytest {posargs}
+    pytest --cov=ragdoc --cov-report=xml --cov-report=term-missing {posargs}
 
 [testenv:py{310,311,312}-lowest]
 uv_resolution = lowest-direct
@@ -271,6 +286,11 @@ extras =
     azure-di
     pdf-mineru
     qdrant
+    extraction
+    llm
+    tokenizers
+    xlsx
+    pdf
 commands =
     basedpyright
 """

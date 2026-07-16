@@ -1,5 +1,13 @@
-from ragdoc.utils.helpers import MetadataEncoder, _normalize_text, add_unregister, escape_markdown
-from ragdoc.utils.tokenizer import GPTTokenizer, MaxTokenizer, RerankerTokenizer, Tokenizer, TransformerTokenizer
+from ragdoc.utils.concurrency import fan_out, resolve_semaphore
+from ragdoc.utils.helpers import MetadataEncoder, add_unregister, escape_markdown, normalize_text
+from ragdoc.utils.tokenizer import (
+    GPTTokenizer,
+    MaxTokenizer,
+    RerankerTokenizer,
+    Tokenizer,
+    TransformerTokenizer,
+    resolve_tokenizer,
+)
 
 __all__ = [
     "GPTTokenizer",
@@ -8,9 +16,10 @@ __all__ = [
     "RerankerTokenizer",
     "Tokenizer",
     "TransformerTokenizer",
-    "_normalize_text",
     "add_unregister",
     "escape_markdown",
-    # evaluate_footnotes and FootnoteFileResult are importable from ragdoc.utils.evaluate_footnotes
-    # (not re-exported here to avoid a circular import via ragdoc.automatic → ragdoc.rendering → ragdoc.utils)
+    "fan_out",
+    "normalize_text",
+    "resolve_semaphore",
+    "resolve_tokenizer",
 ]

@@ -1,32 +1,32 @@
+import asyncio
+import importlib.util
 from pathlib import Path
 
-import pandas as pd
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ragdoc.document import Document
-from ragdoc.parsing.base import load_file
 from ragdoc.parsing.parser import Parser
-from ragdoc.parsing.xlsx.load import ExcelConfig, generate_document as generate_xlsx_documents
+from ragdoc.parsing.xlsx.load import (
+    _XLSX_IMPORT_ERROR,
+    ExcelConfig,
+    generate_document as generate_xlsx_documents,
+)
 
 
-class ExcelSource(BaseModel):
-    file_path: str | Path
-    config: ExcelConfig = Field(default_factory=ExcelConfig)
+def load_excel(path: Path | str, config: ExcelConfig | None = None) -> Document:
+    """Parse an Excel workbook into a Document.
 
-    model_config = {"arbitrary_types_allowed": True}
+    Provenance (``source_path``, ``metadata["filename"]``) is stamped centrally by
+    :func:`ragdoc.parsing.load` — not here.
 
-
-@load_file.register
-def load_excel(file_obj: ExcelSource) -> Document:
-    """Parse an Excel workbook into a Document. Sets ``source_path`` and ``metadata["filename"]``."""
-    document = generate_xlsx_documents(pd.ExcelFile(file_obj.file_path), file_obj.config)
-    document.metadata["filename"] = Path(file_obj.file_path).name
-    document.source_path = str(file_obj.file_path)
-    return document
-
-
-# Backwards-compatible alias removed — use ExcelSource
-ExcelPackage = ExcelSource
+    Raises:
+        ImportError: If pandas is not installed (the ``xlsx`` extra).
+    """
+    try:
+        import pandas as pd
+    except ImportError as exc:
+        raise ImportError(_XLSX_IMPORT_ERROR) from exc
+    return generate_xlsx_documents(pd.ExcelFile(Path(path)), config or ExcelConfig())
 
 
 # ---------------------------------------------------------------------------
@@ -38,9 +38,17 @@ class XlsxParser(Parser):
     name: str = "xlsx"
     patterns: list[str] = [".xlsx"]
     description: str = "Excel spreadsheets"
+    config: ExcelConfig = Field(default_factory=ExcelConfig, description="Per-parser Excel parsing configuration.")
+
+    def is_available(self) -> bool:
+        return importlib.util.find_spec("pandas") is not None
+
+    def unavailable_reason(self) -> str:
+        return "xlsx: install 'ragdoc[xlsx]' for Excel parsing"
 
     async def __call__(self, path: Path) -> Document:
-        return load_excel(ExcelSource(file_path=path))
+        # pandas parses the workbook synchronously (CPU + file I/O) — run it off the event loop.
+        return await asyncio.to_thread(load_excel, path, self.config)
 
 
 def _register() -> None:

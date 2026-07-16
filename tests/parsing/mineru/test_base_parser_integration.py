@@ -9,18 +9,19 @@ from pathlib import Path
 import pytest
 
 from ragdoc.document import Document, Heading, Table
-from ragdoc.parsing.mineru.base import MinerUMiddleDocument, _latex_to_text
-from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUExtractor
-from ragdoc.utils.helpers import _normalize_text
+from ragdoc.parsing.mineru.base import MinerUMiddleDocument
+from ragdoc.parsing.mineru.parser import CoreExtractor, MinerUExtractor
+from ragdoc.utils.helpers import normalize_text
+from tests.latex_text import latex_to_text
 
 # Path to test cases JSON
 TEST_CASES_FILE = Path(__file__).parent.parent.parent / "data" / "test_cases.json"
 FILES_DIR = Path(__file__).parent.parent / "data" / "mineru"
 
 
-def _normalize_text_and_spaces(text: str) -> str:
+def normalize_text_and_spaces(text: str) -> str:
     """Normalize text and also remove whitespaces."""
-    normalized = _normalize_text(_latex_to_text(text))
+    normalized = normalize_text(latex_to_text(text))
     return re.sub(r"\s+", "", normalized).strip()
 
 
@@ -43,15 +44,15 @@ def load_test_cases() -> dict:
             with open(middle_json, encoding="utf-8") as f:
                 json_data = json.load(f)
             mineru_doc = MinerUMiddleDocument.model_validate(json_data)
-            # Run only CoreExtractionMiddleware (no heading refiner, no footnote resolution)
+            # Run only CoreExtractor (no heading refiner, no footnote resolution)
             # Module-level asyncio.run() — acceptable: feeds @pytest.mark.parametrize at import time.
             import asyncio
 
-            extractor = MinerUExtractor(use_default_middlewares=False)
-            extractor.use(CoreExtractionMiddleware())
+            extractor = MinerUExtractor(use_default_stages=False)
+            extractor.use(CoreExtractor())
             document = asyncio.run(extractor.parse(mineru_doc))
             data[test_case_name]["parsed_doc"] = document
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- fixture loader; parse failures surface in test_mineru_base.py
             # should be handled/ detected by test_mineru_base.py
             print(f"Error loading {middle_json}: {e}")
     return data
@@ -86,13 +87,13 @@ _table_params = [
 @pytest.mark.skipif(not _footnote_params, reason="No footnotes defined in test cases")
 @pytest.mark.parametrize("test_case_name,fn_index,fn_text", _footnote_params)
 def test_footnote_parsed_by_core_middleware(test_case_name: str, fn_index: int, fn_text: str) -> None:
-    """Test that CoreExtractionMiddleware extracts each expected footnote."""
+    """Test that CoreExtractor extracts each expected footnote."""
     document: Document = TEST_CASES[test_case_name].get("parsed_doc")
-    parsed_footnotes = [_normalize_text_and_spaces(fn.text) for fn in document.footnotes]
+    parsed_footnotes = [normalize_text_and_spaces(fn.text) for fn in document.footnotes]
 
-    assert len(parsed_footnotes) > 0, f"[{test_case_name}] No footnotes extracted by CoreExtractionMiddleware"
+    assert len(parsed_footnotes) > 0, f"[{test_case_name}] No footnotes extracted by CoreExtractor"
 
-    needle = _normalize_text_and_spaces(fn_text)
+    needle = normalize_text_and_spaces(fn_text)
     found = any(needle in parsed or parsed in needle for parsed in parsed_footnotes)
     assert found, (
         f"[{test_case_name}] fn{fn_index} not found: '{fn_text[:80]}'\n"
@@ -110,11 +111,11 @@ def test_footnote_parsed_by_core_middleware(test_case_name: str, fn_index: int, 
 def test_heading_detected(test_case_name: str, heading_name: str) -> None:
     """Test that each expected heading is present in the parsed document."""
     document = TEST_CASES[test_case_name].get("parsed_doc")
-    parsed_heading_texts = [_normalize_text_and_spaces(el.text) for el in document.elements if isinstance(el, Heading)]
+    parsed_heading_texts = [normalize_text_and_spaces(el.text) for el in document.elements if isinstance(el, Heading)]
 
     assert len(parsed_heading_texts) > 0, f"[{test_case_name}] No headings extracted"
 
-    needle = _normalize_text_and_spaces(heading_name)
+    needle = normalize_text_and_spaces(heading_name)
     found = any(needle in h or h in needle for h in parsed_heading_texts)
     assert found, (
         f"[{test_case_name}] Expected heading not found: '{heading_name}'\n"
@@ -130,16 +131,16 @@ def test_heading_detected(test_case_name: str, heading_name: str) -> None:
 @pytest.mark.skipif(not _table_params, reason="No tables defined in test cases")
 @pytest.mark.parametrize("test_case_name,table_index,expected_text", _table_params)
 def test_table_parsed_by_core_middleware(test_case_name: str, table_index: int, expected_text: str) -> None:
-    """Test that CoreExtractionMiddleware extracts tables with expected HTML content."""
+    """Test that CoreExtractor extracts tables with expected HTML content."""
     document: Document = TEST_CASES[test_case_name].get("parsed_doc")
     tables = [el for el in document.elements if isinstance(el, Table)]
 
-    assert len(tables) > 0, f"[{test_case_name}] No tables extracted by CoreExtractionMiddleware"
+    assert len(tables) > 0, f"[{test_case_name}] No tables extracted by CoreExtractor"
 
-    found = any(expected_text in table.html_content for table in tables)
+    found = any(expected_text in table.html for table in tables)
     assert found, (
         f"[{test_case_name}] table{table_index}: expected text not found in any table: '{expected_text}'\n"
-        f"  Parsed tables ({len(tables)}): {[t.html_content[:80] for t in tables]}"
+        f"  Parsed tables ({len(tables)}): {[t.html[:80] for t in tables]}"
     )
 
 
@@ -157,7 +158,7 @@ async def test_parser_field_set_to_mineru():
 
 
 def test_heading_html_contains_css():
-    """CoreExtractionMiddleware must embed CSS font-size on the heading outer tag."""
+    """CoreExtractor must embed CSS font-size on the heading outer tag."""
     # Use first available _middle.json fixture that has at least one heading
     for name, tc in TEST_CASES.items():
         document = tc.get("parsed_doc")

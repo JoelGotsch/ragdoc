@@ -1,7 +1,7 @@
 """Tests for VectorStorePipeline (plan / apply, Mode 1 direct path).
 
 Covers:
-- _file_hash(): 64-char hex, content-stable.
+- file_hash(): 64-char hex, content-stable.
 - plan(): new -> to_add; changed hash -> to_update; unchanged -> skipped (not in ChangeSet);
   plan() does not touch the store; collision raises before processing.
 - delete_orphans: default False (no deletion); True -> to_delete.
@@ -22,7 +22,7 @@ import pytest
 from ragdoc.document import Document
 from ragdoc.pipeline import DocumentPipeline, EmbedderConfig, VectorStorePipeline
 from ragdoc.pipeline.embedders import Embedder
-from ragdoc.pipeline.vectorstore import UpdateResult, _file_hash
+from ragdoc.pipeline.sync import UpdateResult, file_hash
 
 from .conftest import MemoryVectorStore, make_document
 
@@ -49,29 +49,33 @@ def vstore() -> MemoryVectorStore:
     return MemoryVectorStore()
 
 
-def make_vs_pipeline(vstore, source_id_fn=None, embedders=None) -> VectorStorePipeline:
+def make_vs_pipeline(vstore, source_id_fn=None, embedders=None, hash_fn=None) -> VectorStorePipeline:
     async def _parse(path: Path) -> Document:
         return make_document(title=path.stem, body=path.read_text(encoding="utf-8"))
 
     dp_kwargs = {}
     if source_id_fn is not None:
         dp_kwargs["source_id_fn"] = source_id_fn
+    vs_kwargs = {}
+    if hash_fn is not None:
+        vs_kwargs["hash_fn"] = hash_fn
     return VectorStorePipeline(
         pipeline=DocumentPipeline(parser=_parse, **dp_kwargs),
         vector_store=vstore,
         embedders=embedders,
+        **vs_kwargs,
     )
 
 
 # ---------------------------------------------------------------------------
-# _file_hash
+# file_hash
 # ---------------------------------------------------------------------------
 
 
 def test_file_hash_is_64_char_hex(tmp_path: Path):
     p = tmp_path / "f.txt"
     p.write_text("hello", encoding="utf-8")
-    h = _file_hash(p)
+    h = file_hash(p)
     assert len(h) == 64 and all(c in "0123456789abcdef" for c in h)
 
 
@@ -79,7 +83,7 @@ def test_file_hash_content_stable(tmp_path: Path):
     a, b = tmp_path / "a", tmp_path / "b"
     a.write_text("same", encoding="utf-8")
     b.write_text("same", encoding="utf-8")
-    assert _file_hash(a) == _file_hash(b)
+    assert file_hash(a) == file_hash(b)
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +200,7 @@ async def test_apply_update_deletes_stale_chunks_before_upsert(tmp_path, vstore)
     await pipeline.run([p])
     assert old_ids.isdisjoint(set(vstore.stored.keys()))
     # source_hash updated to the new file's hash
-    assert all(c.source_hash == _file_hash(p) for c in vstore.stored.values())
+    assert all(c.source_hash == file_hash(p) for c in vstore.stored.values())
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +236,7 @@ async def test_run_empty_sources(vstore):
 async def test_run_chunks_carry_provenance(make_files, vstore):
     paths = make_files({"doc.html": "Content"})
     await make_vs_pipeline(vstore).run(paths)
-    expected_hash = _file_hash(paths[0])
+    expected_hash = file_hash(paths[0])
     for chunk in vstore.stored.values():
         assert chunk.source_id == "doc.html"
         assert chunk.source_hash == expected_hash
@@ -283,6 +287,47 @@ async def test_run_one_bad_source_does_not_block_others(tmp_path, vstore):
     result = await pipeline.run([good, bad])
     assert result.processed == ["good.html"]
     assert [sid for sid, _ in result.errors] == ["bad.html"]
+
+
+def _flaky_hash(path: Path) -> str:
+    """hash_fn that fails for c.html (simulates an unreadable file)."""
+    if path.name == "c.html":
+        raise PermissionError("unreadable")
+    return file_hash(path)
+
+
+@pytest.mark.anyio
+async def test_run_unreadable_file_isolated_others_sync(make_files, vstore):
+    """One unhashable file: the other sources still sync, and the failure lands in errors."""
+    paths = make_files({"a.html": "A", "b.html": "B", "c.html": "C"})
+    result = await make_vs_pipeline(vstore, hash_fn=_flaky_hash).run(paths)
+
+    assert set(result.processed) == {"a.html", "b.html"}
+    assert [(sid, type(exc)) for sid, exc in result.errors] == [("c.html", PermissionError)]
+    assert await vstore.list_source_ids() == {"a.html", "b.html"}
+
+
+@pytest.mark.anyio
+async def test_run_unreadable_file_is_not_orphan_deleted(make_files, vstore):
+    """A source whose hash failed is live-but-unreadable: delete_orphans must not remove its chunks."""
+    paths = make_files({"a.html": "A", "b.html": "B", "c.html": "C"})
+    await make_vs_pipeline(vstore).run(paths)  # seed all three, incl. c.html
+
+    result = await make_vs_pipeline(vstore, hash_fn=_flaky_hash).run(paths, delete_orphans=True)
+    assert result.deleted == []
+    assert "c.html" in await vstore.list_source_ids()
+    assert [sid for sid, _ in result.errors] == ["c.html"]
+
+
+@pytest.mark.anyio
+async def test_plan_unreadable_file_not_in_changeset_nor_orphaned(make_files, vstore):
+    paths = make_files({"a.html": "A", "b.html": "B", "c.html": "C"})
+    await make_vs_pipeline(vstore).run(paths)
+
+    changeset = await make_vs_pipeline(vstore, hash_fn=_flaky_hash).plan(paths, delete_orphans=True)
+    planned = {sc.source_id for sc in changeset.to_add + changeset.to_update}
+    assert "c.html" not in planned
+    assert "c.html" not in changeset.to_delete
 
 
 # ---------------------------------------------------------------------------

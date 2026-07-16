@@ -65,13 +65,14 @@ import re
 import uuid
 from collections.abc import Awaitable
 from html.parser import HTMLParser
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
 from ragdoc.document import Footnote
-from ragdoc.processing._concurrency import _fan_out
+from ragdoc.llm import ChatClient, call_structured, resolve_openai_client
 from ragdoc.processing.base import DocumentProcessor
+from ragdoc.utils.concurrency import fan_out
 
 logger = logging.getLogger(__name__)
 
@@ -620,6 +621,14 @@ class SimpleFootnoteResolver:
 # =============================================================================
 
 
+class _FootnoteSelection(BaseModel):
+    """Structured LLM output: which candidate location (if any) carries the footnote reference."""
+
+    selection: int | None = Field(
+        description="1-based candidate number of the best location, or null when no candidate is appropriate."
+    )
+
+
 class LLMFootnoteResolver:
     """
     LLM-based footnote reference resolver.
@@ -629,11 +638,12 @@ class LLMFootnoteResolver:
     complex documents where context matters.
 
     The resolver uses a system prompt explaining footnote patterns and asks
-    the LLM to select the most appropriate candidate.
+    the LLM for a structured :class:`_FootnoteSelection` (a 1-based candidate
+    number, or ``null`` when nothing fits).
 
     Attributes:
-        client: AsyncOpenAI-compatible client for LLM calls
-        model: Model name to use (default: gpt-4o-mini)
+        client: Chat-capable client for LLM calls (resolved fail-loud at construction)
+        model: Model name to use (``None`` resolves to ``get_config().default_llm_model``)
 
     Example:
         >>> from openai import AsyncOpenAI
@@ -643,7 +653,7 @@ class LLMFootnoteResolver:
     """
 
     SYSTEM_PROMPT = """You are analyzing document text to find footnote references.
-Given a footnote number and its content, plus several candidate locations where 
+Given a footnote number and its content, plus several candidate locations where
 the reference might appear, select the most appropriate location.
 
 A footnote reference typically appears:
@@ -651,25 +661,27 @@ A footnote reference typically appears:
 - Near terms, names, or concepts that the footnote explains or cites
 - In a context where the footnote would add relevant supplementary information
 
-Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate is appropriate."""
+Return the 1-based candidate number of the best location, or null if no candidate is appropriate."""
 
     def __init__(
         self,
-        client: Any | None = None,  # AsyncOpenAI-compatible client
-        model: str = "gpt-4o-mini",
+        client: ChatClient | None = None,
+        model: str | None = None,
     ):
         """
         Initialize the LLM resolver.
 
         Args:
-            client: AsyncOpenAI-compatible client for LLM calls.
-                    If None, falls back to ``get_config().openai_client``.
-            model: Model name to use for resolution
+            client: Chat-capable client for LLM calls. ``None`` falls back to
+                ``get_config().openai_client``; raises
+                :class:`~ragdoc.llm.LLMNotConfiguredError` when neither is available.
+            model: Model name to use for resolution. ``None`` falls back to
+                ``get_config().default_llm_model``.
         """
         from ragdoc.config import get_config
 
-        self.client: Any = client if client is not None else get_config().openai_client
-        self.model = model
+        self.client: ChatClient = resolve_openai_client(client)
+        self.model: str = model if model is not None else get_config().default_llm_model
 
     async def resolve(
         self,
@@ -707,34 +719,28 @@ Respond with only the candidate number (1, 2, 3, etc.) or "NONE" if no candidate
         prompt = "\n".join(prompt_parts)
 
         try:
-            response = await self.client.chat.completions.create(
+            result = await call_structured(
+                self.client,
                 model=self.model,
                 messages=[
                     {"role": "system", "content": self.SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
+                response_format=_FootnoteSelection,
                 temperature=0.0,
-                max_tokens=10,
+                log_prefix="LLMFootnoteResolver",
             )
-
-            result = response.choices[0].message.content.strip().upper()
-
-            if result == "NONE":
-                return None
-
-            # Try to parse the selection
-            try:
-                selection = int(result.replace(".", "").strip())
-                if 1 <= selection <= len(candidates):
-                    return candidates[selection - 1]
-            except ValueError:
-                pass
-
+        except Exception as exc:  # noqa: BLE001 -- any LLM failure (incl. refusal) degrades to unresolved, never a wrong answer
+            logger.warning(
+                f"LLMFootnoteResolver: LLM call failed for footnote {footnote_number} ({exc!r}); "
+                "leaving footnote unresolved."
+            )
             return None
 
-        except Exception:
-            # On error, return the first candidate as fallback
-            return candidates[0] if candidates else None
+        selection = result.selection
+        if selection is not None and 1 <= selection <= len(candidates):
+            return candidates[selection - 1]
+        return None
 
 
 # =============================================================================
@@ -766,10 +772,19 @@ class FootnoteProcessor(DocumentProcessor):
         context_chars: Number of context characters for candidate analysis
         same_page_only: Whether to restrict candidate search to same page
         update_html: Whether to update element HTML with ref tags
-        only_orphaned: When True, skip footnotes that are already referenced
-            in the document (i.e. already have a ``<ref>`` tag somewhere).
-            Useful when re-running the processor or when the parser has already
-            resolved some footnotes.
+        only_orphaned: When True (the **default**), only resolve footnotes that are not
+            yet referenced (no ``<ref rel="footnote">`` for them anywhere). This makes
+            ``process`` **idempotent**: re-running it skips already-resolved footnotes, so
+            it never appends a duplicate/spurious ref. On a fresh document (no refs yet)
+            every footnote is orphaned, so behaviour is identical to processing all of them.
+            Set ``False`` for the legacy behaviour that re-resolves every footnote on each
+            call (non-idempotent — a second pass corrupts already-resolved footnotes).
+
+    Idempotency:
+        Resolution is destructive of its own anchor — it replaces the matched number with a
+        ``<ref>`` tag that the candidate search skips. Re-resolving an already-resolved
+        footnote therefore cannot re-find its anchor and instead mis-fires onto another number.
+        ``only_orphaned=True`` avoids this by never reconsidering resolved footnotes.
 
     Example:
         >>> resolver = SimpleFootnoteResolver()
@@ -783,7 +798,7 @@ class FootnoteProcessor(DocumentProcessor):
         context_chars: int = 50,
         same_page_only: bool = True,
         update_html: bool = True,
-        only_orphaned: bool = False,
+        only_orphaned: bool = True,
         concurrency: int | asyncio.Semaphore = 1,
     ):
         """
@@ -795,8 +810,9 @@ class FootnoteProcessor(DocumentProcessor):
             context_chars: Number of characters before/after reference for context
             same_page_only: Whether to only search on the same page as the footnote
             update_html: Whether to update element HTML with <ref> tags
-            only_orphaned: When True, skip footnotes that already have a ``<ref>``
-                tag in any element.  Defaults to False (process all footnotes).
+            only_orphaned: When True (**default**), only resolve footnotes that are not
+                yet referenced — makes ``process`` idempotent (see class docstring).
+                ``False`` re-resolves every footnote on each call (legacy, non-idempotent).
             concurrency: Maximum number of footnotes resolved concurrently.  Accepts
                 an ``int`` (private semaphore) or a shared ``asyncio.Semaphore``.
                 Defaults to ``1`` (sequential), which preserves the sequential
@@ -903,9 +919,9 @@ class FootnoteProcessor(DocumentProcessor):
                 results[idx] = await self._resolve_footnote(document, footnote, None)
 
             coros: list[Awaitable[None]] = [_resolve_one(i, f) for i, f in enumerate(sorted_footnotes)]
-            await _fan_out(coros, self._concurrency)
+            await fan_out(coros, self._concurrency)
 
-            for footnote, best in zip(sorted_footnotes, results):
+            for footnote, best in zip(sorted_footnotes, results, strict=True):
                 if best is None:
                     continue
                 resolved_count += 1
@@ -923,75 +939,3 @@ class FootnoteProcessor(DocumentProcessor):
                 apply_ref_patches(document.elements[element_idx], patches)
 
         return document
-
-
-class SyncFootnoteProcessor(DocumentProcessor):
-    """
-    Footnote processor using :class:`SimpleFootnoteResolver` — no LLM required.
-
-    .. note::
-        Each footnote is resolved to **exactly one** reference location (see
-        *Single-reference assumption* in the module docstring).
-
-    Example:
-        >>> processor = SyncFootnoteProcessor()
-        >>> doc = await processor.process(doc)
-    """
-
-    def __init__(
-        self,
-        context_chars: int = 50,
-        same_page_only: bool = True,
-        update_html: bool = True,
-        only_orphaned: bool = False,
-    ):
-        """
-        Initialize the sync footnote processor.
-
-        Args:
-            context_chars: Number of characters before/after reference for context
-            same_page_only: Whether to only search on the same page as the footnote
-            update_html: Whether to update element HTML with <ref> tags
-            only_orphaned: When True, skip footnotes that already have a ``<ref>``
-                tag in any element.  Defaults to False (process all footnotes).
-        """
-        self.context_chars = context_chars
-        self.same_page_only = same_page_only
-        self.update_html = update_html
-        self.only_orphaned = only_orphaned
-
-    async def process(self, document: Document) -> Document:
-        """
-        Process the document to resolve footnote references.
-
-        Uses SimpleFootnoteResolver internally (no I/O).
-
-        Args:
-            document: The document to process
-
-        Returns:
-            The processed document (modified in place)
-        """
-        import asyncio
-
-        # Create an async processor with SimpleFootnoteResolver
-        async_processor = FootnoteProcessor(
-            resolver=SimpleFootnoteResolver(),
-            context_chars=self.context_chars,
-            same_page_only=self.same_page_only,
-            update_html=self.update_html,
-            only_orphaned=self.only_orphaned,
-        )
-
-        # Run in a new event loop (or existing if available)
-        try:
-            loop = asyncio.get_running_loop()
-            # If we're in an async context, we can't use run_until_complete
-            # This shouldn't happen for a SyncProcessor, but handle it
-            import nest_asyncio
-
-            nest_asyncio.apply()
-            return loop.run_until_complete(async_processor.process(document))
-        except RuntimeError:
-            # No running loop, safe to create one
-            return asyncio.run(async_processor.process(document))

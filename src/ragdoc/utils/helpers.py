@@ -14,7 +14,7 @@ def escape_markdown(text: str) -> str:
 
 def add_unregister(func):
     # build a dictionary mapping names to closure cells
-    closure = dict(zip(func.register.__code__.co_freevars, func.register.__closure__))
+    closure = dict(zip(func.register.__code__.co_freevars, func.register.__closure__, strict=True))
     registry = closure["registry"].cell_contents
     dispatch_cache = closure["dispatch_cache"].cell_contents
 
@@ -41,7 +41,7 @@ class MetadataEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def _normalize_text(text: str) -> str:
+def normalize_text(text: str) -> str:
     """Normalize text for comparison (whitespace + Unicode NFKC).
 
     Useful for aligning visually identical text such as ``H₂O`` vs ``H2O``.

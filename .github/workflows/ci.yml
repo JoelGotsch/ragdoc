@@ -11,6 +11,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
+  notebooks:
+    name: Notebook check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+      - name: marimo check
+        run: uv run --group docs marimo check docs/notebooks/*.py
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -47,6 +59,44 @@ jobs:
       - name: Run basedpyright
         run: tox -e type
 
+  smoke:
+    name: Base install smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pandoc
+        run: sudo apt-get update && sudo apt-get install -y pandoc
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
+      - name: Install base package only (no extras)
+        run: uv venv && uv pip install .
+
+      - name: Import + parse + chunk (no extras)
+        run: |
+          uv run --no-project python - <<'EOF'
+          import asyncio, sys
+          for banned in ("torch", "transformers", "pandas", "openai", "PIL", "pymupdf", "numpy"):
+              assert banned not in sys.modules
+          import ragdoc
+          for banned in ("torch", "transformers", "pandas", "openai", "PIL", "pymupdf", "numpy"):
+              assert banned not in sys.modules, f"import ragdoc pulled {banned}"
+
+          async def main():
+              from pathlib import Path
+              doc = await ragdoc.load("tests/data/test.html")
+              assert doc.elements, "parsed HTML document must have elements"
+              chunks = await ragdoc.DocumentPipeline().run(Path("tests/data/test.html"))
+              assert chunks and chunks[0].prompt_content
+
+          asyncio.run(main())
+          print("base-install smoke: OK")
+          EOF
+
   test:
     name: Test (py${{ matrix.python-version }}, ${{ matrix.resolution }})
     runs-on: ubuntu-latest
@@ -56,7 +106,7 @@ jobs:
         # highest resolution on every supported Python; lowest only on the
         # minimum Python (3.10) — the floors are pinned to versions with 3.10
         # wheels, and lowest-on-newest-Python would pull pre-wheel releases.
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
         resolution: ["highest"]
         include:
           - python-version: "3.10"

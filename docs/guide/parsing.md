@@ -29,18 +29,32 @@ ragdoc registers parsers for common file types at import time. Resolution is bas
 suffix matching — longer patterns take precedence, and within the same pattern the
 highest-priority parser wins:
 
-| Pattern | Parser | Name | Priority |
-|---------|--------|------|----------|
-| `.html`, `.htm` | HTML | `html` | — |
-| `.docx`, `.doc` | Pandoc | `pandoc` | — |
-| `.xlsx` | Excel | `xlsx` | — |
-| `.azure.json` | Azure DI (JSON) | `azure_json` | — |
-| `.pdf` | Azure DI (live) | `azure_di` | 40 |
-| `_middle.json` | MinerU | `mineru` | 50 |
-| `.ragdoc.json` | RagdocJson | `ragdoc_json` | 60 |
+| Pattern | Parser | Name | Priority | Extra |
+|---------|--------|------|----------|-------|
+| `.html`, `.htm` | HTML | `html` | — | — |
+| `.docx`, `.doc` | Pandoc | `pandoc` | — | — |
+| `.xlsx` | Excel | `xlsx` | — | `xlsx` |
+| `.azure.json` | Azure DI (JSON) | `azure_json` | — | — |
+| `.pdf` | pymupdf (local) | `pdf_basic` | 10 | `pdf` |
+| `.pdf` | Azure DI (live) | `azure_di` | 40 | `azure-di` + credentials |
+| `_middle.json` | MinerU | `mineru` | 50 | `pdf-mineru` |
+| `.ragdoc.json` | RagdocJson | `ragdoc_json` | 60 | — |
 
-For PDFs, `load("report.pdf")` dispatches directly to Azure Document Intelligence —
-no extra call needed.
+Resolution also checks **availability**: a parser whose extra isn't installed (or whose
+credentials aren't configured, for `azure_di`) is skipped in favour of the next-best
+available one, and if *nothing* usable matches you get an actionable error at resolve
+time telling you which extra to install.
+
+### PDF options
+
+| Extra | Parser | Fidelity | Setup |
+|---|---|---|---|
+| `pdf` | `pdf_basic` | Text + font-size headings (pymupdf) | zero config |
+| `azure-di` | `azure_di` | Full layout, tables, figures | Azure credentials |
+| `pdf-mineru` | `mineru` | Full layout via MinerU `_middle.json` | run MinerU separately |
+
+With `ragdoc[pdf]` installed, `load("report.pdf")` just works; configure Azure DI (or run
+MinerU) when you need higher fidelity — the registry then prefers those automatically.
 
 ## Available parsers
 
@@ -74,6 +88,16 @@ document = await load("data.xlsx")
 # document.parser == "xlsx"
 ```
 
+### Basic local PDF (`.pdf`)
+
+`pdf_basic` (the `pdf` extra) parses PDFs locally with pymupdf: text extraction plus
+font-size/bold heading detection. Zero configuration, no network.
+
+```python
+document = await load("report.pdf")
+# document.parser == "pdf_basic"   (when no higher-fidelity PDF parser is available)
+```
+
 ### Azure Document Intelligence (`.azure.json`, `.pdf`)
 
 Parses the JSON output from Azure Document Intelligence into a `Document`. This is the
@@ -86,7 +110,7 @@ There are two registered parsers: `azure_json` for static `.azure.json` result f
 document = await load("result.azure.json")
 # document.parser == "azure_di"  (parsed by the "azure_json" registry entry)
 
-document = await load("report.pdf")   # invokes Azure DI directly
+document = await load("report.pdf")   # invokes Azure DI (when credentials are configured)
 # document.parser == "azure_di"       (parsed by the "azure_di" registry entry)
 ```
 
@@ -104,7 +128,7 @@ Requires the `pdf-mineru` extra: `uv add ragdoc[pdf-mineru]`.
 
 #### What the parser extracts
 
-`CoreExtractionMiddleware` (the default) converts every MinerU block into document
+`CoreExtractor` (the default) converts every MinerU block into document
 elements:
 
 | MinerU block | Produces | Notes |
@@ -165,7 +189,7 @@ Every handler is a plain callable in `ExtractionConfig`. Replace any single entr
 change that block type's behaviour without touching anything else:
 
 ```python
-from ragdoc.parsing.mineru import MinerUParser, MinerUExtractor, CoreExtractionMiddleware
+from ragdoc.parsing.mineru import MinerUParser, MinerUExtractor, CoreExtractor
 from ragdoc.parsing.mineru.handlers import ExtractionConfig, handle_discarded_as_raw_text
 from ragdoc.parsing.mineru.base import DiscardedBlockType
 from pathlib import Path
@@ -174,8 +198,8 @@ from pathlib import Path
 config = ExtractionConfig()
 config.discarded_handlers[DiscardedBlockType.HEADER] = handle_discarded_as_raw_text
 
-extractor = MinerUExtractor(use_default_middlewares=False)
-extractor.use(CoreExtractionMiddleware(config=config))
+extractor = MinerUExtractor(use_default_stages=False)
+extractor.use(CoreExtractor(config=config))
 
 parser = MinerUParser(extractor=extractor)
 document = await parser(Path("report_middle.json"))
@@ -216,7 +240,7 @@ levels based on font size — the same mechanism used by the HTML and Azure DI p
 ### ragdoc JSON snapshots (`.ragdoc.json`)
 
 Deserializes `.ragdoc.json` files produced by
-[`DocumentDumpProcessor`](../api/processing.md#DocumentDumpProcessor) back into
+[`DocumentDumpProcessor`](../api/processing.md#documentdumpprocessor) back into
 `Document` objects. Registered at priority 60 — the highest of any built-in parser —
 so `.ragdoc.json` files always resolve here, even if another parser also matches.
 
@@ -259,7 +283,7 @@ document = await proc.process(document)  # writes cache/{stem}_{id[:8]}.ragdoc.j
 
 ### Registering a custom parser
 
-Subclass [`Parser`](../api/parsing.md#Parser) and register an instance:
+Subclass [`Parser`](../api/parsing.md#parser) and register an instance:
 
 ```python
 from pathlib import Path
@@ -403,7 +427,7 @@ the merge strategy and nesting `MultiSourceParser` for three-way merges.
 
 All parsers produce a `Document` where:
 
-- Elements store content as `innerhtml` (HTML string)
+- Elements store content as `html` (full HTML including the outer tag)
 - Visual properties (font size, weight, alignment) are stored as **inline CSS** on the HTML tags
 - `document.parser` is set to identify the source parser
 - Inline references (`<ref id="..." rel="..."/>`) are embedded in HTML for images and footnotes
@@ -411,26 +435,10 @@ All parsers produce a `Document` where:
 - `document.source_path` is set to the full path as a string (e.g. `"/data/report.docx"`)
 
 The CSS-in-HTML convention is what allows processors like
-[`HeadingLevelProcessor`](../api/processing.md#HeadingLevelProcessor) to work uniformly
+[`HeadingLevelProcessor`](../api/processing.md#headinglevelprocessor) to work uniformly
 across all parsers without parser-specific logic.
 
 ---
-
-## Legacy API
-
-`from_path()` and `load_document()` are still available but **deprecated**. Use `load()`
-instead:
-
-```python
-# Deprecated
-from ragdoc.parsing import from_path, load_document
-source = from_path("report.docx")
-document = load_document(source)
-
-# Preferred
-from ragdoc.parsing import load
-document = await load("report.docx")
-```
 
 ## See Also
 

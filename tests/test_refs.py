@@ -164,7 +164,7 @@ def test_base_element_does_not_have_external_refs():
     """BaseElement (and subclasses) should NOT have external_refs attribute."""
 
     para = Paragraph(html="<p>Test</p>")
-    heading = Heading(innerhtml="Title", level=1)
+    heading = Heading(html="<h1>Title</h1>")
 
     assert not hasattr(para, "external_refs") or "external_refs" not in para.model_fields
     assert not hasattr(heading, "external_refs") or "external_refs" not in heading.model_fields
@@ -214,7 +214,7 @@ def test_get_element_by_id():
     """Can retrieve element by ID."""
 
     para = Paragraph(html="<p>Test paragraph</p>")
-    heading = Heading(innerhtml="Title", level=1)
+    heading = Heading(html="<h1>Title</h1>")
 
     doc = Document(elements=[heading, para])
 

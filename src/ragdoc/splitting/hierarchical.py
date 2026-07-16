@@ -1,6 +1,7 @@
 from typing import cast
 
 from ragdoc.document import BaseElement, Document, ElementType, ExternalRef, Heading
+from ragdoc.metadata import copy_metadata
 from ragdoc.splitting.groups import ElementGroup, build_element_groups
 
 
@@ -119,7 +120,7 @@ def split_hierarchical(document: Document) -> list[Document]:
             elements=cast("list[ElementType]", all_elements),
             title=document.title,
             source_path=document.source_path,
-            metadata=document.metadata,
+            metadata=copy_metadata(document.metadata),
         )
         split_docs.append(doc)
 
