@@ -24,8 +24,9 @@ construction, not a runtime rejection):
 Shape mirrors the sync pipelines (all compose the shared
 :class:`~ragdoc.pipeline.sync.SyncEngine`):
 
-* :meth:`run` — streaming, **per source**. Each source is atomic; a completed source stays
-  durable if a later one fails.
+* :meth:`run` — streaming, **per source**. A source is extracted as a unit (one failing
+  split fails the whole source and nothing is written for it); a source that was written
+  stays written if a later one fails.
 * :meth:`plan` / :meth:`apply` — the reviewable path, returning a serializable
   :class:`~ragdoc.pipeline.changeset.ChangeSet` of mentions
   (``ChangeSet[Mention[P]]``; load with ``ChangeSet[Mention[P]].load(path)``).
@@ -388,9 +389,13 @@ class MentionStorePipeline(Generic[PayloadT]):
         return await self._engine.plan(await self._resolve(sources), delete_orphans)
 
     async def apply(self, changeset: ChangeSet[Mention[PayloadT]]) -> UpdateResult:
-        """Write *changeset* to the mention store (delete orphans, delete stale, then upsert).
+        """Write *changeset* to the mention store (orphans first, then each source).
 
-        Updates go delete-then-upsert with per-source error isolation: a source whose
-        stale-delete failed is recorded in ``errors`` and **not** upserted (no old/new mixing).
+        Per-source error isolation. An update goes through the store's ``replace_source`` when
+        it has one (``QdrantMentionStore``: new mentions are written before stale ones are
+        removed, so a failed write keeps the old ones). Any other store (e.g.
+        ``LocalMentionStore``) is written delete-then-upsert: a source whose stale-delete failed
+        is recorded in ``errors`` and **not** upserted (no old/new mixing), and an upsert failing
+        after the delete leaves the source without mentions until the next run re-extracts it.
         """
         return await self._engine.apply(changeset)

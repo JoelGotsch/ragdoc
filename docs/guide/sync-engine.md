@@ -14,20 +14,31 @@ Every sync pipeline exposes the same three methods:
 | Method | What it does | Store writes |
 |---|---|---|
 | `plan(...)` | Compute a reviewable [`ChangeSet`](../api/pipeline.md#changeset) | none |
-| `apply(changeset)` | Write a (possibly edited) ChangeSet | the whole change set, prepared first |
+| `apply(changeset)` | Write a (possibly edited) ChangeSet | the whole change set, prepared first, then source by source |
 | `run(...)` | Detect changes and write them in one call | per source, as produced |
 
 `run()` is a separate streaming path, not a literal `apply(plan(...))`: when every source
 succeeds it reaches the **same end state** — same change detection, same final store
-contents — but it is scheduled differently. `run` writes each changed source as soon as it
-has been produced, so sources written before a later failure stay written. `apply` runs the
-`pre_write` hook once over the whole change set before it writes anything; for
-`VectorStorePipeline` that hook is embedding, so `apply` embeds all chunks of the change set
-first and only then starts deleting and upserting.
+contents — but it is scheduled differently.
 
-Neither path is a transaction across the corpus, and a single source's write
-(delete stale entries, then upsert) is not a transaction either. After a sync, look at
-`UpdateResult.errors`: a source listed there may not be fully written.
+- **`run`** writes each changed source as soon as it has been produced, so sources written
+  before a later failure stay written. It is **back-pressured**: a producer keeps its
+  concurrency slot until the writer has taken its result, so at most `concurrency + 2`
+  sources' items are held in memory at any time, however large the corpus is. (One
+  lightweight task per source is still created up front.)
+- **`apply`** runs the `pre_write` hook once over the whole change set before it writes
+  anything; for `VectorStorePipeline` that hook is embedding, so `apply` embeds all chunks of
+  the change set first. If that fails, the store is untouched and every changed source is
+  reported in `errors`. Then it deletes the orphans in `to_delete` and writes the sources one
+  by one. The whole change set is in memory by construction.
+
+`apply` never mutates the `ChangeSet` it is given — embedding runs on copies — so a plan still
+equals its saved copy afterwards, and a saved-then-loaded plan applies exactly like the
+in-memory one.
+
+Neither path is a transaction across the corpus. After a sync, look at
+`UpdateResult.errors`: a source listed there was not (fully) written, and what the store holds
+for it is described under [Write discipline](#write-discipline) below.
 
 ### Human-in-the-loop review
 
@@ -56,8 +67,11 @@ two first-class change tokens:
 - **`content_hash`** — `Document.content_hash()`, a canonical-JSON hash over
   `(title, elements)` — pure Python, dependency-stable. Used on the **Boundary-2 path**
   (reading from a [`DocumentStore`](../api/pipeline.md#documentstore)): editing a stored
-  Document changes its hash, which triggers re-chunking/re-extraction. A stored
-  `content_hash` of `None` means "always changed".
+  Document changes its hash, which triggers re-chunking/re-extraction.
+
+A **missing or blank stored hash means "always changed"** on either path (`None` or `""`).
+Stores use that deliberately: a source whose stored items disagree on their hashes, or whose
+write was interrupted, is reported with blank hashes so it is re-processed.
 
 Both live as first-class fields on the synced items (`Chunk`, `Document`, `Mention`) — never
 in `metadata`.
@@ -68,13 +82,17 @@ in `metadata`.
 
 - **Change detection** — compare each source's current token against the stored state
   (`list_source_state()`), skip matches.
-- **Concurrency** — sources are produced under a semaphore and streamed as completed.
-- **Error isolation** — production and write failures (`Exception` subclasses) are caught
-  per source and collected into `UpdateResult.errors`, so one bad file does not stop the
-  others. Cancellation (`asyncio.CancelledError`) is not collected; it propagates to the
-  caller.
-- **Write discipline** — per source: optional `pre_write` (embedding) → delete stale entries
-  by `source_id` → upsert. In `apply`, a source whose stale-delete failed is *not* upserted.
+- **Concurrency** — sources are produced under a semaphore (`concurrency`, an `int` or a
+  shared `asyncio.Semaphore`) and streamed as completed. If you share a semaphore, nothing on
+  the write path (the embedder, the store) may acquire that same semaphore: in `run` the
+  producers hold their slots while they wait for the writer.
+- **Error isolation** — resolution, production and write failures (`Exception` subclasses)
+  are caught per source and collected into `UpdateResult.errors`, so one bad file does not
+  stop the others. Cancellation (`asyncio.CancelledError`) and other `BaseException`s are not
+  collected; they propagate to the caller, and the running producers are cancelled and awaited
+  before control returns.
+- **Write discipline** — per source: optional `pre_write` (embedding), then the write
+  described in the next section.
 - **Orphan deletion** — sources present in the store but absent upstream are deleted only
   when `delete_orphans=True` (opt-in footgun guard: on the direct path, only pass your
   complete corpus with this flag).
@@ -82,7 +100,67 @@ in `metadata`.
 The engine writes to anything satisfying
 [`SourceSyncStore[T]`](../api/pipeline.md#sourcesyncstore) — three methods
 (`upsert`, `delete_by_source`, `list_source_state`) that `VectorStore`, `DocumentStore`, and
-`MentionStore` all satisfy structurally.
+`MentionStore` all satisfy structurally. A store may additionally implement
+[`SourceReplaceStore[T]`](../api/pipeline.md#sourcereplacestore) (`replace_source`), which
+changes how updates are written.
+
+## Write discipline
+
+How a changed source is written depends on what it is and on what the store can do:
+
+| Case | What the engine calls | If the write fails |
+|---|---|---|
+| New source | `upsert(items)` | Nothing was stored before; the source is re-processed as new next run |
+| Updated source, store implements `SourceReplaceStore` | `replace_source(source_id, items)` — new items land **before** stale ones are removed | The previously stored items stay in place |
+| Updated source, any other store | `delete_by_source(source_id)` then `upsert(items)` | A failed delete skips the upsert (no old/new mixing). A failed upsert leaves the source **empty**; the next run finds no stored state and re-processes it as new |
+| Updated source that now yields no items | `delete_by_source(source_id)` | Old items stay; retried next run |
+
+`pre_write` (embedding) runs before any of this, so an embedding failure leaves the store
+untouched for that source.
+
+The built-in stores that implement `SourceReplaceStore` are `QdrantVectorStore`,
+`QdrantMentionStore`, `QdrantDocumentStore` and `LocalDocumentStore`. A custom store only
+needs `replace_source` if it can honour the contract: a failure must not leave the source
+looking "unchanged", and should leave the previous items in place.
+
+### What the Qdrant stores guarantee
+
+Qdrant has no multi-request transactions, so the stores make an interrupted write
+*detectable* rather than atomic:
+
+- **Blank-then-stamp.** A write that spans several requests (more than 100 points, or any
+  `replace_source`) first writes the points with `source_hash` / `content_hash` blank and
+  stamps the real hashes with a final `set_payload` once every batch has landed. Until that
+  stamp, the source reads as "changed". A write that fits one request is a single upsert.
+- **Failure or cancellation part-way.** The points this call created are deleted again, by
+  point id (on cancellation the cleanup runs shielded, then the cancellation is re-raised).
+  Points that existed before the call are never deleted; if the call had already overwritten
+  one, it is **not** restored to its old content — it keeps the new content with blank hashes.
+- **Hard crash** (process killed, power loss). No cleanup runs: the partially written points
+  remain and are retrievable, with blank hashes, so the next sync re-processes the source and
+  replaces them.
+- **Replace** writes the new points, then deletes only the source's stale points (ids not in
+  the new set), then stamps. A failure before the stale delete leaves the old chunks or
+  mentions in place.
+- **Mixed state.** `list_source_state()` reports a source whose points disagree on their
+  hashes with blank hashes — "always changed".
+
+`QdrantDocumentStore` and `LocalDocumentStore` keep one record per source, so an update is a
+single atomic replacement (one point; one file written to a temp name and renamed over the
+old one). A stored document file that cannot be read or parsed is logged and reported as
+"always changed" instead of aborting the listing: a Boundary-1 re-ingest overwrites it, and at
+Boundary 2 that one source lands in `UpdateResult.errors` while the others proceed.
+
+### Two things that are not guarantees
+
+- **A source that yields no items is re-produced on every run.** The change token lives on
+  the stored items; with nothing stored there is nothing to compare against, so the source is
+  parsed, processed and (where applicable) sent to the LLM again each time until it yields
+  items.
+- **A processor-filtered document is treated differently by the two direct paths.**
+  `DocumentStorePipeline` keeps the previously stored Document (the producer returns `None`);
+  `VectorStorePipeline` in direct mode deletes the source's stored chunks (the producer
+  returns an empty change). This is current behaviour, not a contract of the engine.
 
 What each pipeline contributes is just:
 
@@ -133,7 +211,9 @@ result.errors      # [(source_id, exception)] — isolated per source
 ## Extending: your own synced sink
 
 Point the engine at a new sink by implementing the three `SourceSyncStore` methods and writing
-a producer — no engine changes. Index your backing store on the item's `source_id` field (a
+a producer — no engine changes. Add `replace_source` (see
+[Write discipline](#write-discipline)) if your backend can write a source's new items before
+removing the old ones. Index your backing store on the item's `source_id` field (a
 first-class field, not metadata) so `delete_by_source` and `list_source_state` stay cheap; see
 [Implementing a custom VectorStore](pipeline.md#implementing-a-custom-vectorstore) for a
 concrete example.

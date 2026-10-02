@@ -189,6 +189,18 @@ async for batch in pipeline.stream(paths, concurrency=4):
     await vector_store.upsert(batch)
 ```
 
+Two things to know about `stream`:
+
+- It is **not back-pressured**. `concurrency` bounds how many files are processed at once,
+  but all files are scheduled up front and finished batches wait in memory until you consume
+  them — a consumer slower than the pipeline accumulates them.
+- It **stops at the first failing file**: the exception propagates out of the loop and the
+  remaining work is cancelled (`on_error="skip"` applies to `run_many` only).
+
+For syncing into a store, prefer [`VectorStorePipeline.run`](#scenario-b-incremental-update):
+it isolates failures per source and holds at most `concurrency + 2` sources' chunks in memory,
+however large the corpus is.
+
 ---
 
 ## TokenSplitter reference
@@ -263,7 +275,7 @@ result = await vs_pipeline.run(paths)
 | Case | What happens |
 |------|-------------|
 | **New file** | Parsed, chunked, upserted; `source_id` / `source_hash` / `content_hash` set on each chunk. |
-| **Modified file** (byte hash changed) | Old chunks deleted by `source_id`, file re-processed, new chunks upserted. |
+| **Modified file** (byte hash changed) | File re-processed and its stored chunks replaced. With a store that implements `SourceReplaceStore` (e.g. `QdrantVectorStore`) the new chunks are written before the stale ones are removed; otherwise the old chunks are deleted by `source_id` and the new ones upserted. |
 | **Removed file** (path no longer in source list) | Kept by default; deleted only with `delete_orphans=True`. |
 
 Orphan deletion is **opt-in** and must be requested explicitly:
@@ -278,10 +290,13 @@ print(result.deleted)  # ["old_report.docx"]  (source IDs, not paths)
 ### plan() / apply()
 
 `run()` reaches the same end state as `apply(plan(...))`, but it is a separate streaming
-path that writes each source as soon as it is ready (see the
-[Sync Engine Guide](sync-engine.md)). Call `plan()` and `apply()` yourself to review changes
-before they reach the store — `plan()` returns a serializable `ChangeSet` and does not touch
-the store:
+path: it writes each source as soon as it is ready and is back-pressured, so memory stays
+bounded by `concurrency`, not by corpus size (see the [Sync Engine Guide](sync-engine.md)).
+Call `plan()` and `apply()` yourself to review changes before they reach the store —
+`plan()` returns a serializable `ChangeSet` and does not touch the store. `apply()` embeds
+the whole change set first (if embedding fails, the store is untouched) and then writes
+source by source; it holds the whole change set in memory and does not modify the
+`ChangeSet` you pass in:
 
 ```python
 from ragdoc.chunking import Chunk
@@ -313,7 +328,13 @@ for source_id, exc in result.errors:
     print(f"FAILED {source_id}: {exc}")
 ```
 
-Always check `errors` after a sync: a source listed there was not (fully) written.
+Always check `errors` after a sync: a source listed there was not (fully) written. What the
+store then holds for it depends on the store — with `QdrantVectorStore` a failed update keeps
+the previously stored chunks; with a store that only offers delete-then-upsert a failed upsert
+leaves the source empty until the next run re-processes it. Either way the next run picks the
+source up again. Cancellation (`asyncio.CancelledError`) is never collected: it propagates,
+and sources already written stay written. The details are in the Sync Engine Guide under
+[Write discipline](sync-engine.md#write-discipline).
 
 ---
 
@@ -347,7 +368,7 @@ from ragdoc.pipeline import (
 client = AsyncQdrantClient("http://localhost:6333")
 
 # create() creates the collection (and a source_id payload index) if it doesn't exist.
-# Against a Qdrant server it is safe to call on every startup.
+# It is idempotent — safe to call on every startup, against a server or the in-process client.
 store = await QdrantVectorStore.create(client, "my_docs", vector_size=1536)
 
 pipeline = DocumentPipeline(splitter=TokenSplitter(max_tokens=4000))
@@ -384,7 +405,13 @@ point id, and the vectors).  The provenance fields (`source_id`, `source_hash`,
 
 - `create()` adds a Qdrant payload index on `source_id`, turning filter operations
   in `list_source_state` and `delete_by_source` from O(n) scans into O(log n) lookups.
-- `upsert()` batches points in groups of 100 to avoid gRPC message size limits.
+- `upsert()` batches points in groups of 100 to avoid gRPC message size limits. A write
+  spanning several batches is made detectable rather than atomic: points are written with
+  blank change-detection hashes and the real hashes are stamped once every batch has landed,
+  so an interrupted write is re-processed by the next sync (see
+  [What the Qdrant stores guarantee](sync-engine.md#what-the-qdrant-stores-guarantee)).
+- `create()` is idempotent — safe to call on every start, against a server or the in-process
+  client. An existing collection is used as is.
 - `list_source_ids()` uses scroll pagination (1000 points per page) so it works
   correctly at any collection size.
 
@@ -398,7 +425,10 @@ For a runnable end-to-end example (in-process Qdrant, no credentials needed), se
 Any object implementing the `VectorStore` protocol satisfies the requirements.
 The protocol requires five async methods — implementations should index on
 `chunk.source_id` and `chunk.source_hash` (first-class fields, not
-`chunk.metadata`):
+`chunk.metadata`). Optionally add `replace_source(source_id, chunks)`
+([`SourceReplaceStore`](../api/pipeline.md#sourcereplacestore)) if your backend can write a
+source's new chunks before removing the old ones; without it, updates are written as
+delete-then-upsert:
 
 ```python
 from ragdoc.chunking import Chunk

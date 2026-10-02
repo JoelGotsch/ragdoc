@@ -261,7 +261,7 @@ class ChunkPipeline(Generic[TMetadata]):
                 raise ValueError(
                     f"Document metadata is missing required fields: {sorted(missing)}. "
                     f"Expected by {self._metadata_type.__name__} "
-                    "(parsers stamp 'filename'; processors must set custom Required keys)."
+                    "('filename' is stamped at load time; processors must set custom Required keys)."
                 )
 
         # Source-level provenance (uniform across all of this document's chunks).
@@ -441,9 +441,15 @@ class DocumentPipeline(Generic[TMetadata]):
     ) -> AsyncIterator[list[Chunk]]:
         """Yield chunk batches as each file completes.
 
-        Memory-efficient alternative to :meth:`run_many` for large file sets:
-        each batch can be handed off (e.g. to a vector store) before the next
-        file is started.
+        Alternative to :meth:`run_many` that hands each file's chunks to the caller as soon
+        as the file completes (e.g. to upsert them) instead of aggregating the whole corpus.
+
+        Not back-pressured: all files are scheduled up front (at most ``concurrency`` run at
+        a time) and finished batches stay in memory until the consumer takes them. The first
+        failing file raises out of the iteration and cancels the remaining work —
+        ``on_error`` applies to :meth:`run_many` only. For a bounded-memory, per-source
+        error-isolated sync into a store use
+        :meth:`~ragdoc.pipeline.vectorstore.VectorStorePipeline.run`.
 
         Args:
             sources: Iterable of file paths to process.

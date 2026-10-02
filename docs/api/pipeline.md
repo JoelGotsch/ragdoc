@@ -91,6 +91,19 @@ The generic plan/apply/run core shared by all sync pipelines. See the
       show_source: true
       heading_level: 4
 
+### SourceReplaceStore
+
+Optional capability next to `SourceSyncStore`: a store that can replace one source's items
+without a delete-first window. The engine detects it structurally and uses it for updates —
+see [Write discipline](../guide/sync-engine.md#write-discipline). Implemented by
+`QdrantVectorStore`, `QdrantMentionStore`, `QdrantDocumentStore` and `LocalDocumentStore`.
+
+::: ragdoc.pipeline.sync.SourceReplaceStore
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
 ### SyncSource
 
 ::: ragdoc.pipeline.sync.SyncSource

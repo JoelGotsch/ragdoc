@@ -377,7 +377,10 @@ def _(mo):
     ### Streaming
 
     `stream` yields one batch of chunks per file as it completes, so you can hand each
-    batch off (for example to a vector store) instead of collecting everything first:
+    batch off (for example to a vector store) instead of collecting everything first.
+    It is not back-pressured (finished batches wait in memory until you consume them) and it
+    stops at the first failing file — for syncing into a store, use `VectorStorePipeline.run`
+    (Scenario B), which isolates failures per source and keeps memory bounded:
     """)
     return
 
@@ -572,7 +575,8 @@ def _(mo):
     changed since the `apply()` above, every source is skipped — no parsing, no chunking, no
     embedding. (`run()` reaches the same end state as `apply(plan(...))`; it differs in
     scheduling, writing each source as soon as it is ready instead of preparing the whole
-    change set first.)
+    change set first. It is back-pressured: at most `concurrency + 2` sources' chunks are in
+    memory at a time, however large the corpus is.)
     """)
     return
 
@@ -705,9 +709,9 @@ def _(mo):
     |------|-------------|
     | **New file** | Parsed, chunked, embedded, upserted. |
     | **Unchanged file** (byte hash matches the store) | Skipped — listed in `UpdateResult.skipped`. |
-    | **Modified file** (byte hash differs) | Re-processed; the source's old chunks are deleted and the new ones upserted. |
+    | **Modified file** (byte hash differs) | Re-processed and replaced. A store with `replace_source` (e.g. `QdrantVectorStore`) gets the new chunks before the stale ones are removed; any other store — like the in-memory one here — gets delete-then-upsert. |
     | **Removed file** (in the store, not in the list) | Left in place by default. Deleted only with `delete_orphans=True`. |
-    | **Failing file** | Reported in `UpdateResult.errors`; the other sources are still processed. |
+    | **Failing file** | Reported in `UpdateResult.errors`; the other sources are still processed. A failed update keeps the old chunks in a `replace_source` store; with delete-then-upsert a failed upsert leaves the source empty until the next run re-processes it. |
 
     ---
 

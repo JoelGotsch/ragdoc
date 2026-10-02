@@ -2,8 +2,8 @@
 
 * :class:`MentionStore` — source-aware sink for raw :class:`~ragdoc.extraction.mention.Mention`
   records (Layer 1). Mirrors the :class:`~ragdoc.pipeline.stores.VectorStore` shape so it
-  reuses :class:`~ragdoc.pipeline.stores.SourceState` and the delete-then-upsert sync
-  discipline.
+  reuses :class:`~ragdoc.pipeline.stores.SourceState` and the shared sync engine's write
+  discipline (see :mod:`ragdoc.pipeline.sync`).
 * :class:`LocalMentionStore` — filesystem backend (one JSON file per source), index-free, for local
   development.
 
