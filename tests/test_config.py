@@ -121,7 +121,7 @@ async def test_configure_async_isolation_across_tasks():
 
 
 def test_openai_client_accepts_protocol_stub():
-    """Any object with chat + embeddings attributes satisfies the LLMClient protocol field."""
+    """An object with chat + embeddings attributes is accepted (chat-only / embeddings-only: see tests/test_llm.py)."""
     from unittest.mock import MagicMock
 
     class _Stub:
@@ -133,7 +133,7 @@ def test_openai_client_accepts_protocol_stub():
 
 
 def test_openai_client_rejects_non_client():
-    """An object with neither chat nor embeddings fails LLMClient validation."""
+    """An object with neither chat nor embeddings fails validation."""
     with pytest.raises(Exception, match=r"LLMClient|openai_client"):
         RagdocConfig(openai_client=object())  # pyright: ignore[reportArgumentType]
 

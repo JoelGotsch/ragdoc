@@ -25,7 +25,7 @@ from contextvars import ContextVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ragdoc.llm import LLMClient
+from ragdoc.llm import ChatClient, EmbeddingsClient
 
 
 class RagdocConfig(BaseModel):
@@ -34,9 +34,14 @@ class RagdocConfig(BaseModel):
     azure_key: str | None = Field(default=None, description="Azure DI API key")
     azure_endpoint: str | None = Field(default=None, description="Azure DI endpoint URL")
     download_images: bool = Field(default=True, description="Download remote images in HTML parser")
-    openai_client: LLMClient | None = Field(
+    openai_client: ChatClient | EmbeddingsClient | None = Field(
         default=None,
-        description="Default AsyncOpenAI-compatible client (chat + embeddings) for LLM features.",
+        description=(
+            "Default AsyncOpenAI-compatible client for LLM features. Any client with a `chat` and/or an "
+            "`embeddings` attribute is accepted (an `AsyncOpenAI` has both); each consumer demands only the "
+            "capability it uses — chat consumers resolve it via `ragdoc.llm.resolve_openai_client`, which "
+            "raises `LLMNotConfiguredError` for an embeddings-only client."
+        ),
     )
     default_llm_model: str = Field(
         default="gpt-4.1",

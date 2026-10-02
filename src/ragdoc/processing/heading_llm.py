@@ -215,9 +215,13 @@ Guidelines:
         self.settings = settings or LLMHeadingResolverSettings()
         config = get_config()
         self.settings.model_name = model_name or self.settings.model_name or config.default_llm_model
-        resolved_client = client or self._create_client_from_settings() or config.openai_client
+        resolved_client = client or self._create_client_from_settings()
         if resolved_client is None:
-            raise ValueError("No client provided and could not create one from settings or config.")
+            configured = config.openai_client
+            # The config may hold an embeddings-only client; this resolver needs the chat capability.
+            if not isinstance(configured, ChatClient):
+                raise ValueError("No client provided and could not create one from settings or config.")
+            resolved_client = configured
         self.client: ChatClient = resolved_client
         self.remove_title_from_elements = remove_title_from_elements
         self.remove_elements_before_title = remove_elements_before_title
