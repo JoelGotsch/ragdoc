@@ -41,10 +41,17 @@ class SourceChange(BaseModel, Generic[T]):
             ``list[Mention[P]]``). May be empty — "this source now yields nothing".
     """
 
-    source_id: str
-    source_hash: str
-    content_hash: str | None = None
-    items: list[T]
+    source_id: str = Field(description="The source identity key.")
+    source_hash: str = Field(description="File-byte hash recorded for this source ('' when unknown).")
+    content_hash: str | None = Field(
+        default=None, description="Document content hash (None on the direct path when unknown)."
+    )
+    items: list[T] = Field(
+        description=(
+            "The payload for this source (Documents, Chunks, Mentions, ...). May be empty: "
+            "'this source now yields nothing' — its stored items are deleted on apply."
+        )
+    )
 
 
 class ChangeSet(BaseModel, Generic[T]):
