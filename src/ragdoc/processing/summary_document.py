@@ -51,7 +51,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -62,7 +63,7 @@ from ragdoc.llm import ChatClient, call_structured, resolve_openai_client
 from ragdoc.processing.base import DocumentProcessor
 from ragdoc.processing.summary_base import DocumentSummary
 from ragdoc.utils import Tokenizer
-from ragdoc.utils.concurrency import fan_out
+from ragdoc.utils.concurrency import resolve_semaphore
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -241,6 +242,48 @@ def pack_summaries(summaries: list[str], max_tokens: int, tokenizer: Tokenizer) 
 _JOIN = "\n\n"
 
 
+async def run_ordered(
+    factories: list[Callable[[], Awaitable[str]]],
+    concurrency: int | asyncio.Semaphore,
+) -> list[str]:
+    """Run string-producing coroutine *factories* with bounded concurrency; results in input order.
+
+    Takes **factories**, not coroutine objects: a coroutine is only created at the moment it is
+    going to be awaited, so a failure never leaves already-created coroutines un-awaited
+    (``RuntimeWarning: coroutine ... was never awaited``).
+
+    Fail-fast: the first failure propagates. With ``concurrency == 1`` (int) the remaining
+    factories are simply never called; otherwise every still-running sibling task is cancelled
+    and awaited before the error is re-raised, so no LLM call keeps running in the background.
+    The same cleanup runs when the caller itself is cancelled.
+
+    Args:
+        factories: Zero-argument callables, each returning the awaitable for one result.
+        concurrency: Maximum simultaneous awaits — an ``int`` (private semaphore) or a shared
+            ``asyncio.Semaphore``. The int ``1`` runs strictly sequentially.
+
+    Returns:
+        One result per factory, in the order of *factories*.
+    """
+    if isinstance(concurrency, int) and concurrency == 1:
+        return [await factory() for factory in factories]
+
+    sem = resolve_semaphore(concurrency)
+
+    async def _guarded(factory: Callable[[], Awaitable[str]]) -> str:
+        async with sem:
+            return await factory()
+
+    tasks = [asyncio.ensure_future(_guarded(factory)) for factory in factories]
+    try:
+        return list(await asyncio.gather(*tasks))
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
+
+
 class DocumentSummarizerProcessor(DocumentProcessor):
     """Writes an LLM summary of the whole document to ``document.metadata[metadata_key]``.
 
@@ -266,6 +309,10 @@ class DocumentSummarizerProcessor(DocumentProcessor):
         overwrite: When False (default), skip documents that already have the key.
         concurrency: Maximum concurrent LLM calls within a fold level. ``int`` (private semaphore)
             or a shared ``asyncio.Semaphore``. Defaults to ``1`` (sequential).
+
+    A failing LLM call fails the document (this processor raises — it does not degrade): the
+    fold is fail-fast, in-flight sibling calls are cancelled, and ``metadata[metadata_key]`` is
+    left unset.
     """
 
     def __init__(
@@ -360,16 +407,6 @@ class DocumentSummarizerProcessor(DocumentProcessor):
                     "summaries are not shrinking below max_input_tokens. Check the prompt or raise the limit."
                 )
 
-        async def fan_out_summaries(coros: list[Awaitable[str]]) -> list[str]:
-            """Run summary coroutines with bounded concurrency, preserving input order."""
-            results: list[str] = [""] * len(coros)
-
-            async def _run(i: int, coro: Awaitable[str]) -> None:
-                results[i] = await coro
-
-            await fan_out([_run(i, c) for i, c in enumerate(coros)], self._concurrency)
-            return results
-
         async def reduce(summaries: list[str], depth: int) -> str:
             _check_depth(depth)
             joined = _JOIN.join(summaries)
@@ -379,7 +416,7 @@ class DocumentSummarizerProcessor(DocumentProcessor):
             if n <= settings.max_input_tokens:
                 return await call(joined)
             batches = pack_summaries(summaries, settings.max_input_tokens, tokenizer)
-            batch_summaries = await fan_out_summaries([call(_JOIN.join(b)) for b in batches])
+            batch_summaries = await run_ordered([partial(call, _JOIN.join(b)) for b in batches], self._concurrency)
             return await reduce(batch_summaries, depth + 1)
 
         async def summarize_doc(doc: Document, depth: int, parent_tokens: int | None) -> str:
@@ -405,7 +442,9 @@ class DocumentSummarizerProcessor(DocumentProcessor):
             if len(pieces) <= 1:
                 logger.warning("DocumentSummarizer: splitter could not split oversized content; truncating")
                 return await call(tokenizer.truncate(text, settings.max_input_tokens))
-            piece_summaries = await fan_out_summaries([summarize_doc(p, depth + 1, n) for p in pieces])
+            piece_summaries = await run_ordered(
+                [partial(summarize_doc, p, depth + 1, n) for p in pieces], self._concurrency
+            )
             return await reduce(piece_summaries, depth + 1)
 
         document.metadata[self.metadata_key] = await summarize_doc(document, 0, None)

@@ -363,3 +363,121 @@ async def test_prompt_override_reaches_system_message():
     await processor.process(doc)
 
     assert calls[0][0]["content"] == "CUSTOM PROMPT"
+
+
+# =============================================================================
+# Failure inside the map fan-out: no orphaned coroutines
+# =============================================================================
+
+
+async def _run_and_collect_warnings(processor: DocumentSummarizerProcessor, doc: Document) -> tuple[str, list[str]]:
+    """Run *processor* expecting a RuntimeError; return (error message, warnings emitted).
+
+    The exception (and with it the traceback's frames, which keep any un-awaited coroutine
+    objects alive) is dropped before ``gc.collect()``, so a "coroutine ... was never awaited"
+    RuntimeWarning — emitted when such a coroutine is finalized — lands in the recorded list.
+    ``ragdoc.llm``'s error log is silenced for the call because pytest's log capture would
+    otherwise hold the exception (as a log-record argument) until after the test.
+    """
+    import gc
+    import logging
+    import warnings
+
+    llm_logger = logging.getLogger("ragdoc.llm")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        llm_logger.disabled = True
+        try:
+            await processor.process(doc)
+        except RuntimeError as exc:
+            message = str(exc)
+        else:
+            pytest.fail("expected the failing map call to propagate")
+        finally:
+            llm_logger.disabled = False
+        gc.collect()
+    return message, [str(w.message) for w in caught]
+
+
+def _failing_on(marker: str):
+    def summary_fn(text: str) -> str:
+        if marker in text:
+            raise RuntimeError(f"map call failed on {marker}")
+        return "s"
+
+    return summary_fn
+
+
+def _three_piece_processor(client, concurrency) -> DocumentSummarizerProcessor:
+    pieces = [Document(elements=[_para(f"{name} {name} {name}")]) for name in ("AAA", "BBB", "CCC")]
+    return DocumentSummarizerProcessor(
+        client=client,
+        settings=DocumentSummarizerSettings(min_tokens=0, max_input_tokens=5),
+        renderer=_renderer(),
+        tokenizer=_WordTokenizer(),
+        splitter=lambda doc: pieces,
+        concurrency=concurrency,
+    )
+
+
+@pytest.mark.anyio
+async def test_failing_map_call_leaves_no_unawaited_coroutines_sequential():
+    """Sequential fan-out: when the first map call fails, the remaining calls are never *created*
+    (previously they were created eagerly and dropped: 'coroutine ... was never awaited')."""
+    client, calls = _make_client(_failing_on("AAA"))
+    processor = _three_piece_processor(client, concurrency=1)
+    doc = Document(elements=[_para(" ".join(["word"] * 20))])
+
+    message, warned = await _run_and_collect_warnings(processor, doc)
+
+    assert "map call failed on AAA" in message
+    assert not [w for w in warned if "never awaited" in w], warned
+    assert len(calls) == 1  # fail-fast: no LLM call after the failure
+    assert "summary" not in doc.metadata
+
+
+@pytest.mark.anyio
+async def test_failing_map_call_leaves_no_unawaited_coroutines_concurrent():
+    """Concurrent fan-out: one failing map call propagates and its siblings are cancelled/awaited."""
+    client, _calls = _make_client(_failing_on("BBB"))
+    processor = _three_piece_processor(client, concurrency=3)
+    doc = Document(elements=[_para(" ".join(["word"] * 20))])
+
+    message, warned = await _run_and_collect_warnings(processor, doc)
+
+    assert "map call failed on BBB" in message
+    assert not [w for w in warned if "never awaited" in w], warned
+    assert "summary" not in doc.metadata
+
+
+@pytest.mark.anyio
+async def test_failing_map_call_cancels_in_flight_siblings():
+    """A failure must not leave sibling LLM calls running in the background."""
+    import asyncio
+
+    started: list[str] = []
+    finished: list[str] = []
+    all_started = asyncio.Event()
+
+    async def parse(*args, **kwargs):
+        text = kwargs["messages"][1]["content"]
+        name = next(n for n in ("AAA", "BBB", "CCC") if n in text)
+        started.append(name)
+        if len(started) == 3:
+            all_started.set()
+        if name == "AAA":
+            await all_started.wait()  # fail only once the siblings are in flight
+            raise RuntimeError("map call failed on AAA")
+        await asyncio.sleep(30)
+        finished.append(name)
+        return MagicMock(choices=[MagicMock(message=MagicMock(parsed=DocumentSummary(summary="s")))])
+
+    client = MagicMock()
+    client.chat.completions.parse = AsyncMock(side_effect=parse)
+    processor = _three_piece_processor(client, concurrency=3)
+
+    with pytest.raises(RuntimeError, match="map call failed on AAA"):
+        await asyncio.wait_for(processor.process(Document(elements=[_para(" ".join(["word"] * 20))])), timeout=5)
+
+    assert sorted(started) == ["AAA", "BBB", "CCC"]
+    assert finished == []  # cancelled, not awaited to completion
