@@ -51,7 +51,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -63,7 +62,7 @@ from ragdoc.llm import ChatClient, call_structured, resolve_openai_client
 from ragdoc.processing.base import DocumentProcessor
 from ragdoc.processing.summary_base import DocumentSummary
 from ragdoc.utils import Tokenizer
-from ragdoc.utils.concurrency import resolve_semaphore
+from ragdoc.utils.concurrency import run_ordered
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -240,48 +239,6 @@ def pack_summaries(summaries: list[str], max_tokens: int, tokenizer: Tokenizer) 
 # ---------------------------------------------------------------------------
 
 _JOIN = "\n\n"
-
-
-async def run_ordered(
-    factories: list[Callable[[], Awaitable[str]]],
-    concurrency: int | asyncio.Semaphore,
-) -> list[str]:
-    """Run string-producing coroutine *factories* with bounded concurrency; results in input order.
-
-    Takes **factories**, not coroutine objects: a coroutine is only created at the moment it is
-    going to be awaited, so a failure never leaves already-created coroutines un-awaited
-    (``RuntimeWarning: coroutine ... was never awaited``).
-
-    Fail-fast: the first failure propagates. With ``concurrency == 1`` (int) the remaining
-    factories are simply never called; otherwise every still-running sibling task is cancelled
-    and awaited before the error is re-raised, so no LLM call keeps running in the background.
-    The same cleanup runs when the caller itself is cancelled.
-
-    Args:
-        factories: Zero-argument callables, each returning the awaitable for one result.
-        concurrency: Maximum simultaneous awaits — an ``int`` (private semaphore) or a shared
-            ``asyncio.Semaphore``. The int ``1`` runs strictly sequentially.
-
-    Returns:
-        One result per factory, in the order of *factories*.
-    """
-    if isinstance(concurrency, int) and concurrency == 1:
-        return [await factory() for factory in factories]
-
-    sem = resolve_semaphore(concurrency)
-
-    async def _guarded(factory: Callable[[], Awaitable[str]]) -> str:
-        async with sem:
-            return await factory()
-
-    tasks = [asyncio.ensure_future(_guarded(factory)) for factory in factories]
-    try:
-        return list(await asyncio.gather(*tasks))
-    except BaseException:
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        raise
 
 
 class DocumentSummarizerProcessor(DocumentProcessor):

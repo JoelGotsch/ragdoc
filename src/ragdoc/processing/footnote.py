@@ -63,7 +63,7 @@ import asyncio
 import logging
 import re
 import uuid
-from collections.abc import Awaitable
+from functools import partial
 from html.parser import HTMLParser
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
@@ -72,7 +72,7 @@ from pydantic import BaseModel, Field
 from ragdoc.document import Footnote
 from ragdoc.llm import ChatClient, call_structured, resolve_openai_client
 from ragdoc.processing.base import DocumentProcessor
-from ragdoc.utils.concurrency import fan_out
+from ragdoc.utils.concurrency import run_ordered
 
 logger = logging.getLogger(__name__)
 
@@ -922,14 +922,11 @@ class FootnoteProcessor(DocumentProcessor):
                     )
         else:
             # --- Parallel path: no ordering constraint ---
-            # Pre-allocate results; index matches sorted_footnotes order.
-            results: list[FootnoteCandidate | None] = [None] * len(sorted_footnotes)
-
-            async def _resolve_one(idx: int, footnote: Footnote) -> None:
-                results[idx] = await self._resolve_footnote(document, footnote, None)
-
-            coros: list[Awaitable[None]] = [_resolve_one(i, f) for i, f in enumerate(sorted_footnotes)]
-            await fan_out(coros, self._concurrency)
+            # Results come back in sorted_footnotes order.
+            results = await run_ordered(
+                [partial(self._resolve_footnote, document, footnote, None) for footnote in sorted_footnotes],
+                self._concurrency,
+            )
 
             for footnote, best in zip(sorted_footnotes, results, strict=True):
                 if best is None:

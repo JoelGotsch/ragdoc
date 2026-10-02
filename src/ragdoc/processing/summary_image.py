@@ -32,7 +32,7 @@ from ragdoc.document import Image
 from ragdoc.llm import ChatClient, call_structured, is_llm_failure, resolve_openai_client
 from ragdoc.processing.base import DocumentProcessor
 from ragdoc.processing.summary_base import ImageSummary
-from ragdoc.utils.concurrency import fan_out
+from ragdoc.utils.concurrency import run_ordered
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -302,8 +302,7 @@ class ImageSummaryProcessor(DocumentProcessor):
                 f"ImageSummaryProcessor: {len(images)} images to summarize"
                 + (f" ({skipped} skipped: already summarized)" if skipped else "")
             )
-        coros: list[Awaitable[None]] = [self._process_one(summarize, img, document) for img in images]
-        await fan_out(coros, self._concurrency)
+        await run_ordered([partial(self._process_one, summarize, img, document) for img in images], self._concurrency)
         return document
 
     async def _process_one(

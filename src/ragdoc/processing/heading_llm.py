@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable
 from dataclasses import dataclass
 from enum import Enum
+from functools import partial
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, SecretStr
@@ -21,7 +21,7 @@ from ragdoc.config import get_config
 from ragdoc.document import Heading, Paragraph
 from ragdoc.llm import ChatClient, call_structured
 from ragdoc.processing.base import DocumentProcessor
-from ragdoc.utils.concurrency import fan_out
+from ragdoc.utils.concurrency import run_ordered
 
 if TYPE_CHECKING:
     from ragdoc.document import Document
@@ -377,19 +377,15 @@ Guidelines:
         # Pre-compute (id_offset, batch) so offsets are stable even under parallel execution.
         batches = [(i, heading_infos[i : i + batch_size]) for i in range(0, len(heading_infos), batch_size)]
 
-        # Pre-allocate results list: preserves order regardless of completion order.
-        results: list[list[HeadingJudgment]] = [[] for _ in batches]
-
-        async def _process_batch(batch_idx: int, id_offset: int, batch: list[HeadingInfo]) -> None:
+        async def _process_batch(id_offset: int, batch: list[HeadingInfo]) -> list[HeadingJudgment]:
             batch_judgments = await self._get_heading_levels(batch)
             # Re-map IDs from batch-local (1-based) to global (1-based)
-            results[batch_idx] = [HeadingJudgment(id=j.id + id_offset, level=j.level) for j in batch_judgments]
+            return [HeadingJudgment(id=j.id + id_offset, level=j.level) for j in batch_judgments]
 
-        coros: list[Awaitable[None]] = [
-            _process_batch(idx, offset, batch) for idx, (offset, batch) in enumerate(batches)
-        ]
-        await fan_out(coros, self._concurrency)
-
+        # Results come back in batch order regardless of completion order.
+        results = await run_ordered(
+            [partial(_process_batch, offset, batch) for offset, batch in batches], self._concurrency
+        )
         return [j for r in results for j in r]
 
     def _apply_levels(

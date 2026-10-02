@@ -43,6 +43,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable, Iterable
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, cast
 
@@ -60,7 +61,7 @@ from ragdoc.pipeline.sync import (
     file_hash,
     source_hash_token,
 )
-from ragdoc.utils.concurrency import resolve_semaphore
+from ragdoc.utils.concurrency import run_ordered
 
 logger = logging.getLogger(__name__)
 
@@ -249,25 +250,13 @@ class MentionStorePipeline(Generic[PayloadT]):
         for split in splits:
             split.source_id = source_id
             split.source_hash = source_hash
-        # An int is a private per-source bound (resolved here, inside the running loop); a shared
-        # asyncio.Semaphore passes through and acts as a cross-source budget.
-        sem = resolve_semaphore(self._split_concurrency)
-
-        async def _extract_split(split: Document) -> list[Mention[PayloadT]]:
-            async with sem:
-                return await self._extractor.extract(split)
-
-        tasks = [asyncio.ensure_future(_extract_split(split)) for split in splits]
-        try:
-            results = await asyncio.gather(*tasks)
-        except BaseException:
-            # First failing split fails the source (as before) — but do not let the remaining
-            # splits keep calling the LLM for a result that will be thrown away. Also runs on
-            # cancellation of this source.
-            for task in tasks:
-                task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-            raise
+        # An int is a private per-source bound; a shared asyncio.Semaphore passes through and acts
+        # as a cross-source budget. run_ordered is fail-fast: the first failing split fails the
+        # source and cancels its siblings, so they do not keep calling the LLM for a result that
+        # will be thrown away (the same cleanup runs on cancellation of this source).
+        results = await run_ordered(
+            [partial(self._extractor.extract, split) for split in splits], self._split_concurrency
+        )
 
         out: list[Mention[PayloadT]] = []
         id_map: dict[str, str] = {}

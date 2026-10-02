@@ -1,30 +1,34 @@
 """Tests for bounded concurrency on element-level processors.
 
 Covers:
-- _resolve_semaphore: int → new Semaphore; Semaphore → pass-through
-- _fan_out: concurrency=1 sequential fast-path; concurrency=2 bounded parallel
 - ImageSummaryProcessor: concurrency=1 and concurrency=2 respect the cap
 - LLMHeadingResolver._process_in_batches: concurrency=2 respects the cap
 - FootnoteProcessor: concurrency=1 uses ordering constraint; concurrency=2 parallel
 - Shared asyncio.Semaphore crosses processor boundaries
+- A failure or cancellation mid fan-out leaves no un-awaited coroutines behind
+
+The helper itself (``ragdoc.utils.concurrency.run_ordered``) is tested in tests/utils/test_concurrency.py.
 """
 
 from __future__ import annotations
 
 import asyncio
 import base64
+import gc
 import io
+import warnings
+from unittest.mock import MagicMock
 
 import pytest
 
 pytest.importorskip("PIL", reason="llm extra (pillow) not installed")
 from PIL import Image as PILImage
 
-from ragdoc.document import Document, Footnote, Image, Paragraph
+from ragdoc.document import Document, Footnote, Heading, Image, Paragraph
 from ragdoc.processing.footnote import FootnoteProcessor
+from ragdoc.processing.heading_llm import LLMHeadingResolver, LLMHeadingResolverSettings
 from ragdoc.processing.summary_base import ImageSummary
 from ragdoc.processing.summary_image import ImageSummaryProcessor
-from ragdoc.utils.concurrency import fan_out, resolve_semaphore
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -52,96 +56,6 @@ def _make_doc_with_footnotes(n: int) -> Document:
         footnotes.append(Footnote(number=i, innerhtml=f"<p>Footnote {i}</p>", page=1))
     elements.extend(footnotes)
     return Document(elements=elements)
-
-
-# ---------------------------------------------------------------------------
-# _resolve_semaphore
-# ---------------------------------------------------------------------------
-
-
-def test_resolve_semaphore_int_creates_new():
-    sem = resolve_semaphore(3)
-    assert isinstance(sem, asyncio.Semaphore)
-
-
-def test_resolve_semaphore_passthrough():
-    original = asyncio.Semaphore(2)
-    assert resolve_semaphore(original) is original
-
-
-# ---------------------------------------------------------------------------
-# _fan_out
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.anyio
-async def test_fan_out_sequential_runs_all():
-    results: list[int] = []
-
-    async def _task(n: int) -> None:
-        results.append(n)
-
-    await fan_out([_task(i) for i in range(5)], concurrency=1)
-    assert results == list(range(5))
-
-
-@pytest.mark.anyio
-async def test_fan_out_sequential_preserves_order():
-    order: list[int] = []
-
-    async def _task(n: int) -> None:
-        order.append(n)
-
-    await fan_out([_task(i) for i in range(4)], concurrency=1)
-    assert order == [0, 1, 2, 3]
-
-
-@pytest.mark.anyio
-async def test_fan_out_parallel_runs_all():
-    results: list[int] = []
-
-    async def _task(n: int) -> None:
-        results.append(n)
-
-    await fan_out([_task(i) for i in range(5)], concurrency=2)
-    assert sorted(results) == list(range(5))
-
-
-@pytest.mark.anyio
-async def test_fan_out_parallel_respects_cap():
-    concurrent = 0
-    max_concurrent = 0
-
-    async def _task() -> None:
-        nonlocal concurrent, max_concurrent
-        concurrent += 1
-        max_concurrent = max(max_concurrent, concurrent)
-        await asyncio.sleep(0)
-        concurrent -= 1
-
-    await fan_out([_task() for _ in range(6)], concurrency=2)
-    assert max_concurrent <= 2
-
-
-@pytest.mark.anyio
-async def test_fan_out_shared_semaphore_respected():
-    """A shared Semaphore(1) serialises tasks from two separate fan_out calls."""
-    shared = asyncio.Semaphore(1)
-    concurrent = 0
-    max_concurrent = 0
-
-    async def _task() -> None:
-        nonlocal concurrent, max_concurrent
-        concurrent += 1
-        max_concurrent = max(max_concurrent, concurrent)
-        await asyncio.sleep(0)
-        concurrent -= 1
-
-    await asyncio.gather(
-        fan_out([_task() for _ in range(3)], concurrency=shared),
-        fan_out([_task() for _ in range(3)], concurrency=shared),
-    )
-    assert max_concurrent <= 1
 
 
 # ---------------------------------------------------------------------------
@@ -285,3 +199,68 @@ async def test_footnote_processor_concurrency_respects_cap():
     doc = _make_doc_with_footnotes(6)
     await FootnoteProcessor(resolver=CountingResolver(), concurrency=2).process(doc)
     assert max_concurrent <= 2
+
+
+# ---------------------------------------------------------------------------
+# No un-awaited coroutines when a fan-out is interrupted
+# ---------------------------------------------------------------------------
+
+
+class _Abort(BaseException):
+    """Stands in for cancellation: a BaseException no per-item ``except Exception`` contains."""
+
+
+async def _never_awaited_warnings(awaitable_factory, expected: type[BaseException]) -> list[str]:
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        # No pytest.raises here: its ExceptionInfo would keep the traceback — and with it the
+        # frames holding any un-awaited coroutine — alive past gc.collect().
+        try:
+            await awaitable_factory()
+        except expected:
+            pass
+        else:
+            pytest.fail(f"expected {expected.__name__}")
+        gc.collect()
+    return [str(w.message) for w in caught if "never awaited" in str(w.message)]
+
+
+@pytest.mark.anyio
+async def test_image_processor_bug_in_summarize_leaves_no_unawaited_coroutines():
+    """A non-LLM error (a bug) propagates from the first image; the others are never started."""
+    seen: list[str] = []
+
+    async def _summarize(image: Image, context: str | None) -> ImageSummary:
+        seen.append(image.id)
+        raise TypeError("bug in the summarize function")
+
+    doc = _make_doc_with_images(3)
+    processor = ImageSummaryProcessor(summarize=_summarize, concurrency=1)
+
+    unawaited = await _never_awaited_warnings(lambda: processor.process(doc), TypeError)
+
+    assert len(seen) == 1
+    assert unawaited == []
+
+
+@pytest.mark.anyio
+async def test_heading_resolver_interrupted_batches_leave_no_unawaited_coroutines():
+    """An interruption in the first heading batch must not orphan the remaining batch coroutines."""
+    calls = 0
+
+    async def _parse(**_: object) -> None:
+        # Raise a fresh exception per call: a shared instance kept on the mock would pin its
+        # traceback (and the frames holding un-awaited coroutines) and hide the warning.
+        nonlocal calls
+        calls += 1
+        raise _Abort
+
+    client = MagicMock()
+    client.chat.completions.parse = _parse
+    doc = Document(elements=[Heading(html=f"<h1>Heading {i}</h1>") for i in range(3)])
+    resolver = LLMHeadingResolver(client, settings=LLMHeadingResolverSettings(batch_size=1), concurrency=1)
+
+    unawaited = await _never_awaited_warnings(lambda: resolver.process(doc), _Abort)
+
+    assert calls == 1
+    assert unawaited == []

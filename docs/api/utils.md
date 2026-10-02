@@ -72,9 +72,9 @@ Utility classes and functions used throughout the ragdoc pipeline.
 
 ## Concurrency
 
-### fan_out
+### run_ordered
 
-::: ragdoc.utils.concurrency.fan_out
+::: ragdoc.utils.concurrency.run_ordered
     options:
       show_root_heading: true
       show_source: true

@@ -7,7 +7,10 @@ cross-package consumers (sync pipelines, extraction) import a public name.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable, Sequence
+from typing import TypeVar
+
+T = TypeVar("T")
 
 
 def resolve_semaphore(concurrency: int | asyncio.Semaphore) -> asyncio.Semaphore:
@@ -17,35 +20,52 @@ def resolve_semaphore(concurrency: int | asyncio.Semaphore) -> asyncio.Semaphore
     return asyncio.Semaphore(concurrency)
 
 
-async def fan_out(
-    coros: list[Awaitable[None]],
+async def run_ordered(
+    factories: Sequence[Callable[[], Awaitable[T]]],
     concurrency: int | asyncio.Semaphore,
-) -> None:
-    """Run *coros* with bounded concurrency.
+) -> list[T]:
+    """Run coroutine *factories* with bounded concurrency; results come back in input order.
 
-    When *concurrency* is the integer ``1`` (the default for all processors),
-    takes a direct ``for`` loop fast-path: no semaphore overhead, no
-    ``asyncio.gather``, and sequential ordering is guaranteed.
+    This is the library's one fan-out helper (element-level processors, the document
+    summarizer's map step, per-split extraction).
 
-    For any other value — an int ``> 1`` or a pre-built
-    ``asyncio.Semaphore`` — wraps each coroutine with the semaphore and
-    fans out via :func:`asyncio.gather`.
+    Takes **factories**, not coroutine objects: a coroutine is only created at the moment it is
+    going to be awaited, so a failure or a cancellation never leaves already-created coroutines
+    un-awaited (``RuntimeWarning: coroutine ... was never awaited``). Bind arguments with
+    :func:`functools.partial`::
+
+        results = await run_ordered([partial(summarize, image) for image in images], concurrency=4)
+
+    Fail-fast: the first failure propagates. With ``concurrency == 1`` (int) the work runs
+    strictly sequentially in the calling task and the remaining factories are simply never
+    called; otherwise every still-running sibling task is cancelled and awaited before the error
+    is re-raised, so no LLM call keeps running in the background. The same cleanup runs when the
+    caller itself is cancelled. Work that must survive a sibling's failure has to contain its
+    own errors inside the factory's coroutine.
 
     Args:
-        coros: Coroutines to run.  Each must return ``None``.
-        concurrency: Maximum number of coroutines that may run at the same
-            time.  Pass a shared ``asyncio.Semaphore`` to enforce a
-            cross-processor budget.
+        factories: Zero-argument callables, each returning the awaitable for one result.
+        concurrency: Maximum simultaneous awaits — an ``int`` (private semaphore) or a shared
+            ``asyncio.Semaphore`` (a budget across several calls). The int ``1`` runs strictly
+            sequentially without a semaphore.
+
+    Returns:
+        One result per factory, in the order of *factories*.
     """
     if isinstance(concurrency, int) and concurrency == 1:
-        for coro in coros:
-            await coro
-        return
+        return [await factory() for factory in factories]
 
     sem = resolve_semaphore(concurrency)
 
-    async def _guarded(coro: Awaitable[None]) -> None:
+    async def _guarded(factory: Callable[[], Awaitable[T]]) -> T:
         async with sem:
-            await coro
+            return await factory()
 
-    await asyncio.gather(*[_guarded(c) for c in coros])
+    tasks = [asyncio.ensure_future(_guarded(factory)) for factory in factories]
+    try:
+        return list(await asyncio.gather(*tasks))
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
