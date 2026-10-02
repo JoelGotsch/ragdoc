@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from ragdoc.document import Document, Footnote, Heading, Image, Paragraph
 from ragdoc.parsing.ragdoc_json import ProvenanceMode, parse_ragdoc_json
@@ -115,25 +116,42 @@ def test_new_dump_shape_has_html_field_only():
     assert "html" not in footnote and footnote["innerhtml"] == "note"
 
 
-def test_old_dump_shape_still_loads():
-    """Pre-Phase-6 dumps (html_content/innerhtml + computed `html` key) happen to load.
+def test_old_dump_shape_fails_loudly_for_stored_html_classes():
+    """Pre-Phase-6 dumps (html_content/innerhtml + computed `html` key) are rejected, not half-read.
 
-    The old computed "html" key feeds the new stored field for the five classes; the stale
-    html_content/innerhtml extras are ignored; Image/Footnote structured fields win over the
-    parsed html kwarg.  Accidental compatibility — pinned but not promised (see CHANGELOG).
+    Element models forbid unknown keys, and the pre-refactor content keys raise an error that
+    names the new ``html`` field. Old dumps of the stored-html classes therefore fail loudly on
+    load (re-ingest the source, or drop the stale keys) — they are never silently accepted with
+    keys ignored.
+    """
+    old_heading = {"element_type": "heading", "innerhtml": "Old Title", "level": 2, "html": "<h2>Old Title</h2>"}
+    old_paragraph = {"element_type": "paragraph", "html_content": "<p>body</p>", "html": "<p>body</p>"}
+    old_raw = {"element_type": "raw_text", "innerhtml": "raw body", "html": "<div>raw body</div>"}
+
+    for old_element, key in ((old_heading, "innerhtml"), (old_paragraph, "html_content"), (old_raw, "innerhtml")):
+        with pytest.raises(ValidationError, match=f"no longer accepts '{key}='"):
+            Document.model_validate({"elements": [old_element]})
+
+    # Dropping the stale keys is all a migration needs: the old computed `html` is the new field.
+    migrated = Document.model_validate(
+        {
+            "elements": [
+                {"element_type": "heading", "html": "<h2>Old Title</h2>"},
+                {"element_type": "paragraph", "html": "<p>body</p>"},
+                {"element_type": "raw_text", "html": "<div>raw body</div>"},
+            ]
+        }
+    )
+    assert [el.html for el in migrated.elements] == ["<h2>Old Title</h2>", "<p>body</p>", "<div>raw body</div>"]
+
+
+def test_old_dump_shape_still_loads_for_derived_html_classes():
+    """Old Image/Footnote dumps carried a computed `html` key next to the structured fields.
+
+    The key is consumed by the before-validators (structured fields win), so these still load.
     """
     old_dump = {
         "elements": [
-            {
-                "element_type": "heading",
-                "html_content": "<h2>Old Title</h2>",
-                "html": "<h2>Old Title</h2>",
-            },
-            {
-                "element_type": "raw_text",
-                "innerhtml": "raw body",
-                "html": "<div>raw body</div>",
-            },
             {
                 "element_type": "image",
                 "image": "aGVsbG8=",
@@ -150,8 +168,6 @@ def test_old_dump_shape_still_loads():
         ],
     }
     doc = Document.model_validate(old_dump)
-    heading, raw, image, footnote = doc.elements
-    assert isinstance(heading, Heading) and heading.html == "<h2>Old Title</h2>"
-    assert raw.html == "<div>raw body</div>"
+    image, footnote = doc.elements
     assert isinstance(image, Image) and image.image == "aGVsbG8=" and image.alt == "diagram"
     assert isinstance(footnote, Footnote) and footnote.number == 4 and footnote.innerhtml == "old note"

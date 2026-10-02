@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import uuid
+from collections.abc import Iterable
 from enum import Enum
 from functools import reduce
 from typing import TYPE_CHECKING, Annotated, Generic, Literal, TypeVar, cast
@@ -124,6 +125,37 @@ _HEADING_TAG_PATTERN = re.compile(r"h[1-6]")
 """Matches heading tag names ``h1``–``h6`` (bs4 name matcher)."""
 
 
+_RENAMED_ELEMENT_KEYWORDS: dict[str, str] = {
+    "html_content": "the full HTML including the outer tag",
+    "innerhtml": "the full HTML including the outer tag (RawText adds its outer <div> automatically)",
+}
+"""Pre-refactor content keywords -> what to pass as ``html=`` instead."""
+
+
+def reject_renamed_element_keywords(class_name: str, field_names: frozenset[str], keys: Iterable[object]) -> None:
+    """Raise a targeted error when a pre-refactor content keyword is used on an element.
+
+    ``html_content`` (Heading/Paragraph/Table/DocumentList) and ``innerhtml`` (RawText) were
+    replaced by the stored ``html`` field. They are deliberately not accepted as aliases; this
+    turns the generic "extra inputs are not permitted" into a message naming the new field. A
+    key that *is* a field of the class (``Footnote.innerhtml``) is left alone.
+
+    Args:
+        class_name: Name of the element class being constructed (for the message).
+        field_names: The class's declared field names.
+        keys: Keys of the constructor / ``model_validate`` input.
+
+    Raises:
+        ValueError: If a renamed keyword is present and is not a field of the class.
+    """
+    for key in keys:
+        if isinstance(key, str) and key in _RENAMED_ELEMENT_KEYWORDS and key not in field_names:
+            raise ValueError(
+                f"{class_name} no longer accepts '{key}=': the content field is now 'html'. "
+                f"Use {class_name}(html=...) with {_RENAMED_ELEMENT_KEYWORDS[key]}."
+            )
+
+
 class BaseElement(BaseModel):
     """Base class for all document elements.
 
@@ -135,9 +167,15 @@ class BaseElement(BaseModel):
 
     ``validate_assignment=True``: assigning ``element.html = value`` (or any field) re-runs
     the field validators, so assignments normalize exactly like construction.
+
+    ``extra="forbid"``: an unknown constructor keyword (or unknown key in ``model_validate``
+    input) raises instead of being silently dropped. The pre-refactor spellings
+    ``html_content=`` and RawText's ``innerhtml=`` are *not* aliases — they raise an error that
+    names ``html`` (see :func:`reject_renamed_element_keywords`). Custom subclasses inherit
+    this; declare every field you pass.
     """
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = ConfigDict(validate_assignment=True, extra="forbid")
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for the element")
     element_type: str = Field(
@@ -165,6 +203,13 @@ class BaseElement(BaseModel):
 
     _soup: BeautifulSoup | None = PrivateAttr(default=None)
     _soup_source: str | None = PrivateAttr(default=None)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_renamed_keywords(cls, data: object) -> object:
+        if isinstance(data, dict):
+            reject_renamed_element_keywords(cls.__name__, frozenset(cls.model_fields), data.keys())
+        return data
 
     def _parsed(self) -> BeautifulSoup:
         """Cached BeautifulSoup parse of ``self.html``.
@@ -810,7 +855,12 @@ class Document(BaseModel, Generic[TMetadata]):
         external_refs: References to external documents (parent, siblings, etc.)
         parser: Name of the parser that created this document (for processor behavior)
         parser_version: Version of the parser (optional)
+
+    Unknown constructor keywords / ``model_validate`` keys raise (``extra="forbid"``) — a
+    misspelled or removed field is an error, never silently dropped.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier for the document")
     source_path: str = Field(default="", description="Full path to the source file")
