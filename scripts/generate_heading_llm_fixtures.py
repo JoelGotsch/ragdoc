@@ -122,15 +122,11 @@ async def main() -> None:
     #     raise SystemExit("OPENAI_API_KEY environment variable is not set.")
 
     FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
-    from httpx import AsyncClient
-
     settings = LLMHeadingResolverSettings()
-    http_client = AsyncClient()
     openai_client = AsyncOpenAI(
         max_retries=3,
         api_key=settings.api_key.get_secret_value(),
         base_url=settings.base_url,
-        http_client=http_client,
     )
     # resolver = LLMHeadingResolver(client, settings)
     resolver = LLMHeadingResolver(client=openai_client)
