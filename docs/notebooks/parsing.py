@@ -16,7 +16,7 @@ def _(mo):
     # Parsing
 
     Parsing is the first stage of the pipeline. It converts a raw file into a structured
-    `Document` object. Each parser sets `document.parser` to a provenance string so downstream
+    `Document` object. `document.parser` records which parser produced it, so downstream
     processors can adjust behavior.
     """)
     return
@@ -27,25 +27,51 @@ def _(mo):
     mo.md(r"""
     ## Quick start
 
-    [`load()`][ragdoc.parsing.load] is the primary entry point. It infers the right parser
-    from the file extension. Replace the path below with a real file to run this cell.
+    [`load()`][ragdoc.parsing.load] is the primary entry point. It picks the parser from
+    the file name. The cell below writes a small HTML file to a temp directory and loads it;
+    point `sample_path` at one of your own files to try another format.
     """)
     return
 
 
 @app.cell
 async def _():
+    import tempfile
     from pathlib import Path
 
     from ragdoc.parsing import load
 
-    document = None
-    if Path("report.docx").exists():  # noqa: ASYNC240 — placeholder-file guard in a doc example
-        document = await load("report.docx")
-        print(f"parser={document.parser!r}  elements={len(document.elements)}")
-    else:
-        print("report.docx not found — replace the path with a real file to run this cell")
-    return (Path, document, load)
+    sample_path = Path(tempfile.mkdtemp(prefix="ragdoc-parsing-")) / "page.html"
+    sample_path.write_text(
+        "<html><body>"
+        "<h1>Annual Report</h1>"
+        "<p>Revenue grew in every region.</p>"
+        "<h2>Regions</h2>"
+        "<table><tr><th>Region</th><th>Growth</th></tr><tr><td>North</td><td>8%</td></tr></table>"
+        "</body></html>",
+        encoding="utf-8",
+    )
+
+    document = await load(sample_path)
+    print(f"parser={document.parser!r}  elements={len(document.elements)}")
+    print(f"source_path={document.source_path!r}")
+    print(f"metadata={document.metadata}")
+    for _el in document.elements:
+        print(f"  {type(_el).__name__:<10} {_el.text[:50]!r}")
+    return (Path, document, load, sample_path)
+
+
+@app.cell
+def test_load_html(document, sample_path):
+    from ragdoc.document import Heading, Paragraph, Table
+
+    assert document.parser == "html"
+    assert [type(e) for e in document.elements] == [Heading, Paragraph, Heading, Table]
+    assert [h.level for h in document.headings] == [1, 2]
+    # load() stamps provenance: the full path as a field, the bare filename in metadata.
+    assert document.source_path == str(sample_path)
+    assert document.metadata["filename"] == "page.html"
+    return
 
 
 @app.cell(hide_code=True)
@@ -79,20 +105,16 @@ def _(mo):
     ### HTML files (`.html`)
 
     Parses HTML files directly into a `Document`, preserving heading structure, paragraphs,
-    tables, and images.
+    tables, and images. Pass `parser=` to force a parser by its registry name instead of
+    relying on the file name:
     """)
     return
 
 
 @app.cell
-async def _(Path, load):
-    doc_html = None
-    if Path("page.html").exists():
-        doc_html = await load("page.html")
-        # doc_html.parser == "html"
-        print(f"parser={doc_html.parser!r}")
-    else:
-        print("page.html not found — replace the path with a real .html file to run this cell")
+async def _(load, sample_path):
+    doc_html = await load(sample_path, parser="html")
+    print(f"parser={doc_html.parser!r}  tables={len(doc_html.tables)}")
     return (doc_html,)
 
 
@@ -124,8 +146,7 @@ def _(mo):
     mo.md(r"""
     ### Azure Document Intelligence (`.azure.json`)
 
-    Parses the JSON output from Azure Document Intelligence into a `Document`. This is the
-    recommended parser for complex PDFs.
+    Parses a saved JSON result from Azure Document Intelligence into a `Document`.
     """)
     return
 
@@ -145,20 +166,25 @@ async def _(Path, load):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    You can also pass an in-memory analyze result directly, without a file on disk:
+    ### PDF files (`.pdf`)
+
+    Several parsers can handle PDFs. `load("report.pdf")` uses the highest-priority one that
+    is *available* in the current environment — a parser whose extra or credentials are
+    missing is skipped:
+
+    | Parser | Priority | Needs |
+    |---|---|---|
+    | `azure_di` | 40 | `azure-di` extra + Azure Document Intelligence credentials |
+    | `pdf_basic` | 10 | `pdf` extra (local, pymupdf; text + font-size headings) |
+
+    MinerU works on its own output file rather than on the PDF: run MinerU first, then load
+    the resulting `*_middle.json` (parser `mineru`, `pdf-mineru` extra).
+
+    ```python
+    doc_pdf = await load("report.pdf")                      # best available PDF parser
+    doc_pdf = await load("report.pdf", parser="pdf_basic")  # force one by name
+    ```
     """)
-    return
-
-
-@app.cell
-async def _(load):
-    # For PDFs, load() dispatches directly to Azure Document Intelligence:
-    # doc_pdf = await load("report.pdf")
-
-    # You can also force a specific parser by name:
-    # doc = await load("result.json", parser="azure_di")
-
-    print("load() dispatches PDFs to Azure DI; pass parser= to force a specific parser")
     return
 
 
@@ -169,15 +195,18 @@ def _(mo):
 
     `load()` resolves parsers from a registry. Built-in parsers are registered at import time:
 
-    | Pattern | Parser | Priority |
+    | File name ends with | Parser name | Priority |
     |---------|--------|----------|
-    | `.html`, `.htm` | HTML | — |
-    | `.docx`, `.doc` | Pandoc | — |
-    | `.xlsx` | Excel | — |
-    | `.azure.json` | Azure DI | 40 |
-    | `.pdf` | Azure DI | 40 |
-    | `_middle.json` | MinerU | 50 |
+    | `.html`, `.htm` | `html` | 0 |
+    | `.docx`, `.doc` | `pandoc` | 0 |
+    | `.xlsx` | `xlsx` | 0 |
+    | `.azure.json` | `azure_json` | 0 |
+    | `.pdf` | `azure_di` | 40 |
+    | `.pdf` | `pdf_basic` | 10 |
+    | `_middle.json` | `mineru` | 50 |
+    | `.ragdoc.json` | `ragdoc_json` | 60 |
 
+    When several parsers match a file name, the highest-priority available one wins.
     Use `describe_registry()` to see all registered parsers:
     """)
     return
@@ -186,7 +215,16 @@ def _(mo):
 @app.cell
 def _():
     from ragdoc.parsing import describe_registry
-    print(describe_registry())
+
+    registry_text = describe_registry()
+    print(registry_text)
+    return (registry_text,)
+
+
+@app.cell
+def test_registry_lists_builtin_parsers(registry_text):
+    for _name in ("html", "pandoc", "xlsx", "azure_json", "azure_di", "pdf_basic", "mineru", "ragdoc_json"):
+        assert _name in registry_text, f"{_name} missing from the parser registry"
     return
 
 
@@ -199,10 +237,14 @@ def _(mo):
 
     - Elements store content as `html` (full HTML including the outer tag)
     - Visual properties (font size, weight, alignment) are stored as **inline CSS** on the HTML tags
-    - `document.parser` is set to identify the source parser
     - Inline references (`<ref id="..." rel="..."/>`) are embedded in HTML for images and footnotes
-    - `document.metadata["filename"]` is set to the source filename (bare name)
-    - `document.source_path` is set to the full path as a string
+
+    Provenance is stamped centrally by `load()` (and by the pipelines when you pass a custom
+    parser), not by each parser:
+
+    - `document.parser` — the name of the parser that produced the document
+    - `document.source_path` — the path that was loaded, as a string
+    - `document.metadata["filename"]` — the bare filename
 
     The CSS-in-HTML convention is what allows processors like
     [`HeadingLevelProcessor`][ragdoc.processing.HeadingLevelProcessor] to work uniformly

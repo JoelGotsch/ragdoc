@@ -1,14 +1,19 @@
 """Notebook execution tests — run every notebook in docs/notebooks/ via app.run().
 
-Each test wraps one marimo notebook, executes it end-to-end, and asserts a key
-definition so a broken notebook fails loudly in CI.
+Each test wraps one marimo notebook, executes it end-to-end, and asserts on the values
+the notebook actually computed (``defs``), so a notebook that runs but produces the wrong
+thing fails here — not only one that crashes.
+
+This is layer 4 of the notebook-freshness checks (see CLAUDE.md). Layers 2/3 — the
+``test_*`` cells inside the notebooks — run via ``uv run pytest docs/notebooks/``.
 
 Skip guards:
 - marimo missing            -> all tests skip.
-- qdrant_pipeline           -> needs the ``qdrant_client`` extra and LLM credentials
-  (``LLM_HEADING_RESOLVER_API_KEY``; the notebook itself loads them via ``.env``).
-- pipeline_walkthrough      -> makes REAL LLM calls; opt in with
-  ``RAGDOC_RUN_LLM_NOTEBOOKS=1`` (plus LLM credentials).
+- qdrant_pipeline           -> needs the ``qdrant`` extra (runs offline against
+  ``AsyncQdrantClient(":memory:")``; no LLM credentials needed).
+- pipeline_walkthrough      -> two tests: the offline one runs the notebook with the LLM
+  key blanked and checks that the LLM-backed cells skip cleanly; the other makes REAL
+  LLM calls and is opt-in via ``RAGDOC_RUN_LLM_NOTEBOOKS=1`` (plus LLM credentials).
 - mineru_example            -> needs the MinerU parser to be importable.
 - extraction                -> needs numpy (``extraction`` extra) for entity resolution.
 """
@@ -57,6 +62,11 @@ def test_document_model_notebook():
     _outputs, defs = app.run()
     assert defs["doc"].title == "Annual Report"
     assert len(defs["demo_doc"].headings) == 2
+    # concat_documents: first's elements, a bridge <h1> carrying the second title, second's.
+    combined = defs["combined"]
+    assert [e.text for e in combined.elements] == ["First part.", "Part Two", "Second part."]
+    assert combined.metadata["filename"] == "one.html"  # default policy: first wins
+    assert combined.source_id is None
 
 
 def test_extraction_notebook():
@@ -99,22 +109,75 @@ def test_mineru_example_notebook():
 def test_parsing_notebook():
     from docs.notebooks.parsing import app
 
+    from ragdoc.document import Heading, Paragraph, Table
+
     _outputs, defs = app.run()
-    assert callable(defs["load"])
-    # Placeholder paths (report.docx, page.html, ...) usually don't exist; the
-    # notebook must still run and leave the documents as None in that case.
-    for name in ("document", "doc_docx", "doc_html", "doc_xlsx", "doc_azure"):
-        doc = defs[name]
-        assert doc is None or len(doc.elements) >= 0
+    # The quick-start cell really parses the sample HTML file it writes.
+    document = defs["document"]
+    assert document.parser == "html"
+    assert [type(e) for e in document.elements] == [Heading, Paragraph, Heading, Table]
+    assert document.title is None  # no processor ran: title detection is a processing step
+    assert document.metadata["filename"] == "page.html"
+    assert document.source_path == str(defs["sample_path"])
+    # Forcing the parser by name parses the same content.
+    assert defs["doc_html"].content_hash() == document.content_hash()
+    # The registry listing names every built-in parser.
+    for name in ("html", "pandoc", "xlsx", "azure_json", "azure_di", "pdf_basic", "mineru", "ragdoc_json"):
+        assert name in defs["registry_text"]
 
 
 def test_pipeline_notebook():
     from docs.notebooks.pipeline import app
 
     _outputs, defs = app.run()
-    assert defs["pipeline"] is not None
-    assert defs["pipeline_with_split"] is not None
-    assert defs["paths"] == []  # placeholder corpus is empty
+    # Scenario A: one chunk without a splitter, several with one; ids are deterministic.
+    assert len(defs["chunks"]) == 1
+    assert len(defs["split_chunks"]) > 1
+    assert [c.id for c in defs["rerun_chunks"]] == [c.id for c in defs["split_chunks"]]
+    assert defs["split_chunks"][0].id == defs["expected_first_id"]
+    # Scenario D: fan-out collects every file; on_error="skip" reports the missing one.
+    assert len(defs["many_result"].chunks) == 3
+    assert [p.name for p, _ in defs["skip_result"].errors] == ["does_not_exist.html"]
+    # Scenario B (direct sync): plan writes nothing, apply adds, unchanged skips, edit updates.
+    all_sources = ["faq.html", "handbook.html", "release_notes.html"]
+    assert sorted(sc.source_id for sc in defs["first_plan"].to_add) == all_sources
+    assert defs["stored_after_plan"] == 0
+    assert sorted(defs["first_apply"].processed) == all_sources
+    assert defs["unchanged_run"].processed == []
+    assert sorted(defs["unchanged_run"].skipped) == all_sources
+    assert [sc.source_id for sc in defs["changed_plan"].to_update] == ["faq.html"]
+    assert defs["changed_run"].processed == ["faq.html"]
+    # Orphans are kept by default and deleted only on opt-in.
+    assert defs["orphan_kept_run"].deleted == []
+    assert defs["orphan_deleted_run"].deleted == ["release_notes.html"]
+    assert defs["sources_after_opt_in"] == {"faq.html", "handbook.html"}
+    # Scenario C (two boundaries): only the edited source moves through each boundary.
+    assert defs["b1_changed"].processed == ["faq.html"]
+    assert [sc.source_id for sc in defs["b2_changed_plan"].to_update] == ["faq.html"]
+    assert defs["b2_changed"].processed == ["faq.html"]
+
+
+def test_pipeline_walkthrough_notebook_offline(monkeypatch: pytest.MonkeyPatch):
+    """Without an LLM key the parsing stage runs and every LLM-backed cell skips cleanly."""
+    pytest.importorskip("openai", reason="llm extra not installed")
+    try:
+        from ragdoc.parsing.mineru import MinerUParser  # noqa: F401
+    except ImportError:
+        pytest.skip("MinerU parser not importable (pdf-mineru extra not installed)")
+    # An empty value wins over any repo-root .env (load_dotenv never overrides the environment).
+    monkeypatch.setenv("LLM_HEADING_RESOLVER_API_KEY", "")
+
+    from docs.notebooks.pipeline_walkthrough import app
+
+    _outputs, defs = app.run()
+    assert defs["llm_client"] is None
+    doc_parsed = defs["doc_parsed"]
+    assert doc_parsed.parser == "mineru"
+    assert len(doc_parsed.headings) > 0
+    assert len(doc_parsed.tables) > 0
+    # Stage 2 onwards needs the LLM: those cells were stopped, so their names are undefined.
+    for name in ("chunks_quick", "doc_headings", "splits", "chunks"):
+        assert name not in defs
 
 
 def test_pipeline_walkthrough_notebook():
@@ -134,26 +197,48 @@ def test_pipeline_walkthrough_notebook():
 
 def test_qdrant_pipeline_notebook():
     pytest.importorskip("qdrant_client", reason="qdrant extra not installed")
-    if not _llm_credentials_available():
-        pytest.skip("LLM_HEADING_RESOLVER_API_KEY not configured (the notebook builds an LLM client at setup)")
 
     from docs.notebooks.qdrant_pipeline import app
 
     _outputs, defs = app.run()
-    assert defs["doc_pipeline"] is not None
-    assert defs["paths"] == []  # placeholder corpus dir does not exist
-    assert defs["VECTOR_SIZE"] == 1536
+    all_sources = ["onboarding.html", "security.html", "travel.html"]
+    # First run adds everything; the second (run_directory) skips everything.
+    assert sorted(defs["first_run"].processed) == all_sources
+    assert defs["first_run"].errors == []
+    assert defs["second_run"].processed == []
+    assert sorted(defs["second_run"].skipped) == all_sources
+    # An edited file is the only planned update; apply() writes it.
+    assert [sc.source_id for sc in defs["update_plan"].to_update] == ["security.html"]
+    assert defs["update_result"].processed == ["security.html"]
+    # A removed file stays unless delete_orphans=True.
+    assert defs["kept_run"].deleted == []
+    assert defs["orphan_run"].deleted == ["travel.html"]
+    assert defs["sources_after_orphan"] == {"onboarding.html", "security.html"}
+    # Provenance is stored top-level in the Qdrant payload, and retrieval finds the new text.
+    assert {"source_id", "source_hash", "content_hash"} <= set(defs["payload_keys"])
+    assert "Hardware security keys" in defs["top_hit_payload"]["prompt_content"]
+    # Two-boundary sync through QdrantDocumentStore.
+    assert sorted(defs["b2_first"].processed) == ["onboarding.html", "security.html"]
+    assert defs["b2_second"].processed == []
 
 
-def test_quickstart_notebook():
+def test_quickstart_notebook(monkeypatch: pytest.MonkeyPatch):
     from docs.notebooks.quickstart import app
 
+    pytest.importorskip("openai", reason="llm extra not installed (the enrichment cell imports openai)")
+    # The enrichment cell is gated on OPENAI_API_KEY; force the offline path.
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
     _outputs, defs = app.run()
-    assert defs["pipeline"] is not None
-    # FILE_PATH is a placeholder (report.docx); without the file both chunk
-    # lists stay empty, but the notebook must run without exceptions.
-    assert isinstance(defs["chunks"], list)
-    assert isinstance(defs["enriched_chunks"], list)
+    # The notebook writes a sample report.html and chunks it for real.
+    chunks = defs["chunks"]
+    assert len(chunks) == 1
+    assert "Quarterly Report" in chunks[0].prompt_content
+    assert "subscription tier" in chunks[0].prompt_content
+    assert chunks[0].source_id == "report.html"
+    assert chunks[0].source_path == str(defs["FILE_PATH"])
+    # No OPENAI_API_KEY: the LLM enrichment cell is skipped and produces nothing.
+    assert defs["enriched_chunks"] == []
 
 
 def test_rendering_notebook():

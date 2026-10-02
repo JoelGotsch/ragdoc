@@ -220,6 +220,80 @@ def _(Document, Heading, Paragraph, Table):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## Concatenating documents
+
+    `concat_documents(first, second)` appends `second`'s elements after `first`'s and returns
+    a **new** `Document`; neither input is mutated. `join_documents([...])` does the same
+    left-to-right over a list. (There is no `|` operator on `Document`.)
+
+    | Field | Result |
+    |---|---|
+    | `title` | `first.title or second.title` |
+    | `elements` | first's, then — if **both** have a title — an `<h1>` carrying `second.title`, then second's |
+    | `metadata` | merged; on a conflicting key `metadata_policy` decides: `"first"` (default) / `"second"` wins, `"strict"` raises `ValueError` |
+    | `id` | a new id |
+    | `source_id`, `source_hash` | `None` — the result is new content |
+
+    This is plain concatenation. To *align* two parses of the **same** source (e.g. two PDF
+    parsers) use `ragdoc.merging.merge_documents` — see the [Merging notebook](merging.py).
+    """)
+    return
+
+
+@app.cell
+def _(Document, Heading, Paragraph):
+    from ragdoc.document import concat_documents, join_documents
+
+    part_one = Document(
+        title="Part One",
+        elements=[Paragraph(html="<p>First part.</p>")],
+        metadata={"filename": "one.html", "language": "en"},
+    )
+    part_two = Document(
+        title="Part Two",
+        elements=[Paragraph(html="<p>Second part.</p>")],
+        metadata={"filename": "two.html"},
+    )
+
+    combined = concat_documents(part_one, part_two)
+    print(f"title:    {combined.title!r}")
+    print(f"elements: {[(type(e).__name__, e.text) for e in combined.elements]}")
+    print(f"metadata: {combined.metadata}")
+
+    combined_second_wins = concat_documents(part_one, part_two, metadata_policy="second")
+    try:
+        concat_documents(part_one, part_two, metadata_policy="strict")
+        strict_error = None
+    except ValueError as _exc:
+        strict_error = str(_exc)
+    print(f"strict:   {strict_error}")
+
+    joined = join_documents([part_one, part_two, Document(elements=[Heading(html="<h2>Appendix</h2>")])])
+    return combined, combined_second_wins, joined, part_one, part_two, strict_error
+
+
+@app.cell
+def test_concat_documents(combined, combined_second_wins, joined, part_one, part_two, strict_error):
+    # Elements: first's, a bridge <h1> with the second title, then second's.
+    assert [e.text for e in combined.elements] == ["First part.", "Part Two", "Second part."]
+    assert combined.elements[1].level == 1
+    assert combined.title == "Part One"
+    # Metadata: first wins by default, second on request, "strict" refuses the conflict.
+    assert combined.metadata == {"filename": "one.html", "language": "en"}
+    assert combined_second_wins.metadata == {"filename": "two.html", "language": "en"}
+    assert strict_error is not None and "filename" in strict_error
+    # A new document: new id, no inherited sync identity, inputs untouched.
+    assert combined.id not in {part_one.id, part_two.id}
+    assert combined.source_id is None
+    assert len(part_one.elements) == 1 and len(part_two.elements) == 1
+    # join_documents folds a list left-to-right.
+    assert [e.text for e in joined.elements] == ["First part.", "Part Two", "Second part.", "Appendix"]
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ## See Also
 
     - [API Reference: Document][ragdoc.document]
