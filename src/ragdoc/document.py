@@ -156,10 +156,12 @@ class BaseElement(BaseModel):
     if TYPE_CHECKING:
         # Typing-only declaration: every concrete subclass provides `html` either as a stored
         # field (Heading/Paragraph/Table/DocumentList/RawText) or as a property with a setter
-        # (Image/Footnote). Not a runtime annotation, so Pydantic creates no field here and no
-        # "shadows an attribute in parent" warning fires in subclasses. The typing-only default
-        # keeps `html` optional in the synthesized constructors of the derived-html subclasses.
-        html: str = ""
+        # (Image/Footnote, via `_DerivedHtmlElement`). Not a runtime annotation, so Pydantic
+        # creates no field here and no "shadows an attribute in parent" warning fires in
+        # subclasses. Declared WITHOUT a default so that required overrides
+        # (`html: str = Field(...)`) type-check on every basedpyright version — older releases
+        # reject a required field overriding a defaulted one.
+        html: str
 
     _soup: BeautifulSoup | None = PrivateAttr(default=None)
     _soup_source: str | None = PrivateAttr(default=None)
@@ -262,9 +264,22 @@ class BaseElement(BaseModel):
 E = TypeVar("E", bound=BaseElement)
 
 
+class _DerivedHtmlElement(BaseElement):
+    """Typing-only base for elements whose ``html`` is a derived property (Image, Footnote).
+
+    Adds no runtime fields or behavior. Its typing-only default keeps ``html`` an *optional*
+    keyword in the synthesized constructors of the derived-html subclasses
+    (``Image(html=...)`` / ``Footnote(html=...)`` are handled by their ``mode="before"``
+    validators), while :class:`BaseElement` itself declares ``html`` without a default.
+    """
+
+    if TYPE_CHECKING:
+        html: str = ""
+
+
 class Heading(BaseElement):
     element_type: Literal[ElementTypeEnum.HEADING] = Field(default=ElementTypeEnum.HEADING)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
-    html: str = Field(..., description="Full HTML of the heading including the outer <h1>-<h6> tag.")  # pyright: ignore[reportGeneralTypeIssues]  # required override of the typing-only base declaration
+    html: str = Field(..., description="Full HTML of the heading including the outer <h1>-<h6> tag.")
 
     @field_validator("html", mode="after")
     @classmethod
@@ -326,7 +341,7 @@ class Paragraph(BaseElement):
 
 class DocumentList(BaseElement):
     element_type: Literal[ElementTypeEnum.DOCUMENT_LIST] = Field(default=ElementTypeEnum.DOCUMENT_LIST)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
-    html: str = Field(..., description="Full HTML of the list. Expected outer tag: <ul>, <ol>, or <dl>.")  # pyright: ignore[reportGeneralTypeIssues]  # required override of the typing-only base declaration
+    html: str = Field(..., description="Full HTML of the list. Expected outer tag: <ul>, <ol>, or <dl>.")
 
     @field_validator("html", mode="after")
     @classmethod
@@ -336,7 +351,7 @@ class DocumentList(BaseElement):
 
 class Table(BaseElement):
     element_type: Literal[ElementTypeEnum.TABLE] = Field(default=ElementTypeEnum.TABLE)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
-    html: str = Field(..., description="Full HTML of the table. Expected outer tag: <table>.")  # pyright: ignore[reportGeneralTypeIssues]  # required override of the typing-only base declaration
+    html: str = Field(..., description="Full HTML of the table. Expected outer tag: <table>.")
 
     @field_validator("html", mode="after")
     @classmethod
@@ -382,7 +397,7 @@ def image_fields_from_html(html_str: str) -> dict[str, str | int | None]:
     return {k: v for k, v in data.items() if v is not None}
 
 
-class Image(BaseElement):
+class Image(_DerivedHtmlElement):
     element_type: Literal[ElementTypeEnum.IMAGE] = Field(default=ElementTypeEnum.IMAGE)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     image: str | None = Field(
         default=None,
@@ -530,7 +545,7 @@ def footnote_fields_from_html(html_str: str) -> dict[str, int | str]:
     return {"innerhtml": raw.strip()}
 
 
-class Footnote(BaseElement):
+class Footnote(_DerivedHtmlElement):
     """Represents a footnote definition in the document."""
 
     element_type: Literal[ElementTypeEnum.FOOTNOTE] = Field(default=ElementTypeEnum.FOOTNOTE)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
