@@ -348,6 +348,33 @@ class QdrantVectorStore(_QdrantCollectionStore):
         await self._batched_upsert(points)
         return [c.id for c in chunks]
 
+    async def replace_source(self, source_id: str, chunks: list[Chunk]) -> list[str]:
+        """Replace every chunk stored for *source_id* with *chunks*, new-before-old.
+
+        Implements :class:`~ragdoc.pipeline.sync.SourceReplaceStore`: the new chunks are
+        written first, then only the stale ones (ids not in *chunks*) are deleted, and the
+        change-detection hashes are stamped last. A failure before the stale delete leaves
+        the previously stored chunks in place, and an interrupted replacement always reads
+        as "changed" on the next sync.
+
+        Args:
+            source_id: The source whose stored chunks are replaced.
+            chunks: The source's complete new chunk set (all must carry *source_id*).
+
+        Returns:
+            IDs of the written chunks in the same order as *chunks*.
+
+        Raises:
+            ValueError: If a chunk belongs to another source, or has no embeddings and no
+                ``sparse_vectors`` are configured.
+        """
+        foreign = sorted({c.source_id for c in chunks if c.source_id != source_id})
+        if foreign:
+            raise ValueError(f"replace_source({source_id!r}) received chunks of other sources: {foreign}")
+        points = [_chunk_to_point(c, self._sparse_vectors or None) for c in chunks]
+        await self._replace_source(source_id, points)
+        return [c.id for c in chunks]
+
     async def delete(self, ids: list[str]) -> None:
         """Remove chunks by ID.  IDs that do not exist are silently ignored.
 

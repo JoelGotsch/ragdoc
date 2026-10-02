@@ -101,6 +101,28 @@ class QdrantMentionStore(_QdrantCollectionStore):
         await self._batched_upsert(points)
         return [m.mention_id for m in mentions]
 
+    async def replace_source(self, source_id: str, mentions: list[Mention]) -> list[str]:
+        """Replace every mention stored for *source_id* with *mentions*, new-before-old.
+
+        Implements :class:`~ragdoc.pipeline.sync.SourceReplaceStore`: new mentions are written
+        first, then only the stale ones are deleted, and the change-detection hashes are
+        stamped last — a failed write leaves the previously stored mentions in place and an
+        interrupted replacement reads as "changed" on the next sync.
+
+        Raises:
+            ValueError: If a mention belongs to another source.
+        """
+        foreign = sorted({m.source_id for m in mentions if m.source_id != source_id})
+        if foreign:
+            raise ValueError(f"replace_source({source_id!r}) received mentions of other sources: {foreign}")
+        vectors = await self._embedder([m.payload for m in mentions]) if mentions else []
+        points = [
+            models.PointStruct(id=self._point_id(m.mention_id), vector=vec, payload=m.model_dump(mode="json"))
+            for m, vec in zip(mentions, vectors, strict=True)
+        ]
+        await self._replace_source(source_id, points)
+        return [m.mention_id for m in mentions]
+
     async def delete_by_source(self, source_id: str) -> None:
         """Delete all mentions whose ``source_id`` equals *source_id*."""
         await self._delete_by_source_filter(source_id)

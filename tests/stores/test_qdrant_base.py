@@ -42,6 +42,8 @@ def client() -> MagicMock:
     c.scroll = AsyncMock(return_value=([], None))
     c.upsert = AsyncMock()
     c.delete = AsyncMock()
+    c.retrieve = AsyncMock(return_value=[])
+    c.set_payload = AsyncMock()
     c.create_collection = AsyncMock()
     c.create_payload_index = AsyncMock()
     return c
@@ -178,7 +180,8 @@ async def test_batched_upsert_collection_override(store: _StoreA, client: MagicM
 
 
 # ---------------------------------------------------------------------------
-# _batched_upsert — rollback on mid-run batch failure
+# _batched_upsert — failure handling (request shapes only; the behaviour against a real
+# store is covered in test_qdrant_write_safety.py)
 # ---------------------------------------------------------------------------
 
 
@@ -190,11 +193,11 @@ def _points_for_sources(n: int, source_ids: list[str]) -> list[models.PointStruc
 
 
 @pytest.mark.anyio
-async def test_batched_upsert_mid_run_failure_rolls_back_all_sources_and_reraises(
+async def test_batched_upsert_mid_run_failure_deletes_sent_ids_never_by_source(
     store: _StoreA, client: MagicMock
 ) -> None:
-    """A failure on batch 2 must delete every source touched by this call (else the already-
-    persisted batch 1 carries the NEW source_hash and the next sync sees 'unchanged' forever)."""
+    """A failure on batch 2 deletes the ids of the batches that were sent — a point-id
+    selector, never a source filter (which would wipe the source's pre-existing points)."""
     batch = _QdrantCollectionStore._UPSERT_BATCH
     points = _points_for_sources(batch + 1, ["src-a", "src-b"])
     client.upsert = AsyncMock(side_effect=[None, RuntimeError("batch 2 boom")])
@@ -202,9 +205,26 @@ async def test_batched_upsert_mid_run_failure_rolls_back_all_sources_and_reraise
     with pytest.raises(RuntimeError, match="batch 2 boom"):
         await store._batched_upsert(points)
 
-    deleted = {c.kwargs["points_selector"].must[0].match.value for c in client.delete.call_args_list}
-    assert deleted == {"src-a", "src-b"}
-    assert all(c.kwargs["collection_name"] == "base_col" for c in client.delete.call_args_list)
+    assert client.delete.await_count == 1
+    selector = client.delete.call_args.kwargs["points_selector"]
+    assert isinstance(selector, models.PointIdsList)
+    assert selector.points == [p.id for p in points]
+    assert client.delete.call_args.kwargs["collection_name"] == "base_col"
+
+
+@pytest.mark.anyio
+async def test_batched_upsert_rollback_spares_preexisting_ids(store: _StoreA, client: MagicMock) -> None:
+    batch = _QdrantCollectionStore._UPSERT_BATCH
+    points = _points_for_sources(batch + 1, ["src-a"])
+    existing = MagicMock()
+    existing.id = points[0].id
+    client.retrieve = AsyncMock(return_value=[existing])
+    client.upsert = AsyncMock(side_effect=[None, RuntimeError("boom")])
+
+    with pytest.raises(RuntimeError):
+        await store._batched_upsert(points)
+
+    assert points[0].id not in client.delete.call_args.kwargs["points_selector"].points
 
 
 @pytest.mark.anyio
@@ -228,15 +248,17 @@ async def test_batched_upsert_rollback_uses_collection_override(store: _StoreA, 
     with pytest.raises(RuntimeError):
         await store._batched_upsert(points, collection="other_col")
     assert client.delete.call_args.kwargs["collection_name"] == "other_col"
+    assert client.retrieve.call_args.kwargs["collection_name"] == "other_col"
 
 
 @pytest.mark.anyio
-async def test_batched_upsert_failure_without_source_ids_skips_rollback(store: _StoreA, client: MagicMock) -> None:
-    """Points without a source_id payload (nothing to roll back by) still re-raise."""
+async def test_batched_upsert_single_batch_failure_deletes_nothing(store: _StoreA, client: MagicMock) -> None:
+    """A single-batch request lands whole or not at all — there is nothing partial to undo."""
     client.upsert = AsyncMock(side_effect=RuntimeError("boom"))
     with pytest.raises(RuntimeError, match="boom"):
-        await store._batched_upsert(_dummy_points(1))
+        await store._batched_upsert(_points_for_sources(3, ["src-a"]))
     client.delete.assert_not_called()
+    client.retrieve.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -322,10 +344,10 @@ async def test_ensure_collection_passes_sparse_config_when_given(client: MagicMo
 
 
 @pytest.mark.anyio
-async def test_list_source_state_first_seen_wins_and_cheap_keys(store: _StoreA, client: MagicMock) -> None:
+async def test_list_source_state_agreeing_points_report_their_hashes(store: _StoreA, client: MagicMock) -> None:
     points = [
         _point({"source_id": "a", "source_hash": "h1", "content_hash": "c1"}),
-        _point({"source_id": "a", "source_hash": "h2", "content_hash": "c2"}),  # ignored: first seen wins
+        _point({"source_id": "a", "source_hash": "h1", "content_hash": "c1"}),
         _point({"source_id": "b", "source_hash": None, "content_hash": None}),  # missing hashes normalized
     ]
     client.scroll = AsyncMock(return_value=(points, None))
@@ -335,6 +357,31 @@ async def test_list_source_state_first_seen_wins_and_cheap_keys(store: _StoreA, 
     assert state["a"].source_hash == "h1" and state["a"].content_hash == "c1"
     assert state["b"].source_hash == "" and state["b"].content_hash is None
     assert set(client.scroll.call_args.kwargs["with_payload"]) == {"source_id", "source_hash", "content_hash"}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "second",
+    [
+        pytest.param({"source_hash": "h2", "content_hash": "c2"}, id="old-and-new-mixed"),
+        pytest.param({"source_hash": None, "content_hash": None}, id="unstamped-point"),
+        pytest.param({"source_hash": "h1", "content_hash": "c2"}, id="content-hash-differs"),
+    ],
+)
+async def test_list_source_state_disagreeing_points_read_as_always_changed(
+    store: _StoreA, client: MagicMock, second: dict[str, str | None]
+) -> None:
+    """A source whose points disagree is half-written: it must never report a usable hash."""
+    points = [
+        _point({"source_id": "a", "source_hash": "h1", "content_hash": "c1"}),
+        _point({"source_id": "a", **second}),
+        _point({"source_id": "a", "source_hash": "h1", "content_hash": "c1"}),  # later agreement must not undo it
+    ]
+    client.scroll = AsyncMock(return_value=(points, None))
+
+    state = await store._list_source_state()
+
+    assert state["a"].source_hash == "" and state["a"].content_hash is None
 
 
 @pytest.mark.anyio

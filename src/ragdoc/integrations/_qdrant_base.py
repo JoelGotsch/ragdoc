@@ -3,8 +3,8 @@
 All five Qdrant stores (vector / document / mention / entity / graph) subclass
 :class:`_QdrantCollectionStore`. The base owns the payload-agnostic plumbing —
 idempotent collection creation with **per-index** 409 handling, paginated payload
-scrolls, batched upserts, ``source_id`` filtering, and deterministic namespaced
-point ids — while each subclass owns only its payload marshalling and
+scrolls, interruption-safe batched upserts, ``source_id`` filtering, and deterministic
+namespaced point ids — while each subclass owns only its payload marshalling and
 store-specific queries.
 
 Requires the ``ragdoc[qdrant]`` extra (the import guard lives here, stated once).
@@ -12,6 +12,7 @@ Requires the ``ragdoc[qdrant]`` extra (the import guard lives here, stated once)
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from collections.abc import AsyncIterator
@@ -34,6 +35,22 @@ logger = logging.getLogger(__name__)
 
 # Payload keys read by the bulk change-detection path (must stay cheap — no full bodies).
 _STATE_KEYS = ["source_id", "source_hash", "content_hash"]
+# The change-detection hashes: blanked while a multi-batch write is in flight, stamped last.
+_HASH_KEYS = ("source_hash", "content_hash")
+# What change detection sees for a partially written or mixed source: "always changed".
+_BLANK_STATE = SourceState(source_hash="", content_hash=None)
+
+
+def _blank_hashes(point: models.PointStruct) -> models.PointStruct:
+    """Return a copy of *point* whose change-detection hashes are ``None``.
+
+    A point that carries neither hash key (entity / graph payloads) is returned unchanged.
+    """
+    payload = point.payload
+    if not payload or not any(key in payload for key in _HASH_KEYS):
+        return point
+    blanked = {key: (None if key in _HASH_KEYS else value) for key, value in payload.items()}
+    return models.PointStruct(id=point.id, vector=point.vector, payload=blanked)
 
 
 def _source_id_filter(source_id: str) -> models.Filter:
@@ -145,20 +162,33 @@ class _QdrantCollectionStore:
     async def _list_source_state(self, collection: str | None = None) -> dict[str, SourceState]:
         """Return ``source_id`` -> :class:`SourceState` for every source, in one scan.
 
-        First seen wins per ``source_id`` (all points of a source share the hashes). A **cheap**
-        read: scrolls only the three hash payload keys with ``with_vectors=False``, so it never
-        pulls full point bodies (keeps ``plan()`` fast).
+        A source reports its stored hashes only when **every** one of its points carries the
+        same ``(source_hash, content_hash)`` pair. If its points disagree — a half-replaced
+        source mixing old and new points, or an interrupted write whose points still carry
+        blank hashes next to stamped ones (see :meth:`_batched_upsert`) — the source is
+        reported with blank hashes (``source_hash=""``, ``content_hash=None``), which every
+        change-detection path reads as "always changed". A partially written source therefore
+        never looks "unchanged".
+
+        A **cheap** read: scrolls only the three hash payload keys with ``with_vectors=False``,
+        so it never pulls full point bodies (keeps ``plan()`` fast).
         """
         state: dict[str, SourceState] = {}
         async for payload in self._scroll_payloads(_STATE_KEYS, collection=collection):
             sid = payload.get("source_id")
-            if isinstance(sid, str) and sid not in state:
-                source_hash = payload.get("source_hash")
-                content_hash = payload.get("content_hash")
-                state[sid] = SourceState(
-                    source_hash=source_hash if isinstance(source_hash, str) else "",
-                    content_hash=content_hash if isinstance(content_hash, str) else None,
-                )
+            if not isinstance(sid, str):
+                continue
+            source_hash = payload.get("source_hash")
+            content_hash = payload.get("content_hash")
+            seen = SourceState(
+                source_hash=source_hash if isinstance(source_hash, str) else "",
+                content_hash=content_hash if isinstance(content_hash, str) else None,
+            )
+            known = state.get(sid)
+            if known is None:
+                state[sid] = seen
+            elif known != seen:
+                state[sid] = _BLANK_STATE  # mixed / partially written ⇒ always changed
         return state
 
     async def _collect_source_ids(self, key: str = "source_id", collection: str | None = None) -> set[str]:
@@ -177,33 +207,157 @@ class _QdrantCollectionStore:
     async def _batched_upsert(self, points: list[models.PointStruct], collection: str | None = None) -> None:
         """Upsert *points* in ``_UPSERT_BATCH``-sized batches (avoids message-size limits).
 
-        On a mid-run batch failure, earlier batches are already persisted carrying the NEW
-        ``source_hash``/``content_hash`` — the next sync would read that state as "unchanged"
-        and skip the half-written source forever. So a failure triggers a **best-effort
-        rollback**: every distinct ``source_id`` present in *points* is deleted from the
-        collection, then the original exception is re-raised. The next run sees those sources
-        missing and re-processes them. Cancellation is never caught (no rollback on
-        ``asyncio.CancelledError`` — consistent with the sync engine's error discipline).
+        **Single batch** — one request, applied by Qdrant as a whole or not at all. There is
+        nothing partial to undo, so a failure simply re-raises and **nothing is deleted**.
+
+        **Multiple batches** — a write that stops part-way (error, cancellation, process
+        crash) must never look "unchanged" to change detection, so the write is two-phase:
+
+        1. every batch is written with its change-detection hashes (``source_hash`` /
+           ``content_hash``) **blanked**; a blank hash reads as "always changed";
+        2. once all batches have landed, the real hashes are stamped with one ``set_payload``
+           request per distinct hash pair (the commit marker).
+
+        An interruption at any point before the stamp leaves only blank-hash points, so the
+        next sync re-processes the source — this holds even after a hard crash, where no
+        cleanup code runs. Points that carry neither hash key (entity / graph stores) are
+        written as-is and skip the stamp.
+
+        **Rollback** (multi-batch only, best effort). When a batch fails with an ``Exception``
+        or the call is cancelled (``asyncio.CancelledError`` — the cleanup then runs shielded
+        and the cancellation is re-raised), the points *this call created* are deleted by
+        point id. Rollback never deletes by source and never deletes a point id that existed
+        before the call.
+
+        Limitations (stated plainly):
+
+        * A pre-existing point that this call already **overwrote** is not restored: it keeps
+          the new content with blank hashes (so its source is re-processed); it is not
+          reverted to the old version.
+        * "Existed before the call" is one ``retrieve`` taken before the first batch; a
+          concurrent writer creating the same ids in between is not detected.
+        * No rollback after a failed stamp (all points landed; they stay, unstamped) nor on
+          non-``Exception`` aborts such as ``KeyboardInterrupt`` or a process crash — the
+          blank hashes already guarantee re-processing, but the partial points remain
+          retrievable until then.
+        * When several sources share one call and the process dies between two stamp
+          requests, the already-stamped sources are complete and the rest read as changed.
         """
+        coll = collection or self._collection_name
+        if len(points) <= self._UPSERT_BATCH:
+            if points:
+                await self._client.upsert(collection_name=coll, points=points)
+            return
+        await self._write_blanked(points, coll)
+        await self._stamp_hashes(points, coll)
+
+    async def _replace_source(
+        self, source_id: str, points: list[models.PointStruct], collection: str | None = None
+    ) -> None:
+        """Replace everything stored for *source_id* with *points*, new-before-old.
+
+        Order: write the new points with blank hashes → delete the source's **stale** points
+        (those whose id is not among *points*) → stamp the real hashes. The old points stay
+        in place until every new point has landed, so a failed write leaves the previously
+        stored data in place (subject to the overwrite limitation documented on
+        :meth:`_batched_upsert`), and the source reads as "changed" until the final stamp —
+        an interruption anywhere is re-processed by the next sync. Applies to single-batch
+        writes too: the stamp is the commit marker for the whole replacement.
+
+        With no *points* this is a plain delete of the source.
+        """
+        coll = collection or self._collection_name
+        if not points:
+            await self._delete_by_source_filter(source_id, collection=coll)
+            return
+        await self._write_blanked(points, coll)
+        await self._client.delete(
+            collection_name=coll,
+            points_selector=models.Filter(
+                must=[models.FieldCondition(key="source_id", match=models.MatchValue(value=source_id))],
+                must_not=[models.HasIdCondition(has_id=[p.id for p in points])],
+            ),
+        )
+        await self._stamp_hashes(points, coll)
+
+    async def _existing_ids(self, ids: list[models.ExtendedPointId], collection: str) -> set[models.ExtendedPointId]:
+        """Return the subset of *ids* already present in *collection* (ids only, no bodies)."""
+        existing: set[models.ExtendedPointId] = set()
+        for i in range(0, len(ids), self._SCROLL_BATCH):
+            records = await self._client.retrieve(
+                collection_name=collection,
+                ids=ids[i : i + self._SCROLL_BATCH],
+                with_payload=False,
+                with_vectors=False,
+            )
+            existing.update(record.id for record in records)
+        return existing
+
+    async def _write_blanked(self, points: list[models.PointStruct], collection: str) -> None:
+        """Phase 1 of a two-phase write: upsert *points* in batches with blank hashes.
+
+        On an ``Exception`` or a cancellation of a multi-batch write, the points this call
+        created (ids absent before the call) are deleted — see :meth:`_batched_upsert` for
+        the full contract.
+        """
+        multi_batch = len(points) > self._UPSERT_BATCH
+        # Only a multi-batch write can be left partial, so only it needs the pre-image.
+        preexisting = await self._existing_ids([p.id for p in points], collection) if multi_batch else set()
+        sent: list[models.ExtendedPointId] = []
         try:
             for i in range(0, len(points), self._UPSERT_BATCH):
-                await self._client.upsert(
-                    collection_name=collection or self._collection_name,
-                    points=points[i : i + self._UPSERT_BATCH],
-                )
-        except Exception as exc:
-            source_ids = sorted({sid for p in points if isinstance(sid := (p.payload or {}).get("source_id"), str)})
-            if source_ids:
-                logger.warning(
-                    f"batched upsert failed mid-run ({exc!r}); rolling back sources {source_ids} "
-                    "so the next sync re-processes them instead of seeing a half-written 'unchanged' state"
-                )
-            for sid in source_ids:
-                try:
-                    await self._delete_by_source_filter(sid, collection=collection)
-                except Exception:
-                    logger.error(f"rollback delete_by_source({sid!r}) failed", exc_info=True)
+                batch = points[i : i + self._UPSERT_BATCH]
+                # Recorded BEFORE the request: a failed/cancelled request may still have landed.
+                sent.extend(p.id for p in batch)
+                await self._client.upsert(collection_name=collection, points=[_blank_hashes(p) for p in batch])
+        except asyncio.CancelledError:
+            if multi_batch:
+                # Shielded: the cleanup completes even though this task is being cancelled.
+                await asyncio.shield(self._rollback_created(sent, preexisting, collection))
             raise
+        except Exception as exc:
+            if multi_batch:
+                logger.warning(f"batched upsert failed part-way ({exc!r}); removing the points this call created")
+                await self._rollback_created(sent, preexisting, collection)
+            raise
+
+    async def _rollback_created(
+        self,
+        sent: list[models.ExtendedPointId],
+        preexisting: set[models.ExtendedPointId],
+        collection: str,
+    ) -> None:
+        """Best-effort delete of the point ids this call created (never a pre-existing id)."""
+        created = [pid for pid in sent if pid not in preexisting]
+        if not created:
+            return
+        try:
+            await self._client.delete(collection_name=collection, points_selector=models.PointIdsList(points=created))
+        except Exception:
+            logger.error(
+                f"rollback of {len(created)} partially written point(s) failed; they keep blank hashes, "
+                "so the next sync still re-processes their source",
+                exc_info=True,
+            )
+
+    async def _stamp_hashes(self, points: list[models.PointStruct], collection: str) -> None:
+        """Phase 2 of a two-phase write: set the real hashes on *points* (the commit marker).
+
+        One ``set_payload`` request per distinct hash pair, addressed by point id — never by
+        a ``source_id`` filter, which would also stamp stale points of the same source.
+        """
+        groups: dict[tuple[tuple[str, str | None], ...], list[models.ExtendedPointId]] = {}
+        for point in points:
+            payload = point.payload or {}
+            hashes = tuple(
+                (key, value if isinstance(value := payload[key], str) else None) for key in _HASH_KEYS if key in payload
+            )
+            if hashes:
+                groups.setdefault(hashes, []).append(point.id)
+        for hashes, ids in groups.items():
+            await self._client.set_payload(
+                collection_name=collection, payload=dict(hashes), points=models.PointIdsList(points=ids)
+            )
 
     async def _delete_by_source_filter(self, source_id: str, collection: str | None = None) -> None:
         """Delete every point whose ``source_id`` payload key equals *source_id*."""

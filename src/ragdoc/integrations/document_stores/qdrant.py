@@ -158,6 +158,21 @@ class QdrantDocumentStore(_QdrantCollectionStore):
             raise
         return [doc.source_id for doc in documents if doc.source_id]
 
+    async def replace_source(self, source_id: str, documents: list[Document]) -> list[str]:
+        """Replace the document stored for *source_id* in place (no delete-first window).
+
+        Implements :class:`~ragdoc.pipeline.sync.SourceReplaceStore`. Documents are keyed 1:1
+        on ``source_id`` (one point per source), so the single upsert request already
+        replaces the stored document atomically; a failed write leaves the old one intact.
+
+        Raises:
+            ValueError: If *documents* is not exactly one document carrying *source_id*.
+            DocumentTooLargeError: if Qdrant rejects the document's payload as too large.
+        """
+        if len(documents) != 1 or documents[0].source_id != source_id:
+            raise ValueError(f"replace_source({source_id!r}) requires exactly one document with that source_id.")
+        return await self.upsert(documents)
+
     async def delete_by_source(self, source_id: str) -> None:
         """Delete the document stored for *source_id* (no-op if absent).
 
