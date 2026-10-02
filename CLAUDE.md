@@ -56,7 +56,7 @@ Four principles govern all design decisions:
 
    Rendering uses `render_for_prompt` (full-fidelity structured text) or `render_raw` (with base64 images). There is no separate embedding renderer — chunkers handle that concern.
 
-4. **Source provenance and metadata propagate through the entire pipeline.** `Document.source_path` is an explicit field set by parsers. Parsers also write `document.metadata["filename"] = path.name` — the bare filename lives in metadata, not as a first-class field. Provenance propagates through splitting and chunking into `Chunk.source_path` (optional on Chunk). `Document.metadata` is a dict that carries both **user-defined custom data** and **library-written informational fields** (e.g. `filename` set by parsers, `split_sequence`/`split_total` set by `split_document`). The rule for library-written metadata keys is: **no other part of the library may read or branch on them** — they exist purely for external consumers (retrieval clients, self-query filters). Keys that drive internal library behavior (change detection, deletion) belong as first-class fields on `Chunk` instead (`source_id`, `source_hash`). Any key/value present in `document.metadata` will arrive on the final chunks. Processors must not drop or overwrite metadata. Splitters copy the parent document's `source_path` and `metadata` to each split. Chunkers forward both into `Chunk`. **`VectorStorePipeline` never injects into `chunk.metadata`** — provenance (`source_id`, `source_hash`) lives in dedicated first-class `Chunk` fields, not in metadata.
+4. **Source provenance and metadata propagate through the entire pipeline.** `Document.source_path` is an explicit field and `document.metadata["filename"] = path.name` carries the bare filename (in metadata, not as a first-class field). Both are stamped **centrally** by `stamp_provenance` — called by `parsing.load()` and by `IngestPipeline.run()` — not by the individual parsers. Provenance propagates through splitting and chunking into `Chunk.source_path` (optional on Chunk). `Document.metadata` is a dict that carries both **user-defined custom data** and **library-written informational fields** (e.g. `filename` stamped at load time, `split_sequence`/`split_total` set by `split_document`). The rule for library-written metadata keys is: **no other part of the library may read or branch on them** — they exist purely for external consumers (retrieval clients, self-query filters). Keys that drive internal library behavior (change detection, deletion) belong as first-class fields on `Chunk` instead (`source_id`, `source_hash`). Any key/value present in `document.metadata` will arrive on the final chunks. Processors must not drop or overwrite metadata. Splitters copy the parent document's `source_path` and `metadata` to each split. Chunkers forward both into `Chunk`. **`VectorStorePipeline` never injects into `chunk.metadata`** — provenance (`source_id`, `source_hash`) lives in dedicated first-class `Chunk` fields, not in metadata.
 
 ### Pipeline
 
@@ -90,9 +90,9 @@ Cross-document relationships use `ExternalRef` (parent/child/related); within-do
 
 ### Stage 1: Parsing (`src/ragdoc/parsing/`: `html/`, `pandoc/`, `xlsx/`, `azure_di/`, `mineru/`, `pdf_basic/`, `ragdoc_json/`)
 
-Each parser converts a format → `Document` and sets parser-specific fields (e.g. `document.parser = "mineru"`). File provenance is stamped **centrally** by `parsing.load()` via `stamp_provenance` (`parser` if unset, `source_path`, `metadata["filename"]`) — individual loaders do not stamp it. Processors check `document.parser` to adjust behavior.
+Each parser converts a format → `Document` and sets parser-specific fields (e.g. `document.parser = "mineru"`). File provenance is stamped **centrally** via `stamp_provenance` (`parser`, `source_path`, `metadata["filename"]` — each only if the parser left it unset), called by `parsing.load()` and again by `IngestPipeline.run()` (so an explicit `parser=` callable that bypasses `load()` gets the same provenance) — individual parsers do not stamp it. Processors check `document.parser` to adjust behavior.
 
-Parsers declare availability via `Parser.is_available()` / `unavailable_reason()`: resolution skips parsers whose extra/credentials are missing and raises an actionable `ValueError` at resolve time when nothing usable matches. PDF parsers by priority: `mineru` (50) > `azure_di` (40) > `pdf_basic` (10, pymupdf, zero-config via the `pdf` extra).
+Parsers declare availability via `Parser.is_available()` / `unavailable_reason()`: resolution skips parsers whose extra/credentials are missing and raises an actionable `ValueError` at resolve time when nothing usable matches. `.pdf` resolves by priority to `azure_di` (40) > `pdf_basic` (10, pymupdf, zero-config via the `pdf` extra); `mineru` (50) is registered for MinerU's `_middle.json` output, not for `.pdf`, and `ragdoc_json` (60) for `.ragdoc.json` snapshots.
 
 ### Stage 2: Processing (`src/ragdoc/processing/`)
 
@@ -115,7 +115,7 @@ Processors may return `None` to drop a document. `ProcessingPipeline` short-circ
 
 ### Stage 6: Sync (`src/ragdoc/pipeline/`)
 
-Incremental synchronisation follows a **plan → apply** shape across two boundaries plus a direct path. Every sync pipeline exposes `plan()` (compute a reviewable `ChangeSet`, no store writes), `apply()` (write it), and `run = apply(plan(...))`.
+Incremental synchronisation follows a **plan → apply** shape across two boundaries plus a direct path. Every sync pipeline exposes `plan()` (compute a reviewable `ChangeSet`, no store writes), `apply()` (write it), and `run()`. `run()` is **not** literally `apply(plan(...))`: it is a separate streaming path through the same engine that writes each source as it is produced. It uses the same change detection and, when no source fails, reaches the same end state.
 
 **One engine, three pipelines.** All sync pipelines (`VectorStorePipeline`, `DocumentStorePipeline`, `MentionStorePipeline`) are thin compositions over the generic streaming core `SyncEngine[T]` (`pipeline/sync.py`) — do not re-implement change detection, orphan handling, or write discipline in a pipeline. The engine owns: token comparison against `store.list_source_state()`, per-source concurrency, per-source error isolation (`except Exception`, never `BaseException` — cancellation propagates), delete-then-upsert with an optional `pre_write` hook (embedding; `apply()` calls it whole-corpus-first, `run()` per source), and opt-in orphan deletion. A pipeline contributes only (a) resolution of its request into a `SyncPlanInput` and (b) a producer coroutine `SyncSource -> SourceChange[T] | None` (`None` ⇒ unavailable, warn + skip; empty `items` ⇒ source yields nothing, stale entries deleted — `DocumentStorePipeline` deliberately returns `None` for processor-filtered documents so a transient filter never deletes the stored copy). Resolution failures (e.g. an unreadable file during hashing) never abort the run: `build_current_map` captures them per path, they surface in `UpdateResult.errors` via `SyncPlanInput.pre_failed`, and the failed source stays in `live_source_ids` so it is never orphan-deleted. Sinks satisfy the structural `SourceSyncStore[T]` protocol (`upsert`/`delete_by_source`/`list_source_state`). See `docs/guide/sync-engine.md`.
 
@@ -179,31 +179,36 @@ Notebooks in `docs/notebooks/` are living documentation and must execute correct
 uv run marimo check docs/notebooks/*.py
 ```
 
-**2. pytest execution** — marimo notebooks are pure Python; pytest runs them and discovers `test_*` cells natively (no plugin needed):
+**2. pytest execution** — marimo notebooks are pure Python and marimo exposes every `test_*` cell as a test function, which pytest collects and runs (each test runs the cell's upstream cells first):
 ```bash
 uv run pytest docs/notebooks/
 ```
+Two pieces of config make this work — keep them: `python_files` in `pyproject.toml` includes `docs/notebooks/*.py` (the notebook filenames don't match `test_*.py`; `testpaths` stays `tests`, so a bare `uv run pytest` does **not** run this layer), and `docs/conftest.py` awaits test cells whose upstream cells are async (pytest cannot run those on its own).
 
 **3. `test_*` cells inside notebooks** — name assertion cells `test_*`. These serve dual purpose: pytest runs them in CI, and readers see exactly what outputs to expect without running the notebook. Good test cells are readable documentation:
 ```python
 @app.cell
 def test_document_parsed(doc):
     assert len(doc.elements) > 0, "document must have elements after parsing"
-    assert doc.filename is not None
+    assert doc.metadata["filename"] == "report.html"
+    return
 ```
+Test cells are plain `def` even when the cells they depend on are `async`. Assert on values the notebook computed — never on things that cannot fail (`is not None`, `len(x) >= 0`).
 
-**4. `tests/test_notebooks.py`** — wrap every notebook with `app.run()` for assertions in the main test suite:
+**4. `tests/test_notebooks.py`** — wrap every notebook with `app.run()` for assertions in the main test suite (`app.run()` is synchronous, so these are plain sync tests):
 ```python
-from docs.notebooks.pipeline_walkthrough import app
+def test_quickstart_notebook():
+    from docs.notebooks.quickstart import app
 
-@pytest.mark.anyio
-async def test_pipeline_walkthrough():
-    outputs, defs = app.run()
-    assert "chunks" in defs
-    assert len(defs["chunks"]) > 0
+    _outputs, defs = app.run()
+    chunks = defs["chunks"]
+    assert len(chunks) == 1
+    assert "Quarterly Report" in chunks[0].prompt_content
 ```
 
-CI (`ci.yml`) runs all four layers. See `/documentation-guidelines` for the full documentation workflow.
+**Offline by default.** Notebooks must execute without credentials or network: use a temp-dir corpus, `SimpleChunker`, a deterministic fake embedder, and an in-memory store (`AsyncQdrantClient(":memory:")` or a small in-notebook `VectorStore`). Cells that genuinely need an LLM are gated — `mo.stop(...)` (or an `if`) on the API key — so they skip cleanly; never leave API calls commented out, because commented-out code is not checked against the current API.
+
+CI (`ci.yml`) runs all four layers: the `notebooks` job runs layer 1 (`marimo check`) and layers 2–3 (`pytest docs/notebooks/`); layer 4 runs inside the `test` job as part of the main suite. See `/documentation-guidelines` for the full documentation workflow.
 
 ## Plan Guidelines
 
