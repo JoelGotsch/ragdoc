@@ -256,3 +256,22 @@ async def test_reviewer_returns_parsed_reviewresult():
     result = await reviewer(["Acme Corp", "ACME Corporation"])
 
     assert result is parsed
+
+
+@pytest.mark.anyio
+async def test_reviewer_forwards_timeout_through_shared_layer():
+    """The entity-review call site can take a per-request timeout."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from ragdoc.extraction.resolution import ReviewResult, make_llm_reviewer
+
+    message = MagicMock()
+    message.parsed = ReviewResult()
+    client = MagicMock()
+    client.chat.completions.parse = AsyncMock(return_value=MagicMock(choices=[MagicMock(message=message)]))
+
+    await make_llm_reviewer(client, model="test-model", request_timeout=3.0)(["a", "b"])
+    assert client.chat.completions.parse.call_args.kwargs["timeout"] == 3.0
+
+    await make_llm_reviewer(client, model="test-model")(["a", "b"])
+    assert "timeout" not in client.chat.completions.parse.call_args.kwargs

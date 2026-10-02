@@ -379,11 +379,20 @@ distinct entity its own group (a single-index group is fine). Assign each group 
 """.strip()
 
 
-def make_llm_reviewer(client: ChatClient, model: str, *, temperature: float = 0.0) -> Reviewer:
+def make_llm_reviewer(
+    client: ChatClient,
+    model: str,
+    *,
+    temperature: float = 0.0,
+    request_timeout: float | None = None,
+    max_retries: int = 2,
+) -> Reviewer:
     """Build a :data:`Reviewer` backed by an LLM ``.parse()`` call returning a :class:`ReviewResult`.
 
-    Transport errors are retried by the shared LLM layer; a refusal degrades to an empty
-    :class:`ReviewResult` (no merge groups), preserving the reviewer's safe-degrade contract.
+    Transport errors are retried by the shared LLM layer (*max_retries* additional attempts);
+    a refusal degrades to an empty :class:`ReviewResult` (no merge groups), preserving the
+    reviewer's safe-degrade contract. *request_timeout* is the per-request timeout in seconds
+    (``None`` uses the client's configured timeout — 600 s for a default ``AsyncOpenAI``).
     """
 
     async def _review(texts: list[str]) -> ReviewResult:
@@ -398,6 +407,8 @@ def make_llm_reviewer(client: ChatClient, model: str, *, temperature: float = 0.
                 ],
                 response_format=ReviewResult,
                 temperature=temperature,
+                timeout=request_timeout,
+                max_retries=max_retries,
                 log_prefix="EntityReviewer",
             )
         except LLMRefusalError:

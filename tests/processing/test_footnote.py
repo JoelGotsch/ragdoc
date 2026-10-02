@@ -1154,3 +1154,56 @@ async def test_llm_resolver_error_returns_none_with_warning(caplog):
         result = await resolver.resolve(candidates, 1, "A study.")
     assert result is None
     assert any(r.levelno == logging.WARNING for r in caplog.records)
+
+
+def _two_candidates() -> list[FootnoteCandidate]:
+    return [
+        FootnoteCandidate(
+            element_id=f"elem-{i}",
+            element_idx=i,
+            page=1,
+            match_start=10,
+            match_end=11,
+            context_before="text",
+            context_after="more",
+            full_context="text 1 more",
+            reference_number=1,
+            footnote_text="Note",
+            footnote_id="fn-1",
+        )
+        for i in range(2)
+    ]
+
+
+@pytest.mark.anyio
+async def test_llm_resolver_forwards_timeout_through_shared_layer():
+    """The footnote call site can take a per-request timeout (it could not before)."""
+    mock_client = _selection_client(1)
+    resolver = LLMFootnoteResolver(client=mock_client, model="test-model", request_timeout=4.5)
+
+    await resolver.resolve(_two_candidates(), 1, "Note")
+
+    assert mock_client.chat.completions.parse.call_args.kwargs["timeout"] == 4.5
+
+
+@pytest.mark.anyio
+async def test_llm_resolver_default_sends_no_timeout():
+    mock_client = _selection_client(1)
+    await LLMFootnoteResolver(client=mock_client, model="test-model").resolve(_two_candidates(), 1, "Note")
+    assert "timeout" not in mock_client.chat.completions.parse.call_args.kwargs
+
+
+@pytest.mark.anyio
+async def test_llm_resolver_max_retries_zero_makes_one_attempt():
+    """max_retries is configurable; a transport failure still degrades to None (unresolved)."""
+    import httpx
+
+    openai = pytest.importorskip("openai", reason="llm extra not installed")
+    mock_client = MagicMock()
+    mock_client.chat.completions.parse = AsyncMock(
+        side_effect=openai.APIConnectionError(request=httpx.Request("POST", "https://api.test/v1"))
+    )
+    resolver = LLMFootnoteResolver(client=mock_client, model="test-model", max_retries=0)
+
+    assert await resolver.resolve(_two_candidates(), 1, "Note") is None
+    assert mock_client.chat.completions.parse.await_count == 1

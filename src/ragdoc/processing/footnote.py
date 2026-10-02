@@ -667,6 +667,8 @@ Return the 1-based candidate number of the best location, or null if no candidat
         self,
         client: ChatClient | None = None,
         model: str | None = None,
+        request_timeout: float | None = None,
+        max_retries: int = 2,
     ):
         """
         Initialize the LLM resolver.
@@ -677,11 +679,17 @@ Return the 1-based candidate number of the best location, or null if no candidat
                 :class:`~ragdoc.llm.LLMNotConfiguredError` when neither is available.
             model: Model name to use for resolution. ``None`` falls back to
                 ``get_config().default_llm_model``.
+            request_timeout: Per-request LLM timeout in seconds (``None`` uses the client's
+                configured timeout — 600 s for a default ``AsyncOpenAI``).
+            max_retries: Maximum additional attempts on retryable transport failures
+                (shared policy, see :mod:`ragdoc.llm`).
         """
         from ragdoc.config import get_config
 
         self.client: ChatClient = resolve_openai_client(client)
         self.model: str = model if model is not None else get_config().default_llm_model
+        self.request_timeout = request_timeout
+        self.max_retries = max_retries
 
     async def resolve(
         self,
@@ -728,6 +736,8 @@ Return the 1-based candidate number of the best location, or null if no candidat
                 ],
                 response_format=_FootnoteSelection,
                 temperature=0.0,
+                timeout=self.request_timeout,
+                max_retries=self.max_retries,
                 log_prefix="LLMFootnoteResolver",
             )
         except Exception as exc:  # noqa: BLE001 -- any LLM failure (incl. refusal) degrades to unresolved, never a wrong answer
