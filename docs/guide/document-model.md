@@ -13,14 +13,16 @@ A `Document` is a Pydantic model containing:
 - **`id`** — Unique identifier (UUID string)
 - **`title`** — Optional document title
 - **`elements`** — Ordered list of [`BaseElement`](../api/document.md#baseelement) subclasses
-- **`filename`** — Name of the source file (e.g. `"report.pdf"`), set by parsers
-- **`source_path`** — Full path to the source file (e.g. `"/data/report.pdf"`), set by parsers
-- **`metadata`** — Arbitrary key-value metadata (dict) for user-defined custom data
+- **`source_path`** — Full path to the source file (e.g. `"/data/report.pdf"`)
+- **`source_id`** / **`source_hash`** — Sync identity and file-byte hash, stamped by the pipelines (`None` on a hand-built document)
+- **`metadata`** — Key-value metadata (dict): your own custom data plus a few library-written
+  informational keys such as `filename` (the bare source filename, e.g. `"report.pdf"`)
 - **`external_refs`** — List of [`ExternalRef`](../api/document.md#externalref) for cross-document links
-- **`parser`** — Provenance string set by the parser (e.g. `"azure_di"`, `"pandoc"`)
+- **`parser`** — Name of the parser that produced the document (e.g. `"azure_di"`, `"pandoc"`)
 
-`filename` and `source_path` are explicit first-class fields — not stored in `metadata`.
-Parsers set them automatically; they propagate through splitting and into `Chunk`.
+`source_path` is a first-class field; the bare filename lives in `metadata["filename"]`.
+Both, and `parser`, are stamped by [`load()`](../api/parsing.md#load) (and by the pipelines
+when you pass a custom parser); they propagate through splitting and into `Chunk`.
 
 ```python
 from ragdoc.document import Document, Heading, Paragraph
@@ -113,6 +115,25 @@ doc.footnotes     # list[Footnote]
 
 doc.main_heading  # Heading | None  (the first h1)
 ```
+
+## Concatenating documents
+
+`concat_documents(first, second)` appends `second`'s elements after `first`'s and returns a
+new `Document` (inputs are not mutated); `join_documents([...])` folds a list left-to-right.
+There is no `|` operator on `Document`.
+
+```python
+from ragdoc.document import concat_documents, join_documents
+
+combined = concat_documents(part_one, part_two)                          # metadata: first wins
+combined = concat_documents(part_one, part_two, metadata_policy="strict")  # raise on conflicting keys
+whole = join_documents([part_one, part_two, appendix])
+```
+
+When both documents have a title, an `<h1>` carrying the second title is inserted between
+the two element lists. The result has a new `id` and no `source_id` / `source_hash`.
+This is plain concatenation — to *align* two parses of the same source, see the
+[Merging Guide](merging.md).
 
 ## See Also
 

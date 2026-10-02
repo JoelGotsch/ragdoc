@@ -102,7 +102,7 @@ class Event(BaseModel):
     date: FuzzyDate = Field(description="When the event happened (verbatim + canonical).")
     location: str | None = Field(default=None, description="Where, if stated.")
 
-extractor = StructuredExtractor(Event)   # client from configure(openai_client=...)
+extractor = StructuredExtractor(Event)   # client: pass client=..., or use configure(RagdocConfig(openai_client=...))
 mentions = await extractor.extract(document)
 ```
 

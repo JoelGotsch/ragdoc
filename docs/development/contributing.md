@@ -23,8 +23,24 @@ uv run pytest tests/ -k "test_name"   # single test by name
 uv run pytest-watcher tests/          # watch mode
 ```
 
-LLM-dependent code is tested with mocked clients and pre-recorded fixture replay; Qdrant is fully
-stubbed. The suite must stay runnable offline with zero credentials.
+LLM-dependent code is tested with mocked clients and pre-recorded fixture replay; Qdrant is
+stubbed or run in-process (`AsyncQdrantClient(":memory:")`). The suite must stay runnable
+offline with zero credentials.
+
+### Notebooks
+
+The marimo notebooks in `docs/notebooks/` are executed as tests, so they cannot drift from
+the code:
+
+```bash
+uv run marimo check docs/notebooks/*.py   # static check
+uv run pytest docs/notebooks/             # run the test_* cells inside the notebooks
+uv run pytest tests/test_notebooks.py     # run every notebook end-to-end (part of `uv run pytest`)
+```
+
+A plain `uv run pytest` does not include the second command — run it when you touch a
+notebook or a public API. Notebooks must run offline; gate cells that need an LLM on the API
+key so they skip cleanly.
 
 ## Lint, format, type-check
 

@@ -101,14 +101,18 @@ chunks = [c for s in enriched if s is not None for c in await chunker.chunk(s)]
 
 All LLM processors resolve their client through one chain (see the
 [LLM API](../api/llm.md)): an explicit `client=` argument wins, else
-`configure(openai_client=...)`'s global [`RagdocConfig`](../api/config.md#ragdocconfig),
-else construction fails loudly with `LLMNotConfiguredError`:
+the `openai_client` of the active [`RagdocConfig`](../api/config.md#ragdocconfig)
+(set with `configure(...)`), else construction fails loudly with `LLMNotConfiguredError`.
+`configure()` is a context manager — the config is active inside the block:
 
 ```python
 from openai import AsyncOpenAI
-from ragdoc import configure
+from ragdoc import RagdocConfig, configure
+from ragdoc.processing import DocumentSummarizerProcessor
 
-configure(openai_client=AsyncOpenAI(), default_llm_model="gpt-4.1")
+async with configure(RagdocConfig(openai_client=AsyncOpenAI(), default_llm_model="gpt-4.1")):
+    summarizer = DocumentSummarizerProcessor()   # resolves the client from the active config
+    document = await summarizer.process(document)
 ```
 
 Every call goes through the shared reliability layer (`ragdoc.llm`): one retry policy

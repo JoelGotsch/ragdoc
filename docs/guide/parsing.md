@@ -3,8 +3,8 @@
 > Run interactively: `marimo edit docs/notebooks/parsing.py`
 
 Parsing is the first stage of the pipeline. It converts a raw file into a structured
-[`Document`](document-model.md) object. Each parser sets `document.parser` to a provenance
-string so downstream processors can adjust behavior.
+[`Document`](document-model.md) object. `document.parser` records which parser produced it,
+so downstream processors can adjust behavior.
 
 ## Quick start
 
@@ -20,7 +20,7 @@ document = await load("report.docx")
 Pass `parser=` to force a specific parser by name:
 
 ```python
-document = await load("result.json", parser="azure_di")
+document = await load("result.json", parser="azure_json")
 ```
 
 ## Built-in parser registry
@@ -300,7 +300,7 @@ class MyParser(Parser):
 
     async def __call__(self, path: Path) -> Document:
         # parse a custom format
-        return Document(...)
+        return Document(elements=[])  # build your elements here
 
 
 register_parser(MyParser())

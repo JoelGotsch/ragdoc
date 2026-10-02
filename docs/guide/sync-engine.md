@@ -14,15 +14,20 @@ Every sync pipeline exposes the same three methods:
 | Method | What it does | Store writes |
 |---|---|---|
 | `plan(...)` | Compute a reviewable [`ChangeSet`](../api/pipeline.md#changeset) | none |
-| `apply(changeset)` | Write a (possibly edited) ChangeSet | buffered, embed-first |
-| `run(...)` | `apply(plan(...))` in streaming form | per source, as produced |
+| `apply(changeset)` | Write a (possibly edited) ChangeSet | the whole change set, prepared first |
+| `run(...)` | Detect changes and write them in one call | per source, as produced |
 
-`run()` produces the **same end state** as `apply(plan(...))` — same change detection, same
-final store contents — differing only in scheduling: `run` writes each changed source as it
-completes (a finished source stays durable even if a later one fails), while `apply` calls the
-`pre_write` hook once over the whole corpus first. For `VectorStorePipeline` that hook is
-embedding: `apply` embeds **all** chunks before any deletion, so a mid-run embedding failure
-leaves the store untouched.
+`run()` is a separate streaming path, not a literal `apply(plan(...))`: when every source
+succeeds it reaches the **same end state** — same change detection, same final store
+contents — but it is scheduled differently. `run` writes each changed source as soon as it
+has been produced, so sources written before a later failure stay written. `apply` runs the
+`pre_write` hook once over the whole change set before it writes anything; for
+`VectorStorePipeline` that hook is embedding, so `apply` embeds all chunks of the change set
+first and only then starts deleting and upserting.
+
+Neither path is a transaction across the corpus, and a single source's write
+(delete stale entries, then upsert) is not a transaction either. After a sync, look at
+`UpdateResult.errors`: a source listed there may not be fully written.
 
 ### Human-in-the-loop review
 
@@ -64,12 +69,12 @@ in `metadata`.
 - **Change detection** — compare each source's current token against the stored state
   (`list_source_state()`), skip matches.
 - **Concurrency** — sources are produced under a semaphore and streamed as completed.
-- **Error isolation** — production and write failures are caught per source
-  (`except Exception`, never `BaseException` — cancellation always propagates) and collected
-  into `UpdateResult.errors`; one bad file never aborts the corpus.
+- **Error isolation** — production and write failures (`Exception` subclasses) are caught
+  per source and collected into `UpdateResult.errors`, so one bad file does not stop the
+  others. Cancellation (`asyncio.CancelledError`) is not collected; it propagates to the
+  caller.
 - **Write discipline** — per source: optional `pre_write` (embedding) → delete stale entries
-  by `source_id` → upsert. A source whose stale-delete failed is *not* upserted (no old/new
-  mixing).
+  by `source_id` → upsert. In `apply`, a source whose stale-delete failed is *not* upserted.
 - **Orphan deletion** — sources present in the store but absent upstream are deleted only
   when `delete_orphans=True` (opt-in footgun guard: on the direct path, only pass your
   complete corpus with this flag).

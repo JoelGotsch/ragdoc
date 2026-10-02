@@ -99,21 +99,25 @@ document.metadata["document_date"] = _extract_date(document)
 document.metadata = {"document_name": _extract_name(document)}
 ```
 
-`document.metadata["filename"]` is set by every parser and is the primary provenance
-key used throughout the pipeline. Replacing the dict loses it silently.
+`document.metadata["filename"]` is stamped when the file is loaded and travels with the
+document onto every chunk. Replacing the dict loses it silently (and a `metadata_type`
+check, which requires `filename`, then fails).
 
 ### Custom parser
 
-Any callable `(Path) -> Document` satisfies the `Parser` protocol:
+Any **async** callable `(Path) -> Document` can be passed as `parser=`. The pipeline stamps
+provenance (`parser`, `source_path`, `metadata["filename"]`, `source_id`) on the returned
+document, so the parser only has to produce the elements:
 
 ```python
 from pathlib import Path
-from ragdoc.document import Document
+from ragdoc.document import Document, Paragraph
 from ragdoc.pipeline import DocumentPipeline
 
 async def my_parser(path: Path) -> Document:
-    # e.g. call an internal API, parse a custom format, …
-    return Document(...)
+    # e.g. call a web API, parse a custom format, …
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return Document(elements=[Paragraph(html=f"<p>{line}</p>") for line in lines if line])
 
 pipeline = DocumentPipeline(parser=my_parser)
 ```
@@ -175,10 +179,10 @@ for path, exc in result.errors:
     print(f"  FAILED {path}: {exc}")
 ```
 
-### Streaming (memory-efficient)
+### Streaming
 
-`stream` yields a batch of chunks per file as it completes, so you can hand
-off each batch (e.g. to a vector store) before the next file starts:
+`stream` yields one batch of chunks per file as it completes, so you can hand
+off each batch (e.g. to a vector store) instead of collecting the whole corpus first:
 
 ```python
 async for batch in pipeline.stream(paths, concurrency=4):
@@ -273,10 +277,16 @@ print(result.deleted)  # ["old_report.docx"]  (source IDs, not paths)
 
 ### plan() / apply()
 
-`run()` is `apply(plan(...))`. Call them separately to review changes before they reach the
-store — `plan()` returns a serializable `ChangeSet` and does not touch the store:
+`run()` reaches the same end state as `apply(plan(...))`, but it is a separate streaming
+path that writes each source as soon as it is ready (see the
+[Sync Engine Guide](sync-engine.md)). Call `plan()` and `apply()` yourself to review changes
+before they reach the store — `plan()` returns a serializable `ChangeSet` and does not touch
+the store:
 
 ```python
+from ragdoc.chunking import Chunk
+from ragdoc.pipeline import ChangeSet
+
 changeset = await vs_pipeline.plan(paths)
 changeset.save(Path("review/changes.json"))
 # ... inspect / edit the JSON ...
@@ -294,13 +304,16 @@ result = await vs_pipeline.run_directory(Path("docs/"), glob="**/*.docx")
 
 ### Error handling
 
-Per-file exceptions are collected in `UpdateResult.errors` rather than propagated:
+Per-source exceptions are collected in `UpdateResult.errors` (keyed on `source_id`, like
+the rest of `UpdateResult`) rather than propagated:
 
 ```python
 result = await vs_pipeline.run(paths)
-for path, exc in result.errors:
-    print(f"FAILED {path}: {exc}")
+for source_id, exc in result.errors:
+    print(f"FAILED {source_id}: {exc}")
 ```
+
+Always check `errors` after a sync: a source listed there was not (fully) written.
 
 ---
 
@@ -320,18 +333,31 @@ uv add "ragdoc[qdrant]"
 
 ```python
 from pathlib import Path
+from openai import AsyncOpenAI
 from qdrant_client import AsyncQdrantClient
 from ragdoc.integrations.vector_stores import QdrantVectorStore
-from ragdoc.pipeline import DocumentPipeline, VectorStorePipeline, TokenSplitter
+from ragdoc.pipeline import (
+    DocumentPipeline,
+    EmbedderConfig,
+    OpenAIEmbedder,
+    TokenSplitter,
+    VectorStorePipeline,
+)
 
 client = AsyncQdrantClient("http://localhost:6333")
 
 # create() creates the collection (and a source_id payload index) if it doesn't exist.
-# Safe to call on every startup — it is idempotent.
+# Against a Qdrant server it is safe to call on every startup.
 store = await QdrantVectorStore.create(client, "my_docs", vector_size=1536)
 
 pipeline = DocumentPipeline(splitter=TokenSplitter(max_tokens=4000))
-vs_pipeline = VectorStorePipeline(pipeline=pipeline, vector_store=store)
+vs_pipeline = VectorStorePipeline(
+    pipeline=pipeline,
+    vector_store=store,
+    # Qdrant needs a vector per chunk: configure at least one embedder
+    # (or server-side sparse vectors on the store).
+    embedders={"dense": EmbedderConfig(OpenAIEmbedder(AsyncOpenAI(), model="text-embedding-3-small"))},
+)
 
 result = await vs_pipeline.run(list(Path("docs/").glob("**/*.docx")))
 print(f"processed: {len(result.processed)}, skipped: {len(result.skipped)}")
@@ -339,18 +365,19 @@ print(f"processed: {len(result.processed)}, skipped: {len(result.skipped)}")
 
 ### Payload schema
 
-Each Qdrant point stores the full `Chunk` as payload.  The provenance fields
-(`source_id`, `source_hash`) live at the top level — they are **not** injected
-into the user-facing `metadata` dict:
+Each Qdrant point stores the `Chunk` as payload (everything except `id`, which is the
+point id, and the vectors).  The provenance fields (`source_id`, `source_hash`,
+`content_hash`) live at the top level — they are **not** injected into the `metadata` dict:
 
 | Payload key | Chunk field | Purpose |
 |---|---|---|
 | `source_id` | `chunk.source_id` | Groups chunks by source for cleanup |
-| `source_hash` | `chunk.source_hash` | Detects whether the source has changed |
+| `source_hash` | `chunk.source_hash` | File-byte hash: detects whether the source file has changed |
+| `content_hash` | `chunk.content_hash` | Document content hash: change detection when chunking from a `DocumentStore` |
 | `source_path` | `chunk.source_path` | Full path to the source file |
 | `prompt_content` | `chunk.prompt_content` | Full-fidelity text for LLM context |
 | `embedding_content` | `chunk.embedding_content` | Text used to generate the embedding |
-| `metadata` | `chunk.metadata` | User-defined key/value data |
+| `metadata` | `chunk.metadata` | Document metadata (your keys plus library-written ones such as `filename`) |
 | `created_at` | `chunk.created_at` | ISO 8601 creation timestamp |
 
 ### Performance notes
@@ -361,7 +388,7 @@ into the user-facing `metadata` dict:
 - `list_source_ids()` uses scroll pagination (1000 points per page) so it works
   correctly at any collection size.
 
-For a full production example including processors and `LLMChunker`, see the
+For a runnable end-to-end example (in-process Qdrant, no credentials needed), see the
 [Qdrant Pipeline notebook](../notebooks/qdrant_pipeline/).
 
 ---
@@ -374,6 +401,9 @@ The protocol requires five async methods — implementations should index on
 `chunk.metadata`):
 
 ```python
+from ragdoc.chunking import Chunk
+from ragdoc.pipeline import SourceState
+
 class MyVectorStore:
     async def upsert(self, chunks: list[Chunk]) -> list[str]:
         ids = [await self._db.insert(c) for c in chunks]
@@ -401,8 +431,8 @@ class MyVectorStore:
 
 ### Provenance fields
 
-Each chunk upserted by `VectorStorePipeline` has two first-class fields set
-before upsert — these are **not** injected into `chunk.metadata`:
+Each chunk upserted by `VectorStorePipeline` carries these first-class fields —
+they are **not** injected into `chunk.metadata`:
 
 | Field | Value | Purpose |
 |-------|-------|---------|

@@ -68,7 +68,7 @@ Retrieval-augmented pipelines need two text representations per chunk: `prompt_c
 Rendering uses `render_for_prompt` (full-fidelity structured text) or `render_raw` (with base64 images). There is no separate embedding renderer.
 
 **4. Source provenance and metadata propagate through the entire pipeline.**
-Parsers set `Document.source_path` and write the bare filename into `document.metadata["filename"]`. Metadata carries both user-defined custom data and library-written informational fields; processors must not drop or overwrite it, splitters copy it to every split, and chunkers forward it into `Chunk` — anything you put in `document.metadata` arrives on the final chunks. Fields that drive library behavior (change detection, deletion) are first-class on `Chunk` instead (`source_id`, `source_hash`, `content_hash`), never metadata keys, and `VectorStorePipeline` never injects into `chunk.metadata`.
+`load()` stamps `Document.source_path` and writes the bare filename into `document.metadata["filename"]` (the pipelines do the same for a custom parser). Metadata carries both user-defined custom data and library-written informational fields; processors must not drop or overwrite it, splitters copy it to every split, and chunkers forward it into `Chunk` — anything you put in `document.metadata` arrives on the final chunks. Fields that drive library behavior (change detection, deletion) are first-class on `Chunk` instead (`source_id`, `source_hash`, `content_hash`), never metadata keys, and `VectorStorePipeline` never injects into `chunk.metadata`.
 
 ## Architecture
 
@@ -90,7 +90,7 @@ PARSING → PROCESSING ─┐
 
 ### Stage 1: Parsing
 
-Convert source files into `Document` objects. Each parser sets `document.parser` for provenance.
+Convert source files into `Document` objects. `document.parser` records which parser produced the document.
 
 ```python
 from ragdoc import load
@@ -100,7 +100,7 @@ document = await load("page.html")
 document = await load("data.xlsx")
 ```
 
-Supported formats: `.html`, `.docx`/`.doc`, `.xlsx` (with `ragdoc[xlsx]`), `.json` (Azure DI output), PDF.
+Supported formats: `.html`, `.docx`/`.doc`, `.xlsx` (with `ragdoc[xlsx]`), PDF, `.azure.json` (a saved Azure Document Intelligence result), `_middle.json` (MinerU output).
 
 PDF parsing is zero-config with the `pdf` extra (`pip install 'ragdoc[pdf]'` — local pymupdf text + font-size headings):
 
@@ -110,7 +110,7 @@ from ragdoc import load
 document = await load("report.pdf")   # resolves to the pdf_basic parser
 ```
 
-For higher fidelity, install `azure-di` (plus Azure credentials) or `pdf-mineru`; the registry automatically prefers the highest-priority *available* parser:
+For higher fidelity, install `azure-di` (plus Azure credentials); the registry automatically prefers the highest-priority *available* parser. (MinerU is supported through its output file: run MinerU, then `load()` the resulting `*_middle.json` with the `pdf-mineru` extra.)
 
 ```python
 from ragdoc import RagdocConfig, configure, load
@@ -181,15 +181,15 @@ from ragdoc import Chunk
 
 ## Incremental Sync
 
-`VectorStorePipeline` (and `DocumentStorePipeline`) follow a **plan → apply** shape: `plan()` computes a reviewable `ChangeSet` without touching the store, `apply()` writes it, and `run()` does both.
+`VectorStorePipeline` (and `DocumentStorePipeline`) follow a **plan → apply** shape: `plan()` computes a reviewable `ChangeSet` without touching the store and `apply()` writes it. `run()` detects and writes changes in one call, source by source.
 
 ```python
 plan = await sync.plan(paths)       # ChangeSet: to_add / to_update / to_delete — no writes
-plan.save("changeset.json")         # optionally review or edit before applying
+plan.save(Path("changeset.json"))   # optionally review or edit before applying
 result = await sync.apply(plan)     # embed, then per-source delete-and-upsert
 ```
 
-Change detection uses two hashes: `source_hash` (SHA-256 of the raw file bytes) when syncing from files, and `content_hash` (renderer-stable `Document.content_hash()`) when syncing from a `DocumentStore`. Unchanged sources are skipped; changed ones are re-chunked, re-embedded, and replaced atomically per source. Orphan deletion is off by default (`delete_orphans=False`) — enable it only when you pass your complete corpus. The stored payload schema (the `Chunk` fields above plus your metadata) is documented at <https://joelgotsch.github.io/ragdoc/> for retrieval clients to read.
+Change detection uses two hashes: `source_hash` (SHA-256 of the raw file bytes) when syncing from files, and `content_hash` (`Document.content_hash()`, a canonical-JSON hash over the title and elements — no rendering involved) when syncing from a `DocumentStore`. Unchanged sources are skipped; changed ones are re-chunked, re-embedded, and replaced per source (stale chunks deleted, new ones upserted). Failures are reported per source in `UpdateResult.errors`. Orphan deletion is off by default (`delete_orphans=False`) — enable it only when you pass your complete corpus. The stored payload schema (the `Chunk` fields above plus your metadata) is documented at <https://joelgotsch.github.io/ragdoc/> for retrieval clients to read.
 
 ## Core Model
 
@@ -215,7 +215,8 @@ The `Document`-centric design, combined with chunkers owning the embedding strat
 ## Configuration
 
 ```python
-from ragdoc import RagdocConfig, configure
+from openai import AsyncOpenAI
+from ragdoc import RagdocConfig, configure, load
 
 async with configure(RagdocConfig(
     azure_key="...",
@@ -244,12 +245,12 @@ ragdoc chunk file.html --format md --output ./out
 
 - **Document**: Structured representation of content (paragraphs, headings, images, tables, …).
 - **DocumentProcessor**: Transforms a Document (heading levels, footnotes, summaries, …).
-- **Parser**: Converts raw input into a Document. Sets `document.parser` for provenance.
+- **Parser**: Converts raw input into a Document. `document.parser` records which one was used.
 - **Renderer**: Converts a Document to a formatted string (HTML, Markdown, plain text, …).
 - **Prompt-Content**: Text included in the LLM prompt after retrieval — full context, narrow topic.
 - **Embedding-Content**: Text embedded for semantic search — typically a short summary.
 - **Splitter**: Splits a Document into smaller Documents by heading hierarchy or token budget.
-- **Chunker**: Combines a prompt renderer and an embedding renderer to produce `Chunk` objects.
+- **Chunker**: Turns a (split) Document into `Chunk` objects and decides how `embedding_content` is produced.
 - **Chunk**: A chunk ready to load into a vector store — holds both prompt and embedding content.
 
 ### Comparison with other RAG libraries

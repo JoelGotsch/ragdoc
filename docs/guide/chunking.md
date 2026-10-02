@@ -68,11 +68,11 @@ chunks = [chunk for section in sections for chunk in await chunker.chunk(section
 ## Provenance fields
 
 `source_path`, `source_id`, `source_hash`, and `content_hash` are explicit first-class
-fields on `Chunk`; the bare filename lives in `metadata["filename"]` (written by parsers
-onto the `Document` and propagated automatically through splitting):
+fields on `Chunk`; the bare filename lives in `metadata["filename"]` (stamped onto the
+`Document` by `load()` and propagated automatically through splitting):
 
 ```python
-# Parsers set these; they propagate through splits automatically:
+# load() stamps these; they propagate through splits automatically:
 print(document.metadata["filename"])  # "annual_report_2024.docx"
 print(document.source_path)          # "/data/annual_report_2024.docx"
 

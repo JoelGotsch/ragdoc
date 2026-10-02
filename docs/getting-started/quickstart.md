@@ -64,14 +64,15 @@ chunks = asyncio.run(build_chunks("report.docx"))
 
 ## Supported file formats
 
-| Extension | Parser | Notes |
+| File name ends with | Parser | Notes |
 |-----------|--------|-------|
-| `.docx`, `.doc` | Pandoc | Requires Pandoc installed |
-| `.html` | HTML parser | |
-| `.xlsx` | Excel parser | |
-| `.azure.json` | Azure DI | Azure Document Intelligence output |
-| `.pdf` | Azure DI | Dispatches to Azure Document Intelligence |
-| `_middle.json` | MinerU | MinerU layout output |
+| `.html`, `.htm` | `html` | |
+| `.docx`, `.doc` | `pandoc` | Converted via pandoc |
+| `.xlsx` | `xlsx` | Needs the `xlsx` extra |
+| `.pdf` | `azure_di` or `pdf_basic` | Azure Document Intelligence if the `azure-di` extra and credentials are available; otherwise the local `pdf_basic` parser (`pdf` extra) |
+| `.azure.json` | `azure_json` | A saved Azure Document Intelligence result |
+| `_middle.json` | `mineru` | MinerU layout output (`pdf-mineru` extra) |
+| `.ragdoc.json` | `ragdoc_json` | A `Document` previously dumped by ragdoc |
 
 Use [`load()`](../api/parsing.md#load) to automatically select the right parser, or pass
 `parser=` to force a specific one.
