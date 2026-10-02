@@ -25,10 +25,9 @@ exclude = [
   "/TODO",
 ]
 
-# Pin uv to public PyPI as the default index. This makes `uv sync` work in any
-# environment without relying on an internal mirror — the prior `uv.lock` was
-# generated against an internal artifactory host that's not reachable outside
-# the corporate network. PyTorch CPU wheels are pulled from a secondary index.
+# Pin uv to public PyPI as the default index so `uv sync` resolves the same way
+# in every environment, regardless of any index configured on the machine.
+# PyTorch CPU wheels are pulled from a secondary, explicit index.
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"

@@ -125,7 +125,7 @@ async def main() -> None:
     from httpx import AsyncClient
 
     settings = LLMHeadingResolverSettings()
-    http_client = AsyncClient(verify=False) # str(Path(__file__).parent.parent / 'certs' / 'ca-bundle-all.crt'))
+    http_client = AsyncClient()
     openai_client = AsyncOpenAI(
         max_retries=3,
         api_key=settings.api_key.get_secret_value(),
