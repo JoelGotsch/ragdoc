@@ -394,3 +394,51 @@ def test_copies_compare_equal_to_their_source():
     assert original.model_copy() == original
     assert original.model_copy(deep=True) == original
     assert Paragraph.model_validate(original.model_dump()) == original
+
+
+# ---------------------------------------------------------------------------
+# Soup cache on derived-html types (Image / Footnote)
+# ---------------------------------------------------------------------------
+
+
+def test_footnote_soup_cache_hits_across_accesses(parse_counter):
+    """Footnote.html is rebuilt per access (a new str each time) — the cache must still hit."""
+    fn = Footnote(number=1, innerhtml="see <ref id='t1' rel='table'/>")
+    parse_counter["n"] = 0
+    first = fn.inline_refs
+    second = fn.inline_refs
+    _ = fn.footnote_ids
+    assert [ref.target_id for ref in first] == ["t1"]
+    assert second == first
+    assert parse_counter["n"] == 1
+
+
+def test_footnote_soup_cache_invalidated_when_fields_change():
+    fn = Footnote(number=1, innerhtml="see <ref id='t1' rel='table'/>")
+    assert [ref.target_id for ref in fn.inline_refs] == ["t1"]
+    fn.innerhtml = "see <ref id='t2' rel='table'/>"
+    assert [ref.target_id for ref in fn.inline_refs] == ["t2"]
+    fn.innerhtml = "no refs"
+    assert fn.inline_refs == []
+
+
+def test_image_derived_accessors_do_not_parse_or_retain_the_payload(parse_counter):
+    """A large base64 image must not be parsed, nor pinned a second time by the soup cache."""
+    payload = "A" * 1_000_000
+    img = Image(image=payload, image_type="png", alt="<ref id='x' rel='image'/> chart")
+    parse_counter["n"] = 0
+    assert img.inline_refs == []
+    assert img.image_ids == []
+    assert img.footnote_ids == []
+    assert img.text == ""
+    assert parse_counter["n"] == 0
+    assert img._soup is None
+    assert img._soup_source is None
+
+
+def test_image_parsed_soup_is_never_cached():
+    img = Image(image="AAAA", image_type="png")
+    soup = img._parsed()
+    assert soup.find("img") is not None
+    assert img._soup is None
+    assert img._soup_source is None

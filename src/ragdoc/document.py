@@ -169,13 +169,16 @@ class BaseElement(BaseModel):
     def _parsed(self) -> BeautifulSoup:
         """Cached BeautifulSoup parse of ``self.html``.
 
-        Cache validity is keyed on the *identity* of the html string object: any assignment
-        binds a new ``str``, so ``self._soup_source is not html`` detects staleness without
-        assignment hooks (``el.html = el.html`` keeps the cache warm — strings are immutable).
-        Never hand the cached soup to callers; read-only derivations only.
+        Cache validity is keyed on the html string's *value*. For stored-html types the
+        comparison short-circuits on object identity (``el.html`` returns the same ``str``
+        until it is reassigned), so a warm hit costs a pointer compare. Footnote derives
+        ``html`` — a new ``str`` per access — so an identity key would never hit there; the
+        value compare is what makes its cache effective. Image bypasses the cache entirely
+        (see :meth:`Image._parsed`). Never hand the cached soup to callers; read-only
+        derivations only.
         """
         html_str = self.html
-        if self._soup is None or self._soup_source is not html_str:
+        if self._soup is None or self._soup_source != html_str:
             self._soup = BeautifulSoup(html_str, "html.parser")
             self._soup_source = html_str
         return self._soup
@@ -458,6 +461,27 @@ class Image(_DerivedHtmlElement):
         rendered image content.
         """
         return f'<ref id="{self.id}" rel="image"/>'
+
+    def _parsed(self) -> BeautifulSoup:
+        """Fresh, **uncached** parse of the derived ``<img>`` html.
+
+        The derived html embeds the full base64 payload; caching it would pin a second copy of
+        the image (source string + parsed soup) on every element for no benefit.
+        """
+        return BeautifulSoup(self.html, "html.parser")
+
+    @property
+    def inline_refs(self) -> list[InlineRef]:
+        """Always empty: the derived ``<img>`` tag cannot contain ``<ref/>`` tags (``alt`` is escaped).
+
+        Answered without building or parsing the html, which embeds the full base64 payload.
+        """
+        return []
+
+    @property
+    def text(self) -> str:
+        """Always empty: an ``<img>`` tag has no text content (use ``alt`` / ``text_representation``)."""
+        return ""
 
     @property
     def html(self) -> str:
