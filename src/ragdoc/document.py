@@ -180,6 +180,22 @@ class BaseElement(BaseModel):
             self._soup_source = html_str
         return self._soup
 
+    def __eq__(self, other: object) -> bool:
+        """Field-based equality: same concrete type and equal field values.
+
+        Pydantic's default ``__eq__`` also compares private attributes, which would make
+        equality depend on soup-cache state (an element whose ``.text`` was read would differ
+        from an identical one whose cache is cold). Caches are an implementation detail and
+        never participate.
+        """
+        if not isinstance(other, BaseElement):
+            return NotImplemented
+        return (
+            type(self) is type(other)
+            and self.__dict__ == other.__dict__
+            and self.__pydantic_extra__ == other.__pydantic_extra__
+        )
+
     @property
     def inline_refs(self) -> list[InlineRef]:
         """Inline references parsed from <ref id="..." rel="..."/> tags in this element's HTML.

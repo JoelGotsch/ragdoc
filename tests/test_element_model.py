@@ -336,3 +336,61 @@ def test_inline_refs_unknown_rel_logs_once(caplog: pytest.LogCaptureFixture):
     warnings = [r for r in caplog.records if "bogus-rel-once" in r.getMessage()]
     assert len(warnings) == 1
     assert [r.rel_type for r in refs] == ["image"]
+
+
+# ---------------------------------------------------------------------------
+# Equality: field-based, independent of soup-cache state
+# ---------------------------------------------------------------------------
+
+
+def _equality_pairs() -> list[tuple[object, object]]:
+    return [
+        (Paragraph(id="e", html="<p>x</p>"), Paragraph(id="e", html="<p>x</p>")),
+        (Heading(id="e", html="<h2>x</h2>"), Heading(id="e", html="<h2>x</h2>")),
+        (
+            Table(id="e", html="<table><tr><td>x</td></tr></table>"),
+            Table(id="e", html="<table><tr><td>x</td></tr></table>"),
+        ),
+        (DocumentList(id="e", html="<ul><li>x</li></ul>"), DocumentList(id="e", html="<ul><li>x</li></ul>")),
+        (RawText(id="e", html="<div>x</div>"), RawText(id="e", html="<div>x</div>")),
+        (Footnote(id="e", number=1, innerhtml="x"), Footnote(id="e", number=1, innerhtml="x")),
+        (Image(id="e", image="AAAA", alt="a"), Image(id="e", image="AAAA", alt="a")),
+    ]
+
+
+@pytest.mark.parametrize("pair", _equality_pairs(), ids=lambda pair: type(pair[0]).__name__)
+def test_equal_fields_compare_equal_regardless_of_cache_state(pair):
+    first, second = pair
+    assert first == second
+    # Warm the derived-accessor cache on ONE side only — equality must not change.
+    _ = first.text
+    _ = first.inline_refs
+    assert first == second
+    assert second == first
+    _ = second.text
+    assert first == second
+
+
+def test_equality_survives_cache_invalidating_assignment():
+    first, second = Paragraph(id="e", html="<p>x</p>"), Paragraph(id="e", html="<p>x</p>")
+    _ = first.text
+    first.html = "<p>y</p>"
+    assert first != second
+    _ = first.text
+    first.html = "<p>x</p>"
+    assert first == second
+
+
+def test_elements_with_different_fields_or_types_are_unequal():
+    assert Paragraph(id="e", html="<p>x</p>") != Paragraph(id="e", html="<p>y</p>")
+    assert Paragraph(id="e", html="<p>x</p>") != Paragraph(id="other", html="<p>x</p>")
+    assert Paragraph(id="e", html="<div>x</div>") != RawText(id="e", html="<div>x</div>")
+    assert Paragraph(id="e", html="<p>x</p>") != "<p>x</p>"
+
+
+def test_copies_compare_equal_to_their_source():
+    original = Paragraph(html="<p>See <ref id='i1' rel='image'/></p>")
+    _ = original.inline_refs
+    assert original.model_copy() == original
+    assert original.model_copy(deep=True) == original
+    assert Paragraph.model_validate(original.model_dump()) == original
