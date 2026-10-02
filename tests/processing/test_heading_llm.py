@@ -254,3 +254,62 @@ async def test_heading_resolver_degrades_to_empty_on_exhaustion():
     assert result is doc
     assert result.elements[0].level == 3  # unchanged — degrade to no judgments
     client.chat.completions.parse.assert_called_once()  # 400 is not retried
+
+
+@pytest.mark.anyio
+async def test_heading_resolver_title_removal_options_are_noops_on_titled_document():
+    """Documented behaviour: with a pre-set title both removal options do nothing — nothing before
+    the LLM-judged title is stripped and that heading keeps its level — while levels still resolve."""
+    from ragdoc.document import Paragraph
+
+    doc = Document(
+        title="Existing Title",
+        elements=[
+            Paragraph(html="<p>Cover page boilerplate</p>"),
+            Heading(html="<h4>LLM-Detected Title</h4>"),
+            Heading(html="<h5>Section</h5>"),
+        ],
+    )
+    response = HeadingResponse(
+        judgments=[
+            HeadingJudgment(id=1, level=HeadingLevel.DOCUMENT_TITLE),
+            HeadingJudgment(id=2, level=HeadingLevel.H2),
+        ]
+    )
+    resolver = LLMHeadingResolver(
+        _make_mock_client(response), remove_title_from_elements=True, remove_elements_before_title=True
+    )
+    result = await resolver.process(doc)
+
+    assert result.title == "Existing Title"
+    assert [type(e).__name__ for e in result.elements] == ["Paragraph", "Heading", "Heading"]
+    judged_title = result.elements[1]
+    assert isinstance(judged_title, Heading)
+    assert judged_title.level == 4  # ignored judgment: level untouched, no metadata
+    assert "llm_heading_level" not in judged_title.metadata
+    section = result.elements[2]
+    assert isinstance(section, Heading)
+    assert section.level == 2  # level resolution is NOT skipped
+    assert section.metadata["llm_heading_level"] == "h2"
+
+
+def test_heading_resolver_uses_chat_only_config_client():
+    """The config fallback needs only the chat capability."""
+    from ragdoc.config import RagdocConfig, configure
+
+    class _ChatOnly:
+        chat = MagicMock()
+
+    configured = _ChatOnly()
+    with configure(RagdocConfig(openai_client=configured)):
+        assert LLMHeadingResolver().client is configured
+
+
+def test_heading_resolver_rejects_embeddings_only_config_client():
+    from ragdoc.config import RagdocConfig, configure
+
+    class _EmbeddingsOnly:
+        embeddings = MagicMock()
+
+    with configure(RagdocConfig(openai_client=_EmbeddingsOnly())), pytest.raises(ValueError, match="No client"):
+        LLMHeadingResolver()

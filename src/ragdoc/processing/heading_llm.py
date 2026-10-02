@@ -209,8 +209,26 @@ Guidelines:
             model_name: Model name to use (e.g., "gpt-4o"). Overrides settings and config.
             settings: Optional settings object. Can also be configured via environment variables.
             remove_title_from_elements: Remove the detected title element from the document.
+                Only takes effect when this resolver *assigns* the title, i.e. when
+                ``document.title`` was empty before :meth:`process` — see the note below.
             remove_elements_before_title: Remove all elements preceding the detected title.
+                Same condition as ``remove_title_from_elements``.
             concurrency: Max concurrent LLM calls across batches (int or shared semaphore).
+
+        Note:
+            When the document **already has a title** (set by a parser such as html
+            ``<title>`` / mineru ``document_title``, by another title processor, or by an
+            earlier run of this resolver), heading *levels* are still resolved and applied
+            exactly as for an untitled document, but title handling is skipped entirely: a
+            ``document-title`` judgment is ignored (that heading keeps its level and gets
+            no metadata), ``document.title`` is never overwritten, and neither
+            ``remove_title_from_elements`` nor ``remove_elements_before_title`` removes
+            anything. This keeps re-runs non-destructive; to let the resolver pick the
+            title and strip elements, clear ``document.title`` first.
+
+        Raises:
+            ValueError: No client passed, none constructible from settings, and the active
+                config holds no chat-capable client.
         """
         self.settings = settings or LLMHeadingResolverSettings()
         config = get_config()
