@@ -52,7 +52,7 @@ import logging
 import re
 from collections.abc import Set as AbstractSet
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field, create_model
 
@@ -78,6 +78,7 @@ from ragdoc.utils import Tokenizer
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
+    from typing_extensions import TypeForm
 
     from ragdoc.document import Document
     from ragdoc.rendering import Renderer
@@ -362,18 +363,21 @@ class KnowledgeGraphExtractor:
         self._renderer = renderer
         self._tokenizer = tokenizer
         self._gleaning = gleaning if gleaning is not None else self.settings.gleaning
-        self._payload_model: Any = None
+        self._payload_model: TypeForm[BaseModel] | None = None
 
     @property
     def schema(self) -> GraphSchema:
         return self._schema
 
     @property
-    def payload_model(self) -> Any:
+    def payload_model(self) -> TypeForm[BaseModel]:
         """The discriminated union over node + edge types — the merged payload model.
 
         Kept as a documented public attribute (parametrizes store queries and
-        ``ChangeSet[Mention[...]]``); the union alias is not a ``type[BaseModel]``, hence ``Any``.
+        ``ChangeSet[Mention[...]]``). For a schema with more than one type this is an
+        ``Annotated[Union[...], Field(discriminator="kind")]`` *type form*, not a class — hence
+        ``TypeForm[BaseModel]`` rather than ``type[BaseModel]``; use it where a type expression
+        is accepted (``TypeAdapter(...)``, ``Mention[...]``), not with ``isinstance``.
         Cached on first read because building a discriminated union over the schema's types is
         pure and the schema is immutable.
         """

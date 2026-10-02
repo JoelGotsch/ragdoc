@@ -17,7 +17,7 @@ bookkeeping.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from urllib.parse import quote, unquote
 
 from pydantic import BaseModel
@@ -26,7 +26,30 @@ from ragdoc.extraction._io import read_text as _read_text, write_text as _write_
 from ragdoc.extraction.entity import Entity
 from ragdoc.extraction.schema import GraphSchema, build_edge_union, build_node_union
 
+if TYPE_CHECKING:
+    from typing_extensions import TypeForm
+
 _ENTITY_SUFFIX = ".entity.json"
+
+
+def entity_type_for(payload: TypeForm[BaseModel]) -> type[Entity]:
+    """``Entity`` parametrized with a payload *type form* (a model class or a discriminated union).
+
+    Pydantic parametrizes a generic model with any type form at runtime, but a static checker
+    cannot bind ``Entity``'s ``BaseModel``-bound type variable to a union assembled at runtime
+    — this function is the one place that bridges the two.
+    """
+    return Entity[payload]  # pyright: ignore[reportInvalidTypeArguments]
+
+
+def node_entity_type(schema: GraphSchema) -> type[Entity]:
+    """The ``Entity[...]`` type that rehydrates *schema*'s resolved **nodes** (discriminated on ``kind``)."""
+    return entity_type_for(build_node_union(schema.node_types))
+
+
+def edge_entity_type(schema: GraphSchema) -> type[Entity]:
+    """The ``Entity[...]`` type that rehydrates *schema*'s resolved **edges** (discriminated on ``kind``)."""
+    return entity_type_for(build_edge_union(schema.edge_types))
 
 
 @runtime_checkable
@@ -107,12 +130,10 @@ class LocalGraphStore:
     # ---- entity-type construction ----
 
     def _node_entity_type(self) -> type[Entity]:
-        node_union = build_node_union(self._schema.node_types)
-        return Entity[node_union]
+        return node_entity_type(self._schema)
 
     def _edge_entity_type(self) -> type[Entity]:
-        edge_union = build_edge_union(self._schema.edge_types)
-        return Entity[edge_union]
+        return edge_entity_type(self._schema)
 
     # ---- path helpers ----
 

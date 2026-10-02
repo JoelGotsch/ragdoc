@@ -26,9 +26,12 @@ and schema size pushes prompt tokens; split into multiple extractors with smalle
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Union, cast, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+if TYPE_CHECKING:
+    from typing_extensions import TypeForm
 
 
 class EdgeRef(BaseModel):
@@ -140,23 +143,29 @@ class GraphSchema(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def build_node_union(types: tuple[type[BaseModel], ...] | list[type[BaseModel]]) -> Any:
+def build_node_union(types: tuple[type[BaseModel], ...] | list[type[BaseModel]]) -> TypeForm[BaseModel]:
     """Build a discriminated union over *types*, keyed on the ``kind`` field.
 
     Single-type input returns the type unchanged (avoids a degenerate union). Multi-type input
     returns ``Annotated[Union[...], Field(discriminator="kind")]`` — Pydantic's idiomatic
     discriminated-union shape, which OpenAI strict mode handles correctly when ``kind`` is the
     first field on every variant.
+
+    The result is a *type form* (PEP 747 ``TypeForm[BaseModel]``): something valid wherever a
+    type expression is — a field annotation, ``TypeAdapter(...)``, a generic argument such as
+    ``Mention[...]`` — but not necessarily a class (no ``isinstance`` against the union form).
     """
-    types = tuple(types)
-    if not types:
+    members = tuple(types)
+    if not members:
         raise ValueError("build_node_union requires at least one type.")
-    if len(types) == 1:
-        return types[0]
-    return Annotated[Union[types], Field(discriminator="kind")]  # noqa: UP007
+    if len(members) == 1:
+        return members[0]
+    # The union is assembled at runtime from the registered types, so no checker can derive its
+    # static type; every member is a BaseModel subclass, which is what the cast records.
+    return cast("TypeForm[BaseModel]", Annotated[Union[members], Field(discriminator="kind")])  # noqa: UP007
 
 
-def build_edge_union(types: tuple[type[BaseModel], ...] | list[type[BaseModel]]) -> Any:
+def build_edge_union(types: tuple[type[BaseModel], ...] | list[type[BaseModel]]) -> TypeForm[BaseModel]:
     """Build a discriminated union over edge *types* (same shape as :func:`build_node_union`).
 
     Two named functions one shape — call sites read more clearly when intent (nodes vs edges)

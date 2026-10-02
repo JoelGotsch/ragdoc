@@ -283,3 +283,22 @@ async def test_delete_by_id_removes_specific_entities(tmp_path: Path):
     await store.delete([alice.entity_id])
     remaining = await store.list_nodes()
     assert [n.entity_id for n in remaining] == [acme.entity_id]
+
+
+# ---------------------------------------------------------------------------
+# Typed entity-type helpers (shared with backend graph stores)
+# ---------------------------------------------------------------------------
+
+
+def test_node_and_edge_entity_types_rehydrate_by_kind():
+    """node_entity_type / edge_entity_type build Entity[<discriminated union>] for a schema."""
+    from ragdoc.extraction.graph_store import edge_entity_type, node_entity_type
+
+    node = _node_entity(Person(full_name="Alice"), ["m1"], ["s1"])
+    rehydrated = node_entity_type(SCHEMA).model_validate(node.model_dump(mode="json"))
+    assert isinstance(rehydrated.payload, Person)
+
+    refs = EdgeRef(source_mention_id="e1", target_mention_id="e2")
+    edge = _edge_entity(Authorship(refs=refs), ["m2"], ["s1"])
+    rehydrated_edge = edge_entity_type(SCHEMA).model_validate(edge.model_dump(mode="json"))
+    assert isinstance(rehydrated_edge.payload, Authorship)
