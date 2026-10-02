@@ -4,6 +4,83 @@ Pre-1.0: breaking changes land at will and are documented here.
 
 ## Unreleased
 
+> The entries below are grouped by the phase in which they landed, newest first. Where a
+> later phase renamed or removed something an earlier phase introduced, the earlier entry
+> names the **current** API and says so.
+
+### Fixed (review remediation — correctness)
+
+- **Default chunk ids are valid vector-store point ids.** `mint_chunk_id` now emits a
+  deterministic, canonical **UUID string** derived from
+  `(source_id, split_sequence, chunk_ordinal, content_hash)` (previously a raw hex digest,
+  which Qdrant rejects as a point id). The default pipeline can upsert into
+  `QdrantVectorStore` without a custom `chunk_id_fn`.
+- **`MentionStorePipeline` on multi-split sources**: mention ordinals now run per source
+  across splits, and knowledge-graph edge references are rewritten to the finalized mention
+  ids (new `rewrite_edge_refs`). Previously a source that was split could silently overwrite
+  mentions and lose edges.
+- **Qdrant batched upsert**: when a batch fails part-way, the store makes a best-effort
+  rollback — it deletes the affected sources' points — so the next sync re-processes them
+  instead of treating a partially written source as unchanged. Those sources are missing
+  from the collection until that next sync.
+- **Unreadable files no longer abort a sync.** Hashing errors are captured per path
+  (`SyncPlanInput.pre_failed`) and reported in `UpdateResult.errors`; a file that could not
+  be read is never treated as an orphan.
+- **`LocalDocumentStore`**: the filename is the authoritative `source_id`. A hand-edited
+  `source_id` inside the stored JSON is re-stamped on read (with a warning) and can no
+  longer orphan live chunks.
+- **`DocumentStorePipeline` keeps the stored document when processing filters a source
+  out** (skipped with a warning). A transient filter, or a misclassifying LLM processor, no
+  longer deletes the stored copy.
+- **`IngestPipeline` stamps provenance on the explicit-parser path**: a custom `parser=`
+  callable now gets the same `parser` / `source_path` / `metadata["filename"]` as `load()`.
+- **`Required` metadata keys are actually enforced** by `ChunkPipeline(metadata_type=…)`
+  (the check was silently empty for TypedDicts declared in modules using
+  `from __future__ import annotations`).
+- **Element model**: `Heading.level` rejects values outside 1–6; assigning `Image.html`
+  re-derives all fields and raises on a missing `<img>` tag or a non-`data:` src.
+- **`LLMHeadingResolver`** resolves heading levels on documents that already have a title
+  (only the title assignment respects the existing title).
+- **Token splitter** no longer emits heading-only trailing splits after delegating an
+  oversized section.
+- **Extraction**: a malformed compact date (`YYYY-MMDD`) fails loudly instead of parsing as
+  a reversed interval; gleaning merge survives non-contiguous primary ids and fails loudly
+  on duplicate secondary ids; the Qdrant entity date filter matches half-bounded intervals
+  (parity with `LocalEntityStore`).
+- **`retry_llm`** no longer masks a non-openai transport error with an `ImportError` on a
+  base install.
+
+### Changed (review remediation — breaking)
+
+- **`ragdoc.document.merge_documents` is renamed `concat_documents`** (it collided with the
+  alignment-based `ragdoc.merging.merge_documents`). `join_documents` is unchanged.
+- **`Mention.source_hash` is `str | None`** (was `str`) — the file-byte hash in direct-mode
+  sync, `None` otherwise; never faked from the content hash. Mirrors `Chunk.source_hash`.
+- **LLM-using extractors and summarizers resolve their client in `__init__`** and raise
+  `LLMNotConfiguredError` at construction when none is available.
+- **Chunk id format** (see Fixed above): existing chunks get new ids the next time their
+  source is updated.
+
+### Changed (review remediation — internals)
+
+- One shared default-renderer / default-tokenizer resolution
+  (`ragdoc.rendering.resolve_renderer`, `ragdoc.utils.resolve_tokenizer`), one
+  `mint_entity_id`, shared `aiofiles` helpers for the local extraction stores.
+- `MentionStorePipeline` defaults its splitter to `TokenSplitter()`; per-split extraction
+  and the knowledge-graph halving fallback run concurrently; blocking pandoc render/split
+  call sites are wrapped in `asyncio.to_thread`.
+
+### Changed (documentation and notebooks)
+
+- The sync notebooks (`pipeline.py`, `qdrant_pipeline.py`) now execute for real, offline
+  (in-memory stores, a deterministic fake embedder), and assert the plan → apply behaviour
+  in `test_*` cells; `quickstart.py` and `parsing.py` run against a sample file instead of
+  placeholders; `document_model.py` covers `concat_documents`.
+- `uv run pytest docs/notebooks/` now collects and runs the notebooks' `test_*` cells
+  (it previously collected nothing), and CI runs it.
+- `pipeline_walkthrough.py` uses a standard OpenAI-compatible endpoint configured from the
+  environment and skips its LLM-backed cells when no API key is set.
+
 ### Added (Phase 10 — documentation)
 
 - **Extraction/knowledge-graph docs** (the feature previously had zero docs presence):
@@ -126,7 +203,7 @@ Pre-1.0: breaking changes land at will and are documented here.
 ### Changed (Phase 8)
 
 - **Async honesty**: blocking work is now wrapped off the event loop — splitter invocation in
-  `DocumentPipeline.chunk_document`, chunker rendering (`SimpleChunker`/`LLMChunker`), the
+  `ChunkPipeline.run` (then `DocumentPipeline.chunk_document`), chunker rendering (`SimpleChunker`/`LLMChunker`), the
   pandoc and xlsx and pdf_basic parsers, and PIL transforms in `ImageSummaryProcessor` all
   run under `asyncio.to_thread`; `LocalDocumentStore`, `LocalMentionStore`, and
   `LocalGraphStore` file I/O moved to `aiofiles`; `VectorStorePipeline.run_directory`'s glob
@@ -340,25 +417,28 @@ Pre-1.0: breaking changes land at will and are documented here.
   `split_document` no-split path **no longer mutates the input document** — it returns a
   shallow copy carrying `split_sequence`/`split_total`. Elements remain shared across splits
   by design.
-- **Chunk ids are minted by `DocumentPipeline.chunk_document`** over
+- **Chunk ids are minted by the pipeline** — `ChunkPipeline.run` (introduced here as
+  `DocumentPipeline.chunk_document`, renamed in Phase 9) — over
   `(source_id, split_sequence, chunk_ordinal, content_hash)` via the new
-  `ragdoc.chunking.provenance.mint_chunk_id` (override with `DocumentPipeline(chunk_id_fn=…)`,
-  type `ChunkIdFn`). This fixes the collision where two identical-content splits of one source
+  `ragdoc.chunking.provenance.mint_chunk_id` (override with `ChunkPipeline(chunk_id_fn=…)` or
+  the delegating `DocumentPipeline(chunk_id_fn=…)`, type `ChunkIdFn`). This fixes the collision where two identical-content splits of one source
   produced one chunk id, and gives `LLMChunker` stable ids. The chunkers' `id_fn` constructor
   parameters are **removed**; standalone chunker use yields uuid4 ids.
 - **`Chunk.source_hash` is `str | None` and honest** — it is the file-byte hash from the sync
   pipelines' `hash_fn` or `None`; the silent `content_hash` fallback at every stamping site is
   gone (use `content_hash` for content change detection). The shared fallback chain lives in
   `ragdoc.chunking.provenance.resolve_chunk_provenance`.
-- **`merge_documents(first, second, *, metadata_policy="first"|"second"|"strict")` replaces
-  `Document.__or__`** with an explicit, documented field policy (title bridge heading is now
+- **`concat_documents(first, second, *, metadata_policy="first"|"second"|"strict")` replaces
+  `Document.__or__`** (introduced here as `ragdoc.document.merge_documents`; renamed in the
+  review remediation above) with an explicit, documented field policy (title bridge heading is now
   HTML-escaped; `parser`/`parser_version` kept iff identical; metadata always a fresh dict;
   `"strict"` raises on conflicting keys). `join_documents` gained the same `metadata_policy`
   keyword. (Not to be confused with `ragdoc.merging.merge_documents`, which aligns two parses
   of the *same* source.)
 - **Parser provenance is stamped centrally in `ragdoc.parsing.load()`** via the new
   `stamp_provenance(document, source, parser_name)` (fills `parser`, `source_path`,
-  `metadata["filename"]` only when unset). The standalone loaders (`load_html`, `load_pandoc`,
+  `metadata["filename"]` only when unset; `IngestPipeline.run` calls it too, so custom
+  `parser=` callables are covered). The standalone loaders (`load_html`, `load_pandoc`,
   `load_excel`, `load_azure_json`, mineru) no longer stamp these fields themselves — call
   them through `load()` (or stamp manually) when you need file provenance.
 - **Escaping fixes** (four injection sites): Heading attribute values (via bs4
@@ -386,10 +466,10 @@ Pre-1.0: breaking changes land at will and are documented here.
   - A Boundary-2 target `source_id` missing from the DocumentStore, or a document that vanishes
     between `list_source_state` and `get_document`, is **logged and skip-counted** everywhere
     (previously uncounted; `MentionStorePipeline.plan()` was fully silent).
-  - A **filtered source** (processor returns `None`) yields an empty change: counted
-    `processed` and its stale stored artifacts are **deleted**. This fixes
-    `DocumentStorePipeline` leaving a stale stored Document behind forever when its source file
-    becomes filtered.
+  - A **filtered source** (processor returns `None`) yields an empty change in the vector
+    and mention pipelines: counted `processed` and its stale stored artifacts are **deleted**.
+    (`DocumentStorePipeline` is the exception since the review remediation above: it keeps
+    the stored Document and counts the source as skipped.)
   - `apply()` performs delete-then-upsert with per-source error isolation everywhere: a source
     whose stale-delete failed is recorded in `errors` and **not** upserted (previously the
     mention path could mix old and new mentions; the docstore path did no stale-delete).
@@ -406,6 +486,20 @@ Pre-1.0: breaking changes land at will and are documented here.
 - `ChangeSet`'s type parameter loosened from `TypeVar("T", Document, Chunk)` to
   `TypeVar("T", bound=BaseModel)` — any Pydantic model payload.
 
+### Removed (Phase 2 — public API surface reset)
+
+- **`DocumentPipeline.run_sync()`** and every other sync wrapper — the library is async-only;
+  call `asyncio.run(pipeline.run(path))`.
+- **`AutoParser`** — `DocumentPipeline` defaults to `ragdoc.parsing.load` and accepts any
+  async `(Path) -> Document` callable as `parser=`.
+- The legacy parsing surface: `load_document`, `DocumentSource`, the `load_file`
+  single-dispatch and its source classes (`HTMLSource`/`HTMLFile`, `PandocFile`/`WordFile`,
+  `ExcelSource`/`ExcelPackage`). Use `ragdoc.parsing.load(path)`.
+- `ragdoc.integrations.llama_index`.
+- The `ragdoc` root now exports a deliberately small surface (see `ragdoc.__all__`); helpers
+  such as `metadata_json_schema` are imported from their module
+  (`from ragdoc.metadata import metadata_json_schema`).
+
 ### Removed
 
 - **`VectorStore.get_source_hash`** (protocol + `QdrantVectorStore` implementation) — superseded
@@ -415,6 +509,14 @@ Pre-1.0: breaking changes land at will and are documented here.
   `ChangeSet[Mention[P]]` / `SourceChange[Mention[P]]` from `ragdoc.pipeline.changeset`.
 
 ## 0.1.0 — 2026-07-04
+
+> Historical entries. Several names in this section were later renamed or removed — see
+> *Unreleased* above: `run_sync()` and `AutoParser` (removed), `chunk_document` /
+> `parse_and_process` (now `ChunkPipeline.run` / `IngestPipeline.run`), the
+> `has_*` boundary predicates (removed), `StructuredExtractionProcessor` /
+> `KnowledgeGraphProcessor` (now `StructuredExtractor` / `KnowledgeGraphExtractor`),
+> `SimpleChunker(id_fn=…)` (removed; ids are minted by the pipeline), and the
+> renderer-based `content_hash()` (now canonical JSON).
 
 ### Added
 
@@ -460,8 +562,7 @@ Pre-1.0: breaking changes land at will and are documented here.
 - **`LLMHeadingResolver` short-circuits when `document.title` is already set** — prevents a second
   pass from re-detecting a different title and re-stripping elements.
 
-- **`ragdoc.pipeline` module** — high-level facade over parse → process → split → chunk
-  (Scenarios A and D from `PLAN_PIPELINE.md`).
+- **`ragdoc.pipeline` module** — high-level facade over parse → process → split → chunk.
   - `DocumentPipeline` — linear pipeline with async `run()`, `run_many()`, `stream()`,
     and `run_sync()` entry points.  Supports configurable concurrency via
     `asyncio.Semaphore` and per-file error handling (`on_error="raise"|"skip"`).
