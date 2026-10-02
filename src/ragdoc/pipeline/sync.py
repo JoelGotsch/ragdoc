@@ -6,9 +6,22 @@ One streaming core drives every sync pipeline (``VectorStorePipeline``,
 * :meth:`SyncEngine.plan` buffers the per-source event stream into a serializable
   :class:`~ragdoc.pipeline.changeset.ChangeSet` (no store writes).
 * :meth:`SyncEngine.run` consumes the **same** event stream, writing each changed source as
-  its event is yielded (per-source ``pre_write`` → delete-then-upsert).
+  its event is yielded (per-source ``pre_write`` → write, see below).
 * :meth:`SyncEngine.apply` writes an already-buffered ChangeSet, calling ``pre_write`` once
   over the whole corpus first (embed-first semantics: the store is untouched if it raises).
+
+**How an updated source is written** depends on the store:
+
+* A store implementing :class:`SourceReplaceStore` gets one ``replace_source`` call. The
+  store writes the new items before removing the stale ones, so a failed write leaves the
+  previously stored items in place.
+* Any other store gets ``delete_by_source`` followed by ``upsert``. If the upsert fails
+  after the delete, the source is left **empty** in the store (the error is recorded); the
+  next run finds no stored state for it and re-processes it as new.
+
+**Sources that yield no items** (an empty ``SourceChange.items``) leave nothing in the store
+that could carry their change token, so they are re-produced on every run — see
+:data:`Producer`.
 
 ``run()`` therefore produces the same end state as ``apply(plan(...))`` — same change
 detection, same final store contents — differing only in *scheduling*: per-source
@@ -22,12 +35,13 @@ Unified error discipline: production and write failures are caught per source wi
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Generic, Literal, Protocol, TypeVar, runtime_checkable
+from typing import Generic, Literal, Protocol, TypeVar, cast, runtime_checkable
 
 from pydantic import BaseModel
 
@@ -74,6 +88,24 @@ class SourceSyncStore(Protocol[T]):
         ...
 
 
+@runtime_checkable
+class SourceReplaceStore(Protocol[T]):
+    """Optional sink capability: replace one source's items without a delete-first window.
+
+    A store that can write a source's new items **before** removing its stale ones implements
+    this next to :class:`SourceSyncStore`; the engine detects it structurally and uses it for
+    every *update* that carries items. Stores without it get ``delete_by_source`` + ``upsert``.
+    """
+
+    async def replace_source(self, source_id: str, items: list[T], /) -> list[str]:
+        """Make *items* the complete stored content of *source_id*; return their stored ids.
+
+        Contract: a failure must not leave the source looking "unchanged" to
+        ``list_source_state``, and should leave the previously stored items in place.
+        """
+        ...
+
+
 @dataclass(frozen=True)
 class SyncSource:
     """One source as the engine sees it before production.
@@ -117,17 +149,26 @@ class SyncPlanInput:
 
 
 Producer = Callable[[SyncSource], Awaitable["SourceChange[T] | None"]]
-"""Per-source item production.
+"""Per-source item production. The two "nothing to write" results mean different things:
 
-Returns a :class:`~ragdoc.pipeline.changeset.SourceChange` with the source's new content
-(``items`` may be empty ⇒ "the source now yields nothing" — its stale stored entry is
-deleted), or ``None`` when the source cannot yield a payload this run — the engine logs a
-warning and counts it skipped, leaving any stored state untouched. ``None`` covers both
-"unavailable" (e.g. it vanished from the upstream store between listing and loading) and
-"filtered" (a processor dropped the document): a filtered source **preserves** its stored
-copy — filtering is potentially transient (an LLM misclassification must not destroy
-durable state), so deletion stays reserved for ``delete_orphans`` and for sources that
-genuinely vanish from the input set.
+* A :class:`~ragdoc.pipeline.changeset.SourceChange` with **empty** ``items`` — "the source
+  now yields nothing": the engine **deletes** whatever is stored for it and counts it
+  processed.
+* ``None`` — "no payload this run": the engine logs a warning, counts the source skipped
+  and leaves any stored state **untouched**.
+
+Which one a filtered source produces is the pipeline's choice, and the built-in pipelines
+differ (current behaviour, not a guarantee of the engine):
+
+* ``DocumentStorePipeline`` returns ``None`` for a processor-filtered document, so the stored
+  Document is preserved.
+* ``VectorStorePipeline`` in direct mode returns an empty change for a processor-filtered
+  document (and for any document that chunks to nothing), so its stored chunks are deleted.
+* ``None`` is also returned when a Boundary-2 document vanished between listing and loading.
+
+Either way the store keeps **no change token** for a source without stored items (tokens
+live on the items), so such a source is produced again on every run — parsed, processed and,
+where applicable, LLM-extracted — until it yields items.
 """
 
 TokenSelector = Callable[[SourceState], "str | None"]
@@ -150,8 +191,8 @@ def source_hash_token(state: SourceState) -> str | None:
 
 
 def content_hash_token(state: SourceState) -> str | None:
-    """Boundary-2 selector: the stored ``content_hash`` (``None`` ⇒ always changed)."""
-    return state.content_hash
+    """Boundary-2 selector: the stored ``content_hash`` (``None`` or ``''`` ⇒ always changed)."""
+    return state.content_hash or None
 
 
 @dataclass(frozen=True)
@@ -182,7 +223,8 @@ class UpdateResult:
     """Aggregated result of a sync, keyed on ``source_id`` (not Path).
 
     Attributes:
-        processed: source_ids newly added or updated (items written).
+        processed: source_ids newly added or updated (items written — or, for a source
+            that now yields no items, its stored items deleted).
         skipped: source_ids whose stored change token matched (unchanged) or that were
             unavailable at production time. Populated by ``run``; empty for a bare
             ``apply`` (apply does not know what was skipped during planning).
@@ -299,6 +341,11 @@ class SyncEngine(Generic[T]):
             for Boundary 2).
         pre_write: Optional hook mutating items before they are written (embedding).
         concurrency: Max sources produced concurrently (``int`` or a shared semaphore).
+            In :meth:`run` a producer keeps its slot until the writer has taken its result
+            (back-pressure), so this also bounds how many produced-but-unwritten sources
+            are held in memory. Consequence for a **shared** semaphore: nothing on the write
+            path (``pre_write``, the store) may acquire that same semaphore, or the writer
+            and the waiting producers block each other.
     """
 
     def __init__(
@@ -338,28 +385,62 @@ class SyncEngine(Generic[T]):
             logger.error(f"sync failed for {src.source_id}: {exc!r}", exc_info=True)
             return SourceOutcome(kind="error", source_id=src.source_id, error=exc)
 
-    async def _stream(self, request: SyncPlanInput, delete_orphans: bool) -> AsyncIterator[SourceOutcome[T]]:
+    async def _stream(self, request: SyncPlanInput, delete_orphans: bool) -> AsyncGenerator[SourceOutcome[T], None]:
         """Yield one outcome per source (as completed), then one orphan outcome per orphan.
 
-        Tasks are created eagerly and drained via ``asyncio.as_completed``; the ``finally``
-        block cancels and gathers leftovers so an early abort never abandons tasks.
+        **Back-pressure.** Each source's task evaluates under the concurrency semaphore and
+        keeps its slot until its outcome has been handed to the consumer through a one-slot
+        queue. A slow consumer (the writer in :meth:`run`) therefore stalls production instead
+        of letting finished outcomes pile up: at most ``concurrency + 2`` outcomes exist at
+        any time (one per slot, one queued, one held by the consumer), independent of corpus
+        size. No reference to an outcome is kept once it has been yielded. One lightweight
+        task per source is still created up front (waiting on the semaphore).
+
+        The ``finally`` block cancels and gathers every task, so an early abort (consumer
+        error, cancellation) never abandons a running producer. A fatal ``BaseException``
+        escaping a producer task is re-raised here.
         """
         state = await self._store.list_source_state()
         logger.info(f"sync: {len(request.sources)} sources, {len(state)} known in store")
         sem = resolve_semaphore(self._concurrency)
+        handoff: asyncio.Queue[SourceOutcome[T]] = asyncio.Queue(maxsize=1)
+        fatal: asyncio.Future[None] = asyncio.get_running_loop().create_future()
 
-        async def _guarded(src: SyncSource) -> SourceOutcome[T]:
+        async def _guarded(src: SyncSource) -> None:
             async with sem:
-                return await self._evaluate(src, state)
+                await handoff.put(await self._evaluate(src, state))
+
+        def _on_done(task: asyncio.Task[None]) -> None:
+            # Only abnormal ends matter: wake the consumer so it never waits on a dead producer.
+            if fatal.done():
+                return
+            if task.cancelled():
+                fatal.cancel()
+            elif (exc := task.exception()) is not None:
+                fatal.set_exception(exc)
 
         tasks = [asyncio.create_task(_guarded(src)) for src in request.sources]
+        for task in tasks:
+            task.add_done_callback(_on_done)
         try:
-            for next_done in asyncio.as_completed(tasks):
-                yield await next_done
+            for _ in range(len(tasks)):
+                getter = asyncio.ensure_future(handoff.get())
+                try:
+                    await asyncio.wait({getter, fatal}, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    if not getter.done():
+                        getter.cancel()
+                if getter.cancelled() or not getter.done():
+                    fatal.result()  # raises the producer's fatal exception (or CancelledError)
+                yield getter.result()
         finally:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            if fatal.done() and not fatal.cancelled():
+                fatal.exception()  # mark retrieved: no "exception was never retrieved" noise
+            else:
+                fatal.cancel()
 
         if delete_orphans:
             for sid in state:
@@ -379,15 +460,18 @@ class SyncEngine(Generic[T]):
         """
         changeset: ChangeSet[T] = ChangeSet()
         failed: list[str] = [sid for sid, _ in request.pre_failed]
-        async for outcome in self._stream(request, delete_orphans):
-            if outcome.kind == "changed":
-                if outcome.change is None:  # pragma: no cover - _evaluate always sets it
-                    raise AssertionError("changed outcome without a SourceChange")
-                (changeset.to_add if outcome.is_new else changeset.to_update).append(outcome.change)
-            elif outcome.kind == "orphan":
-                changeset.to_delete.append(outcome.source_id)
-            elif outcome.kind == "error":
-                failed.append(outcome.source_id)
+        # aclosing: the stream's cleanup (cancel + gather producers) runs before we leave,
+        # not whenever the abandoned generator happens to be finalized.
+        async with contextlib.aclosing(self._stream(request, delete_orphans)) as stream:
+            async for outcome in stream:
+                if outcome.kind == "changed":
+                    if outcome.change is None:  # pragma: no cover - _evaluate always sets it
+                        raise AssertionError("changed outcome without a SourceChange")
+                    (changeset.to_add if outcome.is_new else changeset.to_update).append(outcome.change)
+                elif outcome.kind == "orphan":
+                    changeset.to_delete.append(outcome.source_id)
+                elif outcome.kind == "error":
+                    failed.append(outcome.source_id)
         if failed:
             logger.warning(f"plan(): {len(failed)} source(s) failed during processing: {failed}")
         return changeset
@@ -395,27 +479,36 @@ class SyncEngine(Generic[T]):
     async def run(self, request: SyncPlanInput, delete_orphans: bool = False) -> UpdateResult:
         """Consume the event stream, writing each changed source as it arrives.
 
-        Per-source atomicity: ``pre_write(items)`` → (update ⇒ ``delete_by_source``) →
-        (items ⇒ ``upsert``); a failure at any step leaves that one source's write
-        unapplied and records it in ``errors``. Orphan outcomes are deleted as they
-        arrive. The corpus is **not** all-or-nothing: a completed source stays durable
-        even if a later one fails.
+        Per source: ``pre_write(items)`` runs first (a failure there leaves the store
+        untouched for that source), then the source is written — see the module docstring
+        for the two write paths and what a failed write leaves behind. Every failure is
+        recorded in ``errors`` and never blocks other sources. Orphan outcomes are deleted
+        as they arrive. The corpus is **not** all-or-nothing: a completed source stays
+        durable even if a later one fails.
+
+        Memory: producers are back-pressured by the writer, so at most ``concurrency + 2``
+        sources' items are alive at once (see :meth:`_stream`); a written source's items are
+        released before the next one is taken.
         """
         result = UpdateResult()
         result.skipped.extend(request.pre_skipped)
         result.errors.extend(request.pre_failed)
         try:
-            async for outcome in self._stream(request, delete_orphans):
-                if outcome.kind == "skipped":
-                    result.skipped.append(outcome.source_id)
-                elif outcome.kind == "error":
-                    if outcome.error is None:  # pragma: no cover - _evaluate always sets it
-                        raise AssertionError("error outcome without an exception")
-                    result.errors.append((outcome.source_id, outcome.error))
-                elif outcome.kind == "orphan":
-                    await self._delete_orphan(outcome.source_id, result)
-                else:  # "changed"
-                    await self._write_change(outcome, result)
+            # aclosing: on an abort the producers are cancelled and awaited before run()
+            # returns control, instead of lingering until the generator is finalized.
+            async with contextlib.aclosing(self._stream(request, delete_orphans)) as stream:
+                async for outcome in stream:
+                    if outcome.kind == "skipped":
+                        result.skipped.append(outcome.source_id)
+                    elif outcome.kind == "error":
+                        if outcome.error is None:  # pragma: no cover - _evaluate always sets it
+                            raise AssertionError("error outcome without an exception")
+                        result.errors.append((outcome.source_id, outcome.error))
+                    elif outcome.kind == "orphan":
+                        await self._delete_orphan(outcome.source_id, result)
+                    else:  # "changed"
+                        await self._write_change(outcome, result)
+                    del outcome  # release the written items before waiting for the next source
         except BaseException:
             # A fatal exception (e.g. asyncio.CancelledError) escaped the stream —
             # collected per-source errors do not reach here; this is the abort path.
@@ -432,54 +525,42 @@ class SyncEngine(Generic[T]):
 
         ``pre_write`` runs over **all** items of ``to_add`` + ``to_update`` before any store
         mutation: if it raises, the store is left untouched and every changed source is
-        reported in ``errors``. Then ``to_delete`` is processed, stale entries of updates
-        are deleted (a source whose stale-delete failed is **not** upserted — no old/new
-        mixing), and finally each source's items are upserted.
+        reported in ``errors``. Then ``to_delete`` is processed, and finally each source is
+        written — additions by ``upsert``, updates as described in the module docstring
+        (``replace_source`` where the store offers it, else ``delete_by_source`` then
+        ``upsert``; a source whose stale-delete failed is **not** upserted — no old/new
+        mixing).
 
         Returns:
             :class:`UpdateResult` (``skipped`` is always empty — apply cannot know
             plan-time skips).
         """
         result = UpdateResult()
-        changes = list(changeset.to_add) + list(changeset.to_update)
+        changes = [(sc, True) for sc in changeset.to_add] + [(sc, False) for sc in changeset.to_update]
 
         if self._pre_write is not None:
-            all_items = [item for sc in changes for item in sc.items]
+            all_items = [item for sc, _ in changes for item in sc.items]
             try:
                 await self._pre_write(all_items)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 logger.error("apply(): pre-write failed; store left untouched.", exc_info=True)
-                for sc in changes:
+                for sc, _ in changes:
                     result.errors.append((sc.source_id, exc))
                 return result
 
         for sid in changeset.to_delete:
             await self._delete_orphan(sid, result)
 
-        errored: set[str] = set()
-        for sc in changeset.to_update:
+        for sc, is_new in changes:
             try:
-                await self._store.delete_by_source(sc.source_id)
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logger.error(f"apply(): delete stale {sc.source_id} failed: {exc!r}", exc_info=True)
-                result.errors.append((sc.source_id, exc))
-                errored.add(sc.source_id)
-
-        for sc in changes:
-            if sc.source_id in errored:
-                continue
-            try:
-                if sc.items:
-                    await self._store.upsert(sc.items)
+                await self._write_source(sc, is_new)
                 result.processed.append(sc.source_id)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                logger.error(f"apply(): upsert {sc.source_id} failed: {exc!r}", exc_info=True)
+                logger.error(f"apply(): write failed for {sc.source_id}: {exc!r}", exc_info=True)
                 result.errors.append((sc.source_id, exc))
 
         logger.info(
@@ -491,18 +572,41 @@ class SyncEngine(Generic[T]):
     # write helpers
     # ------------------------------------------------------------------
 
+    async def _write_source(self, change: SourceChange[T], is_new: bool) -> None:
+        """Write one source's items to the store (no ``pre_write``, no error handling).
+
+        * new source — ``upsert`` (nothing stored to replace);
+        * update with no items — ``delete_by_source`` (the source now yields nothing);
+        * update, store is a :class:`SourceReplaceStore` — ``replace_source`` (new items
+          land before stale ones are removed; a failure keeps the old items);
+        * update, any other store — ``delete_by_source`` then ``upsert``. A failed delete
+          skips the upsert; a failed upsert leaves the source **empty** until the next run
+          re-processes it as new.
+        """
+        if is_new:
+            if change.items:
+                await self._store.upsert(change.items)
+        elif not change.items:
+            await self._store.delete_by_source(change.source_id)
+        elif isinstance(self._store, SourceReplaceStore):
+            replacer = cast("SourceReplaceStore[T]", self._store)
+            await replacer.replace_source(change.source_id, change.items)
+        else:
+            await self._store.delete_by_source(change.source_id)
+            await self._store.upsert(change.items)
+
     async def _write_change(self, outcome: SourceOutcome[T], result: UpdateResult) -> None:
-        """Write one changed source: pre_write → delete-stale (updates) → upsert (atomic per source)."""
+        """Write one changed source for :meth:`run`: ``pre_write`` → :meth:`_write_source`.
+
+        Any ``Exception`` is recorded on *result* for this source only.
+        """
         if outcome.change is None:  # pragma: no cover - _evaluate always sets it
             raise AssertionError("changed outcome without a SourceChange")
         change = outcome.change
         try:
             if self._pre_write is not None:
                 await self._pre_write(change.items)
-            if not outcome.is_new:
-                await self._store.delete_by_source(change.source_id)
-            if change.items:
-                await self._store.upsert(change.items)
+            await self._write_source(change, outcome.is_new)
             result.processed.append(change.source_id)
         except asyncio.CancelledError:
             raise

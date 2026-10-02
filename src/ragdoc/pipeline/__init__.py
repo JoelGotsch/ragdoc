@@ -50,6 +50,7 @@ from ragdoc.pipeline.splitter import TokenSplitter
 from ragdoc.pipeline.stores import DocumentStore, SourceState, VectorStore
 from ragdoc.pipeline.sync import (
     SourceOutcome,
+    SourceReplaceStore,
     SourceSyncStore,
     SyncEngine,
     SyncPlanInput,
@@ -75,6 +76,7 @@ __all__ = [
     "PipelineResult",
     "SourceChange",
     "SourceOutcome",
+    "SourceReplaceStore",
     "SourceState",
     "SourceSyncStore",
     "SyncEngine",

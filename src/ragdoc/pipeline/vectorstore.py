@@ -16,10 +16,12 @@ constructors, so an illegal configuration is a ``TypeError`` at construction:
 
 Two entry points:
 
-* :meth:`run` — the **standard** path. Syncs **per source** (produce → embed →
-  delete-then-upsert), writing each source as soon as it is ready. Each source is atomic
-  (embed-first per source); the corpus is **not** all-or-nothing — a completed source stays
-  durable even if a later one fails. Flat peak memory (one source's chunks at a time).
+* :meth:`run` — the **standard** path. Syncs **per source** (produce → embed → write),
+  writing each source as soon as it is ready. Embedding runs before the write, so an embed
+  failure leaves that source untouched; the corpus is **not** all-or-nothing — a completed
+  source stays durable even if a later one fails. Peak memory is bounded by ``concurrency``,
+  not by corpus size: production is back-pressured by the writer, so at most
+  ``concurrency + 2`` sources' chunks are held at once.
 * :meth:`plan` / :meth:`apply` — the **reviewable** path. :meth:`plan` determines what changed
   and computes chunks for new/modified sources, returning a serializable
   :class:`~ragdoc.pipeline.changeset.ChangeSet` without touching the store (safe to call
@@ -30,6 +32,19 @@ Two entry points:
 state, differing only in scheduling (per-source embed-and-write versus whole-corpus
 embed-first). Use :meth:`plan` / :meth:`apply` when you need to review changes or want
 whole-corpus embed-first semantics.
+
+**What a failed write leaves behind** depends on the vector store (see
+:mod:`ragdoc.pipeline.sync`): a store offering ``replace_source`` (e.g.
+``QdrantVectorStore``) writes the new chunks before removing stale ones, so a failed update
+keeps serving the previous chunks; any other store is written delete-then-upsert, and an
+upsert that fails after the delete leaves the source **empty** until the next run
+re-processes it.
+
+**Documents that yield no chunks.** In direct mode a document dropped by a processor (or one
+that chunks to nothing) is synced as "yields nothing": its previously stored chunks are
+**deleted** — unlike ``DocumentStorePipeline``, which preserves the stored Document of a
+filtered source. Because change tokens live on stored chunks, such a source has no stored
+token and is parsed and processed again on every run.
 
 Provenance: each chunk carries ``source_id`` (from the ``IngestPipeline``'s
 ``source_id_fn``) and ``source_hash`` (file-byte SHA-256, set here via ``hash_fn``).
@@ -195,6 +210,9 @@ class VectorStorePipeline(Generic[TMetadata]):
             raise AssertionError("direct-mode SyncSource without a path")
         if self._pipeline is None:  # pragma: no cover - wired only in direct mode
             raise AssertionError("_produce_from_path called without a DocumentPipeline")
+        # A processor-filtered document comes back as [] and is synced as an EMPTY change:
+        # the engine deletes its stored chunks (documented on the module; differs from
+        # DocumentStorePipeline, which returns None and preserves the stored Document).
         chunks = await self._pipeline.run(src.path)
         # source_id is already stamped by the pipeline (via doc.source_id, same
         # source_id_fn). source_hash is a sync-only concern unknown at chunk time.
@@ -295,8 +313,9 @@ class VectorStorePipeline(Generic[TMetadata]):
         """Embed and write *changeset* to the store.
 
         Embeds **all** chunks first (non-destructive): if embedding fails, the store is left
-        untouched and every changed source is reported in ``errors``.  Then, per source:
-        delete orphans, delete stale chunks for updates, and upsert.
+        untouched and every changed source is reported in ``errors``.  Then orphans are
+        deleted and each source is written (updates via the store's ``replace_source`` when
+        it has one, else delete-then-upsert).
 
         Args:
             changeset: The (possibly hand-edited) ChangeSet to apply.
@@ -319,14 +338,17 @@ class VectorStorePipeline(Generic[TMetadata]):
         difference is *scheduling*, not outcome: ``apply(plan(...))`` chunks the whole corpus
         and embeds *all* chunks before any write, whereas ``run()`` processes each source
         independently and writes it as soon as it is ready (parse → chunk → embed →
-        delete-then-upsert).
+        write).
 
-        **Per-source atomicity.** Each source is written delete-then-upsert, so an individual
-        source is never left half-replaced, and its embed runs *before* its write (an embed
-        failure leaves that one source untouched and records it in ``errors``). The **corpus**
-        is *not* all-or-nothing: a source that succeeds is durable in the store even if a later
-        source fails. Use ``apply(plan(...))`` when you need whole-corpus embed-first semantics
-        or a reviewable :class:`~ragdoc.pipeline.changeset.ChangeSet`.
+        **Per-source isolation.** A source's embed runs *before* its write, so an embed
+        failure leaves that one source untouched and records it in ``errors``. A failed
+        *write* of an updated source keeps the previous chunks when the store offers
+        ``replace_source`` (``QdrantVectorStore`` does); with any other store the update is
+        delete-then-upsert, and an upsert failing after the delete leaves the source empty
+        until the next run re-processes it. The **corpus** is *not* all-or-nothing: a source
+        that succeeds is durable in the store even if a later source fails. Use
+        ``apply(plan(...))`` when you need whole-corpus embed-first semantics or a reviewable
+        :class:`~ragdoc.pipeline.changeset.ChangeSet`.
 
         Args:
             sources: Paths (direct mode) or source_ids / ``None`` for all (Boundary-2

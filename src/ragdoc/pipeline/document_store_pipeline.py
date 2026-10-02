@@ -17,6 +17,11 @@ a warning and any previously stored Document is preserved** — filtering is pot
 transient (an LLM/filter misclassification must not destroy durable state, nor cascade
 into chunk deletion via a later Boundary-2 ``delete_orphans`` run). Genuine deletion stays
 reserved for ``delete_orphans`` and for sources that vanish from the input set.
+
+Two consequences of that choice, as currently implemented: a filtered source that has **no**
+stored Document keeps none, so it has no stored change token and is parsed and processed
+again on every run; and one that *has* a stored Document keeps its old ``source_hash``, so
+it too is re-parsed every run for as long as the file differs from the stored version.
 """
 
 from __future__ import annotations
@@ -126,10 +131,14 @@ class DocumentStorePipeline(Generic[TMetadata]):
         return await self._engine.plan(await self._resolve(sources), delete_orphans)
 
     async def apply(self, changeset: ChangeSet[Document]) -> UpdateResult:
-        """Write *changeset* to the document store (delete orphans, delete stale, then upsert).
+        """Write *changeset* to the document store (orphans first, then each source).
 
-        Updates go delete-then-upsert with per-source error isolation: a source whose
-        stale-delete failed is recorded in ``errors`` and **not** upserted.
+        Per-source error isolation. An update goes through the store's ``replace_source``
+        when it has one (``LocalDocumentStore`` / ``QdrantDocumentStore`` replace the stored
+        Document in place, so a failed write keeps the old one). Any other store is written
+        delete-then-upsert: a source whose stale-delete failed is recorded in ``errors`` and
+        **not** upserted, and an upsert failing after the delete leaves the source absent
+        until the next run re-ingests it.
         """
         return await self._engine.apply(changeset)
 

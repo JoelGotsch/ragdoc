@@ -9,6 +9,17 @@ unchanged sources, clean up stale chunks, and discover orphans without any local
 
 Implementations should use ``chunk.source_id`` / ``chunk.source_hash`` (the dedicated
 fields, not ``chunk.metadata``) for their internal indexing.
+
+**Optional capability.** A store may additionally implement
+:class:`~ragdoc.pipeline.sync.SourceReplaceStore` (``replace_source(source_id, items)``).
+The sync engine then updates a source through that single call — new items written before
+stale ones are removed — instead of ``delete_by_source`` followed by ``upsert``, whose
+failure mode is an empty source until the next run. It is not part of the protocols below:
+existing stores keep working unchanged.
+
+**Change state lives on the stored items.** ``list_source_state`` can only report sources
+that have at least one stored item, so a source that yields nothing has no stored change
+token and is re-processed by every sync run.
 """
 
 from __future__ import annotations
