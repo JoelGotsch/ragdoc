@@ -324,10 +324,10 @@ def test_rawtext_nested_roundtrip():
     assert rt.html == "<div><span>Nested <p>paragraph</p></span> raw</div>"
 
 
-def test_rawtext_strips_tags():
+def test_rawtext_wraps_non_div_content_verbatim():
     rt = RawText(html="<p>nested <strong>tags</strong></p>")
     assert rt.text == "nested tags"
-    assert rt.html == "<div>nested <strong>tags</strong></div>"
+    assert rt.html == "<div><p>nested <strong>tags</strong></p></div>"
 
 
 def test_rawtext_html_wraps_in_div():

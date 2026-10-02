@@ -15,9 +15,11 @@ from ragdoc.document import Document
 from ragdoc.parsing.mineru.base import parse_middle_json_file
 from ragdoc.parsing.mineru.handlers import (
     ExtractionConfig,
+    build_code_html,
     build_heading_html,
     build_text_html,
     check_mineru_images,
+    extract_code_from_lines,
     handle_chart_block,
     handle_code_block,
     handle_discarded_as_footnote,
@@ -109,9 +111,11 @@ __all__ = [
     "ExtractionConfig",
     "MinerUExtractor",
     "MinerUParser",
+    "build_code_html",
     "build_heading_html",
     "build_text_html",
     "check_mineru_images",
+    "extract_code_from_lines",
     "handle_code_block",
     "handle_discarded_as_footnote",
     "handle_discarded_as_metadata",

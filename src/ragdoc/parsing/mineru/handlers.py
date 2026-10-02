@@ -22,6 +22,7 @@ Typical customisation::
 from __future__ import annotations
 
 import base64
+import html as html_stdlib
 import logging
 import re
 from collections.abc import Callable
@@ -53,6 +54,7 @@ from .base import (
     DiscardedBlockType,
     ImageBlock,
     ImageSpan,
+    Line,
     ListBlock,
     PageInfo,
     ParseContext,
@@ -210,6 +212,27 @@ def handle_list_block(
     return [ParsedElement(element=doc_list, source_block=block, source_page=page)]
 
 
+def extract_code_from_lines(lines: list[Line]) -> str:
+    """Extract literal code text from a code body's lines.
+
+    Unlike :func:`~ragdoc.parsing.mineru.base.extract_text_from_lines` (which returns HTML —
+    equations become MathML and lines are joined with spaces), this returns **plain text**:
+    span contents verbatim (an equation span contributes its LaTeX source), spans joined with
+    a space, and one ``\\n`` per line so the code's line structure survives.
+    """
+    return "\n".join(" ".join(getattr(span, "content", "") for span in line.spans) for line in lines)
+
+
+def build_code_html(code: str) -> str:
+    """Build the :class:`~ragdoc.document.RawText` HTML for a block of literal code.
+
+    The code is HTML-escaped and wrapped in ``<pre><code>`` inside the RawText ``<div>``, so
+    ``<``/``>``/``&`` in source code or XML/HTML snippets are text — never parsed as markup or
+    as ``<ref/>`` placeholders — and every output format renders a literal code block.
+    """
+    return f"<div><pre><code>{html_stdlib.escape(code, quote=False)}</code></pre></div>"
+
+
 def handle_code_block(
     block: CodeBlock,
     page: PageInfo,
@@ -219,7 +242,8 @@ def handle_code_block(
     Convert a :class:`CodeBlock` to zero or more elements.
 
     Emits an optional :class:`Paragraph` for the caption followed by a
-    :class:`RawText` for the code body.
+    :class:`RawText` for the code body. The body is carried as escaped, line-preserving
+    text in ``<pre><code>`` (see :func:`build_code_html`).
     """
     results: list[ParsedElement] = []
     page_number = page.page_idx + 1
@@ -240,12 +264,12 @@ def handle_code_block(
             )
 
     if block.code_body is not None:
-        code_text = extract_text_from_lines(block.code_body.lines)
+        code_text = extract_code_from_lines(block.code_body.lines).strip("\n")
         if code_text.strip():
             results.append(
                 ParsedElement(
                     element=RawText(
-                        html=code_text,
+                        html=build_code_html(code_text),
                         bounding_box=_get_bounding_box(block),
                         page=page_number,
                     ),

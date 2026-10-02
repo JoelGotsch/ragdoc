@@ -209,13 +209,46 @@ def test_html_tag_returns_independent_tag():
     ("raw", "expected"),
     [
         ("plain text", "<div>plain text</div>"),
-        ("<span>x</span>", "<div>x</div>"),
+        ("  padded  ", "<div>padded</div>"),
         ("<div>already</div>", "<div>already</div>"),
+        ('<div class="note">kept <b>as is</b></div>', '<div class="note">kept <b>as is</b></div>'),
         ("", "<div></div>"),
+        # Non-div content is wrapped verbatim — the validator never unwraps or rewrites it.
+        ("<span>x</span>", "<div><span>x</span></div>"),
+        ("<p>one</p><p>two</p>", "<div><p>one</p><p>two</p></div>"),
+        ("<div>a</div><div>b</div>", "<div><div>a</div><div>b</div></div>"),
+        ("<table><tr><td>1</td></tr></table>", "<div><table><tr><td>1</td></tr></table></div>"),
+        ("<ul><li>a</li><li>b</li></ul>", "<div><ul><li>a</li><li>b</li></ul></div>"),
+        ("<config>\n <a>1</a>\n</config>", "<div><config>\n <a>1</a>\n</config></div>"),
+        ("a &lt; b &amp;&amp; c", "<div>a &lt; b &amp;&amp; c</div>"),
+        ("><td>mid-tag slice</td></tr>", "<div>><td>mid-tag slice</td></tr></div>"),
     ],
 )
 def test_rawtext_normalizes_to_div(raw, expected):
     assert RawText(html=raw).html == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["plain", "<span>x</span>", "<config>\n <a>1</a>\n</config>", "<div>a</div><div>b</div>", "<div> x </div>"],
+)
+def test_rawtext_normalization_is_idempotent(raw):
+    once = RawText(html=raw).html
+    assert RawText(html=once).html == once
+    assert RawText.model_validate(RawText(html=raw).model_dump()).html == once
+
+
+def test_rawtext_preserves_xml_like_content():
+    """Reviewer repro: unknown tags inside RawText must survive untouched."""
+    raw = RawText(html="<config>\n <a>1</a>\n</config>")
+    assert raw.html == "<div><config>\n <a>1</a>\n</config></div>"
+    assert raw.innerhtml == "<config>\n <a>1</a>\n</config>"
+
+
+def test_rawtext_assignment_normalizes_like_construction():
+    raw = RawText(html="a")
+    raw.html = "<pre>code</pre>"
+    assert raw.html == "<div><pre>code</pre></div>"
 
 
 def test_rawtext_default_is_empty_div():

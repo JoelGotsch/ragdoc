@@ -42,6 +42,8 @@ from ragdoc.parsing.mineru.base import (
     TitleBlock,
 )
 from ragdoc.parsing.mineru.handlers import (
+    build_code_html,
+    extract_code_from_lines,
     handle_chart_block,
     handle_code_block,
     handle_discarded_as_footnote,
@@ -599,3 +601,40 @@ def test_handle_discarded_drop_always_returns_empty():
     for block_type in DiscardedBlockType:
         result = handle_discarded_drop(_discarded("anything", block_type), _page(), _context())
         assert result == [], f"Expected [] for {block_type}"
+
+
+# ---------------------------------------------------------------------------
+# Code blocks carry escaped, line-preserving text
+# ---------------------------------------------------------------------------
+
+
+def _multiline_code_block(lines: list[str]) -> CodeBlock:
+    body = CodeBodyBlock(
+        bbox=[0.0, 15.0, 100.0, 50.0],
+        index=1,
+        lines=[_line(text, y1=15.0 + 12 * i, y2=27.0 + 12 * i) for i, text in enumerate(lines)],
+    )
+    return CodeBlock(bbox=[0.0, 0.0, 100.0, 50.0], index=0, blocks=[body])
+
+
+def test_handle_code_block_preserves_xml_like_code():
+    """Reviewer repro: XML/HTML snippets in a code block must not be rewritten."""
+    lines = ["<config>", " <a>1</a>", "</config>"]
+    element = handle_code_block(_multiline_code_block(lines), _page(), _context())[0].element
+    assert isinstance(element, RawText)
+    assert element.html == "<div><pre><code>&lt;config&gt;\n &lt;a&gt;1&lt;/a&gt;\n&lt;/config&gt;</code></pre></div>"
+    assert element.text == "<config>\n <a>1</a>\n</config>"
+
+
+def test_handle_code_block_escapes_operators_and_ref_lookalikes():
+    lines = ["if a < b && c > d:", '    x = \'<ref id="i1" rel="image"/>\'']
+    element = handle_code_block(_multiline_code_block(lines), _page(), _context())[0].element
+    assert element.text == "\n".join(lines)
+    assert element.inline_refs == []
+
+
+def test_build_code_html_and_extract_code_from_lines():
+    lines = [_line("a <= b"), _line("  c & d")]
+    code = extract_code_from_lines(lines)
+    assert code == "a <= b\n  c & d"
+    assert build_code_html(code) == "<div><pre><code>a &lt;= b\n  c &amp; d</code></pre></div>"

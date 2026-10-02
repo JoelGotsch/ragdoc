@@ -526,6 +526,29 @@ class Image(_DerivedHtmlElement):
         self.height = int(str(height)) if height else None
 
 
+_OUTER_DIV_PATTERN = re.compile(
+    r"""^<div\b(?:[^>"']|"[^"]*"|'[^']*')*>(?P<inner>.*)</div\s*>$""", re.DOTALL | re.IGNORECASE
+)
+"""Matches a string that starts with a ``<div ...>`` open tag and ends with ``</div>``, capturing what lies between."""
+
+
+def is_single_root_div(html_str: str) -> bool:
+    """True when *html_str* consists of exactly one root ``<div>`` element (ignoring outer whitespace).
+
+    Used by :class:`RawText` to decide whether a value already carries its outer wrapper.
+    The parse is only used for this yes/no decision — the string itself is never rewritten.
+    """
+    stripped = html_str.strip()
+    if not (stripped[:4].lower() == "<div" and stripped[-6:].lower() == "</div>"):
+        return False
+    roots = [
+        node
+        for node in BeautifulSoup(stripped, "html.parser").contents
+        if not (isinstance(node, str) and not node.strip())
+    ]
+    return len(roots) == 1 and isinstance(roots[0], Tag) and roots[0].name == "div"
+
+
 class RawText(BaseElement):
     element_type: Literal[ElementTypeEnum.RAW_TEXT] = Field(default=ElementTypeEnum.RAW_TEXT)  # pyright: ignore[reportIncompatibleVariableOverride]  # pydantic discriminator narrowing
     html: str = Field(default="<div></div>", description="Full HTML: a single outer <div> wrapping the raw content.")
@@ -533,27 +556,34 @@ class RawText(BaseElement):
     @field_validator("html", mode="after")
     @classmethod
     def _normalize_rawtext_html(cls, value: str) -> str:
-        """Normalize to a single outer ``<div>``.
+        """Guarantee a single outer ``<div>`` — and nothing else.
 
-        A single root ``<div>`` passes through unchanged; any other single root tag is
-        unwrapped and its contents re-wrapped in ``<div>``; tag-less (or mixed) content is
-        wrapped in ``<div>`` verbatim.
+        The validator normalizes only the *wrapper*; it never unwraps, re-serializes, or
+        otherwise interprets the content:
+
+        * a value that already is exactly one root ``<div>...</div>`` passes through unchanged
+          (surrounding whitespace stripped);
+        * anything else — plain text, several sibling tags, a single non-``div`` tag such as
+          ``<table>``/``<pre>``/``<config>`` — is wrapped **verbatim** in ``<div>``.
+
+        ``RawText.html`` is still HTML: literal text containing ``<``, ``>`` or ``&`` (source
+        code, XML snippets) must be HTML-escaped by the caller, e.g.
+        ``RawText(html=f"<pre><code>{html.escape(code)}</code></pre>")``.
         """
         stripped = value.strip()
-        soup = BeautifulSoup(stripped, "html.parser")
-        roots = [node for node in soup.contents if not (isinstance(node, str) and not node.strip())]
-        if len(roots) == 1 and isinstance(roots[0], Tag):
-            tag = roots[0]
-            if tag.name == "div":
-                return stripped
-            return f"<div>{tag.decode_contents(formatter='html').strip()}</div>"
+        if is_single_root_div(stripped):
+            return stripped
         return f"<div>{stripped}</div>"
 
     @property
     def innerhtml(self) -> str:
-        """Inner HTML of the outer <div> (the raw content). Read-only convenience."""
-        tag = self._parsed().find("div")
-        return tag.decode_contents(formatter="html") if isinstance(tag, Tag) else self.html
+        """Inner HTML of the outer <div> — the raw content, byte-exact. Read-only convenience.
+
+        Sliced from the stored string (not re-serialized through a parser), so whitespace and
+        unknown tags inside the wrapper come back exactly as stored.
+        """
+        match = _OUTER_DIV_PATTERN.match(self.html)
+        return match.group("inner") if match else self.html
 
 
 def footnote_fields_from_html(html_str: str) -> dict[str, int | str]:
