@@ -158,7 +158,12 @@ fixture_regen = [
 
 
 [tool.pytest.ini_options]
+# Default run (`uv run pytest`) is the main suite. The notebook layer is run
+# explicitly with `uv run pytest docs/notebooks/`; the extra `python_files`
+# pattern is what lets pytest collect the marimo notebooks' `test_*` cells
+# there (their filenames do not match `test_*.py`). See docs/conftest.py.
 testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py", "docs/notebooks/*.py"]
 xfail_strict = true
 addopts = [
     "-ra",
