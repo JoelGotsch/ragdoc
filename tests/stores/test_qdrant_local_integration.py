@@ -5,12 +5,15 @@ Real Qdrant id validation and filter evaluation — no stubs, no server. Covers:
 - pipeline-minted default chunk ids are valid Qdrant point ids (regression: the former
   sha256-hexdigest ids were rejected by Qdrant, which accepts only UUIDs or unsigned ints);
 - QdrantEntityStore.query date-overlap parity with LocalEntityStore, including half-bounded
-  and undated entities (missing ``date_start``/``date_end`` payload keys = unbounded).
+  and undated entities (missing ``date_start``/``date_end`` payload keys = unbounded);
+- every store's ``create`` classmethod is idempotent (the local client reports an existing
+  collection with ``ValueError``, not the HTTP 409 the server returns).
 """
 
 from __future__ import annotations
 
 import datetime as dt
+from typing import Literal
 
 import pytest
 from pydantic import BaseModel, Field
@@ -20,11 +23,17 @@ pytest.importorskip("qdrant_client", reason="qdrant extra not installed")
 from qdrant_client import AsyncQdrantClient
 
 from ragdoc.chunking import Chunk
+from ragdoc.document import Document, Paragraph
 from ragdoc.chunking.provenance import mint_chunk_id
 from ragdoc.extraction.dates import FuzzyDate
 from ragdoc.extraction.entity import Entity, LocalEntityStore
+from ragdoc.extraction.mention import Mention
 from ragdoc.extraction.query import DateRange, EntityQuery
+from ragdoc.extraction.schema import EdgeRef, GraphSchema
+from ragdoc.integrations.document_stores.qdrant import QdrantDocumentStore
 from ragdoc.integrations.entity_stores.qdrant import QdrantEntityStore
+from ragdoc.integrations.graph_stores.qdrant import QdrantGraphStore
+from ragdoc.integrations.mention_stores.qdrant import QdrantMentionStore
 from ragdoc.integrations.vector_stores.qdrant import QdrantVectorStore
 
 # ---------------------------------------------------------------------------
@@ -172,3 +181,101 @@ async def test_document_store_round_trips_the_document_it_wrote(source_hash: str
     assert loaded is not None
     assert loaded.source_hash == source_hash
     assert loaded.content_hash() == document.content_hash()
+
+
+# ---------------------------------------------------------------------------
+# create() is idempotent on the local client (and keeps the stored data)
+# ---------------------------------------------------------------------------
+
+
+class _Person(BaseModel):
+    kind: Literal["Person"] = "Person"
+    full_name: str = Field(description="Full name.")
+
+
+class _Company(BaseModel):
+    kind: Literal["Company"] = "Company"
+    name: str = Field(description="Company name.")
+
+
+class _Employment(BaseModel):
+    kind: Literal["Employment"] = "Employment"
+    refs: EdgeRef = Field(description="Source and target node refs.")
+
+
+_SCHEMA = GraphSchema(
+    node_types=(_Person, _Company), edge_types=(_Employment,), patterns=((_Person, _Employment, _Company),)
+)
+
+
+async def _embed_payloads(payloads: list[BaseModel]) -> list[list[float]]:
+    return [[1.0, 0.0, 0.0] for _ in payloads]
+
+
+@pytest.mark.anyio
+async def test_vector_store_create_twice_keeps_the_collection():
+    client = AsyncQdrantClient(":memory:")
+    first = await QdrantVectorStore.create(client, "chunks", vector_size=3)
+    await first.upsert(
+        [
+            Chunk(
+                id=mint_chunk_id("a.txt", 1, 0, "c"),
+                prompt_content="p",
+                embedding_content="e",
+                named_embeddings={"dense": [0.1, 0.2, 0.3]},
+                source_id="a.txt",
+                source_hash="h",
+            )
+        ]
+    )
+
+    second = await QdrantVectorStore.create(client, "chunks", vector_size=3)  # raised ValueError before
+
+    assert await second.list_source_ids() == {"a.txt"}  # same collection, not re-created
+
+
+@pytest.mark.anyio
+async def test_document_store_create_twice_keeps_the_collection():
+    client = AsyncQdrantClient(":memory:")
+    first = await QdrantDocumentStore.create(client, "documents")
+    await first.upsert([Document(elements=[Paragraph(html="<p>kept</p>")], source_id="a.txt")])
+
+    second = await QdrantDocumentStore.create(client, "documents")
+
+    assert await second.list_source_ids() == {"a.txt"}
+
+
+@pytest.mark.anyio
+async def test_mention_store_create_twice_keeps_the_collection():
+    client = AsyncQdrantClient(":memory:")
+    first = await QdrantMentionStore.create(client, "mentions", _Event, _embed_payloads, vector_size=3)
+    mention = Mention[_Event](
+        mention_id="m1", source_id="a.txt", source_hash="h", content_hash="c", payload=_Event(title="kept")
+    )
+    await first.upsert([mention])
+
+    second = await QdrantMentionStore.create(client, "mentions", _Event, _embed_payloads, vector_size=3)
+
+    assert set(await second.list_source_state()) == {"a.txt"}
+
+
+@pytest.mark.anyio
+async def test_entity_store_create_twice_keeps_the_collection():
+    client = AsyncQdrantClient(":memory:")
+    first = await QdrantEntityStore.create(client, "entities", _Event)
+    await first.upsert([_entity("kept", "1994")])
+
+    second = await QdrantEntityStore.create(client, "entities", _Event)
+
+    assert [e.entity_id for e in await second.query(EntityQuery())] == ["kept"]
+
+
+@pytest.mark.anyio
+async def test_graph_store_create_twice_keeps_both_collections():
+    client = AsyncQdrantClient(":memory:")
+    await QdrantGraphStore.create(client, "graph", _SCHEMA)
+
+    await QdrantGraphStore.create(client, "graph", _SCHEMA)
+
+    assert await client.collection_exists("graph_nodes")
+    assert await client.collection_exists("graph_edges")

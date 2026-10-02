@@ -44,6 +44,7 @@ def client() -> MagicMock:
     c.delete = AsyncMock()
     c.retrieve = AsyncMock(return_value=[])
     c.set_payload = AsyncMock()
+    c.collection_exists = AsyncMock(return_value=False)
     c.create_collection = AsyncMock()
     c.create_payload_index = AsyncMock()
     return c
@@ -290,6 +291,23 @@ async def test_ensure_collection_409_still_creates_indexes(client: MagicMock) ->
         models.VectorParams(size=4, distance=models.Distance.COSINE),
         payload_indexes={"source_id": models.PayloadSchemaType.KEYWORD},
     )
+    created = {c.kwargs["field_name"] for c in client.create_payload_index.await_args_list}
+    assert created == {"source_id"}
+
+
+@pytest.mark.anyio
+async def test_ensure_collection_existing_collection_is_not_recreated_but_gains_indexes(client: MagicMock) -> None:
+    """An existing collection is detected up front (works for every transport, including the
+    local client, which reports a duplicate create as ValueError rather than HTTP 409)."""
+    client.collection_exists = AsyncMock(return_value=True)
+    client.create_collection = AsyncMock(side_effect=ValueError("Collection existing_col already exists"))
+    await _QdrantCollectionStore._ensure_collection(
+        client,
+        "existing_col",
+        models.VectorParams(size=4, distance=models.Distance.COSINE),
+        payload_indexes={"source_id": models.PayloadSchemaType.KEYWORD},
+    )
+    client.create_collection.assert_not_called()
     created = {c.kwargs["field_name"] for c in client.create_payload_index.await_args_list}
     assert created == {"source_id"}
 

@@ -2,7 +2,7 @@
 
 All five Qdrant stores (vector / document / mention / entity / graph) subclass
 :class:`_QdrantCollectionStore`. The base owns the payload-agnostic plumbing —
-idempotent collection creation with **per-index** 409 handling, paginated payload
+idempotent collection creation (existence check first, **per-index** 409 handling), paginated payload
 scrolls, interruption-safe batched upserts, ``source_id`` filtering, and deterministic
 namespaced point ids — while each subclass owns only its payload marshalling and
 store-specific queries.
@@ -106,23 +106,31 @@ class _QdrantCollectionStore:
     ) -> None:
         """Create *collection_name* if absent, then ensure every payload index exists.
 
-        ``create_collection`` runs in its own ``try`` (409 ⇒ collection exists, fine); each
-        ``create_payload_index`` then runs in its own 409-tolerant call — so an
-        already-existing collection still gains any missing payload indexes.
-        Safe to call on every application start.
+        Genuinely idempotent on every transport: existence is checked first
+        (``collection_exists``), so a second call never issues ``create_collection`` — the
+        in-process local client (``AsyncQdrantClient(":memory:")`` / ``path=``) reports a
+        duplicate create as ``ValueError``, not the HTTP 409 a server returns. A 409 from
+        ``create_collection`` is still tolerated (another process created the collection between
+        the check and the create). Each ``create_payload_index`` then runs in its own
+        409-tolerant call — so an already-existing collection still gains any missing payload
+        indexes. Safe to call on every application start.
+
+        An existing collection is used **as is**: its vector configuration is not compared with
+        the arguments and is never altered.
         """
-        try:
-            if sparse_vectors_config is not None:
-                await client.create_collection(
-                    collection_name=collection_name,
-                    vectors_config=vectors_config,
-                    sparse_vectors_config=sparse_vectors_config,
-                )
-            else:
-                await client.create_collection(collection_name=collection_name, vectors_config=vectors_config)
-        except UnexpectedResponse as exc:
-            if exc.status_code != 409:  # 409: collection already exists — fine
-                raise
+        if not await client.collection_exists(collection_name):
+            try:
+                if sparse_vectors_config is not None:
+                    await client.create_collection(
+                        collection_name=collection_name,
+                        vectors_config=vectors_config,
+                        sparse_vectors_config=sparse_vectors_config,
+                    )
+                else:
+                    await client.create_collection(collection_name=collection_name, vectors_config=vectors_config)
+            except UnexpectedResponse as exc:
+                if exc.status_code != 409:  # 409: lost a creation race — the collection exists, fine
+                    raise
         for field_name, field_schema in (payload_indexes or {}).items():
             await _create_index_ignore_conflict(client, collection_name, field_name, field_schema)
 

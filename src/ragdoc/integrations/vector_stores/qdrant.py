@@ -266,6 +266,10 @@ class QdrantVectorStore(_QdrantCollectionStore):
     ) -> QdrantVectorStore:
         """Create the collection (if it does not exist) and return a store instance.
 
+        Idempotent — safe to call on every startup, on a server and on the in-process local
+        client alike. An existing collection is kept **as is**: its data stays, and its vector
+        configuration is neither compared with these arguments nor altered.
+
         A payload index on ``source_id`` is created so that
         :meth:`delete_by_source` and :meth:`list_source_state` filter in
         O(log n) rather than O(n).

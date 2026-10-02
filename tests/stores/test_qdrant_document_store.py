@@ -71,6 +71,7 @@ def client() -> MagicMock:
     c.upsert = AsyncMock()
     c.delete = AsyncMock()
     c.retrieve = AsyncMock(return_value=[])
+    c.collection_exists = AsyncMock(return_value=False)
     c.create_collection = AsyncMock()
     c.create_payload_index = AsyncMock()
     return c

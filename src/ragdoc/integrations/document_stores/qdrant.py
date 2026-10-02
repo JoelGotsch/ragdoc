@@ -123,7 +123,8 @@ class QdrantDocumentStore(_QdrantCollectionStore):
         :meth:`QdrantVectorStore.create`, it takes **no** vector-size/distance parameters —
         there is no embedding to configure.
 
-        Safe to call on every startup: a 409 (collection exists) is ignored.
+        Safe to call on every startup, on a server and on the in-process local client alike: an
+        existing collection is kept as is (and still gains a missing payload index).
         """
         await cls._ensure_collection(
             client,

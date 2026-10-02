@@ -67,6 +67,7 @@ class _ChildMeta(_BaseMeta, total=False):
 
 def make_client() -> MagicMock:
     c = MagicMock()
+    c.collection_exists = AsyncMock(return_value=False)
     c.create_collection = AsyncMock()
     c.create_payload_index = AsyncMock()
     c.scroll = AsyncMock(return_value=([], None))
