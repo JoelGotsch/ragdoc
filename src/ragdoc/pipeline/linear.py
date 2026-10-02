@@ -410,9 +410,10 @@ class DocumentPipeline(Generic[TMetadata]):
                 try:
                     chunks = await self.run(path)
                     result.chunks.extend(chunks)
-                except BaseException as exc:
-                    if isinstance(exc, asyncio.CancelledError):
-                        raise
+                except Exception as exc:
+                    # Only Exception subclasses are collected: asyncio.CancelledError,
+                    # KeyboardInterrupt and SystemExit always propagate (same discipline
+                    # as the sync engine).
                     if self._on_error == "skip":
                         logger.error(f"Failed to process {path.name}: {exc!r}", exc_info=True)
                         result.errors.append((path, exc))

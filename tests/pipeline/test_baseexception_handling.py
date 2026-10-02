@@ -157,23 +157,31 @@ async def test_linear_cancelled_error_propagates():
 
 
 @pytest.mark.anyio
-async def test_linear_unknown_base_exception_collected():
-    """An arbitrary BaseException subclass (not CancelledError) is collected
-    with on_error='skip', verifying the except BaseException clause.
+async def test_linear_unknown_base_exception_propagates():
+    """A BaseException that is not an Exception (the KeyboardInterrupt / SystemExit class)
+    propagates out of run_many() even with on_error='skip' — only ``Exception`` subclasses
+    are collected, the same discipline as the sync engine.
     """
 
     class _WeirdBaseError(BaseException):
         pass
 
     pipeline = DocumentPipeline(
-        parser=_parser_raises(_WeirdBaseError),
+        parser=_parser_raises_for("bad.html", _WeirdBaseError),
         on_error="skip",
     )
+    with pytest.raises(_WeirdBaseError):
+        await pipeline.run_many([Path("bad.html"), Path("good.html")])
+
+
+@pytest.mark.anyio
+async def test_linear_memory_error_collected():
+    """MemoryError is an Exception subclass: still collected with on_error='skip'."""
+    pipeline = DocumentPipeline(parser=_parser_raises(MemoryError), on_error="skip")
+
     result = await pipeline.run_many([Path("doc.html")])
 
-    assert len(result.errors) == 1
-    assert isinstance(result.errors[0][1], _WeirdBaseError)
-    assert result.chunks == []
+    assert len(result.errors) == 1 and isinstance(result.errors[0][1], MemoryError)
 
 
 @pytest.mark.anyio
