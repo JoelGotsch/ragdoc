@@ -1,5 +1,7 @@
 # Ragdoc
 
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
 Ragdoc is an **ingestion library** for retrieval-augmented generation. It parses common document formats (DOCX, HTML, XLSX, PDF) into structured `Document` objects, processes and splits them, and chunks them into dual-representation retrieval units. `DocumentPipeline` wires the stages together; `VectorStorePipeline` adds plan/apply **incremental sync** into a vector store (Qdrant supported out of the box), with typed metadata carried end-to-end. Ragdoc is ingestion-only — retrieval/query is out of scope; your retrieval code reads the documented payload fields.
 
 ## Installation
@@ -8,7 +10,7 @@ Ragdoc is an **ingestion library** for retrieval-augmented generation. It parses
 uv add ragdoc        # or: pip install ragdoc
 ```
 
-The base install is lean (no ML-sized
+The first PyPI release is 0.1.0. The base install is lean (no ML-sized
 dependencies); features that need more live behind extras:
 
 - `llm` — LLM features: `LLMChunker`, LLM processors, OpenAI embedders (openai + pillow)

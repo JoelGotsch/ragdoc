@@ -46,7 +46,8 @@ name = "ragdoc"
 version = "0.1.0"
 description = "A library to assist with chunking and preprocessing of documents for usage in LLM usecases."
 readme = "README.md"
-license = {text = "Proprietary"}
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10,<3.14"
 authors = [
     { name = "Joel GOTSCH", email = "contact@joelgotsch.com" },

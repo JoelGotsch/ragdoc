@@ -806,6 +806,9 @@ branch)
 
 ### Changed (Phase 1 — licence, packaging, hygiene)
 
+- **Licence**: relicensed from Proprietary to **Apache-2.0** (`LICENSE`, `NOTICE`, `pyproject.toml`
+  metadata, README badge). The release workflow now publishes to public PyPI via trusted
+  publishing (`pypi` environment) when a GitHub release is published.
 - **Docs match the code**: `CLAUDE.md` and the contributor docs were rewritten from the
   current tooling (ruff, basedpyright in *standard* mode, uv); a root `CONTRIBUTING.md` was
   added; the quickstart examples use `DocumentPipeline` instead of a hand-built `Chunk(...)`.
