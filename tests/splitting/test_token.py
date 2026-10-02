@@ -245,7 +245,7 @@ def test_oversized_parent_ref_set_on_all_chunks():
 
 
 def test_oversized_table_is_split():
-    """Oversized table is split (via HTML rows or token slice) -- output has RawText chunks."""
+    """Oversized single-row table is split (one row cannot stay structural, so it goes to the text tiers)."""
     big_cell = "X" * 50
     table_html = f"<table><tr>{''.join(f'<td>{big_cell}</td>' for _ in range(20))}</tr></table>"
     from ragdoc.document import Table as TableEl
