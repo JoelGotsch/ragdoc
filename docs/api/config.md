@@ -29,6 +29,7 @@ Global configuration for ragdoc, including LLM client settings and Azure credent
 ## LLM reliability layer (`ragdoc.llm`)
 
 Every LLM call in the library goes through one shared layer: structural client protocols,
-one client-resolution policy, and one retry policy. `RagdocConfig.openai_client` holds an
-`LLMClient` (the `ChatClient` × `EmbeddingsClient` intersection). See the
+one client-resolution policy, and one retry policy. `RagdocConfig.openai_client` is typed
+`ChatClient | EmbeddingsClient | None` — a client with either capability is accepted (an
+`AsyncOpenAI` has both), and each consumer demands the one it uses. See the
 [LLM API page](llm.md) for the full reference.

@@ -75,7 +75,10 @@ def _(mo):
     | `Image` | Image with base64 data, alt text, and optional `text_representation` |
     | `DocumentList` | Ordered or unordered list |
     | `Footnote` | Footnote definition with number and text |
-    | `RawText` | Raw HTML content (pre-formatted blocks) |
+    | `RawText` | Raw HTML content (pre-formatted blocks), always inside one outer `<div>` |
+
+    Elements are strict: an unknown or outdated constructor keyword (for example the old
+    `html_content=`) raises a `ValidationError` instead of being silently dropped.
     """)
     return
 
@@ -87,12 +90,21 @@ def _():
     # Construct examples of each element type
     table = Table(html="<table><tr><th>A</th></tr></table>")
     fn = Footnote(innerhtml="<p>See Statute Art. IV.</p>", number=1)
+    # RawText only guarantees an outer <div>: the content is wrapped verbatim, never rewritten.
     raw = RawText(html="<pre>code block</pre>")
 
     print(f"Table element_type: {table.element_type!r}")
     print(f"Footnote number: {fn.number}")
-    print(f"RawText innerhtml: {raw.innerhtml}")
+    print(f"RawText html:      {raw.html}")  # <div><pre>code block</pre></div>
+    print(f"RawText innerhtml: {raw.innerhtml}")  # <pre>code block</pre>
     return (DocumentList, Footnote, Image, RawText, Table, fn, raw, table)
+
+
+@app.cell
+def test_rawtext_wraps_without_rewriting(raw):
+    assert raw.html == "<div><pre>code block</pre></div>"
+    assert raw.innerhtml == "<pre>code block</pre>"
+    return
 
 
 @app.cell(hide_code=True)

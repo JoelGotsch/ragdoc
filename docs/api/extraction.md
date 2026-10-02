@@ -340,9 +340,33 @@ Requires the `extraction` extra for the LLM extractors and settings
       show_source: true
       heading_level: 4
 
+### build_kg_gleaning_messages
+
+::: ragdoc.extraction.kg.build_kg_gleaning_messages
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
 ### build_graph_batch_model
 
 ::: ragdoc.extraction.kg.build_graph_batch_model
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### merge_graph_batches
+
+::: ragdoc.extraction.kg.merge_graph_batches
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### drop_dangling_edges
+
+::: ragdoc.extraction.kg.drop_dangling_edges
     options:
       show_root_heading: true
       show_source: true

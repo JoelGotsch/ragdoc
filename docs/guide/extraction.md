@@ -144,6 +144,12 @@ Like every sync pipeline, it exposes `plan()` / `apply()` for human-in-the-loop 
 into a [`DocumentStore`](../api/pipeline.md#documentstore) — sharing the parse-once
 substrate with the vector-store workflow.
 
+Two knobs bound the LLM fan-out: `concurrency` (sources processed at once, default 10) and
+`split_concurrency` (splits of **one** source extracted at once, default 4). Pass an
+`asyncio.Semaphore` as `split_concurrency` to make it one budget across all sources instead.
+A source is atomic: when one of its splits fails, the source fails at once, its remaining
+split extractions are cancelled, and it is reported in `UpdateResult.errors`.
+
 ## Layer 2 — Resolving mentions into entities
 
 The same person extracted from ten documents is ten mentions but one entity.
@@ -227,9 +233,15 @@ pattern types, missing discriminators, and edge types that appear in no pattern 
 prompt, and every extracted edge is validated against
 [`allowed_pattern_kinds`](../api/extraction.md#allowed_pattern_kinds) — violations are
 dropped (counted + warned) or raise, per `ExtractionSettings.on_pattern_violation`.
-The extractor recovers from LLM failures on large splits by recursively halving the text
-(`halving_max_depth`, `halving_min_chars`) and can run an optional `gleaning` pass for
-missed entities.
+The extractor recovers from **size-related** LLM failures by recursively halving the text
+(`halving_max_depth`, `halving_min_chars`): a context-length error, output truncated at the
+token limit, malformed structured output, or a timeout that survived the retries. Anything a
+smaller input cannot fix — authentication, rate limits, connection errors, 5xx, refusals — is
+raised after the shared retry policy instead of being multiplied by halving. An edge that
+references a node id the model never emitted is dropped with a warning; the rest of the
+response is kept. The optional `gleaning` pass is a continuation of the first call — the model
+is shown its own first answer and asked what is missing — and anything it repeats is
+de-duplicated in the merge.
 
 `KnowledgeGraphExtractor` is just another `Extractor` — the same `MentionStorePipeline`
 syncs its node + edge mentions. Resolution then runs per node type, rewrites edge

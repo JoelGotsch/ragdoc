@@ -50,7 +50,23 @@ All elements inherit from [`BaseElement`](../api/document.md#baseelement):
 | [`Image`](../api/document.md#image) | Image with base64 data, alt text, and optional `text_representation` |
 | [`DocumentList`](../api/document.md#documentlist) | Ordered or unordered list |
 | [`Footnote`](../api/document.md#footnote) | Footnote definition with number and text |
-| [`RawText`](../api/document.md#rawtext) | Raw HTML content (pre-formatted blocks) |
+| [`RawText`](../api/document.md#rawtext) | Raw HTML content (pre-formatted blocks), always inside one outer `<div>` |
+
+A few rules hold for every element:
+
+- **Unknown keywords raise.** Elements and `Document` are strict (`extra="forbid"`): a
+  misspelled or outdated constructor keyword — or an unknown key in JSON passed to
+  `model_validate` — is a `ValidationError`, never silently dropped. The pre-refactor
+  spellings `html_content=` and `RawText(innerhtml=…)` are not aliases; the error names the
+  `html` field. Custom element subclasses inherit this, so declare every field you pass.
+- **`RawText` only guarantees its wrapper.** A value that is exactly one root `<div>…</div>`
+  is stored unchanged; anything else (plain text, several sibling tags, a single `<table>` or
+  `<pre>`) is wrapped verbatim in a `<div>`. The content is never unwrapped or re-serialized,
+  and `RawText.innerhtml` returns it byte for byte. It is still HTML, so escape literal text
+  yourself: `RawText(html=f"<pre><code>{html.escape(code)}</code></pre>")`.
+- **Equality is by value.** Two elements are equal when they have the same concrete type and
+  equal field values. Internal caches (the parsed HTML behind `.text` / `.inline_refs`) never
+  affect equality, so an element equals its own `model_copy()` and its JSON round-trip.
 
 ### Image `text_representation`
 

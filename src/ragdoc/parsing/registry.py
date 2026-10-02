@@ -21,7 +21,12 @@ if TYPE_CHECKING:
 
 
 def stamp_provenance(document: Document, source: Path, parser_name: str) -> Document:
-    """Stamp parser provenance onto *document* — the single stamping site, called by ``load()``.
+    """Stamp parser provenance onto *document* — the single stamping function.
+
+    Called by :func:`ragdoc.parsing.load` and again by ``IngestPipeline.run`` (so an explicit
+    ``parser=`` callable that bypasses ``load()`` gets the same provenance; the second call is
+    a no-op after ``load()``). A parser called directly — ``await HTMLParser()(path)`` — is
+    *not* stamped: call this function yourself if you need file provenance there.
 
     Fills ``document.parser``, ``document.source_path``, and ``metadata["filename"]`` only
     when the parser left them unset, so parsers with special provenance semantics (e.g.

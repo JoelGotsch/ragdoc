@@ -113,7 +113,10 @@ A `Chunk` carries two content fields:
 With `SimpleChunker`, `embedding_content` equals `prompt_content` — one renderer is used
 for both. Only `LLMChunker` produces distinct `embedding_content` by generating N topic
 summaries per document, each becoming a separate chunk with unique `embedding_content`
-but shared `prompt_content`.
+but shared `prompt_content`. If the LLM returns no usable summary (an empty or all-blank
+list), `LLMChunker` logs a warning and emits one chunk with `embedding_content` equal to
+`prompt_content`, so the document never silently disappears from the index. A failed LLM call
+(after retries) or a refusal still raises.
 
 ## See Also
 

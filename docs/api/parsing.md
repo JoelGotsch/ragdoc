@@ -255,6 +255,22 @@ handler swapping, image loading, and metadata propagation.
       show_source: true
       heading_level: 5
 
+#### build_code_html
+
+::: ragdoc.parsing.mineru.build_code_html
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 5
+
+#### extract_code_from_lines
+
+::: ragdoc.parsing.mineru.extract_code_from_lines
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 5
+
 !!! note "MinerUMiddleDocument is internal"
     `MinerUMiddleDocument` is an internal type produced by the MinerU library.
     It is not part of the public API and is not documented here.

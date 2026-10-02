@@ -49,6 +49,31 @@ sections = split_hierarchical(document)
 
 Use this when you want larger, more self-contained sections that preserve sub-structure.
 
+## Token-budget splitting: `split_document`
+
+[`split_document`](../api/splitting.md#split_document) (what
+[`TokenSplitter`](../api/pipeline.md#tokensplitter) calls) combines the heading strategies
+with a token budget. A document that fits is returned as one split; otherwise it is split
+hierarchically by headings, and sections that still do not fit are packed element by element.
+
+An **element that alone exceeds the budget** — a 300-row table, a very long list — is cut on
+its own structural boundaries first:
+
+| Element | Cut at | Each fragment is |
+|---|---|---|
+| Table | rows (including rows in `<tbody>` / `<tfoot>`) | a well-formed `Table`; caption, `<colgroup>` and header are repeated |
+| List | items (`<dt>`/`<dd>` pairs stay together) | a `DocumentList`; an `<ol>` continues its numbering via `start` |
+| Other container | block children | a `RawText` wrapped in the original outer tag |
+
+Fragments keep the outer tag with its attributes and inherit `page`, `bounding_box` and
+`metadata`; referenced elements (`<ref id="…"/>`) follow the fragment that contains their
+reference. Every fragment is measured through the renderer and halved on unit boundaries until
+it fits. Only a **single** row or item that is still too large falls through to the text
+tiers — sentence splitting, then a token slice with `overlap_tokens` of overlap — which work
+on rendered text and also verify the rendered result against `max_tokens`. An element with
+bare text between its child tags is not cut structurally (the text would be lost); it goes to
+the text tiers directly.
+
 ## Parent-child relationships
 
 After splitting, each child document has an `external_refs` entry pointing to its parent,

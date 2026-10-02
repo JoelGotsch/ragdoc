@@ -103,6 +103,9 @@ All LLM processors resolve their client through one chain (see the
 [LLM API](../api/llm.md)): an explicit `client=` argument wins, else
 the `openai_client` of the active [`RagdocConfig`](../api/config.md#ragdocconfig)
 (set with `configure(...)`), else construction fails loudly with `LLMNotConfiguredError`.
+`RagdocConfig.openai_client` accepts any client with a `chat` and/or an `embeddings`
+attribute (`ChatClient | EmbeddingsClient`; an `AsyncOpenAI` has both). Processors need the
+chat capability, so an embeddings-only client there also raises `LLMNotConfiguredError`.
 `configure()` is a context manager — the config is active inside the block:
 
 ```python
@@ -116,10 +119,31 @@ async with configure(RagdocConfig(openai_client=AsyncOpenAI(), default_llm_model
 ```
 
 Every call goes through the shared reliability layer (`ragdoc.llm`): one retry policy
-(429/connection/timeout/5xx with backoff, honoring `Retry-After`) and structured parsing
-with explicit refusal errors. Degrade semantics are per-processor by design: the heading
-resolver returns no changes on failure, the image summarizer skips the image with a
-warning, the footnote resolver leaves the footnote unresolved, and the summarizer raises.
+(429/connection/timeout/5xx with jittered exponential backoff) and structured parsing with
+explicit refusal errors. Three things worth knowing:
+
+- **`Retry-After` is capped.** A `Retry-After` header on a 429 replaces the computed delay,
+  but never beyond `backoff_max` (30 s by default) — a server asking for an hour does not
+  park the pipeline for an hour.
+- **One retry layer.** For a real `AsyncOpenAI` / `AsyncAzureOpenAI` client the library calls
+  through `client.with_options(max_retries=0)`, so the SDK's own retries do not stack under
+  ragdoc's: a call makes exactly `max_retries + 1` HTTP attempts, and the `max_retries` you
+  set on the client itself is ignored for ragdoc calls. A custom client object is called as
+  is.
+- **Timeouts.** Each LLM processor has a per-request timeout knob (`request_timeout`, in
+  seconds: `LLMHeadingResolverSettings`, `DocumentSummarizerSettings`,
+  `openai_image_summarizer(...)`, `LLMFootnoteResolver(...)`). The default `None` sends no
+  per-request timeout, so the client's own timeout applies.
+
+Degrade semantics are per-processor by design: the heading resolver returns no changes on
+failure, the image summarizer skips the failing image with a warning (any LLM-call failure —
+a refusal, a 400 for one bad image, exhausted retries; programming errors and cancellation
+still propagate) and continues with the next image, the footnote resolver leaves the footnote
+unresolved, and the summarizer raises.
+
+`LLMHeadingResolver` resolves heading levels even when the document already has a title; in
+that case the model's document-title judgment is ignored and the two title-removal options
+(`remove_title_from_elements`, `remove_elements_before_title`) do nothing.
 `LLMHeadingResolver` additionally supports env-based client configuration via
 [`LLMHeadingResolverSettings`](../api/processing.md#llmheadingresolversettings)
 (`LLM_HEADING_RESOLVER_API_KEY`, base URL, model).

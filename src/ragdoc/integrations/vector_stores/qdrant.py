@@ -228,7 +228,7 @@ class QdrantVectorStore(_QdrantCollectionStore):
     Example — dense + BM25::
 
         from ragdoc.integrations.vector_stores import QdrantVectorStore, ServerSideVector
-        from ragdoc.pipeline import prompt_content_text
+        from ragdoc.pipeline import DocumentPipeline, EmbedderConfig, VectorStorePipeline, prompt_content_text
 
         store = await QdrantVectorStore.create(
             client,
@@ -236,8 +236,8 @@ class QdrantVectorStore(_QdrantCollectionStore):
             vector_size=1536,
             sparse_vectors={"sparse": ServerSideVector("Qdrant/bm25", text_fn=prompt_content_text)},
         )
-        pipeline = VectorStorePipeline(document_pipeline, store, embedders={"dense": EmbedderConfig(my_embedder)})
-        await pipeline.sync(paths)
+        sync = VectorStorePipeline(DocumentPipeline(), store, embedders={"dense": EmbedderConfig(my_embedder)})
+        result = await sync.run(paths)
     """
 
     def __init__(

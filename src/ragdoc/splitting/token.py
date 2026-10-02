@@ -666,8 +666,9 @@ def split_oversized_element(
     Strategy (applied in order until a split is achieved):
 
     1. **HTML structural split** — :func:`split_at_html_tags`: splits the root
-       element's HTML at top-level block children.  Referenced elements follow
-       their ``<ref/>`` tags into the appropriate sub-chunk.
+       element's HTML at structural boundaries (table rows, list items, block
+       children) into well-formed fragments of the same element type.  Referenced
+       elements follow their ``<ref/>`` tags into the appropriate sub-chunk.
     2. **Sentence split** — :func:`split_at_sentences`: renders the content
        (resolving refs inline) and splits at sentence boundaries.
     3. **Token slice** — last resort: rendered text (refs inlined) sliced into

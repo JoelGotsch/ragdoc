@@ -136,12 +136,28 @@ elements:
 | `TitleBlock` | `Heading` | CSS `font-size` + optional `text-align: center` |
 | `TextBlock` | `Paragraph` | CSS `font-size` + optional `text-align: center` |
 | `ListBlock` | `DocumentList` | CSS applied to `<ul>` tag |
-| `CodeBlock` | `Paragraph?` + `RawText` | caption before body |
+| `CodeBlock` | `Paragraph?` + `RawText` | caption before body; the code is escaped text in `<div><pre><code>…</code></pre></div>`, one line per source line |
 | `TableBlock` | `Paragraph?` + `Table` + `RawText?` | caption, HTML table, footnote |
 | `ImageBlock` | `Image?` + `Paragraph?` | Pillow load from disk + caption |
 
 Discarded blocks (headers, footers, page numbers, asides, footnotes) are handled
 by the discarded-handler table — see [Default discarded-block handling](#default-discarded-block-handling).
+
+A code block's `RawText` carries the source **HTML-escaped** inside `<pre><code>`
+(built by `build_code_html`), so `<`, `>` and `&` in code or XML snippets are text — never
+parsed as markup or as `<ref/>` placeholders — and line breaks survive into every output
+format:
+
+```python
+from ragdoc.parsing.mineru import build_code_html
+
+build_code_html("if a < b:\n    swap(a, b)")
+# '<div><pre><code>if a &lt; b:\n    swap(a, b)</code></pre></div>'
+```
+
+Parsing runs in a worker thread (`asyncio.to_thread`), so custom handlers execute off the
+event loop: they must be plain synchronous functions and should not touch event-loop-bound
+objects.
 
 #### Image loading
 
@@ -159,26 +175,20 @@ document = await load("output/report_middle.json")
 If Pillow is not installed or an image file is not found, the `Image` element is silently
 skipped and a warning is recorded on the document context (not raised as an exception).
 
-#### Metadata from discarded blocks
+#### Discarded blocks never reach `Document.metadata`
 
-Headers and other discarded-block text that gets stored by `handle_discarded_as_metadata`
-is automatically propagated to `Document.metadata` after parsing:
-
-```python
-document = await load("report_middle.json")
-print(document.metadata.get("headers"))
-# [{"page": 1, "text": "Confidential — Draft v1"}, ...]
-```
-
-The accumulated keys depend on which discarded handlers are active (see the default table
-below). Internal context keys are never forwarded.
+The MinerU parser writes nothing to `document.metadata` (`"filename"` is stamped by
+`load()` / the pipeline). To keep running headers or footers, emit them as elements with
+`handle_discarded_as_raw_text` (see below). `handle_discarded_as_metadata` only accumulates
+text in the parse context (`context.metadata`), for a custom extraction stage to read; it does
+not forward anything to the document.
 
 #### Default discarded-block handling
 
 | Block type | Default handler | Effect |
 |---|---|---|
-| `HEADER` | `handle_discarded_as_metadata` | stored in `document.metadata["headers"]` |
-| `FOOTER` | `handle_discarded_as_footnote` | numbered regex → `Footnote`, else warn + drop |
+| `HEADER` | `handle_discarded_drop` | dropped silently |
+| `FOOTER` | `handle_discarded_drop` | dropped silently |
 | `PAGE_NUMBER` | `handle_discarded_drop` | dropped silently |
 | `ASIDE_TEXT` | `handle_discarded_drop` | dropped silently |
 | `PAGE_FOOTNOTE` | `handle_discarded_as_footnote` | numbered regex → `Footnote`, else warn + drop |
@@ -194,7 +204,7 @@ from ragdoc.parsing.mineru.handlers import ExtractionConfig, handle_discarded_as
 from ragdoc.parsing.mineru.base import DiscardedBlockType
 from pathlib import Path
 
-# Emit page headers as RawText elements instead of storing them in metadata
+# Emit page headers as RawText elements instead of dropping them (the default)
 config = ExtractionConfig()
 config.discarded_handlers[DiscardedBlockType.HEADER] = handle_discarded_as_raw_text
 
@@ -219,7 +229,7 @@ Four reusable discarded-block handlers are provided:
 
 | Function | Produces | Use case |
 |---|---|---|
-| `handle_discarded_as_metadata` | `[]` | accumulate text in `document.metadata` |
+| `handle_discarded_as_metadata` | `[]` | accumulate text in the parse context for a custom stage (not in `document.metadata`) |
 | `handle_discarded_as_footnote` | `Footnote` or `[]` | numbered `N text` pattern |
 | `handle_discarded_as_raw_text` | `RawText` | preserve text as a document element |
 | `handle_discarded_drop` | `[]` | discard silently |
