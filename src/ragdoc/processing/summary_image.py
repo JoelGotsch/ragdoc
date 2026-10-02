@@ -29,7 +29,7 @@ from io import BytesIO
 from typing import TYPE_CHECKING, Literal, TypeAlias
 
 from ragdoc.document import Image
-from ragdoc.llm import ChatClient, LLMRefusalError, call_structured, resolve_openai_client
+from ragdoc.llm import ChatClient, call_structured, is_llm_failure, resolve_openai_client
 from ragdoc.processing.base import DocumentProcessor
 from ragdoc.processing.summary_base import ImageSummary
 from ragdoc.utils.concurrency import fan_out
@@ -171,6 +171,8 @@ def openai_image_summarizer(
     model: str | None = None,
     create_messages: ImageMessagesFn = build_image_messages,
     transformations: list[Callable[[PILImage], PILImage]] | None = None,
+    request_timeout: float | None = None,
+    max_retries: int = 2,
 ) -> ImageSummarizeFn:
     """Create an :data:`ImageSummarizeFn` backed by the OpenAI structured-output API.
 
@@ -184,6 +186,10 @@ def openai_image_summarizer(
         transformations: PIL transforms applied before encoding.
             ``None`` uses :data:`DEFAULT_TRANSFORMATIONS` (alpha-channel removal).
             Pass ``[]`` to skip all transformations.
+        request_timeout: Per-request LLM timeout in seconds (``None`` uses the client's
+            configured timeout — 600 s for a default ``AsyncOpenAI``).
+        max_retries: Maximum additional attempts on retryable transport failures
+            (shared policy, see :mod:`ragdoc.llm`).
 
     Returns:
         An async callable ``(image, context) -> ImageSummary``.
@@ -213,6 +219,8 @@ def openai_image_summarizer(
             messages=messages,
             response_format=ImageSummary,
             temperature=0.0,
+            timeout=request_timeout,
+            max_retries=max_retries,
             log_prefix="ImageSummary",
         )
 
@@ -229,6 +237,18 @@ class ImageSummaryProcessor(DocumentProcessor):
 
     Skips images that already have a ``text_representation``. Images are processed
     with bounded concurrency (default: sequential).
+
+    Degrade semantics — **skip-with-warning, per image**: when summarizing one image fails
+    with an LLM-call failure (:func:`ragdoc.llm.is_llm_failure`: a refusal, any
+    ``openai.OpenAIError`` such as a 400 for an unsupported image or a rate limit that
+    outlived the shared retry policy, a structured-output validation error), an unreadable
+    image (``OSError``) or a ``ValueError``, that image keeps ``text_representation=None``,
+    one WARNING is logged, and the remaining images are still processed. A systemic failure
+    (e.g. an invalid API key) therefore yields one warning per image and a document without
+    image summaries — never an exception. Everything else propagates: programming errors
+    (``TypeError``, ``AttributeError``, …) and cancellation. A custom ``summarize`` callable
+    that wants its own failures contained should raise :class:`ragdoc.llm.LLMError`
+    (or ``ValueError`` / ``OSError``).
 
     Args:
         summarize: An :data:`ImageSummarizeFn` callable ``(image, context) -> ImageSummary``.
@@ -303,7 +323,17 @@ class ImageSummaryProcessor(DocumentProcessor):
             # PIL's UnidentifiedImageError subclasses OSError, so this also covers unreadable
             # image payloads without importing PIL here (pillow lives behind the 'llm' extra).
             logger.exception(f"Failed to summarize image {image.id}: image type {image.image_type!r} not supported")
-        except (LLMRefusalError, ValueError) as exc:
-            # Contain per-image LLM refusals/schema failures — one bad image must not abort the
-            # document; the image keeps text_representation=None (skip-with-warning).
+        except ValueError as exc:
+            # No base64 content, undecodable base64, schema-validation failure (pydantic's
+            # ValidationError is a ValueError).
             logger.warning(f"Failed to summarize image {image.id}: {exc}")
+        except Exception as exc:
+            # Contain per-image *LLM-call* failures — a refusal, a 400 for one bad image, an
+            # auth/permission error, or transport retries exhausted (the shared retry policy
+            # already ran inside the summarize fn). One bad image must not abort the document;
+            # the image keeps text_representation=None (skip-with-warning). Anything that is not
+            # an LLM failure (TypeError, AttributeError, ... — a bug) propagates, as does
+            # cancellation (BaseException, never caught here).
+            if not is_llm_failure(exc):
+                raise
+            logger.warning(f"Failed to summarize image {image.id}: {exc!r}")

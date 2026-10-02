@@ -310,3 +310,136 @@ async def test_processor_contains_per_image_refusal(caplog):
     assert result is doc
     assert image.text_representation is None
     assert any("Failed to summarize image" in r.message for r in caplog.records)
+
+
+# --- Degrade semantics: one failing image is skipped with a warning; bugs and cancellation propagate ---
+
+
+def _bad_request_error():
+    import httpx
+    import openai
+
+    response = httpx.Response(400, request=httpx.Request("POST", "https://api.test/v1"))
+    return openai.BadRequestError("invalid image", response=response, body=None)
+
+
+def _rate_limit_error():
+    import httpx
+    import openai
+
+    response = httpx.Response(429, request=httpx.Request("POST", "https://api.test/v1"))
+    return openai.RateLimitError("rate limited", response=response, body=None)
+
+
+def _parse_ok(summary: str) -> MagicMock:
+    return MagicMock(choices=[MagicMock(message=MagicMock(parsed=ImageSummary(summary=summary)))])
+
+
+@pytest.mark.anyio
+async def test_bad_request_for_one_image_skips_only_that_image(caplog):
+    """A 400 for one bad image (non-retryable) must not abort the document."""
+    import logging
+
+    pytest.importorskip("openai", reason="llm extra not installed")
+    client = _make_openai_client()
+    client.chat.completions.parse = AsyncMock(side_effect=[_bad_request_error(), _parse_ok("second image")])
+    summarize = openai_image_summarizer(client, model="gpt-test", transformations=[])
+
+    bad = Image(image=_tiny_png_base64(), image_type="png")
+    good = Image(image=_tiny_png_base64(), image_type="png")
+    doc = Document(elements=[bad, good])
+    with caplog.at_level(logging.WARNING):
+        result = await ImageSummaryProcessor(summarize=summarize).process(doc)
+
+    assert result is doc
+    assert bad.text_representation is None
+    assert good.text_representation == "second image"
+    warnings = [r for r in caplog.records if "Failed to summarize image" in r.getMessage()]
+    assert len(warnings) == 1
+    assert bad.id in warnings[0].getMessage()
+
+
+@pytest.mark.anyio
+async def test_exhausted_retries_for_one_image_skip_only_that_image(monkeypatch, caplog):
+    """Retries exhausted on a 429 skip the image (after the shared retry policy), not the document."""
+    import logging
+
+    import ragdoc.llm
+
+    pytest.importorskip("openai", reason="llm extra not installed")
+
+    async def _no_sleep(delay: float) -> None:
+        return None
+
+    monkeypatch.setattr(ragdoc.llm, "_sleep", _no_sleep)
+    client = _make_openai_client()
+    client.chat.completions.parse = AsyncMock(
+        side_effect=[_rate_limit_error(), _rate_limit_error(), _parse_ok("second image")]
+    )
+    summarize = openai_image_summarizer(client, model="gpt-test", transformations=[], max_retries=1)
+
+    first = Image(image=_tiny_png_base64(), image_type="png")
+    second = Image(image=_tiny_png_base64(), image_type="png")
+    with caplog.at_level(logging.WARNING):
+        await ImageSummaryProcessor(summarize=summarize).process(Document(elements=[first, second]))
+
+    assert client.chat.completions.parse.await_count == 3  # 2 attempts for the first image, 1 for the second
+    assert first.text_representation is None
+    assert second.text_representation == "second image"
+    assert any("Failed to summarize image" in r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("bug", [TypeError("bug"), AttributeError("bug"), KeyError("bug"), RuntimeError("bug")])
+async def test_programming_error_in_summarize_propagates(bug: Exception):
+    """Containment is for LLM/image failures only — a bug in a summarize fn must not be swallowed."""
+
+    async def buggy_summarize(image: Image, context: str | None) -> ImageSummary:
+        raise bug
+
+    doc = Document(elements=[Image(image=_tiny_png_base64(), image_type="png")])
+    with pytest.raises(type(bug)):
+        await ImageSummaryProcessor(summarize=buggy_summarize).process(doc)
+
+
+@pytest.mark.anyio
+async def test_cancellation_in_summarize_propagates():
+    import asyncio
+
+    async def cancelled_summarize(image: Image, context: str | None) -> ImageSummary:
+        raise asyncio.CancelledError
+
+    doc = Document(elements=[Image(image=_tiny_png_base64(), image_type="png")])
+    with pytest.raises(asyncio.CancelledError):
+        await ImageSummaryProcessor(summarize=cancelled_summarize).process(doc)
+
+
+@pytest.mark.anyio
+async def test_openai_summarizer_forwards_timeout_and_max_retries(monkeypatch):
+    """The image call site can take a per-request timeout and retry budget through the shared layer."""
+    import ragdoc.llm
+
+    pytest.importorskip("openai", reason="llm extra not installed")
+
+    async def _no_sleep(delay: float) -> None:
+        return None
+
+    monkeypatch.setattr(ragdoc.llm, "_sleep", _no_sleep)
+    client = _make_openai_client()
+    client.chat.completions.parse = AsyncMock(side_effect=[_rate_limit_error()] * 4 + [_parse_ok("x")])
+    summarize = openai_image_summarizer(client, transformations=[], request_timeout=7.5, max_retries=4)
+
+    result = await summarize(Image(image=_tiny_png_base64(), image_type="png"), None)
+
+    assert result.summary == "x"
+    assert client.chat.completions.parse.await_count == 5
+    assert all(call.kwargs["timeout"] == 7.5 for call in client.chat.completions.parse.await_args_list)
+
+
+@pytest.mark.anyio
+async def test_openai_summarizer_default_sends_no_timeout():
+    client = _make_openai_client()
+    client.chat.completions.parse = AsyncMock(return_value=_parse_ok("x"))
+    summarize = openai_image_summarizer(client, transformations=[])
+    await summarize(Image(image=_tiny_png_base64(), image_type="png"), None)
+    assert "timeout" not in client.chat.completions.parse.await_args.kwargs
