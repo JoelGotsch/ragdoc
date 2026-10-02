@@ -3,6 +3,14 @@ site_description: A library for chunking and preprocessing documents for LLM use
 site_author: Joel GOTSCH
 site_url: https://joelgotsch.github.io/ragdoc/
 docs_dir: docs
+# Test plumbing for the notebook layer lives in docs/ (see docs/conftest.py);
+# keep it and Python bytecode caches out of the published site. `marimo export`
+# also drops a generic assistant-prompt CLAUDE.md into every exported notebook
+# directory; that is not documentation either.
+exclude_docs: |
+  conftest.py
+  __pycache__/
+  notebooks/*/CLAUDE.md
 repo_url: https://github.com/joelgotsch/ragdoc
 
 theme:
