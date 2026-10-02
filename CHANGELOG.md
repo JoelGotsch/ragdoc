@@ -17,14 +17,17 @@ form raises or is gone.
 
 - **Unknown constructor keywords and JSON keys raise.** Elements and `Document` use
   `extra="forbid"`; `Paragraph(html_content=…)`, `Heading(html_content=…)` and
-  `RawText(innerhtml=…)` raise a `ValidationError` naming the `html` field (they used to
-  build an *empty* element silently). → Pass `html=` with the full HTML including the outer
+  `RawText(innerhtml=…)` raise a `ValidationError` naming the `html` field. (These were the
+  real constructor keywords before the element-model refactor on this branch; between that
+  refactor and this fix they silently built an *empty* element.) → Pass `html=` with the full HTML including the outer
   tag; custom element subclasses must declare every field they are constructed with.
 - **JSON written by the pre-refactor element model no longer loads** for `Heading`,
-  `Paragraph`, `Table`, `DocumentList` and `RawText` (dumps carrying `html_content` /
-  `innerhtml` / `level` keys). Old `Image` / `Footnote` dumps still load. → Re-ingest the
-  sources (for a `DocumentStore`: run `DocumentStorePipeline` again); there is no loader for
-  the old format.
+  `Paragraph`, `Table`, `DocumentList` and `RawText` (dumps carrying an `html_content` /
+  `innerhtml` key next to the computed `html`). Old `Image` / `Footnote` dumps still load.
+  This affects every place such JSON lives: a `DocumentStore`, `.ragdoc.json` snapshots,
+  `DocumentDumpProcessor` dumps and saved `ChangeSet[Document]` files. → Regenerate them from
+  the sources (for a `DocumentStore`: run `DocumentStorePipeline` again); there is no loader
+  for the old format.
 - **`RawText` no longer unwraps or rewrites its content.** A single non-`div` root tag is now
   wrapped verbatim: `RawText(html="<pre>x</pre>")` stores `<div><pre>x</pre></div>` and
   `.innerhtml` returns `<pre>x</pre>` (it used to store `<div>x</div>`). → Code that relied on
@@ -65,8 +68,10 @@ form raises or is gone.
 - **The client's own `max_retries` is ignored for ragdoc calls.** For a real `AsyncOpenAI` /
   `AsyncAzureOpenAI` the library calls through `client.with_options(max_retries=0)`; a call
   makes `max_retries + 1` HTTP attempts (was up to `(max_retries + 1) × 3` with the SDK
-  default). → Set the retry budget on the ragdoc side (`max_retries` on the processor,
-  settings object or `OpenAIEmbedder`).
+  default). → Set the retry budget on the ragdoc side where it is exposed: `max_retries`
+  on the settings objects, `LLMFootnoteResolver`, `make_llm_reviewer`, `OpenAIEmbedder`, and
+  `openai_image_summarizer(client, max_retries=…)` for `ImageSummaryProcessor`. `LLMChunker`
+  has no such parameter (fixed at 2 retries).
 - **`Retry-After` is capped at `backoff_max`** (30 s by default). → Pass a larger
   `backoff_max` to `retry_llm` / `call_structured` if you call them yourself and want longer
   waits.
@@ -117,6 +122,61 @@ form raises or is gone.
   also compared private cache state, so reading `.text` could make two identical elements
   unequal. → Nothing to do.
 
+**Earlier on this branch — breaking relative to `origin/main`, not spelled out in the phase
+sections below** (some appear only in the 0.1.0 notes, which were also written on this
+branch)
+
+- **`FootnoteProcessor(only_orphaned=…)` defaults to `True`** (was `False`): footnotes that
+  already have a reference are not re-resolved. → Pass `only_orphaned=False` for the old
+  behaviour.
+- **Boundary 2 no longer runs processors.** Re-chunking a stored Document only splits and
+  chunks. → Run processors at Boundary 1 (`DocumentStorePipeline(IngestPipeline(processors=…))`).
+- **`VectorStorePipeline.run()` is no longer `apply(plan(...))`**: it embeds and writes per
+  source, so an embedding failure no longer leaves the whole store untouched. → Use
+  `apply(await plan(...))` when you need whole-corpus embed-first.
+- **`DocumentPipeline`'s stage arguments are keyword-only** and its first two positional
+  parameters are now `ingest` and `chunk`: `DocumentPipeline(my_parser)` binds the parser to
+  `ingest`. → Pass `parser=`, `processors=`, `splitter=`, … by keyword.
+- **The sync pipelines do not check the class of the pipeline object.**
+  `DocumentStorePipeline(document_pipeline, store)` (the old call shape) still constructs and
+  then fails every source at run time; `VectorStorePipeline`'s fourth positional parameter is
+  now `hash_fn`, not `document_store`. → Pass an `IngestPipeline` (`pipeline.ingest`) to
+  `DocumentStorePipeline`, use `VectorStorePipeline.from_document_store(...)` for Boundary 2,
+  and pass arguments by keyword.
+- **`ChunkPipeline(metadata_type=…)` can newly raise**: `filename` is now among the required
+  keys, and `Required[...]` keys are really checked. → Make sure `metadata["filename"]` and
+  your required keys are set before chunking (they are when documents come from `load()` or
+  `IngestPipeline`).
+- **An embedder returning a different number of vectors than chunks raises `ValueError`** (it
+  used to truncate silently). → Fix the embedder.
+- **`LLMHeadingResolver` leaves an existing title alone.** On a document whose title is
+  already set (HTML with `<title>`, MinerU), the model's document-title judgment no longer
+  overwrites it and `remove_title_from_elements` / `remove_elements_before_title` do nothing.
+  → Clear `document.title` before the resolver if you want it to pick the title.
+- **Parsing entry points removed or changed**: `ragdoc.parsing.from_path`,
+  `ragdoc.parsing.pandoc.load_wordfile`, the modules `ragdoc.parsing.base` and
+  `ragdoc.pipeline.parser` are gone → `ragdoc.parsing.load(path)` and
+  `from ragdoc.parsing.parser import Parser`. `load_html` / `load_pandoc` / `load_excel` take a
+  path instead of a source object. `AzureJSONFile` / `AzureAnalyzeRun` are no longer exported
+  from `ragdoc` or `ragdoc.parsing` (internal; `ragdoc.parsing.azure_di`). MinerU's
+  `PreProcessingMiddleware` / `PostProcessingMiddleware` are removed → subclass
+  `ragdoc.parsing.mineru.base.BaseExtractionStage`.
+- **`load("x.pdf")` without Azure credentials returns a `pdf_basic` document** when pymupdf
+  is installed (it used to raise "Azure DI credentials not configured"). → Pass
+  `parser="azure_di"` to insist on Azure DI.
+- **Root exports**: `import ragdoc` no longer provides `MetadataDict`, `MetadataValue`,
+  `TMetadata`, `metadata_json_schema` (→ `ragdoc.metadata`); `DocumentProcessor`,
+  `ProcessingPipeline`, `HeadingLevelProcessor`, `TitleDetectionProcessor`
+  (→ `ragdoc.processing`); `OutputFormat`, `Renderer`, `render_for_prompt`, `render_raw`
+  (→ `ragdoc.rendering`); `split_by_headings`, `split_hierarchical` (→ `ragdoc.splitting`).
+  `DocumentSource`, `ExcelSource`, `HTMLSource`, `PandocFile`, `WordFile`, `from_path` and
+  `load_document` are removed outright (→ `ragdoc.parsing.load`).
+- **`ragdoc.integrations.llama_index` is removed** with no replacement. → Convert `Chunk`s to
+  your framework's node type yourself.
+- **CLI**: the click entry function `ragdoc.cli.document_processing` is now `ragdoc.cli.cli`
+  (installed as the `ragdoc` console script); it exits with status 1 when any file fails. →
+  Call the `ragdoc` command.
+
 ### Added (review fixes)
 
 - **`ragdoc.pipeline.SourceReplaceStore`** — optional store protocol
@@ -149,8 +209,8 @@ form raises or is gone.
   items are in memory, independent of corpus size. `run()` and `plan()` close the stream
   deterministically, so an abort cancels and awaits the running producers before returning.
 - **Updates no longer pass through an empty window where the store allows it.** With a
-  `SourceReplaceStore` the new items are written before the stale ones are removed, so a
-  failed update keeps the previously stored items. Stores without it keep
+  `SourceReplaceStore` the new items are written before the stale ones are removed, so an
+  update that fails while writing keeps the previously stored items. Stores without it keep
   delete-then-upsert: a failed upsert leaves the source empty and the next run re-processes
   it as new (the docstrings previously claimed the source was left "unapplied").
 - **`apply()` writes source by source** through the same path as `run()` (orphans in
@@ -159,10 +219,12 @@ form raises or is gone.
   like the in-memory one and vectors from one `apply()` cannot leak into a later one.
 - **Qdrant multi-request writes are interruption-safe.** Points are written with blank
   `source_hash` / `content_hash` and the real hashes are stamped only after every batch has
-  landed, so a cancelled or crashed write never reads as "unchanged". On an error or a
-  cancellation part-way the points that call created are deleted by id (shielded on
-  cancellation); points that existed before are never deleted, and one that was already
-  overwritten is not restored. After a hard crash the partial points remain, with blank
+  landed, so a cancelled or crashed write never reads as "unchanged". When a batch of a
+  multi-batch write fails or is cancelled, the points that call created are deleted by id
+  (shielded on cancellation); points that existed before are never deleted, and one that was
+  already overwritten is not restored. There is no cleanup for a single-request write or for
+  a failure in the stale-delete / stamp step of a replace: those leave the new points (and,
+  before the stale delete, the old ones too) in place with blank hashes. After a hard crash the partial points remain, with blank
   hashes, until the next sync replaces them. A write that fits one request is one upsert.
 - **Qdrant `create()` is idempotent on the in-process client.** A second
   `QdrantVectorStore.create()` (and the document / mention / entity / graph equivalents)
@@ -314,8 +376,10 @@ form raises or is gone.
 > `DocumentPipeline` is now the composition of two new classes: `IngestPipeline`
 > (parser + processors + `source_id_fn`; Boundary 1) and `ChunkPipeline` (splitter +
 > chunker + `chunk_id_fn` + `metadata_type`; Boundary 2), exposed as `pipeline.ingest` /
-> `pipeline.chunk`. Illegal configurations are now **unconstructible** (`TypeError` at
-> construction) instead of runtime-rejected prose `ValueError`s.
+> `pipeline.chunk`. A stage on the wrong side of a boundary is now **inexpressible**
+> (there is no parameter for it — a misplaced keyword is a `TypeError`) instead of a
+> runtime-rejected prose `ValueError`. The class of the pipeline object passed to a sync
+> pipeline is not checked at runtime.
 
 ### Added (Phase 9 — pipeline split by boundary)
 
@@ -387,7 +451,7 @@ form raises or is gone.
 - **Zero-config local PDF parsing** — `parsing/pdf_basic/` (`ragdoc[pdf]`): pymupdf text
   extraction with font-size/bold heading detection (reusing
   `compute_size_to_level_mapping`), registered for `.pdf` at priority 10 (below `azure_di`
-  40 and `mineru` 50). Font sizes are emitted as inline CSS so downstream visual processors
+  40; `mineru`, priority 50, is registered for `_middle.json`, not `.pdf`). Font sizes are emitted as inline CSS so downstream visual processors
   keep working.
 - **Availability-aware parser resolution** — `Parser.is_available()` /
   `Parser.unavailable_reason()`: resolution skips parsers whose dependencies or credentials
@@ -446,7 +510,7 @@ form raises or is gone.
   ready for the Phase 8 extras split.
 - **One retry policy everywhere** (transport errors only): 429 (a parseable `Retry-After`
   header replaces the computed delay, capped at `backoff_max` since the review fixes above),
-  connection/timeout errors, and 5xx are retried with full-jitter
+  connection/timeout errors, and 5xx are retried with ±50 %-jitter
   exponential backoff (`min(backoff_max, backoff_base * 2**attempt) * uniform(0.5, 1.5)`);
   other 4xx, `pydantic.ValidationError`, and non-openai errors raise immediately. A model
   refusal (`parsed is None` or empty `choices`) raises **`LLMRefusalError`** and is never
@@ -696,8 +760,8 @@ form raises or is gone.
 
 ### Removed (Phase 2 — public API surface reset)
 
-- **`DocumentPipeline.run_sync()`** and every other sync wrapper — the library is async-only;
-  call `asyncio.run(pipeline.run(path))`.
+- **`DocumentPipeline.run_sync()`** — it was advertised in the 0.1.0 notes below but never
+  existed in the code. The library is async-only; call `asyncio.run(pipeline.run(path))`.
 - **`AutoParser`** — `DocumentPipeline` defaults to `ragdoc.parsing.load` and accepts any
   async `(Path) -> Document` callable as `parser=`.
 - The legacy parsing surface: `load_document`, `DocumentSource`, the `load_file`
@@ -716,7 +780,7 @@ form raises or is gone.
 - **`ragdoc.extraction.changeset`** (`MentionChangeSet`, `MentionSourceChange`) — use
   `ChangeSet[Mention[P]]` / `SourceChange[Mention[P]]` from `ragdoc.pipeline.changeset`.
 
-### Fixed (Phase 0 — eight bug fixes)
+### Fixed (Phase 0 — bug fixes)
 
 - **xlsx**: `ExcelConfig.sheet_params` was silently discarded whenever `default_params` was
   set (operator precedence). Per-sheet parameters are now merged over the defaults.
@@ -742,7 +806,6 @@ form raises or is gone.
 
 ### Changed (Phase 1 — licence, packaging, hygiene)
 
-- **Licence**: the project is Apache-2.0 (`LICENSE`, `NOTICE`, PEP 639 licence metadata).
 - **Docs match the code**: `CLAUDE.md` and the contributor docs were rewritten from the
   current tooling (ruff, basedpyright in *standard* mode, uv); a root `CONTRIBUTING.md` was
   added; the quickstart examples use `DocumentPipeline` instead of a hand-built `Chunk(...)`.
