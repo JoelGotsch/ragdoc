@@ -419,3 +419,238 @@ async def test_mentions_arrive_typed_without_revalidation(make_files, mstore):
     stored = list(mstore.stored.values())
     assert len(stored) == len(returned) == 1
     assert stored[0] is returned[0]  # identity, not a re-validated copy
+
+
+# ---------------------------------------------------------------------------
+# Bounded per-source fan-out (split_concurrency)
+# ---------------------------------------------------------------------------
+
+
+def n_way_splitter(n: int):
+    def _split(document: Document) -> list[Document]:
+        from ragdoc.document import Paragraph
+
+        return [
+            Document(
+                title=f"{document.title}-{seq}",
+                elements=[Paragraph(html=f"<p>body of split {seq}</p>")],
+                metadata={**document.metadata, "split_sequence": seq, "split_total": n},
+            )
+            for seq in range(1, n + 1)
+        ]
+
+    return _split
+
+
+class InFlightExtractor:
+    """Fake extractor recording how many extract() calls overlap (max_in_flight)."""
+
+    payload_model = Event
+
+    def __init__(self) -> None:
+        self.in_flight = 0
+        self.max_in_flight = 0
+        self.calls = 0
+
+    async def extract(self, document: Document) -> list[Mention[Event]]:
+        import asyncio
+
+        self.calls += 1
+        self.in_flight += 1
+        self.max_in_flight = max(self.max_in_flight, self.in_flight)
+        try:
+            for _ in range(5):  # several loop turns, so unbounded siblings would all overlap
+                await asyncio.sleep(0)
+        finally:
+            self.in_flight -= 1
+        return [Mention[Event](mention_id="pending", source_id=document.source_id or "", payload=Event(title="Ev"))]
+
+
+@pytest.mark.anyio
+async def test_split_extraction_is_bounded_by_split_concurrency(make_files, mstore):
+    """All splits of a source used to be gathered at once (unbounded LLM fan-out)."""
+    extractor = InFlightExtractor()
+    pipeline = MentionStorePipeline(
+        ingest=IngestPipeline(parser=make_parser()),
+        extractor=extractor,
+        mention_store=mstore,
+        splitter=n_way_splitter(12),
+        split_concurrency=3,
+    )
+    result = await pipeline.run(make_files({"a.txt": "body"}))
+
+    assert result.processed == ["a.txt"]
+    assert extractor.calls == 12
+    assert extractor.max_in_flight == 3  # bounded — and still concurrent up to the bound
+    assert sorted(m.ordinal for m in mstore.stored.values()) == list(range(12))  # split order kept
+
+
+@pytest.mark.anyio
+async def test_split_concurrency_default_is_bounded(make_files, mstore):
+    extractor = InFlightExtractor()
+    pipeline = MentionStorePipeline(
+        ingest=IngestPipeline(parser=make_parser()),
+        extractor=extractor,
+        mention_store=mstore,
+        splitter=n_way_splitter(40),
+    )
+    await pipeline.run(make_files({"a.txt": "body"}))
+    assert extractor.calls == 40
+    assert extractor.max_in_flight == 4  # the documented default
+
+
+@pytest.mark.anyio
+async def test_int_split_concurrency_is_per_source(make_files, mstore):
+    """An int bounds each source separately: worst case is concurrency x split_concurrency."""
+    extractor = InFlightExtractor()
+    pipeline = MentionStorePipeline(
+        ingest=IngestPipeline(parser=make_parser()),
+        extractor=extractor,
+        mention_store=mstore,
+        splitter=n_way_splitter(8),
+        concurrency=2,
+        split_concurrency=2,
+    )
+    await pipeline.run(make_files({"a.txt": "a", "b.txt": "b", "c.txt": "c"}))
+    assert extractor.calls == 24
+    assert 2 <= extractor.max_in_flight <= 4
+
+
+@pytest.mark.anyio
+async def test_shared_semaphore_is_a_global_extraction_budget(make_files, mstore):
+    """A shared asyncio.Semaphore caps extract() calls across ALL sources of the run."""
+    import asyncio
+
+    extractor = InFlightExtractor()
+    pipeline = MentionStorePipeline(
+        ingest=IngestPipeline(parser=make_parser()),
+        extractor=extractor,
+        mention_store=mstore,
+        splitter=n_way_splitter(8),
+        concurrency=3,
+        split_concurrency=asyncio.Semaphore(2),
+    )
+    await pipeline.run(make_files({"a.txt": "a", "b.txt": "b", "c.txt": "c"}))
+    assert extractor.calls == 24
+    assert extractor.max_in_flight == 2
+
+
+def test_split_concurrency_must_be_positive(mstore):
+    with pytest.raises(ValueError, match="split_concurrency"):
+        MentionStorePipeline(
+            ingest=IngestPipeline(parser=make_parser()),
+            extractor=InFlightExtractor(),
+            mention_store=mstore,
+            split_concurrency=0,
+        )
+
+
+# ---------------------------------------------------------------------------
+# extract() raising inside the sync path
+# ---------------------------------------------------------------------------
+
+
+class FailingOnExtractor:
+    """extract() raises for any split whose rendered body contains *marker*."""
+
+    payload_model = Event
+
+    def __init__(self, marker: str, error: Exception) -> None:
+        self._marker = marker
+        self._error = error
+        self.started: list[str] = []
+        self.finished: list[str] = []
+
+    async def extract(self, document: Document) -> list[Mention[Event]]:
+        import asyncio
+
+        text = " ".join(e.text for e in document.elements)
+        self.started.append(text)
+        if self._marker in text:
+            await asyncio.sleep(0)  # let sibling splits start
+            raise self._error
+        await asyncio.sleep(0.05)
+        self.finished.append(text)
+        return [Mention[Event](mention_id="pending", source_id=document.source_id or "", payload=Event(title=text))]
+
+
+@pytest.mark.anyio
+async def test_extract_error_is_isolated_per_source_in_run(make_files, mstore):
+    """One source whose extract() raises lands in result.errors; the others sync; the failing
+    source's previously stored mentions are left untouched (no half-applied delete)."""
+    paths = make_files({"good.txt": "fine", "bad.txt": "POISON"})
+    await mstore.upsert(
+        [Mention[Event](mention_id="pre", source_id="bad.txt", source_hash="old", payload=Event(title="Old"))]
+    )
+    boom = RuntimeError("extractor exploded")
+    pipeline = make_pipeline(FailingOnExtractor("POISON", boom), mstore)
+
+    result = await pipeline.run(paths)
+
+    assert result.processed == ["good.txt"]
+    assert result.errors == [("bad.txt", boom)]  # the original exception object, keyed by source_id
+    assert [m.payload.title for m in mstore.by_source("bad.txt")] == ["Old"]
+    assert len(mstore.by_source("good.txt")) == 1
+
+
+@pytest.mark.anyio
+async def test_extract_error_in_one_split_fails_whole_source_and_cancels_siblings(make_files, mstore):
+    """A source is atomic: one failing split stores nothing for it, and the sibling splits'
+    extract() calls are cancelled instead of running (and billing) to completion."""
+    boom = RuntimeError("split 2 exploded")
+    extractor = FailingOnExtractor("split 2", boom)
+    pipeline = MentionStorePipeline(
+        ingest=IngestPipeline(parser=make_parser()),
+        extractor=extractor,
+        mention_store=mstore,
+        splitter=n_way_splitter(3),
+    )
+
+    result = await pipeline.run(make_files({"a.txt": "body"}))
+
+    assert result.processed == []
+    assert result.errors == [("a.txt", boom)]
+    assert mstore.stored == {}
+    assert len(extractor.started) == 3
+    assert extractor.finished == []  # siblings cancelled, not awaited to completion
+
+
+@pytest.mark.anyio
+async def test_extract_error_omits_source_from_plan(make_files, mstore):
+    """plan() never raises for a failing source: it is logged and left out of the ChangeSet."""
+    paths = make_files({"good.txt": "fine", "bad.txt": "POISON"})
+    pipeline = make_pipeline(FailingOnExtractor("POISON", RuntimeError("extractor exploded")), mstore)
+
+    changeset = await pipeline.plan(paths)
+
+    assert [c.source_id for c in changeset.to_add] == ["good.txt"]
+    assert changeset.to_update == [] and changeset.to_delete == []
+    assert mstore.stored == {}  # plan() writes nothing
+
+
+@pytest.mark.anyio
+async def test_malformed_llm_output_fails_the_source_without_retry(make_files, mstore):
+    """A completion that does not validate against the schema (pydantic ValidationError out of
+    ``chat.completions.parse``) is not retried by StructuredExtractor and fails only that source."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from pydantic import ValidationError
+
+    from ragdoc.extraction.structured import _batch_model
+
+    async def _parse(**kwargs):  # type: ignore[no-untyped-def]
+        if "POISON" in kwargs["messages"][1]["content"]:
+            _batch_model(Event).model_validate_json('{"mentions": [{"title": ')  # truncated JSON
+        batch = _batch_model(Event)(mentions=[Event(title="Ev")])
+        return MagicMock(choices=[MagicMock(message=MagicMock(parsed=batch))])
+
+    client = MagicMock()
+    client.chat.completions.parse = AsyncMock(side_effect=_parse)
+    pipeline = make_pipeline(StructuredExtractor(Event, client=client, model="m"), mstore)
+
+    result = await pipeline.run(make_files({"good.txt": "fine", "bad.txt": "POISON"}))
+
+    assert result.processed == ["good.txt"]
+    assert [sid for sid, _ in result.errors] == ["bad.txt"]
+    assert isinstance(result.errors[0][1], ValidationError)
+    assert client.chat.completions.parse.await_count == 2  # one per source: no retry of malformed output

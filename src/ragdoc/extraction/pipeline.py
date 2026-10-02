@@ -60,6 +60,7 @@ from ragdoc.pipeline.sync import (
     file_hash,
     source_hash_token,
 )
+from ragdoc.utils.concurrency import resolve_semaphore
 
 logger = logging.getLogger(__name__)
 
@@ -98,9 +99,18 @@ class MentionStorePipeline(Generic[PayloadT]):
         hash_fn: ``Path -> str`` file-byte change-detection hash (default
             :func:`~ragdoc.pipeline.sync.file_hash`, SHA-256 of bytes).
         concurrency: max sources processed concurrently.
+        split_concurrency: max concurrent ``extractor.extract()`` calls over the splits of
+            **one** source (default ``4``). Same convention as the processors'
+            ``concurrency``: an ``int`` is a private bound per source, so the worst case for
+            a run is ``concurrency x split_concurrency`` simultaneous extract calls (40 with
+            the defaults); pass a shared ``asyncio.Semaphore`` instead to cap extract calls
+            across all sources — and across anything else holding that semaphore — at its
+            value. Note an extractor may itself issue more than one LLM call per
+            ``extract()`` (``KnowledgeGraphExtractor`` halving runs two at a time).
 
     Raises:
         TypeError: if *extractor* does not implement the ``Extractor`` protocol.
+        ValueError: if *split_concurrency* is an ``int`` below 1.
     """
 
     def __init__(
@@ -111,6 +121,7 @@ class MentionStorePipeline(Generic[PayloadT]):
         splitter: Splitter | None = None,
         hash_fn: Callable[[Path], str] = file_hash,
         concurrency: int | asyncio.Semaphore = 10,
+        split_concurrency: int | asyncio.Semaphore = 4,
     ) -> None:
         self._wire(
             ingest=ingest,
@@ -120,6 +131,7 @@ class MentionStorePipeline(Generic[PayloadT]):
             splitter=splitter,
             hash_fn=hash_fn,
             concurrency=concurrency,
+            split_concurrency=split_concurrency,
         )
 
     @classmethod
@@ -130,6 +142,7 @@ class MentionStorePipeline(Generic[PayloadT]):
         document_store: DocumentStore,
         splitter: Splitter | None = None,
         concurrency: int | asyncio.Semaphore = 10,
+        split_concurrency: int | asyncio.Semaphore = 4,
     ) -> MentionStorePipeline[PayloadT]:
         """Boundary-2 constructor: split + extract Documents read from *document_store*.
 
@@ -146,6 +159,9 @@ class MentionStorePipeline(Generic[PayloadT]):
             splitter: ``Document -> list[Document]`` splitter run before extraction
                 (``None`` uses :class:`~ragdoc.pipeline.splitter.TokenSplitter` defaults).
             concurrency: max sources processed concurrently.
+            split_concurrency: max concurrent ``extractor.extract()`` calls over the splits
+                of one source (``int``, default ``4``), or a shared ``asyncio.Semaphore``
+                as a cross-source budget — see the class docstring.
 
         Returns:
             A Boundary-2 ``MentionStorePipeline``; its :meth:`plan` / :meth:`run` take
@@ -160,6 +176,7 @@ class MentionStorePipeline(Generic[PayloadT]):
             splitter=splitter,
             hash_fn=file_hash,
             concurrency=concurrency,
+            split_concurrency=split_concurrency,
         )
         return self
 
@@ -173,10 +190,13 @@ class MentionStorePipeline(Generic[PayloadT]):
         splitter: Splitter | None,
         hash_fn: Callable[[Path], str],
         concurrency: int | asyncio.Semaphore,
+        split_concurrency: int | asyncio.Semaphore,
     ) -> None:
         """Shared initialisation for both constructors."""
         if not isinstance(extractor, Extractor):
             raise TypeError("extractor must implement the Extractor protocol: async extract(document) -> list[Mention]")
+        if isinstance(split_concurrency, int) and split_concurrency < 1:
+            raise ValueError(f"split_concurrency must be >= 1, got {split_concurrency}.")
         self._ingest = ingest
         self._extractor = extractor
         self._store = mention_store
@@ -185,6 +205,7 @@ class MentionStorePipeline(Generic[PayloadT]):
         self._splitter: Splitter = splitter if splitter is not None else TokenSplitter()
         self._hash_fn = hash_fn
         self._concurrency = concurrency
+        self._split_concurrency = split_concurrency
         self._engine: SyncEngine[Mention[PayloadT]] = SyncEngine(
             store=mention_store,
             producer=self._produce_from_doc_store if document_store is not None else self._produce_from_path,
@@ -209,7 +230,9 @@ class MentionStorePipeline(Generic[PayloadT]):
         ``source_hash`` may honestly be ``None`` — it is never faked from the content hash).
         Source-of-truth path: both file-mode and Boundary-2 mode delegate here.
 
-        Splits are extracted concurrently, then finalized **in split order** with a running
+        Splits are extracted with bounded concurrency (``split_concurrency``; a failing split
+        fails the source at once and cancels its sibling extractions — a source is atomic, so
+        their results would be discarded anyway), then finalized **in split order** with a running
         per-source ordinal (so identical payloads in different splits mint distinct
         ``mention_id``\\ s) while recording the old → new mention-id map; every edge-carrying
         payload's refs are rewritten through that map, so KG edges keep pointing at the
@@ -226,15 +249,30 @@ class MentionStorePipeline(Generic[PayloadT]):
         for split in splits:
             split.source_id = source_id
             split.source_hash = source_hash
-        results = await asyncio.gather(*(self._extractor.extract(split) for split in splits), return_exceptions=True)
-        for res in results:
-            if isinstance(res, BaseException):
-                raise res  # first failing split fails the source, as before
+        # An int is a private per-source bound (resolved here, inside the running loop); a shared
+        # asyncio.Semaphore passes through and acts as a cross-source budget.
+        sem = resolve_semaphore(self._split_concurrency)
+
+        async def _extract_split(split: Document) -> list[Mention[PayloadT]]:
+            async with sem:
+                return await self._extractor.extract(split)
+
+        tasks = [asyncio.ensure_future(_extract_split(split)) for split in splits]
+        try:
+            results = await asyncio.gather(*tasks)
+        except BaseException:
+            # First failing split fails the source (as before) — but do not let the remaining
+            # splits keep calling the LLM for a result that will be thrown away. Also runs on
+            # cancellation of this source.
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
 
         out: list[Mention[PayloadT]] = []
         id_map: dict[str, str] = {}
         ordinal = 0
-        for split_mentions in cast("list[list[Mention[PayloadT]]]", results):
+        for split_mentions in results:
             for mention in split_mentions:
                 old_id = mention.mention_id
                 mention.ordinal = ordinal

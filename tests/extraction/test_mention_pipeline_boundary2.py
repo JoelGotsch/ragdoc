@@ -298,3 +298,45 @@ async def test_orphan_handling_against_doc_store(docs, mstore):
     result = await pipeline.run(delete_orphans=True)
     assert "b.pdf" in result.deleted
     assert await mstore.list_source_ids() == {"a.pdf"}
+
+
+@pytest.mark.anyio
+async def test_boundary2_split_extraction_is_bounded():
+    """from_document_store exposes the same split_concurrency bound as the direct constructor."""
+    import asyncio
+
+    from ragdoc.extraction.mention import Mention
+
+    class InFlightExtractor:
+        payload_model = Event
+
+        def __init__(self) -> None:
+            self.in_flight = 0
+            self.max_in_flight = 0
+
+        async def extract(self, document: Document) -> list[Mention[Event]]:
+            self.in_flight += 1
+            self.max_in_flight = max(self.max_in_flight, self.in_flight)
+            try:
+                for _ in range(5):
+                    await asyncio.sleep(0)
+            finally:
+                self.in_flight -= 1
+            return [Mention[Event](mention_id="p", source_id=document.source_id or "", payload=Event(title="Ev"))]
+
+    def ten_way_splitter(document: Document) -> list[Document]:
+        return [Document(title=f"s{i}", elements=[Paragraph(html=f"<p>split {i}</p>")]) for i in range(10)]
+
+    docs = MemoryDocumentStore()
+    await _seed(docs, "a", "body")
+    mstore = MemoryMentionStore()
+    extractor = InFlightExtractor()
+    pipeline = MentionStorePipeline.from_document_store(
+        extractor, mstore, docs, splitter=ten_way_splitter, split_concurrency=2
+    )
+
+    result = await pipeline.run()
+
+    assert result.processed == ["a"]
+    assert extractor.max_in_flight == 2
+    assert len(mstore.stored) == 10
