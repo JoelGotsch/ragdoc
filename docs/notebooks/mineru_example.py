@@ -16,7 +16,7 @@ def _(mo):
     mo.md(r"""
     # Example Pipeline using Mineru
 
-    In this example we will use the output of [Mineru](https://github.com/opendatalab/mineru)'s hybrid output (_middle.json file) and show how to parse, process, split, summarize, and render it using RagDoc.
+    In this example we will use the output of [Mineru](https://github.com/opendatalab/mineru)'s hybrid output (_middle.json file) and construct the parser for it. (The full parse → process → split → render walkthrough is in the pipeline walkthrough notebook.)
     """)
     return
 

@@ -12,9 +12,9 @@ two element renderers and multiple output formats.
 | [`render_for_prompt`](../api/rendering.md#render_for_prompt) | Full-fidelity text for LLM context windows and BM25 search |
 | [`render_raw`](../api/rendering.md#render_raw) | Full fidelity, no transformation — for debugging |
 
-`render_for_prompt` is the primary renderer used throughout the pipeline. For `Image`
-elements, it uses `text_representation` as a text fallback when the image cannot be
-displayed directly.
+`render_for_prompt` is the primary renderer used throughout the pipeline. It never emits
+image data: an `Image` renders as its `text_representation`, else its `alt` text, else
+`[Unprocessed Image]`.
 
 ## Using the Renderer
 
@@ -46,7 +46,8 @@ Element renderers always output HTML internally; the `Renderer` handles conversi
 | `OutputFormat.RST` | reStructuredText |
 | `OutputFormat.PLAIN` | Plain text (all markup stripped) |
 
-Format conversion is done via [pypandoc](https://github.com/NicklasTegner/pypandoc).
+MARKDOWN, GFM and RST are converted with [pypandoc](https://github.com/NicklasTegner/pypandoc);
+HTML is returned as is; PLAIN is the HTML's text content (BeautifulSoup `get_text()`).
 
 ## Metadata in output
 
@@ -60,7 +61,8 @@ renderer = Renderer(
     include_title=True,
 )
 text = renderer.render(document)
-# Output starts with: # Document Title\nsource: ...\ndate: ...\n\n...content...
+# Markdown output starts with a YAML front-matter block (keys sorted, title as a key):
+# ---\nauthor: ...\ndate: ...\nsource: ...\ntitle: Document Title\n---\n...content...
 ```
 
 ## Inline reference resolution
@@ -69,13 +71,16 @@ The `Renderer` resolves `<ref id="..." rel="..."/>` tags in element HTML. When a
 contains a reference to an image, the renderer replaces the `<ref>` tag with the rendered
 content of the image element.
 
-Elements that are only referenced inline (and never appear as standalone block elements)
-are skipped during the main rendering pass to avoid duplication.
+With `render_for_prompt`, an element that is referenced inline is rendered only at its
+`<ref>` location, not a second time as a standalone block. `render_raw` renders it in both
+places.
 
 ## Cross-document references
 
-Pass an [`ExternalRefProvider`](../api/rendering.md#externalrefprovider) to access parent
-documents and siblings during rendering. A plain `dict[str, Document]` works:
+Pass an [`ExternalRefProvider`](../api/rendering.md#externalrefprovider) to make other
+documents available to **custom** element renderers (via the render context). The built-in
+renderers do not use it, so it does not change their output. A plain `dict[str, Document]`
+works:
 
 ```python
 all_docs = {doc.id: doc for doc in all_documents}

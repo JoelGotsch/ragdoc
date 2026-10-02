@@ -16,7 +16,7 @@ def _(mo):
     mo.md(r"""
     # Custom Element Types and Parsers
 
-    Note: This is an advanced topic for users who want to extend ragdoc's core functionality.  If you're new to ragdoc, we recommend starting with the [Getting Started](../getting_started.ipynb) guide and referring to the [API Reference](../api_reference.ipynb) for details on existing element types and renderers.
+    Note: This is an advanced topic for users who want to extend ragdoc's core functionality.  If you're new to ragdoc, we recommend starting with the [Getting Started](../getting-started/quickstart.md) guide and referring to the [API Reference](../api/document.md) for details on existing element types and renderers.
 
     This notebook shows how to extend ragdoc with:
 

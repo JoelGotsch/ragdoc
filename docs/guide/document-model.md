@@ -22,7 +22,8 @@ A `Document` is a Pydantic model containing:
 
 `source_path` is a first-class field; the bare filename lives in `metadata["filename"]`.
 Both, and `parser`, are stamped by [`load()`](../api/parsing.md#load) (and by the pipelines
-when you pass a custom parser); they propagate through splitting and into `Chunk`.
+when you pass a custom parser). `source_path` and `metadata` propagate through splitting and
+into `Chunk`; `parser` is not copied to splits.
 
 ```python
 from ragdoc.document import Document, Heading, Paragraph
@@ -71,10 +72,11 @@ A few rules hold for every element:
 ### Image `text_representation`
 
 `Image` elements have an optional `text_representation` field. This is populated by
-`ImageSummaryProcessor` and is used by `render_for_prompt` as a text fallback when
-the image cannot be displayed. The `ImageSummary` model also includes a `decorative`
-boolean field that allows the processor to flag worthless images (e.g. decorative
-borders) so they can be skipped during rendering.
+`ImageSummaryProcessor`. `render_for_prompt` never emits image data: an image renders as its
+`text_representation`, else its `alt` text, else `[Unprocessed Image]`. The `ImageSummary`
+model also has a `decorative` flag; for a decorative image the processor leaves
+`text_representation` as `None` — the image is not removed from the document or the
+rendering.
 
 ```python
 # ImageSummaryProcessor writes here:
@@ -103,16 +105,17 @@ not stored as a field. The HTML is the single source of truth.
 ## Cross-document references
 
 [`ExternalRef`](../api/document.md#externalref) records relationships between documents —
-typically parent/child links created by the splitter:
+such as the `external-parent` link every split carries back to its source document (the
+splitters do not write `external-child` links onto the source):
 
 ```python
 from ragdoc.document import ExternalRef
 
-# After splitting, child documents carry a reference to their parent:
+# What a splitter sets on each split:
 child_doc.external_refs = [
     ExternalRef(target_id=parent_doc.id, rel_type="external-parent")
 ]
-# And the parent carries references to all its children:
+# The reverse link is yours to add if you want it:
 parent_doc.external_refs = [
     ExternalRef(target_id=child_doc.id, rel_type="external-child")
 ]
@@ -129,7 +132,7 @@ doc.tables        # list[Table]
 doc.images        # list[Image]
 doc.footnotes     # list[Footnote]
 
-doc.main_heading  # Heading | None  (the first h1)
+doc.main_heading  # Heading | None  (lowest level number, then earliest by page/position)
 ```
 
 ## Concatenating documents

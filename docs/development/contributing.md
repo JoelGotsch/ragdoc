@@ -76,8 +76,10 @@ These mirror the CI jobs; tox wraps them as `tox -e lint` and `tox -e type`.
 1. Subclass the `Parser` ABC (`src/ragdoc/parsing/parser.py`): set `name`, `patterns`
    (filename suffixes), `priority`, `description`, and implement
    `async def __call__(self, path: Path) -> Document`
-2. In the parser body, set `document.parser` (provenance string), `document.source_path`,
-   and `document.metadata["filename"] = path.name`
+2. Do not stamp file provenance in the parser body: `stamp_provenance` (called by `load()`
+   and `IngestPipeline.run()`) fills `document.parser`, `document.source_path` and
+   `document.metadata["filename"]` wherever the parser left them unset. Set them yourself
+   only when the parser has special provenance semantics
 3. Register it with `register_parser(...)` (`src/ragdoc/parsing/registry.py`) — resolution
    order is: explicit argument → config `parser_preferences` → longest-suffix match + priority
 4. Export from `ragdoc/parsing/__init__.py`

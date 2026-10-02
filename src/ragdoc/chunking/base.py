@@ -7,7 +7,7 @@ The library is async-only.  Implement :meth:`chunk`::
 
     class MyChunker(Chunker):
         async def chunk(self, document: Document) -> list[Chunk]:
-            return [Chunk(prompt_content="...", embedding_content="...")]
+            return [Chunk(prompt_content="...", embedding_content="...", source_id=document.source_id or document.id)]
 
     chunker = MyChunker()
     chunks = await chunker.chunk(doc)

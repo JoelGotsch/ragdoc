@@ -137,7 +137,7 @@ def _(mo):
     | File name ends with | Parser | Notes |
     |-----------|--------|-------|
     | `.html`, `.htm` | `html` | |
-    | `.docx`, `.doc` | `pandoc` | Converted via pandoc |
+    | `.docx` | `pandoc` | Converted via pandoc |
     | `.xlsx` | `xlsx` | Needs the `xlsx` extra |
     | `.pdf` | `azure_di` or `pdf_basic` | Azure Document Intelligence if the `azure-di` extra and credentials are available; otherwise the local `pdf_basic` parser (`pdf` extra) |
     | `.azure.json` | `azure_json` | A saved Azure Document Intelligence result |

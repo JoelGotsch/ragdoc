@@ -38,7 +38,12 @@ in-memory one.
 
 Neither path is a transaction across the corpus. After a sync, look at
 `UpdateResult.errors`: a source listed there was not (fully) written, and what the store holds
-for it is described under [Write discipline](#write-discipline) below.
+for it is described under [Write discipline](#write-discipline) below. One difference between
+the paths: `run()` reports every failure there, whereas on the reviewable path a source that
+fails during hashing or production is left out of the `ChangeSet` by `plan()` and only logged
+(`plan(): N source(s) failed …`) — `apply()`'s `errors` covers embedding and write failures.
+If embedding fails in `apply()`, nothing is written and the orphans in `to_delete` are not
+deleted either.
 
 ### Human-in-the-loop review
 
@@ -67,14 +72,17 @@ two first-class change tokens:
 - **`content_hash`** — `Document.content_hash()`, a canonical-JSON hash over
   `(title, elements)` — pure Python, dependency-stable. Used on the **Boundary-2 path**
   (reading from a [`DocumentStore`](../api/pipeline.md#documentstore)): editing a stored
-  Document changes its hash, which triggers re-chunking/re-extraction.
+  Document's title or elements changes its hash, which triggers re-chunking/re-extraction.
+  A metadata-only edit does **not** change the hash (metadata, `page`, `bounding_box` and
+  provenance fields are excluded), so the stored chunks keep their old metadata until the
+  content changes.
 
 A **missing or blank stored hash means "always changed"** on either path (`None` or `""`).
 Stores use that deliberately: a source whose stored items disagree on their hashes, or whose
 write was interrupted, is reported with blank hashes so it is re-processed.
 
-Both live as first-class fields on the synced items (`Chunk`, `Document`, `Mention`) — never
-in `metadata`.
+Both are first-class fields on `Chunk` and `Mention`. A `Document` carries `source_hash` as a
+field and computes `content_hash()` on demand. Neither is ever stored in `metadata`.
 
 ## The engine, the stores, the producers
 
@@ -110,8 +118,8 @@ How a changed source is written depends on what it is and on what the store can 
 
 | Case | What the engine calls | If the write fails |
 |---|---|---|
-| New source | `upsert(items)` | Nothing was stored before; the source is re-processed as new next run |
-| Updated source, store implements `SourceReplaceStore` | `replace_source(source_id, items)` — new items land **before** stale ones are removed | The previously stored items stay in place |
+| New source | `upsert(items)` | Nothing was stored before; the source is re-processed as new next run (assuming the store's `upsert` does not leave partial items that already carry the final hash) |
+| Updated source, store implements `SourceReplaceStore` | `replace_source(source_id, items)` — new items land **before** stale ones are removed | Store-specific; the contract is that the source must not look "unchanged". The built-in stores are described below: a failure before the stale items are removed leaves the old items in place |
 | Updated source, any other store | `delete_by_source(source_id)` then `upsert(items)` | A failed delete skips the upsert (no old/new mixing). A failed upsert leaves the source **empty**; the next run finds no stored state and re-processes it as new |
 | Updated source that now yields no items | `delete_by_source(source_id)` | Old items stay; retried next run |
 
@@ -119,7 +127,8 @@ How a changed source is written depends on what it is and on what the store can 
 untouched for that source.
 
 The built-in stores that implement `SourceReplaceStore` are `QdrantVectorStore`,
-`QdrantMentionStore`, `QdrantDocumentStore` and `LocalDocumentStore`. A custom store only
+`QdrantMentionStore`, `QdrantDocumentStore` and `LocalDocumentStore` (`LocalMentionStore` does not, and its writes are not atomic). A custom
+store only
 needs `replace_source` if it can honour the contract: a failure must not leave the source
 looking "unchanged", and should leave the previous items in place.
 
@@ -129,19 +138,26 @@ Qdrant has no multi-request transactions, so the stores make an interrupted writ
 *detectable* rather than atomic:
 
 - **Blank-then-stamp.** A write that spans several requests (more than 100 points, or any
-  `replace_source`) first writes the points with `source_hash` / `content_hash` blank and
+  `replace_source` of chunks or mentions) first writes the points with `source_hash` / `content_hash` blank and
   stamps the real hashes with a final `set_payload` once every batch has landed. Until that
   stamp, the source reads as "changed". A write that fits one request is a single upsert.
-- **Failure or cancellation part-way.** The points this call created are deleted again, by
-  point id (on cancellation the cleanup runs shielded, then the cancellation is re-raised).
-  Points that existed before the call are never deleted; if the call had already overwritten
-  one, it is **not** restored to its old content — it keeps the new content with blank hashes.
+- **A batch of a multi-batch write fails or is cancelled.** The points this call created are
+  deleted again, by point id (on cancellation the cleanup runs shielded, then the cancellation
+  is re-raised). Points that existed before the call are never deleted; if the call had
+  already overwritten one, it is **not** restored to its old content — it keeps the new
+  content with blank hashes. This cleanup covers only the batch-writing phase of a write
+  larger than one batch: a single-request write has no cleanup, and neither has a failure in
+  the later steps below.
+- **Replace** writes the new points (blank hashes), then deletes only the source's stale
+  points (ids not in the new set), then stamps. What a failure leaves depends on the step:
+  while writing, the old chunks or mentions stay in place (plus the cleanup above for a
+  multi-batch write); at the stale delete, old and new points **both** remain retrievable,
+  the new ones with blank hashes; at the final stamp, the old points are already gone and the
+  new ones are in place with blank hashes. In every case the source reads as changed and the
+  next sync re-processes it.
 - **Hard crash** (process killed, power loss). No cleanup runs: the partially written points
   remain and are retrievable, with blank hashes, so the next sync re-processes the source and
   replaces them.
-- **Replace** writes the new points, then deletes only the source's stale points (ids not in
-  the new set), then stamps. A failure before the stale delete leaves the old chunks or
-  mentions in place.
 - **Mixed state.** `list_source_state()` reports a source whose points disagree on their
   hashes with blank hashes — "always changed".
 
@@ -157,10 +173,11 @@ Boundary 2 that one source lands in `UpdateResult.errors` while the others proce
   the stored items; with nothing stored there is nothing to compare against, so the source is
   parsed, processed and (where applicable) sent to the LLM again each time until it yields
   items.
-- **A processor-filtered document is treated differently by the two direct paths.**
+- **A processor-filtered document is treated differently by the direct paths.**
   `DocumentStorePipeline` keeps the previously stored Document (the producer returns `None`);
-  `VectorStorePipeline` in direct mode deletes the source's stored chunks (the producer
-  returns an empty change). This is current behaviour, not a contract of the engine.
+  `VectorStorePipeline` and `MentionStorePipeline` in direct mode delete the source's stored
+  chunks / mentions (the producer returns an empty change) and count the source as
+  `processed`. This is current behaviour, not a contract of the engine.
 
 What each pipeline contributes is just:
 
@@ -190,8 +207,11 @@ What each pipeline contributes is just:
 
 Each pipeline takes the boundary-appropriate pipeline type
 ([`IngestPipeline`](../api/pipeline.md#ingestpipeline) or
-[`ChunkPipeline`](../api/pipeline.md#chunkpipeline)), so a stage on the wrong side of a
-boundary is a `TypeError` at construction — see the
+[`ChunkPipeline`](../api/pipeline.md#chunkpipeline)). Those types have no parameter for a
+stage from the other side (`IngestPipeline(splitter=…)` is a `TypeError`), so a misplaced
+stage cannot be expressed. The sync pipelines do not check the class of the pipeline object
+at runtime, though — passing, say, a `DocumentPipeline` where an `IngestPipeline` is expected
+is caught by a type checker, not at construction. See the
 [Pipeline Guide](pipeline.md#scenario-e-two-stage-with-a-documentstore) for the two-stage
 workflow.
 
@@ -202,7 +222,7 @@ All three return the same [`UpdateResult`](../api/pipeline.md#updateresult), key
 
 ```python
 result = await pipeline.run(paths)
-result.processed   # newly added or updated
+result.processed   # newly added or updated (also: a source that now yields nothing, its items deleted)
 result.skipped     # change token matched (or source unavailable)
 result.deleted     # orphans removed (only with delete_orphans=True)
 result.errors      # [(source_id, exception)] — isolated per source

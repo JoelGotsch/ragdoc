@@ -33,14 +33,15 @@ def _(mo):
     |-------|-------------|
     | `id` | Unique identifier (UUID string) |
     | `source_id` | Sync identity key of the source document (required) |
-    | `source_hash` | SHA-256 of the source file bytes (required; chunkers fall back to `Document.content_hash()`) |
+    | `source_hash` | SHA-256 of the source file bytes; `None` outside the sync pipelines (never faked from the content hash) |
+    | `content_hash` | Canonical-JSON hash of the parsed document content |
     | `prompt_content` | Full-fidelity text for LLM context windows and BM25 search |
     | `embedding_content` | Compact semantic text for dense vector search |
     | `metadata` | Key-value metadata from the source document |
-    | `embedding` | Optional pre-computed embedding vector (list[float]) |
+    | `named_embeddings` | Embedding vectors keyed by embedder name (filled by `VectorStorePipeline`) |
     | `created_at` | Timestamp of creation |
 
-    The two content fields come from the two rendering paths.
+    `prompt_content` is rendered from the document; the chunker decides `embedding_content`.
     """)
     return
 
@@ -102,10 +103,10 @@ def _(sample_doc):
         Chunk(
             prompt_content=renderer.render(section),
             embedding_content=renderer.render(section),
-            # source_id / source_hash are required: DocumentPipeline stamps them from the
-            # source path; when building chunks by hand, fall back to document identity.
+            # source_id is required: the pipelines stamp it via source_id_fn; set it yourself
+            # when building chunks by hand. source_hash is optional (the file-byte hash, set
+            # only by the sync pipelines).
             source_id="q3_report.docx",
-            source_hash=section.content_hash(),
             metadata=section.metadata,
         )
         for section in sections
@@ -149,7 +150,7 @@ def _(mo):
     ## Metadata inheritance
 
     When you split a document, child sections inherit parent metadata. Set metadata on the
-    source document before parsing and it will flow through to all chunks.
+    document before splitting and it will flow through to all chunks.
     """)
     return
 

@@ -85,7 +85,8 @@ def _(mo):
     mo.md(r"""
     ### `split_hierarchical`
 
-    Splits recursively by the lowest heading level that produces at least two parts. Use this
+    Splits once, at the lowest heading level that occurs at least twice (`split_document`
+    applies it recursively). Use this
     when you want larger, more self-contained sections that preserve sub-structure.
     """)
     return
@@ -107,8 +108,8 @@ def _(mo):
     mo.md(r"""
     ## Parent-child relationships
 
-    After splitting, each child document has an `external_refs` entry pointing to its parent,
-    and the parent has entries pointing to all children.
+    After splitting, each split has one `external-parent` entry in `external_refs` pointing to
+    the source document. The source document itself is not modified.
     """)
     return
 

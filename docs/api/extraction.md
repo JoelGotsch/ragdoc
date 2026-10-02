@@ -5,8 +5,10 @@ provenance-tagged extraction occurrences), **entities** (canonical, deduplicated
 produced by resolution), and the **typed knowledge graph** (nodes + edges against a
 `GraphSchema`). See the [Extraction Guide](../guide/extraction.md) for the workflow.
 
-Requires the `extraction` extra for the LLM extractors and settings
-(`pip install 'ragdoc[extraction]'`); the data models and stores import without it.
+The data models, stores, extractors and settings import without any extra (the extractors
+need an LLM client, usually via the `llm` extra). The `extraction` extra
+(`pip install 'ragdoc[extraction]'`) adds `edtf` for `FuzzyDate` parsing and `numpy` for the
+resolution pipelines.
 
 ## Layer 1 — Mentions and extractors
 

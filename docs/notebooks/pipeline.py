@@ -711,7 +711,7 @@ def _(mo):
     | **Unchanged file** (byte hash matches the store) | Skipped — listed in `UpdateResult.skipped`. |
     | **Modified file** (byte hash differs) | Re-processed and replaced. A store with `replace_source` (e.g. `QdrantVectorStore`) gets the new chunks before the stale ones are removed; any other store — like the in-memory one here — gets delete-then-upsert. |
     | **Removed file** (in the store, not in the list) | Left in place by default. Deleted only with `delete_orphans=True`. |
-    | **Failing file** | Reported in `UpdateResult.errors`; the other sources are still processed. A failed update keeps the old chunks in a `replace_source` store; with delete-then-upsert a failed upsert leaves the source empty until the next run re-processes it. |
+    | **Failing file** | Reported in `UpdateResult.errors`; the other sources are still processed. An update that fails while the new chunks are being written keeps the old chunks in a `replace_source` store; with delete-then-upsert a failed upsert leaves the source empty until the next run re-processes it. |
 
     ---
 

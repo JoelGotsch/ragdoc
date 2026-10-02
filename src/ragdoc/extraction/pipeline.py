@@ -393,7 +393,7 @@ class MentionStorePipeline(Generic[PayloadT]):
 
         Per-source error isolation. An update goes through the store's ``replace_source`` when
         it has one (``QdrantMentionStore``: new mentions are written before stale ones are
-        removed, so a failed write keeps the old ones). Any other store (e.g.
+        removed, so a write that fails before that removal keeps the old ones). Any other store (e.g.
         ``LocalMentionStore``) is written delete-then-upsert: a source whose stale-delete failed
         is recorded in ``errors`` and **not** upserted (no old/new mixing), and an upsert failing
         after the delete leaves the source without mentions until the next run re-extracts it.

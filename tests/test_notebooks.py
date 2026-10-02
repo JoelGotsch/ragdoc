@@ -44,7 +44,8 @@ def test_chunking_notebook():
     assert len(chunks) > 0
     # SimpleChunker semantics demonstrated in the notebook: embedding == prompt
     assert all(c.embedding_content == c.prompt_content for c in chunks)
-    assert all(c.source_id and c.source_hash for c in chunks)
+    assert all(c.source_id == "q3_report.docx" for c in chunks)
+    assert all(c.source_hash is None for c in chunks)  # hand-built chunks carry no file hash
 
 
 def test_custom_elements_notebook():

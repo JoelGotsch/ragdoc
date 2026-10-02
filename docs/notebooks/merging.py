@@ -32,7 +32,7 @@ def _(mo):
     | Function | `merge_documents` / `compute_patch` | `merge_documents_html` / `compute_html_patch` |
     | Mechanism | Aligns structured elements directly | Render → HTML diff → reparse |
     | Inspectable intermediate | `DocumentPatch` (typed operations) | `DocumentHtmlPatch` (HTML strings) |
-    | Page / bounding-box metadata | preserved | lost (architectural) |
+    | Page / bounding-box metadata | preserved, except on aligned headings (rebuilt) | lost (architectural) |
 
     Use **Approach A** when you need to inspect or override individual merge decisions, or
     when page numbers / bounding boxes must be retained.

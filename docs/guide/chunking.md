@@ -19,7 +19,7 @@ A [`Chunk`](../api/chunking.md#chunk) is a Pydantic model with:
 | `source_id` | Stable source identity used for incremental sync (from `IngestPipeline`'s `source_id_fn`) |
 | `source_hash` | SHA-256 of the raw source-file bytes (`None` outside the sync pipelines) |
 | `content_hash` | Canonical-JSON hash of the parsed document content |
-| `metadata` | Key-value metadata from the source document (includes `metadata["filename"]`, set by parsers) |
+| `metadata` | Key-value metadata from the source document (includes `metadata["filename"]`, stamped at load time) |
 | `named_embeddings` | Embedding vectors keyed by embedder name (populated by `VectorStorePipeline`) |
 | `created_at` | Timestamp of creation |
 
@@ -48,6 +48,7 @@ chunks = [
     Chunk(
         prompt_content=(rendered := renderer.render(section)),
         embedding_content=rendered,
+        source_id=section.source_id or section.source_path or section.id,  # required
         source_path=section.source_path,
         metadata=section.metadata,
     )
@@ -80,6 +81,7 @@ print(document.source_path)          # "/data/annual_report_2024.docx"
 chunk = Chunk(
     prompt_content=...,
     embedding_content=...,
+    source_id=section.source_id or section.source_path or section.id,  # required
     source_path=section.source_path,
     metadata=section.metadata,  # carries metadata["filename"]
 )
@@ -88,7 +90,7 @@ chunk = Chunk(
 ## Metadata inheritance
 
 When you split a document, child sections inherit parent metadata. Set metadata on the
-source document before parsing and it will flow through to all chunks:
+document before splitting and it will flow through to all chunks:
 
 ```python
 document.metadata["department"] = "Finance"

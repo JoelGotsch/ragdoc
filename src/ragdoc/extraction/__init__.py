@@ -12,8 +12,9 @@ Two layers (see ``designs/DESIGN-structured-extraction.md``):
 * **Entities** — canonical, deduplicated records produced by the resolution pass.
 
 :class:`~ragdoc.extraction.dates.FuzzyDate` is a reusable date type embeddable in any
-payload model. The extractors/settings require the ``extraction`` extra (``edtf`` +
-``pydantic-settings``); the data models do not, so they import unconditionally.
+payload model. Everything here imports without an extra. The ``extraction`` extra adds
+``edtf`` (needed once a ``FuzzyDate`` is actually parsed) and ``numpy`` (needed by the
+resolution pipelines); the extractors additionally need an LLM client (``llm`` extra).
 """
 
 from ragdoc.extraction.dates import FuzzyDate, Precision

@@ -28,7 +28,7 @@ uv run marimo edit docs/notebooks/<notebook>.py
 | [Parsing](../notebooks/parsing/) | `load()`, the parser registry, and the built-in parsers |
 | [Rendering](../notebooks/rendering/) | `render_for_prompt` vs `render_raw`, output formats |
 | [Splitting](../notebooks/splitting/) | `split_by_headings`, `split_hierarchical`, post-split processing |
-| [Chunking](../notebooks/chunking/) | Creating `Chunk` objects with `SimpleChunker` and `LLMChunker` |
+| [Chunking](../notebooks/chunking/) | Building `Chunk` objects by hand; how `SimpleChunker` / `LLMChunker` fill the two content fields |
 | [Pipeline](../notebooks/pipeline/) | `DocumentPipeline`, streaming, and incremental sync: `plan()` / `apply()` / `run()`, `ChangeSet`, `DocumentStorePipeline` |
 | [Merging](../notebooks/merging/) | Two-parser merge with `compute_patch` and `compute_html_patch` |
 

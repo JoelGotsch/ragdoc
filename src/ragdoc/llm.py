@@ -17,7 +17,7 @@ Every LLM call in the library goes through this module:
 Retry policy (transport errors only — each site keeps its own failure *product*, e.g. the heading
 resolver degrades to ``[]`` while the chunker raises):
 
-- **Retried** (full-jitter exponential backoff): ``openai.RateLimitError`` (429),
+- **Retried** (exponential backoff with ±50 % jitter): ``openai.RateLimitError`` (429),
   ``openai.APIConnectionError`` (network — includes ``openai.APITimeoutError``), and any
   ``openai.APIStatusError`` with ``status_code >= 500``. A parseable ``Retry-After`` header on a
   429 replaces the computed backoff but is **capped at** ``backoff_max`` — a server asking for a
@@ -430,7 +430,8 @@ async def retry_llm(
     connection/timeout errors, and 5xx server errors. Everything else — other 4xx,
     :class:`LLMRefusalError`, validation errors, non-openai errors — raises immediately.
 
-    Backoff schedule (full jitter): ``min(backoff_max, backoff_base * 2**attempt) *
+    Backoff schedule (±50 % jitter, so a computed delay can reach ``1.5 * backoff_max``):
+    ``min(backoff_max, backoff_base * 2**attempt) *
     uniform(0.5, 1.5)``. A rate limit carrying a parseable ``Retry-After`` header waits
     ``min(retry_after, backoff_max)`` instead (no jitter): the server's hint is honored up to the
     cap, never beyond it — ``Retry-After: 86400`` with ``backoff_max=30`` sleeps 30 s, not a day.

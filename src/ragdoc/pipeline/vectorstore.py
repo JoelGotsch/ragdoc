@@ -35,8 +35,9 @@ whole-corpus embed-first semantics.
 
 **What a failed write leaves behind** depends on the vector store (see
 :mod:`ragdoc.pipeline.sync`): a store offering ``replace_source`` (e.g.
-``QdrantVectorStore``) writes the new chunks before removing stale ones, so a failed update
-keeps serving the previous chunks; any other store is written delete-then-upsert, and an
+``QdrantVectorStore``) writes the new chunks before removing stale ones, so an update that
+fails while writing keeps serving the previous chunks (a failure in the later stale-delete or
+hash-stamp step leaves the new chunks in place with blank hashes — see the store); any other store is written delete-then-upsert, and an
 upsert that fails after the delete leaves the source **empty** until the next run
 re-processes it.
 

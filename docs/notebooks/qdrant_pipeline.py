@@ -223,10 +223,10 @@ def _(mo):
     `QdrantVectorStore.create()` creates the collection and a payload index on `source_id`,
     and returns the store. `vector_size` must match your embedder's output dimension.
 
-    Against a Qdrant **server**, `create()` can be called on every startup: an "already
-    exists" response is ignored. The in-process mode used in this notebook is stricter — it
-    raises if the collection already exists — and it has no payload indexes (Qdrant emits a
-    warning saying so, silenced below).
+    `create()` is idempotent, against a server and in-process alike: it checks whether the
+    collection exists and uses an existing one as is, so it can be called on every startup.
+    The in-process mode used in this notebook has no payload indexes (Qdrant emits a warning
+    saying so, silenced below).
 
     ```python
     # Production: connect to a server instead of ":memory:"
@@ -360,7 +360,7 @@ def _(mo):
     |---|---|
     | **New file** | Parsed, chunked, embedded, upserted |
     | **Unchanged file** | Skipped (its `source_hash` matches the store) |
-    | **Modified file** | Re-processed; the source's old chunks are deleted and the new ones upserted |
+    | **Modified file** | Re-processed; the new chunks are written first, then the source's stale chunks are removed (`replace_source`) |
     | **Removed file** | Left in the store by default; deleted only with `delete_orphans=True` |
 
     ### First run — all files processed

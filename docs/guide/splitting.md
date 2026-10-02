@@ -38,7 +38,8 @@ Use this when you want uniform granularity — one section per heading regardles
 
 ### `split_hierarchical`
 
-Splits recursively by the lowest heading level that produces at least two parts:
+Splits once, at the lowest heading level that occurs at least twice; parent headings are
+prepended to each part as context (`split_document` applies it recursively):
 
 ```python
 from ragdoc.splitting import split_hierarchical
@@ -76,8 +77,9 @@ the text tiers directly.
 
 ## Parent-child relationships
 
-After splitting, each child document has an `external_refs` entry pointing to its parent,
-and the parent has entries pointing to all children:
+After splitting, each split carries one `external-parent` entry in `external_refs` pointing
+to the source document. The source document is not modified — no `external-child` entries
+are written to it; add them yourself if you need them:
 
 ```python
 sections = split_by_headings(document)
@@ -87,9 +89,9 @@ for section in sections:
     print(f"Section '{section.title}' has parent: {parent_refs}")
 ```
 
-These relationships can be used by the renderer's
-[`ExternalRefProvider`](rendering.md#cross-document-references) to include
-context from sibling or parent sections in the rendered output.
+A custom element renderer can look related documents up through the renderer's
+[`ExternalRefProvider`](rendering.md#cross-document-references). The built-in renderers do
+not use it, so these relationships do not change the rendered output by themselves.
 
 ## Post-split processing
 
@@ -111,7 +113,9 @@ sections = [await processor.process(section) for section in sections]
 
 `split_document` writes `metadata["split_sequence"]` (1-based position) and
 `metadata["split_total"]` (total split count) into every document it produces —
-including documents that fit within the budget (`split_sequence=1, split_total=1`).
+including documents that fit within the budget (`split_sequence=1, split_total=1`). (One gap:
+a document that is over budget but cannot be split any further comes back as a single split
+without these keys.)
 The list it returns is already in reading order, but these keys let you restore
 that order after documents have been stored, retrieved, or reordered:
 

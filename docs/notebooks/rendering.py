@@ -32,8 +32,7 @@ def _(mo):
     | [`render_raw`][ragdoc.rendering.render_raw] | Full fidelity, no transformation — for debugging |
 
     `render_for_prompt` is the primary renderer used throughout the pipeline. For `Image`
-    elements, it uses `text_representation` as a text fallback when the image cannot be
-    displayed directly.
+    elements it emits text only: `text_representation`, else `alt`, else `[Unprocessed Image]`.
     """)
     return
 
@@ -98,7 +97,8 @@ def _(mo):
     | `OutputFormat.RST` | reStructuredText |
     | `OutputFormat.PLAIN` | Plain text (all markup stripped) |
 
-    Format conversion is done via [pypandoc](https://github.com/NicklasTegner/pypandoc).
+    MARKDOWN, GFM and RST are converted with [pypandoc](https://github.com/NicklasTegner/pypandoc);
+    HTML is returned as is; PLAIN is the HTML's text content.
     """)
     return
 
@@ -132,7 +132,7 @@ def _(mo):
     ## Image text_representation
 
     When `ImageSummaryProcessor` sets `image.text_representation`, `render_for_prompt` uses
-    it as a text fallback when the image cannot be displayed directly.
+    it as the image's text (falling back to `alt`, then `[Unprocessed Image]`).
     """)
     return
 
@@ -158,8 +158,9 @@ def _(mo):
     mo.md(r"""
     ## Cross-document references
 
-    Pass an [`ExternalRefProvider`][ragdoc.rendering.ExternalRefProvider] to access parent
-    documents and siblings during rendering. A plain `dict[str, Document]` works:
+    Pass an [`ExternalRefProvider`][ragdoc.rendering.ExternalRefProvider] to make other
+    documents available to custom element renderers (the built-in renderers do not use it).
+    A plain `dict[str, Document]` works:
     """)
     return
 

@@ -79,7 +79,7 @@ def _(mo):
     mo.md(r"""
     ## Available parsers
 
-    ### Word documents (`.docx`, `.doc`)
+    ### Word documents (`.docx`)
 
     Uses [Pandoc](https://pandoc.org/) to convert Word documents to HTML, then parses the
     HTML into a `Document`.
@@ -198,7 +198,7 @@ def _(mo):
     | File name ends with | Parser name | Priority |
     |---------|--------|----------|
     | `.html`, `.htm` | `html` | 0 |
-    | `.docx`, `.doc` | `pandoc` | 0 |
+    | `.docx` (`.doc` is registered but pandoc cannot read it) | `pandoc` | 0 |
     | `.xlsx` | `xlsx` | 0 |
     | `.azure.json` | `azure_json` | 0 |
     | `.pdf` | `azure_di` | 40 |

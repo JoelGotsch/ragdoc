@@ -324,7 +324,7 @@ def _(mo):
     | Processor | Type | What it does |
     |---|---|---|
     | `LLMHeadingResolver` | Async (LLM) | Sends heading metadata to an LLM; maps to `h1`/`h2`/`h3`; sets `document.title` |
-    | `TitleDetectionProcessor` | Sync | Removes preamble elements that appear before the detected title |
+    | `TitleDetectionProcessor` | Sync | Fallback title detection: acts only when the document has no title yet (it skips documents whose title the resolver already set) |
     | `FootnoteProcessor` | Async | Inserts `<ref>` tags linking footnote citation numbers to their definitions |
     """)
     return
@@ -343,9 +343,11 @@ def _(mo):
     We pass the shared `llm_client` built from `LLMHeadingResolverSettings` in the setup cell.
     That client already carries the API key and (if configured) the base URL.
 
-    `TitleDetectionProcessor` runs afterwards with `remove_elements_before_title=True`.
-    This strips any preamble elements that appear before the title on the first pages
-    (cover page boilerplate, distribution codes, date headers, etc.).
+    `TitleDetectionProcessor` runs afterwards as a fallback: it only acts when the resolver
+    found no title, because it skips documents that already have one. In that fallback case
+    `remove_elements_before_title=True` strips preamble elements before the title (cover page
+    boilerplate, distribution codes, date headers). To strip the preamble when the *resolver*
+    sets the title, pass `remove_elements_before_title=True` to `LLMHeadingResolver`.
     """)
     return
 
@@ -378,8 +380,8 @@ async def _(
 def _(mo):
     mo.md(r"""
     **Observation:** The LLM has assigned semantic levels to the headings.
-    `TitleDetectionProcessor` then confirmed the title and removed any cover-page preamble
-    that preceded it, so `elements` now starts with the first substantive content.
+    The resolver also set `document.title` and removed the title heading from `elements`;
+    `TitleDetectionProcessor` had nothing left to do (the document already has a title).
     """)
     return
 
@@ -400,7 +402,7 @@ def _(mo):
 
     For each `Footnote` element in the document it:
     1. Searches paragraph text for occurrences of the footnote number using a heuristic scorer.
-    2. Scores candidates by structural signals (end-of-clause punctuation, superscript position, page proximity).
+    2. Scores candidates by structural signals (end-of-clause punctuation, superscript position); candidates are limited to the footnote's page.
     3. Inserts `<ref id="…" rel="footnote"/>` at the best-match position in the element's HTML.
 
     The `Renderer` resolves these `<ref>` tags inline when generating prompt content,
@@ -600,7 +602,7 @@ def _(mo):
     | Stage | Class / Function | What it produced |
     |---|---|---|
     | 1. Parsing | `MinerUParser` | `doc_parsed` — flat `Document` with CSS-styled flat `h1` headings |
-    | 2a. Headings | `LLMHeadingResolver` + `TitleDetectionProcessor` | `doc_headings` — semantic `h1`/`h2`/`h3` levels; `document.title` set; preamble removed |
+    | 2a. Headings | `LLMHeadingResolver` + `TitleDetectionProcessor` | `doc_headings` — semantic `h1`/`h2`/`h3` levels; `document.title` set |
     | 2b. Footnotes | `FootnoteProcessor` | `doc_enriched` — inline `<ref>` tags linking citations to definitions |
     | 3. Splitting | `split_document` | Token-bounded `Document` list with shared heading context |
     | 4. Chunking | `Chunk` | `prompt_content` + `embedding_content` ready for a vector store |

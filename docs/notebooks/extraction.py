@@ -296,7 +296,7 @@ def _(mo):
 
     - **Real LLM extraction** — replace the stub with
       `StructuredExtractor(Person, client=AsyncOpenAI())` (requires
-      `ragdoc[extraction,llm]`); nothing else changes.
+      `ragdoc[llm]`; add `extraction` for `FuzzyDate` parsing and entity resolution); nothing else changes.
     - **Typed knowledge graphs** — declare node/edge models and legal patterns in a
       [`GraphSchema`][ragdoc.extraction.GraphSchema], extract with
       `KnowledgeGraphExtractor(schema)` through the *same* `MentionStorePipeline`, then

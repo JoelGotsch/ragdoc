@@ -113,9 +113,9 @@ def _(mo):
     ### Image `text_representation`
 
     `Image` elements have an optional `text_representation` field. This is populated by
-    `ImageSummaryProcessor` and is used by `render_for_prompt` as a text fallback when the
-    image cannot be displayed. The `ImageSummary` model also includes a `decorative` boolean
-    field for flagging worthless images that can be skipped during rendering.
+    `ImageSummaryProcessor`. `render_for_prompt` renders an image as its `text_representation`,
+    else its `alt` text, else `[Unprocessed Image]`. The `ImageSummary` model also has a
+    `decorative` flag; for a decorative image the processor leaves `text_representation` unset.
     """)
     return
 
@@ -188,7 +188,7 @@ def _(Document, Heading, Paragraph):
         elements=[Paragraph(html="<p>Introduction text.</p>")],
     )
 
-    # After splitting, relationships are set automatically by split_by_headings / split_document
+    # Splitters set this external-parent link on every split (the reverse link below is manual)
     child_doc.external_refs = [
         ExternalRef(target_id=parent_doc.id, rel_type="external-parent")
     ]

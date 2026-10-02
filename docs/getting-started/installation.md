@@ -7,7 +7,7 @@
 
 ## Install with uv
 
-The base install is deliberately lean: it parses HTML/Word/Markdown (via pandoc),
+The base install is deliberately lean: it parses HTML and Word `.docx` (via pandoc),
 processes, splits, and chunks with no ML-sized dependencies. Everything else is
 an extra:
 
@@ -55,9 +55,10 @@ install command — e.g. parsing a `.pdf` on a base install raises at parser
 | `azure-di` | `azure_di` | Full layout, tables, figures | Azure credentials required |
 | `pdf-mineru` | `mineru` | Full layout via MinerU `_middle.json` | run MinerU separately |
 
-With multiple installed, the registry picks the highest-fidelity *available*
-parser (mineru 50 > azure_di 40 > pdf_basic 10); unavailable ones (missing
-package or credentials) are skipped at resolve time.
+For a `.pdf` path the registry picks the highest-priority *available* parser
+(azure_di 40 > pdf_basic 10); unavailable ones (missing package or credentials)
+are skipped at resolve time. MinerU is not a `.pdf` parser: run MinerU yourself
+and `load()` the `*_middle.json` it writes.
 
 ## Install for development
 
@@ -75,9 +76,10 @@ uv sync --all-extras --group docs
 
 Some parsers require system tools:
 
-- **Word documents** (`.docx`, `.doc`): requires [Pandoc](https://pandoc.org/installing.html)
+- **Word documents** (`.docx`): requires [Pandoc](https://pandoc.org/installing.html)
   installed and on `PATH`.
-- **PDF via MinerU** (`pdf-mineru` extra): requires additional model downloads on first use.
+- **MinerU output** (`pdf-mineru` extra): ragdoc only reads MinerU's `*_middle.json`; install and
+  run MinerU separately (MinerU downloads its own models).
 
 ## Verify installation
 

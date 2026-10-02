@@ -13,8 +13,9 @@ One streaming core drives every sync pipeline (``VectorStorePipeline``,
 **How an updated source is written** depends on the store:
 
 * A store implementing :class:`SourceReplaceStore` gets one ``replace_source`` call. The
-  store writes the new items before removing the stale ones, so a failed write leaves the
-  previously stored items in place.
+  store writes the new items before removing the stale ones, so a failure while writing
+  leaves the previously stored items in place; a failure in a later step (removing stale
+  items, committing) is store-specific but must never leave the source looking "unchanged".
 * Any other store gets ``delete_by_source`` followed by ``upsert``. If the upsert fails
   after the delete, the source is left **empty** in the store (the error is recorded); the
   next run finds no stored state for it and re-processes it as new.
@@ -591,7 +592,8 @@ class SyncEngine(Generic[T]):
         * new source — ``upsert`` (nothing stored to replace);
         * update with no items — ``delete_by_source`` (the source now yields nothing);
         * update, store is a :class:`SourceReplaceStore` — ``replace_source`` (new items
-          land before stale ones are removed; a failure keeps the old items);
+          land before stale ones are removed; what a failure leaves is the store's contract,
+          but the source must not look "unchanged");
         * update, any other store — ``delete_by_source`` then ``upsert``. A failed delete
           skips the upsert; a failed upsert leaves the source **empty** until the next run
           re-processes it as new.

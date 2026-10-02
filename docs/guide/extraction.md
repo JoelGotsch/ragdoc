@@ -16,8 +16,9 @@ uv add "ragdoc[qdrant]"             # optional: Qdrant-backed stores
 ```
 
 The data models (`Mention`, `Entity`, `GraphSchema`, `FuzzyDate`) and the local stores
-import without any extra; the LLM extractors need `extraction` (and a configured client,
-usually via the `llm` extra).
+import without any extra, and so do the extractors and `ExtractionSettings` — they only need
+a client (usually via the `llm` extra). The `extraction` extra adds `edtf`, needed once a
+payload actually parses a `FuzzyDate`, and `numpy`, needed by the resolution pipelines.
 
 ## The three layers
 
@@ -156,14 +157,15 @@ The same person extracted from ten documents is ten mentions but one entity.
 [`EntityResolutionPipeline`](../api/extraction.md#entityresolutionpipeline) clusters a
 `MentionStore` into an `EntityStore`:
 
-1. **Seed** — group mentions whose identity text matches exactly.
+1. **Seed** — group mentions whose identity text matches exactly (ignoring case and
+   surrounding whitespace).
 2. **Block** — embed each cluster's representative text and propose nearest-neighbour
    merge candidates above `cosine_threshold`.
 3. **Review** — an LLM reviewer confirms or rejects each candidate group
    ([`make_llm_reviewer`](../api/extraction.md#make_llm_reviewer); inject a fake in tests).
    Confident groups merge; uncertain ones are surfaced as `pending`, never silently merged.
 4. **Canonicalize** — each final cluster becomes one
-   [`Entity`](../api/extraction.md#entity) carrying its member `mention_ids` and
+   [`Entity`](../api/extraction.md#entity) carrying its `member_mention_ids` and
    contributing `source_ids`.
 
 ```python

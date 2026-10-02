@@ -32,7 +32,7 @@ highest-priority parser wins:
 | Pattern | Parser | Name | Priority | Extra |
 |---------|--------|------|----------|-------|
 | `.html`, `.htm` | HTML | `html` | — | — |
-| `.docx`, `.doc` | Pandoc | `pandoc` | — | — |
+| `.docx` (`.doc` is registered but not readable, see below) | Pandoc | `pandoc` | — | — |
 | `.xlsx` | Excel | `xlsx` | — | `xlsx` |
 | `.azure.json` | Azure DI (JSON) | `azure_json` | — | — |
 | `.pdf` | pymupdf (local) | `pdf_basic` | 10 | `pdf` |
@@ -53,12 +53,16 @@ time telling you which extra to install.
 | `azure-di` | `azure_di` | Full layout, tables, figures | Azure credentials |
 | `pdf-mineru` | `mineru` | Full layout via MinerU `_middle.json` | run MinerU separately |
 
-With `ragdoc[pdf]` installed, `load("report.pdf")` just works; configure Azure DI (or run
-MinerU) when you need higher fidelity — the registry then prefers those automatically.
+With `ragdoc[pdf]` installed, `load("report.pdf")` just works; configure Azure DI when you
+need higher fidelity — the registry then prefers it automatically for `.pdf`. MinerU is not a
+`.pdf` parser: run MinerU yourself and `load()` the `*_middle.json` it writes.
 
 ## Available parsers
 
-### Word documents (`.docx`, `.doc`)
+### Word documents (`.docx`)
+
+> Legacy `.doc` files resolve to the pandoc parser but fail: pandoc has no `doc` reader.
+> Convert them to `.docx` first.
 
 Uses [Pandoc](https://pandoc.org/) to convert Word documents to HTML, then parses the
 HTML into a `Document`.
@@ -172,8 +176,10 @@ document = await load("output/report_middle.json")
 # Images in output/images/*.png are loaded automatically
 ```
 
-If Pillow is not installed or an image file is not found, the `Image` element is silently
-skipped and a warning is recorded on the document context (not raised as an exception).
+Image loading needs Pillow, which ships with the `llm` extra (not with `pdf-mineru`). If
+Pillow is missing, the file is not found, or the image cannot be decoded, the `Image` element
+is skipped — logged or noted on the internal parse context, never raised — and nothing about
+it appears on the returned `Document`.
 
 #### Discarded blocks never reach `Document.metadata`
 
@@ -435,14 +441,18 @@ the merge strategy and nesting `MultiSourceParser` for three-way merges.
 
 ## What parsers produce
 
-All parsers produce a `Document` where:
+Every parser produces a `Document` where:
 
 - Elements store content as `html` (full HTML including the outer tag)
 - Visual properties (font size, weight, alignment) are stored as **inline CSS** on the HTML tags
 - `document.parser` is set to identify the source parser
 - Inline references (`<ref id="..." rel="..."/>`) are embedded in HTML for images and footnotes
-- `document.metadata["filename"]` is set to the source filename (e.g. `"report.docx"`)
-- `document.source_path` is set to the full path as a string (e.g. `"/data/report.docx"`)
+
+File provenance is added by `load()` and `IngestPipeline.run()` (via `stamp_provenance`), not
+by the parser classes: `document.metadata["filename"]` (e.g. `"report.docx"`),
+`document.source_path` (e.g. `"/data/report.docx"`), and `document.parser` if the parser left
+it unset. A parser called directly — `await HTMLParser()(path)` — returns a document without
+`source_path` and `filename`; call `stamp_provenance` yourself if you need them.
 
 The CSS-in-HTML convention is what allows processors like
 [`HeadingLevelProcessor`](../api/processing.md#headinglevelprocessor) to work uniformly

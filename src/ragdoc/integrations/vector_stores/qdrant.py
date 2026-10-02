@@ -270,9 +270,9 @@ class QdrantVectorStore(_QdrantCollectionStore):
         client alike. An existing collection is kept **as is**: its data stays, and its vector
         configuration is neither compared with these arguments nor altered.
 
-        A payload index on ``source_id`` is created so that
-        :meth:`delete_by_source` and :meth:`list_source_state` filter in
-        O(log n) rather than O(n).
+        A payload index on ``source_id`` is created so that :meth:`delete_by_source` and
+        the stale-chunk delete of :meth:`replace_source` filter by index.
+        (:meth:`list_source_state` scrolls the whole collection regardless.)
 
         When *sparse_vectors* are provided the collection is created with
         **named** dense and sparse vector fields, enabling hybrid retrieval:
@@ -413,7 +413,9 @@ class QdrantVectorStore(_QdrantCollectionStore):
     async def list_source_state(self) -> dict[str, SourceState]:
         """Return ``source_id`` -> :class:`SourceState` for every source, in one scan.
 
-        Scrolls the whole collection once, recording the first ``source_hash`` /
-        ``content_hash`` seen per ``source_id`` (all chunks of a source share them).
+        Scrolls the whole collection once (hash payload keys only, no vectors). A source
+        reports its hashes only when all of its chunks agree on them; a source whose chunks
+        disagree — half-replaced or interrupted mid-write — is reported with blank hashes,
+        which change detection reads as "always changed".
         """
         return await self._list_source_state()

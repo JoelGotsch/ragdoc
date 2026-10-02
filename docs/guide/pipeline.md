@@ -165,7 +165,8 @@ print(f"Produced {len(result.chunks)} chunks from {len(paths)} files")
 
 ### Error handling
 
-By default errors propagate immediately (`on_error="raise"`).
+By default errors propagate immediately (`on_error="raise"`); files already in flight are not
+cancelled and finish in the background.
 Use `on_error="skip"` to collect failures and continue:
 
 ```python
@@ -240,7 +241,7 @@ all without any local state file.
 
 ```python
 from pathlib import Path
-from ragdoc.pipeline import VectorStorePipeline, TokenSplitter
+from ragdoc.pipeline import DocumentPipeline, TokenSplitter, VectorStorePipeline
 
 vs_pipeline = VectorStorePipeline(
     pipeline=DocumentPipeline(splitter=TokenSplitter()),
@@ -329,10 +330,12 @@ for source_id, exc in result.errors:
 ```
 
 Always check `errors` after a sync: a source listed there was not (fully) written. What the
-store then holds for it depends on the store — with `QdrantVectorStore` a failed update keeps
-the previously stored chunks; with a store that only offers delete-then-upsert a failed upsert
-leaves the source empty until the next run re-processes it. Either way the next run picks the
-source up again. Cancellation (`asyncio.CancelledError`) is never collected: it propagates,
+store then holds for it depends on the store and on where the write failed — with
+`QdrantVectorStore` an update that fails while the new chunks are being written keeps the
+previously stored chunks (a failure in the later stale-delete or hash-stamp step can leave old
+and new chunks side by side, or only the new ones, with blank hashes); with a store that only
+offers delete-then-upsert a failed upsert leaves the source empty. Either way the source
+reads as changed and the next run re-processes it. Cancellation (`asyncio.CancelledError`) is never collected: it propagates,
 and sources already written stay written. The details are in the Sync Engine Guide under
 [Write discipline](sync-engine.md#write-discipline).
 
@@ -403,8 +406,11 @@ point id, and the vectors).  The provenance fields (`source_id`, `source_hash`,
 
 ### Performance notes
 
-- `create()` adds a Qdrant payload index on `source_id`, turning filter operations
-  in `list_source_state` and `delete_by_source` from O(n) scans into O(log n) lookups.
+- `create()` adds a Qdrant payload index on `source_id`, so `delete_by_source` and the
+  stale-chunk delete of an update filter by index instead of scanning.
+- `list_source_state()` — called once per `plan()` / `run()` — scrolls every point (three
+  payload keys, no vectors, 1000 per page), so each sync costs one O(n) pass over the
+  collection.
 - `upsert()` batches points in groups of 100 to avoid gRPC message size limits. A write
   spanning several batches is made detectable rather than atomic: points are written with
   blank change-detection hashes and the real hashes are stamped once every batch has landed,
@@ -499,8 +505,8 @@ resolution).
 | `LocalDocumentStore` | one JSON file per source on disk | local dev, single machine, hand-editing | — |
 | `QdrantDocumentStore` | one Qdrant point per source | shared across workers/containers | `qdrant` |
 
-Each stage takes the boundary-appropriate pipeline type, so a misplaced stage is a
-`TypeError` at construction: `DocumentStorePipeline` takes an `IngestPipeline` (no
+Each stage takes the boundary-appropriate pipeline type, which has no parameter for a stage
+from the other side (so a misplaced stage keyword is a `TypeError`): `DocumentStorePipeline` takes an `IngestPipeline` (no
 splitter/chunker parameter exists), and the Boundary-2 vector sync is a separate
 constructor — `VectorStorePipeline.from_document_store` — taking a `ChunkPipeline`
 (no parser/processors parameter exists).

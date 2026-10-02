@@ -272,7 +272,7 @@ handler swapping, image loading, and metadata propagation.
       heading_level: 5
 
 !!! note "MinerUMiddleDocument is internal"
-    `MinerUMiddleDocument` is an internal type produced by the MinerU library.
+    `MinerUMiddleDocument` is ragdoc's internal Pydantic model of MinerU's `_middle.json`.
     It is not part of the public API and is not documented here.
     Use `MinerUParser`, `parse_mineru_file`, or `MinerUExtractor` instead.
 

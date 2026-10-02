@@ -20,8 +20,10 @@ class MyProcessor(DocumentProcessor):
 - **Return `None` to drop the document.**
   [`ProcessingPipeline`](../api/processing.md#processingpipeline) short-circuits on
   `None` (later processors never run), `IngestPipeline.run()` returns `None`, and
-  `DocumentPipeline.run()` returns `[]` chunks for the filtered file. The sync pipelines
-  treat a filtered source as "yields nothing" — its stale stored entries are deleted.
+  `DocumentPipeline.run()` returns `[]` chunks for the filtered file. In the sync
+  pipelines, direct-mode `VectorStorePipeline` and `MentionStorePipeline` treat a filtered
+  source as "yields nothing" and delete its stale stored entries, while
+  `DocumentStorePipeline` skips it with a warning and keeps the stored Document.
 - **Extend metadata, never replace it.** Write individual keys
   (`document.metadata["x"] = ...`); assigning a new dict silently discards `filename`
   and everything earlier processors wrote. Library-written metadata keys are for
@@ -99,13 +101,18 @@ chunks = [c for s in enriched if s is not None for c in await chunker.chunk(s)]
 
 ## Configuring the LLM
 
-All LLM processors resolve their client through one chain (see the
-[LLM API](../api/llm.md)): an explicit `client=` argument wins, else
-the `openai_client` of the active [`RagdocConfig`](../api/config.md#ragdocconfig)
-(set with `configure(...)`), else construction fails loudly with `LLMNotConfiguredError`.
+`DocumentSummarizerProcessor`, `LLMFootnoteResolver` and the default
+`ImageSummaryProcessor()` resolve their client through one chain (see the
+[LLM API](../api/llm.md)): an explicit client wins (`client=`; for `ImageSummaryProcessor`
+the `summarize=` callable you build from a client), else the `openai_client` of the active
+[`RagdocConfig`](../api/config.md#ragdocconfig) (set with `configure(...)`), else
+construction fails loudly with `LLMNotConfiguredError`.
 `RagdocConfig.openai_client` accepts any client with a `chat` and/or an `embeddings`
 attribute (`ChatClient | EmbeddingsClient`; an `AsyncOpenAI` has both). Processors need the
 chat capability, so an embeddings-only client there also raises `LLMNotConfiguredError`.
+`LLMHeadingResolver` has its own chain — explicit `client=`, then a client built from
+`LLMHeadingResolverSettings` (base URL + API key), then the config client — and raises
+`ValueError` when none of them yields a chat-capable client.
 `configure()` is a context manager — the config is active inside the block:
 
 ```python
