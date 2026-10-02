@@ -17,7 +17,11 @@ def _(mo):
     # Complete Pipeline Walkthrough
 
     End-to-end walkthrough of the **ragdoc** document processing pipeline using a real
-    MinerU-parsed government document as input.
+    MinerU-parsed research paper (the BERT paper, arXiv:1810.04805) as input.
+
+    Stage 1 (parsing) runs offline. Stage 2 uses an LLM to resolve heading levels, so the
+    cells from there on run only when an API key is configured (see *Configuration* below);
+    without one they are skipped and the notebook still executes cleanly.
 
     | Stage | What happens |
     |---|---|
@@ -48,26 +52,41 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ---
-    ## Full pipeline — ingestion script
+    ## Setup
 
-    The block below shows the complete pipeline as you would write it in a production ingestion script.
-    The rest of the notebook unpacks each step in detail.
+    ### Configuration
+
+    The pipeline uses an LLM for heading resolution. Any OpenAI-compatible endpoint works.
+    Credentials are read from the environment (or a `.env` file in the project root) —
+    never hardcoded:
+
+    ```dotenv
+    LLM_HEADING_RESOLVER_API_KEY=<your-api-key>
+    LLM_HEADING_RESOLVER_MODEL_NAME=gpt-4o-mini
+    # Optional: only needed for an OpenAI-compatible endpoint other than api.openai.com
+    # LLM_HEADING_RESOLVER_BASE_URL=https://llm.example.com/v1
+    ```
+
+    `LLMHeadingResolverSettings` (a `pydantic-settings` model) reads these automatically
+    via the `LLM_HEADING_RESOLVER_` prefix. We build one shared `AsyncOpenAI` client from
+    those settings and pass it to the processors that need it.
+
+    If `LLM_HEADING_RESOLVER_API_KEY` is not set, `llm_client` is `None` and the cells that
+    call the LLM are skipped.
     """)
     return
 
 
 @app.cell
-async def _(mo):
-    import asyncio
+def _(mo):
     import hashlib
     from pathlib import Path
 
     from dotenv import load_dotenv
-    from httpx import AsyncClient
     from openai import AsyncOpenAI
 
     from ragdoc.chunking import Chunk
+    from ragdoc.document import Footnote, Heading, Table
     from ragdoc.parsing.mineru import MinerUParser
     from ragdoc.parsing.mineru.base import MinerUMiddleDocument
     from ragdoc.processing import (
@@ -79,44 +98,93 @@ async def _(mo):
     )
     from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
     from ragdoc.splitting import split_document
-    load_dotenv()
+    from ragdoc.utils import GPTTokenizer
+
+    load_dotenv()  # searches upward from the CWD; finds the project-root .env
+
     # Resolve the fixture relative to the notebook file so the path works from any CWD
     DATA_FILE = (mo.notebook_dir() / "../../tests/parsing/data/mineru/bert-paper_middle.json").resolve()
 
-    async def ingest(path: Path) -> list[Chunk]:
-        doc_parsed = await MinerUParser()(path)
-        settings = LLMHeadingResolverSettings()
-        http_client = AsyncClient(verify=False)
-        llm_client = AsyncOpenAI(max_retries=3, api_key=settings.api_key.get_secret_value(), base_url=settings.base_url, http_client=http_client)
-        doc_enriched = await ProcessingPipeline([LLMHeadingResolver(client=llm_client), TitleDetectionProcessor(remove_elements_before_title=True), FootnoteProcessor()]).process(doc_parsed)
-        prompt_renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
-        splits = split_document(doc_enriched, renderer=prompt_renderer, max_tokens=7000, overlap_tokens=200)
-        source_hash = hashlib.sha256(path.read_bytes()).hexdigest()  # noqa: ASYNC240 — doc example; sync read is fine here
-        return [Chunk(prompt_content=prompt_renderer.render(_split), embedding_content=prompt_renderer.render(_split), source_id=path.name, source_hash=source_hash, metadata={"filename": path.stem, "title": doc_enriched.title, "heading_path": " > ".join(h.text for h in _split.headings)}) for _split in splits]
-    chunks_quick = await ingest(DATA_FILE)
-    # In a script: asyncio.run(ingest(DATA_FILE))
-    # In a notebook, await works directly:
-    print(f"{len(chunks_quick)} chunks produced")
+    # Read LLM_HEADING_RESOLVER_* from the environment and build a shared client.
+    settings = LLMHeadingResolverSettings()
+    _api_key = settings.api_key.get_secret_value() if settings.api_key else ""
+    llm_client = (
+        AsyncOpenAI(api_key=_api_key, base_url=settings.base_url, max_retries=3) if _api_key else None
+    )
+
+    if llm_client is None:
+        print("LLM_HEADING_RESOLVER_API_KEY is not set: LLM-backed cells will be skipped.")
+    else:
+        print(f"LLM endpoint: {settings.base_url or 'default (api.openai.com)'}")
+        print(f"LLM model:    {settings.model_name}")
     return (
-        AsyncClient,
-        AsyncOpenAI,
         Chunk,
+        DATA_FILE,
+        Footnote,
         FootnoteProcessor,
+        GPTTokenizer,
+        Heading,
         LLMHeadingResolver,
-        LLMHeadingResolverSettings,
         MinerUMiddleDocument,
         MinerUParser,
         OutputFormat,
         Path,
         ProcessingPipeline,
         Renderer,
+        Table,
         TitleDetectionProcessor,
-        asyncio,
         hashlib,
-        load_dotenv,
+        llm_client,
         render_for_prompt,
         split_document,
     )
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ---
+    ## Full pipeline — ingestion script
+
+    The block below shows the complete pipeline as you would write it in an ingestion script.
+    The rest of the notebook unpacks each step in detail.
+    """)
+    return
+
+
+@app.cell
+async def _(
+    Chunk,
+    DATA_FILE,
+    FootnoteProcessor,
+    LLMHeadingResolver,
+    MinerUParser,
+    OutputFormat,
+    Path,
+    ProcessingPipeline,
+    Renderer,
+    TitleDetectionProcessor,
+    hashlib,
+    llm_client,
+    mo,
+    render_for_prompt,
+    split_document,
+):
+    mo.stop(llm_client is None, mo.md("*Skipped: set `LLM_HEADING_RESOLVER_API_KEY` to run the LLM-backed pipeline.*"))
+
+    async def ingest(path: Path) -> list[Chunk]:
+        doc_parsed = await MinerUParser()(path)
+        doc_enriched = await ProcessingPipeline([LLMHeadingResolver(client=llm_client), TitleDetectionProcessor(remove_elements_before_title=True), FootnoteProcessor()]).process(doc_parsed)
+        prompt_renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)
+        splits = split_document(doc_enriched, renderer=prompt_renderer, max_tokens=7000, overlap_tokens=200)
+        source_hash = hashlib.sha256(path.read_bytes()).hexdigest()  # noqa: ASYNC240 — doc example; sync read is fine here
+        return [Chunk(prompt_content=prompt_renderer.render(_split), embedding_content=prompt_renderer.render(_split), source_id=path.name, source_hash=source_hash, metadata={"filename": path.name, "title": doc_enriched.title, "heading_path": " > ".join(h.text for h in _split.headings)}) for _split in splits]
+
+    # In a script: asyncio.run(ingest(DATA_FILE))
+    # In a notebook, await works directly:
+    chunks_quick = await ingest(DATA_FILE)
+    print(f"{len(chunks_quick)} chunks produced")
+    return (chunks_quick,)
 
 
 @app.cell(hide_code=True)
@@ -128,60 +196,6 @@ def _(mo):
     The same pipeline, one stage at a time — with explanations and intermediate output at each step.
     """)
     return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Setup
-
-    ### Configuration
-
-    The pipeline uses an LLM for heading resolution and table summarisation.
-    Credentials are loaded from a `.env` file in the project root — never hardcoded.
-
-    Create `.env` with the following variables:
-
-    ```dotenv
-    LLM_HEADING_RESOLVER_BASE_URL=https://llm.example.com/v1
-    LLM_HEADING_RESOLVER_API_KEY=<your-api-key>
-    LLM_HEADING_RESOLVER_MODEL_NAME=<your-model-name>
-    ```
-
-    `LLMHeadingResolverSettings` (a `pydantic-settings` model) reads these automatically
-    via the `LLM_HEADING_RESOLVER_` prefix. We then build a shared `AsyncOpenAI` client
-    from those settings.
-
-    The internal endpoint uses a private CA, so a custom `httpx.AsyncClient` is required.
-    Set `verify=False` to skip verification, or `verify=str(path_to_ca_bundle)` to pin
-    the corporate certificate bundle.
-    """)
-    return
-
-
-@app.cell
-def _(AsyncClient, AsyncOpenAI, LLMHeadingResolverSettings, load_dotenv):
-    load_dotenv()
-    from ragdoc.document import Footnote, Heading, Table
-    from ragdoc.utils import GPTTokenizer
-    settings = LLMHeadingResolverSettings()
-    http_client = AsyncClient(verify=False)
-    llm_client = AsyncOpenAI(max_retries=3, api_key=settings.api_key.get_secret_value(), base_url=settings.base_url, http_client=http_client)  # searches upward from CWD; finds the project-root .env
-    llm_model = settings.model_name
-    print(f"LLM endpoint: {settings.base_url}")
-    print(f"LLM model:    {llm_model}")
-    # Read LLM_HEADING_RESOLVER_* from environment and build a shared client.
-    # The internal endpoint uses a private CA — verify=False skips cert validation.
-    # To pin the corporate bundle instead: AsyncClient(verify=str(Path("certs/ca-bundle-all.crt")))
-    print("Imports OK")
-    return (
-        Footnote,
-        GPTTokenizer,
-        Heading,
-        Table,
-        llm_client,
-        llm_model,
-    )
 
 
 @app.cell
@@ -245,7 +259,7 @@ def _(mo):
     1. Reads each block type and creates the corresponding `BaseElement` subclass.
     2. Encodes visual properties — font size, text alignment — as **inline CSS** on the element's `html`.
        This CSS-in-HTML convention is what later processors (`LLMHeadingResolver`) depend on.
-    3. Returns a flat `Document` with all heading-type blocks tagged `h3` (MinerU's default) and `parser="mineru"` set.
+    3. Returns a flat `Document` with all heading-type blocks tagged `h1` (no hierarchy yet).
 
     > **Note on images:** MinerU's `_middle.json` does not expose image blocks as structured elements.
     > Images are detected during PDF rendering but their content is not available in the intermediate format.
@@ -255,14 +269,24 @@ def _(mo):
 
 
 @app.cell
-async def _(MinerUMiddleDocument, MinerUParser, mo):
-    DATA_FILE_1 = (mo.notebook_dir() / "../../tests/parsing/data/mineru/bert-paper_middle.json").resolve()
-    source = MinerUMiddleDocument.from_json_path(DATA_FILE_1)
-    doc_parsed = await MinerUParser()(DATA_FILE_1)
+async def _(DATA_FILE, MinerUMiddleDocument, MinerUParser):
+    source = MinerUMiddleDocument.from_json_path(DATA_FILE)
+    doc_parsed = await MinerUParser()(DATA_FILE)
     print(f"Parsed  parser={doc_parsed.parser!r}  elements={len(doc_parsed.elements)}")
     print(f"Pages in source JSON: {len(source.pdf_info)}")
     print(f"Tables found: {len(doc_parsed.tables)}")
-    return DATA_FILE_1, doc_parsed
+    return (doc_parsed,)
+
+
+@app.cell
+def test_stage_1_parsing(doc_parsed):
+    # Parsing needs no LLM: this holds with or without an API key.
+    assert doc_parsed.parser == "mineru"
+    assert len(doc_parsed.headings) > 0
+    assert len(doc_parsed.tables) > 0
+    # Every heading comes out as a flat h1; resolving the real levels is Stage 2's job.
+    assert {h.level for h in doc_parsed.headings} == {1}
+    return
 
 
 @app.cell
@@ -274,7 +298,7 @@ def _(doc_parsed, doc_structure):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    **Observation:** Headings are tagged `h3` — the flat level MinerU assigns to all title-type blocks.
+    **Observation:** Every heading is tagged `h1` — the parser has no hierarchy information, only one flat level.
     Each `Heading` carries CSS `font-size` (derived from the average line height in the bounding box)
     and possibly `text-align: center` when the block is horizontally centred on the page.
     This is the raw material `LLMHeadingResolver` uses in Stage 2.
@@ -295,7 +319,7 @@ def _(mo):
     ## Stage 2 — Processing
 
     Processing enriches the `Document` in place — no rendered strings leave this stage.
-    Four processors run in sequence:
+    Three processors run in sequence:
 
     | Processor | Type | What it does |
     |---|---|---|
@@ -317,7 +341,7 @@ def _(mo):
     from `elements` and written to `document.title`.
 
     We pass the shared `llm_client` built from `LLMHeadingResolverSettings` in the setup cell.
-    That client already has the correct base URL, API key, and custom httpx transport baked in.
+    That client already carries the API key and (if configured) the base URL.
 
     `TitleDetectionProcessor` runs afterwards with `remove_elements_before_title=True`.
     This strips any preamble elements that appear before the title on the first pages
@@ -333,7 +357,10 @@ async def _(
     TitleDetectionProcessor,
     doc_parsed,
     llm_client,
+    mo,
 ):
+    mo.stop(llm_client is None, mo.md("*Skipped: set `LLM_HEADING_RESOLVER_API_KEY` to run Stage 2 onwards.*"))
+
     doc_headings = await ProcessingPipeline([
         LLMHeadingResolver(client=llm_client),
         TitleDetectionProcessor(remove_elements_before_title=True),
@@ -527,7 +554,7 @@ def _(mo):
 @app.cell
 def _(
     Chunk,
-    DATA_FILE_1,
+    DATA_FILE,
     OutputFormat,
     Renderer,
     doc_enriched,
@@ -536,8 +563,8 @@ def _(
     splits,
     tokenizer,
 ):
-    _source_hash = hashlib.sha256(DATA_FILE_1.read_bytes()).hexdigest()
-    chunks: list[Chunk] = [Chunk(prompt_content=prompt_renderer.render(_split), embedding_content=prompt_renderer.render(_split), source_id=DATA_FILE_1.name, source_hash=_source_hash, metadata={"filename": DATA_FILE_1.stem, "document_title": doc_enriched.title, "heading_path": " > ".join(h.text for h in _split.headings), "n_elements": len(_split.elements)}) for _split in splits]
+    _source_hash = hashlib.sha256(DATA_FILE.read_bytes()).hexdigest()
+    chunks: list[Chunk] = [Chunk(prompt_content=prompt_renderer.render(_split), embedding_content=prompt_renderer.render(_split), source_id=DATA_FILE.name, source_hash=_source_hash, metadata={"filename": DATA_FILE.name, "document_title": doc_enriched.title, "heading_path": " > ".join(h.text for h in _split.headings), "n_elements": len(_split.elements)}) for _split in splits]
     print(f"Created {len(chunks)} chunks.\n")
     print(f"{'ID':10}  {'prompt tok':>10}  {'embed tok':>9}  Heading path")
     print("-" * 80)
@@ -572,7 +599,7 @@ def _(mo):
 
     | Stage | Class / Function | What it produced |
     |---|---|---|
-    | 1. Parsing | `MinerUParser` | `doc_parsed` — flat `Document` with CSS-styled `h3` headings, `parser="mineru"` |
+    | 1. Parsing | `MinerUParser` | `doc_parsed` — flat `Document` with CSS-styled flat `h1` headings |
     | 2a. Headings | `LLMHeadingResolver` + `TitleDetectionProcessor` | `doc_headings` — semantic `h1`/`h2`/`h3` levels; `document.title` set; preamble removed |
     | 2b. Footnotes | `FootnoteProcessor` | `doc_enriched` — inline `<ref>` tags linking citations to definitions |
     | 3. Splitting | `split_document` | Token-bounded `Document` list with shared heading context |
