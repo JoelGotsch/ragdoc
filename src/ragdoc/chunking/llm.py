@@ -132,6 +132,13 @@ class LLMChunker(Chunker):
     LLM context) but have distinct ``embedding_content`` values — one per
     topic summary returned by the LLM.
 
+    Failure products: an LLM error or refusal **raises** (after the shared retry policy).
+    A successful response with **no usable summaries** — an empty list, or only blank
+    strings — does not drop the document from the index: it falls back to a single chunk
+    with ``embedding_content = prompt_content`` (what :class:`SimpleChunker` emits) and logs
+    one WARNING. Blank summaries next to real ones are dropped silently. A document that
+    renders to nothing and gets no summaries yields no chunks.
+
     Args:
         client: Async OpenAI-compatible client.  Falls back to
             ``get_config().openai_client`` when ``None``; raises
@@ -238,6 +245,18 @@ class LLMChunker(Chunker):
             f"LLMChunker: generating topic summaries (model={self._model})"
             f" -> {len(topic_summaries.summaries)} summaries"
         )
+        # Blank summaries are unusable as embedding targets (an empty string cannot be embedded).
+        summaries = [s for s in topic_summaries.summaries if s.strip()]
+        if not summaries and rendered.strip():
+            # The model answered but gave nothing to embed. Emitting zero chunks would silently
+            # drop this content from the index, so degrade to SimpleChunker's product: one chunk
+            # whose embedding content is the prompt content.
+            logger.warning(
+                f"LLMChunker: {doc_label}: the model returned no usable topic summaries "
+                f"({len(topic_summaries.summaries)} returned, all blank); falling back to a single chunk "
+                "with embedding_content = prompt_content."
+            )
+            summaries = [rendered]
 
         metadata = self._metadata_fn(document)
         prov = resolve_chunk_provenance(document)
@@ -251,8 +270,8 @@ class LLMChunker(Chunker):
                 embedding_content=summary,
                 metadata=dict(metadata),  # type: ignore[reportArgumentType]  # fresh dict per chunk
             )
-            for summary in topic_summaries.summaries
+            for summary in summaries
         ]
-        logger.info(f"LLMChunker: {doc_label} -> {len(topic_summaries.summaries)} embedding contents")
-        logger.debug(f"LLMChunker: {doc_label} topics: {[s[:80] for s in topic_summaries.summaries]}")
+        logger.info(f"LLMChunker: {doc_label} -> {len(summaries)} embedding contents")
+        logger.debug(f"LLMChunker: {doc_label} topics: {[s[:80] for s in summaries]}")
         return chunks

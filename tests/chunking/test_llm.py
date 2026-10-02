@@ -117,3 +117,60 @@ async def test_llm_chunker_multi_chunk_ordinals_distinct():
     assert len(chunks) == 3
     assert len({c.id for c in chunks}) == 3
     assert {c.source_id for c in chunks} == {"src"}
+
+
+# --- Empty / blank summaries: content must not vanish from the index ---
+
+
+@pytest.mark.anyio
+async def test_llmchunker_empty_summaries_fall_back_to_single_chunk(caplog):
+    """`summaries == []` used to yield zero chunks — the split silently vanished from the index.
+    Fallback: one chunk embedding the prompt content itself (what SimpleChunker would emit)."""
+    import logging
+
+    chunker = LLMChunker(client=_mock_client([]), model="test")
+    doc = Document(elements=[Paragraph(html="<p>important content</p>")], metadata={"k": "v"})
+    doc.source_id = "src"
+
+    with caplog.at_level(logging.WARNING, logger="ragdoc.chunking.llm"):
+        chunks = await chunker.chunk(doc)
+
+    assert len(chunks) == 1
+    chunk = chunks[0]
+    assert "important content" in chunk.prompt_content
+    assert chunk.embedding_content == chunk.prompt_content
+    assert chunk.source_id == "src"
+    assert chunk.content_hash == doc.content_hash()
+    assert chunk.metadata == {"k": "v"}
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    assert "no usable topic summaries" in warnings[0].getMessage()
+
+
+@pytest.mark.anyio
+async def test_llmchunker_blank_summaries_fall_back_to_single_chunk():
+    """Whitespace-only summaries are as useless as none (an empty string cannot be embedded)."""
+    chunker = LLMChunker(client=_mock_client(["", "   \n"]), model="test")
+    chunks = await chunker.chunk(Document(elements=[Paragraph(html="<p>important content</p>")]))
+    assert len(chunks) == 1
+    assert chunks[0].embedding_content == chunks[0].prompt_content
+
+
+@pytest.mark.anyio
+async def test_llmchunker_drops_blank_summaries_among_real_ones(caplog):
+    """Blank entries are dropped; real summaries are kept as-is and no fallback chunk is added."""
+    import logging
+
+    chunker = LLMChunker(client=_mock_client(["topic a", "  ", "topic b"]), model="test")
+    with caplog.at_level(logging.WARNING, logger="ragdoc.chunking.llm"):
+        chunks = await chunker.chunk(Document(elements=[Paragraph(html="<p>hi</p>")]))
+    assert [c.embedding_content for c in chunks] == ["topic a", "topic b"]
+    assert not [r for r in caplog.records if "no usable topic summaries" in r.getMessage()]
+
+
+@pytest.mark.anyio
+async def test_llmchunker_forwards_request_timeout():
+    client = _mock_client(["topic a"])
+    chunker = LLMChunker(client=client, model="test", request_timeout=11.0)
+    await chunker.chunk(Document(elements=[Paragraph(html="<p>hi</p>")]))
+    assert client.chat.completions.parse.call_args.kwargs["timeout"] == 11.0
