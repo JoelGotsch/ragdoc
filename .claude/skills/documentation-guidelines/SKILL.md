@@ -161,10 +161,14 @@ uv run marimo check docs/notebooks/*.py   # catches undefined names, reactive-gr
 ```
 
 **Layer 2 — pytest execution:**
-Marimo notebooks are pure Python; pytest discovers and runs them natively — no plugin needed:
+Marimo notebooks are pure Python and marimo exposes every `test_*` cell as a test function,
+which pytest collects and runs (each test runs the cell's upstream cells first):
 ```bash
 uv run pytest docs/notebooks/
 ```
+Two pieces of config make this work — keep them: `python_files` in `pyproject.toml` includes
+`docs/notebooks/*.py` (`testpaths` stays `tests`, so a bare `uv run pytest` does not run this
+layer), and `docs/conftest.py` awaits test cells whose upstream cells are async.
 
 **Layer 3 — `test_*` cells inside notebooks:**
 Name assertion cells `test_*`. These serve dual purpose: pytest runs them in CI, and
@@ -175,25 +179,25 @@ is also readable documentation:
 @app.cell
 def test_document_parsed(doc):
     assert len(doc.elements) > 0, "document must have elements after parsing"
-    assert doc.filename is not None
+    assert doc.metadata["filename"] == "report.html"
     # for notebooks: fixtures defined in one cell can't be used by test cells in another —
     # pass the value as a cell argument instead (as shown above)
 ```
 
 **Layer 4 — `tests/test_notebooks.py`:**
 Every notebook gets a test using `app.run()`, which executes the notebook programmatically
-and returns `(outputs, defs)` for assertions:
+and returns `(outputs, defs)` for assertions. `app.run()` is synchronous, so these are plain
+sync tests; assert on values the notebook computed, never on things that cannot fail:
 
 ```python
 # tests/test_notebooks.py
-from docs.notebooks.pipeline_walkthrough import app
-import pytest
+def test_quickstart_notebook():
+    from docs.notebooks.quickstart import app
 
-@pytest.mark.anyio
-async def test_pipeline_walkthrough():
-    outputs, defs = app.run()
-    assert "chunks" in defs
-    assert len(defs["chunks"]) > 0
+    _outputs, defs = app.run()
+    chunks = defs["chunks"]
+    assert len(chunks) == 1
+    assert "Quarterly Report" in chunks[0].prompt_content
 
 # Override cell values to test different scenarios:
 # outputs, defs = app.run(defs={"max_tokens": 1000})
