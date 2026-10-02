@@ -16,10 +16,19 @@ from __future__ import annotations
 
 import datetime as dt
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypeAlias
 
 if TYPE_CHECKING:
     from ragdoc.extraction.entity import Entity
+
+WhereValue: TypeAlias = str | int | bool
+"""A value a ``where`` constraint can match exactly.
+
+Restricted to the scalars *every* backend can match by exact value: the in-memory filter
+compares with ``==``, Qdrant with ``MatchValue`` (which accepts ``str | int | bool`` only — no
+floats, no ``None``, no lists/dicts). ``EntityQuery`` promises identical evaluation across
+backends, so the type admits nothing a backend would reject.
+"""
 
 
 @dataclass(frozen=True)
@@ -41,12 +50,13 @@ class EntityQuery:
 
     Attributes:
         date: When set, keep only entities whose date interval overlaps this range.
-        where: Exact-match constraints on canonical-payload fields (``{field: value}``).
+        where: Exact-match constraints on canonical-payload fields (``{field: value}``);
+            values are ``str | int | bool`` scalars (:data:`WhereValue`).
         limit: Maximum number of results to return (``None`` = no limit).
     """
 
     date: DateRange | None = None
-    where: dict[str, Any] = field(default_factory=dict)
+    where: dict[str, WhereValue] = field(default_factory=dict)
     limit: int | None = None
 
 

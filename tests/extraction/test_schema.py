@@ -330,3 +330,31 @@ def test_render_patterns_prompt_lists_triples():
 def test_render_patterns_prompt_empty_for_no_patterns():
     schema = GraphSchema(node_types=(Person,), edge_types=(), patterns=())
     assert render_patterns_prompt(schema) == ""
+
+
+# ---------------------------------------------------------------------------
+# Raw-input coercion (mode="before" validator)
+# ---------------------------------------------------------------------------
+
+
+def test_list_coercion_does_not_mutate_the_callers_mapping():
+    """model_validate(mapping) coerces lists to tuples in a copy — the caller's dict is untouched."""
+    raw = {
+        "node_types": [Person, Company],
+        "edge_types": [Employment],
+        "patterns": [[Person, Employment, Company]],
+    }
+    schema = GraphSchema.model_validate(raw)
+
+    assert schema.node_types == (Person, Company)
+    assert schema.patterns == ((Person, Employment, Company),)
+    assert raw == {
+        "node_types": [Person, Company],
+        "edge_types": [Employment],
+        "patterns": [[Person, Employment, Company]],
+    }
+
+
+def test_non_mapping_input_is_rejected_by_pydantic():
+    with pytest.raises(ValidationError):
+        GraphSchema.model_validate("not a schema")

@@ -78,15 +78,24 @@ class GraphSchema(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _coerce_to_tuples(cls, data: Any) -> Any:
-        """Accept lists for user convenience; store as tuples (hashable / immutable)."""
-        if isinstance(data, dict):
-            for key in ("node_types", "edge_types"):
-                if key in data and isinstance(data[key], list):
-                    data[key] = tuple(data[key])
-            if "patterns" in data and isinstance(data["patterns"], list):
-                data["patterns"] = tuple(tuple(p) for p in data["patterns"])
-        return data
+    def _coerce_to_tuples(cls, data: object) -> object:
+        """Accept lists for user convenience; store as tuples (hashable / immutable).
+
+        *data* is the raw, not-yet-validated constructor input (``object``: a ``mode="before"``
+        validator may receive anything). Only a mapping is rewritten — into a new dict, the
+        caller's is not mutated; everything else is passed through for Pydantic to reject.
+        """
+        if not isinstance(data, dict):
+            return data
+        coerced: dict[object, object] = dict(data)
+        for key in ("node_types", "edge_types"):
+            value = coerced.get(key)
+            if isinstance(value, list):
+                coerced[key] = tuple(value)
+        patterns = coerced.get("patterns")
+        if isinstance(patterns, list):
+            coerced["patterns"] = tuple(tuple(p) if isinstance(p, list) else p for p in patterns)
+        return coerced
 
     @model_validator(mode="after")
     def _validate_schema(self) -> GraphSchema:
