@@ -71,7 +71,8 @@ async def parse_with_retry(
     :func:`ragdoc.llm.call_structured`: transport errors (429/connection/timeout/5xx) are retried
     with backoff, deterministic errors (other 4xx) are not, and a ``parsed`` of ``None`` raises
     :class:`~ragdoc.llm.LLMRefusalError` without retrying. When exhausted, the last underlying
-    exception re-raises unchanged (the KG halving wrapper catches it above).
+    exception re-raises unchanged (the KG extractor halves its input on top, but only for
+    size-related failures — :func:`ragdoc.llm.is_size_related_failure`).
     """
     return await call_structured(
         client,

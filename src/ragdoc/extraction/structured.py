@@ -115,18 +115,29 @@ class ExtractionSettings(BaseSettings):
     temperature: float = Field(
         default=0.0, description="Sampling temperature (``0.0`` for the most reproducible extraction)."
     )
-    max_retries: int = Field(default=2, description="Maximum retries on an LLM API failure.")
+    max_retries: int = Field(
+        default=2,
+        description=(
+            "Maximum additional attempts on a *retryable* LLM failure (429, connection/timeout, 5xx) — "
+            "the shared ``ragdoc.llm`` policy; the SDK client's own retries are bypassed."
+        ),
+    )
     request_timeout: float | None = Field(
         default=None,
         description=(
             "Per-call timeout (seconds) for the LLM ``.parse()`` request, honored by both "
             "extractors. ``None`` defers to the openai client's default (typically 600s). Set "
             "lower (e.g. ``180``) to fail-fast on pathological inputs so the caller can react — "
-            "e.g. ``KnowledgeGraphExtractor`` falls back to halving sooner."
+            "e.g. ``KnowledgeGraphExtractor`` halves the input once ``max_retries + 1`` attempts "
+            "have all timed out."
         ),
     )
     gleaning: bool = Field(
-        default=False, description="KG: run one extra ``.parse()`` pass asking the LLM for missed entities."
+        default=False,
+        description=(
+            "KG: run one extra ``.parse()`` pass that shows the LLM its first answer and asks for "
+            "missed entities; repeated nodes/edges are de-duplicated when merging."
+        ),
     )
     max_union_size: int = Field(
         default=10,
@@ -137,7 +148,12 @@ class ExtractionSettings(BaseSettings):
         ),
     )
     halving_max_depth: int = Field(
-        default=3, description="KG: maximum recursive halving depth when an LLM extraction call fails."
+        default=3,
+        description=(
+            "KG: maximum recursive halving depth when an LLM extraction call fails for a *size-related* "
+            "reason (context length, truncated or malformed output, timeout after retries). Other "
+            "failures (auth, rate limit, connection, 5xx, refusal) never halve. ``0`` disables halving."
+        ),
     )
     halving_min_chars: int = Field(
         default=1000, description="KG: below this text length, halving re-raises instead of splitting further."
