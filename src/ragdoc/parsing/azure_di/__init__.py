@@ -1,3 +1,4 @@
+import asyncio
 import json
 from pathlib import Path
 
@@ -78,7 +79,8 @@ class AzureJSONParser(Parser):
     description: str = "Azure Document Intelligence JSON result files"
 
     async def __call__(self, path: Path) -> Document:
-        return parse_azure_json(path)
+        # File read + a blocking pandoc subprocess (markdown -> html) — run off the event loop.
+        return await asyncio.to_thread(parse_azure_json, path)
 
 
 class AzureDIParser(Parser):
@@ -107,7 +109,10 @@ class AzureDIParser(Parser):
         )
 
     async def __call__(self, path: Path) -> Document:
-        return parse_pdf_azure_di(path)
+        # Synchronous Azure SDK call (upload + poller.result()) followed by a blocking pandoc
+        # subprocess — run off the event loop. to_thread copies the context, so the active
+        # configure(...) credentials are visible in the worker thread.
+        return await asyncio.to_thread(parse_pdf_azure_di, path)
 
 
 def _register() -> None:

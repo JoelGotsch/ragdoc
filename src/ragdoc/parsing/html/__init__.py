@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 from ragdoc.document import Document
@@ -25,7 +26,10 @@ class HTMLParser(Parser):
     description: str = "HTML files"
 
     async def __call__(self, path: Path) -> Document:
-        return load_html(path)
+        # File read + bs4 parse + (with download_images) one synchronous httpx.get per remote
+        # image — run off the event loop. to_thread copies the context, so the active
+        # configure(...) settings are visible in the worker thread.
+        return await asyncio.to_thread(load_html, path)
 
 
 def _register() -> None:

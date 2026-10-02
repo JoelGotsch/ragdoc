@@ -6,6 +6,7 @@ parser reports itself unavailable via :meth:`MinerUParser.is_available` until
 the extra is installed.
 """
 
+import asyncio
 import importlib.util
 from pathlib import Path
 
@@ -48,7 +49,7 @@ async def parse_mineru_file(path: Path) -> Document:
     Returns:
         Parsed :class:`~ragdoc.document.Document` with ``parser="mineru"``.
     """
-    source = parse_middle_json_file(path)
+    source = await asyncio.to_thread(parse_middle_json_file, path)  # file read + JSON validation
     extractor = MinerUExtractor()
     return await extractor.parse(source, source_path=path)
 
@@ -101,7 +102,7 @@ class MinerUParser(Parser):
 
     async def __call__(self, path: Path) -> Document:
         if self.extractor is not None:
-            source = parse_middle_json_file(path)
+            source = await asyncio.to_thread(parse_middle_json_file, path)  # file read + JSON validation
             return await self.extractor.parse(source, source_path=path)
         return await parse_mineru_file(path)
 

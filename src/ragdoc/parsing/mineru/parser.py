@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from ragdoc.document import Document
@@ -44,46 +45,61 @@ class CoreExtractor(BaseExtractionStage):
         self.config: ExtractionConfig = config if config is not None else ExtractionConfig()
 
     async def process(self, context: ParseContext) -> ParseContext:
-        """Iterate all pages and dispatch every block to its configured handler."""
-        context.metadata.setdefault("_default_heading_level", self.config.default_heading_level)
+        """Iterate all pages and dispatch every block to its configured handler.
 
-        for page in context.source.pdf_info:
-            for block in page.para_blocks:
-                results: list[ParsedElement]
-                if isinstance(block, TitleBlock):
-                    results = self.config.handle_title(block, page, context)
-                elif isinstance(block, TextBlock):
-                    results = self.config.handle_text(block, page, context)
-                elif isinstance(block, ListBlock):
-                    results = self.config.handle_list(block, page, context)
-                elif isinstance(block, CodeBlock):
-                    results = self.config.handle_code(block, page, context)
-                elif isinstance(block, ImageBlock):
-                    results = self.config.handle_image(block, page, context)
-                elif isinstance(block, TableBlock):
-                    results = self.config.handle_table(block, page, context)
-                elif isinstance(block, ChartBlock):
-                    results = self.config.handle_chart(block, page, context)
-                elif isinstance(block, (RefTextBlock, InterlineEquationBlock)):
-                    # Top-level ref_text (bibliography entries) and
-                    # interline_equation blocks have the same shape as a
-                    # TextBlock — a flat list of lines — so reuse the text
-                    # handler. They become Paragraph elements in the Document.
-                    results = self.config.handle_text(
-                        block,  # type: ignore[arg-type]  # RefTextBlock/InterlineEquationBlock are structurally TextBlock (flat .lines)
-                        page,
-                        context,
-                    )
-                else:
-                    results = []
-                context.elements.extend(results)
+        Handlers are synchronous and some block (the chart handler forks a pandoc subprocess,
+        the image handler reads and decodes image files), so the whole dispatch loop runs in a
+        worker thread via :func:`extract_elements` — sequentially, in document order.
+        """
+        return await asyncio.to_thread(extract_elements, self.config, context)
 
-            for block in page.discarded_blocks:
-                handler = self.config.discarded_handlers.get(block.type)
-                if handler is not None:
-                    context.elements.extend(handler(block, page, context))
 
-        return context
+def extract_elements(config: ExtractionConfig, context: ParseContext) -> ParseContext:
+    """Dispatch every block of ``context.source`` to its handler in *config* (synchronous).
+
+    Appends the produced :class:`~ragdoc.parsing.mineru.base.ParsedElement` objects to
+    ``context.elements`` in document order and returns the same context. Blocking — call it via
+    ``asyncio.to_thread`` from async code (as :meth:`CoreExtractor.process` does).
+    """
+    context.metadata.setdefault("_default_heading_level", config.default_heading_level)
+
+    for page in context.source.pdf_info:
+        for block in page.para_blocks:
+            results: list[ParsedElement]
+            if isinstance(block, TitleBlock):
+                results = config.handle_title(block, page, context)
+            elif isinstance(block, TextBlock):
+                results = config.handle_text(block, page, context)
+            elif isinstance(block, ListBlock):
+                results = config.handle_list(block, page, context)
+            elif isinstance(block, CodeBlock):
+                results = config.handle_code(block, page, context)
+            elif isinstance(block, ImageBlock):
+                results = config.handle_image(block, page, context)
+            elif isinstance(block, TableBlock):
+                results = config.handle_table(block, page, context)
+            elif isinstance(block, ChartBlock):
+                results = config.handle_chart(block, page, context)
+            elif isinstance(block, (RefTextBlock, InterlineEquationBlock)):
+                # Top-level ref_text (bibliography entries) and
+                # interline_equation blocks have the same shape as a
+                # TextBlock — a flat list of lines — so reuse the text
+                # handler. They become Paragraph elements in the Document.
+                results = config.handle_text(
+                    block,  # type: ignore[arg-type]  # RefTextBlock/InterlineEquationBlock are structurally TextBlock (flat .lines)
+                    page,
+                    context,
+                )
+            else:
+                results = []
+            context.elements.extend(results)
+
+        for block in page.discarded_blocks:
+            handler = config.discarded_handlers.get(block.type)
+            if handler is not None:
+                context.elements.extend(handler(block, page, context))
+
+    return context
 
 
 # =============================================================================
