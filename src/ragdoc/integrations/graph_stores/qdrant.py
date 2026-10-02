@@ -27,7 +27,8 @@ from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 
 from ragdoc.extraction.entity import Entity
-from ragdoc.extraction.schema import GraphSchema, build_edge_union, build_node_union
+from ragdoc.extraction.graph_store import edge_entity_type, node_entity_type
+from ragdoc.extraction.schema import GraphSchema
 from ragdoc.integrations._qdrant_base import AsyncQdrantClient, _QdrantCollectionStore, models
 
 if TYPE_CHECKING:
@@ -70,12 +71,10 @@ class QdrantGraphStore(_QdrantCollectionStore):
         self._schema = schema
 
     def _node_type(self) -> type[Entity]:
-        node_union = build_node_union(self._schema.node_types)
-        return Entity[node_union]
+        return node_entity_type(self._schema)
 
     def _edge_type(self) -> type[Entity]:
-        edge_union = build_edge_union(self._schema.edge_types)
-        return Entity[edge_union]
+        return edge_entity_type(self._schema)
 
     @classmethod
     async def create(cls, client: AsyncQdrantClient, collection_name: str, schema: GraphSchema) -> QdrantGraphStore:

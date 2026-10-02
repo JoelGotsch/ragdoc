@@ -194,7 +194,13 @@ class QdrantDocumentStore(_QdrantCollectionStore):
         )
         if not records:
             return None
-        return Document.model_validate(records[0].payload)
+        # Undo the index keys _to_point adds on top of the Document dump: ``content_hash`` is not a
+        # Document field (the model rejects unknown keys) and a missing ``source_hash`` is stored as "".
+        payload = dict(records[0].payload or {})
+        payload.pop("content_hash", None)
+        if payload.get("source_hash") == "":
+            payload["source_hash"] = None
+        return Document.model_validate(payload)
 
     async def list_source_ids(self) -> set[str]:
         """Return all stored ``source_id`` values (scroll-paginated)."""

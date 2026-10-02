@@ -142,3 +142,33 @@ async def test_query_where_filter_parity(tmp_path, parity_entities):
         == {e.entity_id for e in await local.query(query)}
         == {"bounded"}
     )
+
+
+# ---------------------------------------------------------------------------
+# QdrantDocumentStore round trip against the real payload it writes
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("source_hash", ["abc123", None])
+async def test_document_store_round_trips_the_document_it_wrote(source_hash: str | None):
+    """The stored payload carries extra top-level hash keys; reading must still yield the Document."""
+    from ragdoc.document import Document, Paragraph
+    from ragdoc.integrations.document_stores.qdrant import QdrantDocumentStore
+
+    client = AsyncQdrantClient(":memory:")
+    store = await QdrantDocumentStore.create(client, "docs")
+    document = Document(
+        elements=[Paragraph(html="<p>hello</p>")],
+        source_id="a.html",
+        source_hash=source_hash,
+        metadata={"filename": "a.html"},
+    )
+
+    await store.upsert([document])
+    loaded = await store.get_document("a.html")
+
+    assert loaded == document
+    assert loaded is not None
+    assert loaded.source_hash == source_hash
+    assert loaded.content_hash() == document.content_hash()
