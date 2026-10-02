@@ -62,9 +62,8 @@ class EntityQuery:
 
 def entity_matches(entity: Entity, query: EntityQuery) -> bool:
     """Return whether *entity* satisfies *query* (the in-memory evaluation, shared by Local stores)."""
-    if query.date is not None:
-        if entity.date is None or not entity.date.overlaps(query.date.start, query.date.end):
-            return False
+    if query.date is not None and (entity.date is None or not entity.date.overlaps(query.date.start, query.date.end)):
+        return False
     for key, value in query.where.items():
         if getattr(entity.payload, key, None) != value:
             return False

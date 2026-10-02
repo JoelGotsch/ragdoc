@@ -133,9 +133,8 @@ async def test_vs_run_failed_logged_on_propagated_exception(tmp_path: Path, capl
         pipeline=DocumentPipeline(parser=_parser_raises(asyncio.CancelledError)),
         vector_store=MemoryVectorStore(),
     )
-    with caplog.at_level(logging.ERROR, logger="ragdoc.pipeline.sync"):
-        with pytest.raises(asyncio.CancelledError):
-            await vs.run([f])
+    with caplog.at_level(logging.ERROR, logger="ragdoc.pipeline.sync"), pytest.raises(asyncio.CancelledError):
+        await vs.run([f])
 
     assert any("Run failed" in r.message for r in caplog.records)
 

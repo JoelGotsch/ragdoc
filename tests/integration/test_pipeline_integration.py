@@ -81,8 +81,7 @@ def _load_test_case() -> dict:
 def mineru_to_html_resolver(path: Path) -> Path | None:
     """Map mineru/*_middle.json → html/*.html in the test data tree."""
     stem = path.stem  # e.g. "tesla-q4-2024-update_middle"
-    if stem.endswith("_middle"):
-        stem = stem[: -len("_middle")]
+    stem = stem.removesuffix("_middle")
     candidate = path.parent.parent / "html" / f"{stem}.html"
     return candidate if candidate.exists() else None
 
@@ -90,8 +89,7 @@ def mineru_to_html_resolver(path: Path) -> Path | None:
 def mineru_to_pandoc_resolver(path: Path) -> Path | None:
     """Map mineru/*_middle.json → pandoc/*.docx in the test data tree."""
     stem = path.stem
-    if stem.endswith("_middle"):
-        stem = stem[: -len("_middle")]
+    stem = stem.removesuffix("_middle")
     candidate = path.parent.parent / "pandoc" / f"{stem}.docx"
     return candidate if candidate.exists() else None
 

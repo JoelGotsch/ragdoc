@@ -50,9 +50,7 @@ def markup_richness_score(html: str) -> int:
     soup = BeautifulSoup(html, "html.parser")
     score = 0
     for tag in soup.find_all(True):
-        if tag.name in _RICH_TAGS:
-            score += 1
-        elif tag.name == "span" and tag.get("style"):
+        if tag.name in _RICH_TAGS or (tag.name == "span" and tag.get("style")):
             score += 1
         elif tag.name == "ref":
             score += 2

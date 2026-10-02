@@ -809,10 +809,9 @@ def _extract_text_from_block(block: ParaBlock) -> list[str]:
         if block.image_caption:
             text_parts.append(extract_text_from_lines(block.image_caption.lines))
 
-    elif isinstance(block, TableBlock):
+    elif isinstance(block, TableBlock) and block.table_caption:
         # Extract caption text if present
-        if block.table_caption:
-            text_parts.append(extract_text_from_lines(block.table_caption.lines))
+        text_parts.append(extract_text_from_lines(block.table_caption.lines))
 
     return text_parts
 

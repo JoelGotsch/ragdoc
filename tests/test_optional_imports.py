@@ -34,7 +34,7 @@ def test_import_ragdoc_pulls_no_optional_deps():
         assert not leaked, f"import ragdoc pulled optional deps: {{leaked}}"
         """
     )
-    result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+    result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, check=False)
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
 
 
@@ -111,7 +111,7 @@ def test_numpy_guard_message(monkeypatch: pytest.MonkeyPatch):
 
 def test_processing_getattr_hint_message(monkeypatch: pytest.MonkeyPatch):
     """The processing package's module __getattr__ raises an actionable hint for absent names."""
-    import ragdoc.processing as processing
+    from ragdoc import processing
 
     # Simulate a base install where the summary_image import failed.
     monkeypatch.delattr(processing, "ImageSummaryProcessor", raising=False)

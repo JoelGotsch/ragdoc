@@ -207,6 +207,15 @@ ignore = [
     # Mutable class attributes: Pydantic models declare these via Field(...),
     # which is the intended pattern and not an actual shared-mutable-default bug.
     "RUF012",
+    # `from x import name as name` is the explicit re-export form type checkers
+    # require (PEP 484); the "useless" alias is the point.
+    "PLC0414",
+    # isinstance() checks on parsed-HTML nodes validate content (e.g. a missing
+    # <img> tag), not argument types — ValueError is the right exception there.
+    "TRY004",
+    # Per-source failure logs keep `{exc!r}` in the message line so the cause
+    # survives log handlers that drop tracebacks.
+    "TRY401",
 ]
 
 [tool.ruff.lint.per-file-ignores]

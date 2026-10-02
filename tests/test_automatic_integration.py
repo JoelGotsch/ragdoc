@@ -23,7 +23,7 @@ async def test_pragmatic_paths(path_fixture, request):
     """load() resolves the correct parser even with many intermediate suffixes."""
     path = request.getfixturevalue(path_fixture)
     name, rest = path.name.split(".")
-    new_file = ".".join([name, "many", "fun", "suffixes", rest])
+    new_file = f"{name}.many.fun.suffixes.{rest}"
     path = path.parent / new_file
     d = await load(path)
     assert len(d.headings) > 0
@@ -39,7 +39,7 @@ async def test_pdf_pragmatic_paths(pdf_file_path: Path, azure_test_pdf_json_file
     async with configure(RagdocConfig(azure_key="k", azure_endpoint="https://example.invalid")):
         with patch("ragdoc.parsing.azure_di.client.get_analyze_result", return_value=analyze_dict):
             name, rest = pdf_file_path.name.split(".")
-            new_file = ".".join([name, "many", "fun", "suffixes", rest])
+            new_file = f"{name}.many.fun.suffixes.{rest}"
             path = pdf_file_path.parent / new_file
             d = await load(path)
 

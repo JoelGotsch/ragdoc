@@ -415,7 +415,7 @@ class DocumentPipeline(Generic[TMetadata]):
                     # KeyboardInterrupt and SystemExit always propagate (same discipline
                     # as the sync engine).
                     if self._on_error == "skip":
-                        logger.error(f"Failed to process {path.name}: {exc!r}", exc_info=True)
+                        logger.exception(f"Failed to process {path.name}: {exc!r}")
                         result.errors.append((path, exc))
                     else:
                         raise
@@ -426,9 +426,8 @@ class DocumentPipeline(Generic[TMetadata]):
         try:
             await asyncio.gather(*[_run_one(p) for p in source_list])
         except BaseException:
-            logger.error(
+            logger.exception(
                 f"Batch failed: {len(result.chunks)} chunks, {len(result.errors)} errors before failure",
-                exc_info=True,
             )
             raise
         logger.info(f"Batch complete: {len(result.chunks)} chunks, {len(result.errors)} errors")

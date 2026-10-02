@@ -58,7 +58,7 @@ def get_mineru_file_for_test_case(test_case_name: str) -> Path | None:
 def get_available_test_cases() -> list[str]:
     """Get test cases that have corresponding MinerU output files."""
     available = []
-    for test_case_name in TEST_CASES.keys():
+    for test_case_name in TEST_CASES:
         if get_mineru_file_for_test_case(test_case_name):
             available.append(test_case_name)
     return available

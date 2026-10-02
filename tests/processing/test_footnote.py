@@ -715,7 +715,7 @@ async def test_footnote_processor_uses_custom_resolver(sample_document):
 
 def test_sync_footnote_processor_removed():
     """The forbidden sync wrapper is gone; FootnoteProcessor() covers its use case."""
-    import ragdoc.processing as processing
+    from ragdoc import processing
 
     assert not hasattr(processing, "SyncFootnoteProcessor")
     assert "SyncFootnoteProcessor" not in processing.__all__

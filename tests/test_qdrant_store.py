@@ -20,13 +20,13 @@ from ragdoc.integrations.vector_stores.qdrant import QdrantVectorStore, ServerSi
 
 
 def make_chunk(**overrides: object) -> Chunk:
-    defaults: dict = dict(
-        prompt_content="prompt",
-        embedding_content="embed",
-        named_embeddings={"dense": [0.1, 0.2, 0.3]},
-        source_id="doc-a",
-        source_hash="abc123",
-    )
+    defaults: dict = {
+        "prompt_content": "prompt",
+        "embedding_content": "embed",
+        "named_embeddings": {"dense": [0.1, 0.2, 0.3]},
+        "source_id": "doc-a",
+        "source_hash": "abc123",
+    }
     return Chunk(**(defaults | overrides))
 
 

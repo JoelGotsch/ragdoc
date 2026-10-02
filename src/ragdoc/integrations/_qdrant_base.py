@@ -334,10 +334,9 @@ class _QdrantCollectionStore:
         try:
             await self._client.delete(collection_name=collection, points_selector=models.PointIdsList(points=created))
         except Exception:
-            logger.error(
+            logger.exception(
                 f"rollback of {len(created)} partially written point(s) failed; they keep blank hashes, "
                 "so the next sync still re-processes their source",
-                exc_info=True,
             )
 
     async def _stamp_hashes(self, points: list[models.PointStruct], collection: str) -> None:

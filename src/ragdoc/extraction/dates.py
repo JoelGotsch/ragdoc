@@ -211,6 +211,4 @@ class FuzzyDate(BaseModel):
         """
         if self.end is not None and query_start is not None and self.end <= query_start:
             return False
-        if self.start is not None and query_end is not None and self.start >= query_end:
-            return False
-        return True
+        return not (self.start is not None and query_end is not None and self.start >= query_end)

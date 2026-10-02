@@ -382,7 +382,7 @@ class SyncEngine(Generic[T]):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.error(f"sync failed for {src.source_id}: {exc!r}", exc_info=True)
+            logger.exception(f"sync failed for {src.source_id}: {exc!r}")
             return SourceOutcome(kind="error", source_id=src.source_id, error=exc)
 
     async def _stream(self, request: SyncPlanInput, delete_orphans: bool) -> AsyncGenerator[SourceOutcome[T], None]:
@@ -512,7 +512,7 @@ class SyncEngine(Generic[T]):
         except BaseException:
             # A fatal exception (e.g. asyncio.CancelledError) escaped the stream —
             # collected per-source errors do not reach here; this is the abort path.
-            logger.error("Run failed before completion", exc_info=True)
+            logger.exception("Run failed before completion")
             raise
         logger.info(
             f"run complete: {len(result.processed)} processed, {len(result.skipped)} skipped, "
@@ -545,7 +545,7 @@ class SyncEngine(Generic[T]):
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                logger.error("apply(): pre-write failed; store left untouched.", exc_info=True)
+                logger.exception("apply(): pre-write failed; store left untouched.")
                 for sc, _ in changes:
                     result.errors.append((sc.source_id, exc))
                 return result
@@ -560,7 +560,7 @@ class SyncEngine(Generic[T]):
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
-                logger.error(f"apply(): write failed for {sc.source_id}: {exc!r}", exc_info=True)
+                logger.exception(f"apply(): write failed for {sc.source_id}: {exc!r}")
                 result.errors.append((sc.source_id, exc))
 
         logger.info(
@@ -611,7 +611,7 @@ class SyncEngine(Generic[T]):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.error(f"run(): write failed for {change.source_id}: {exc!r}", exc_info=True)
+            logger.exception(f"run(): write failed for {change.source_id}: {exc!r}")
             result.errors.append((change.source_id, exc))
 
     async def _delete_orphan(self, source_id: str, result: UpdateResult) -> None:
@@ -622,5 +622,5 @@ class SyncEngine(Generic[T]):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.error(f"delete orphan {source_id} failed: {exc!r}", exc_info=True)
+            logger.exception(f"delete orphan {source_id} failed: {exc!r}")
             result.errors.append((source_id, exc))

@@ -36,7 +36,7 @@ def load_test_case_json() -> dict:
 def load_test_cases() -> dict:
     """Load test cases from JSON file and their parsed _middle.json file., keyed by test case name."""
     data = load_test_case_json()
-    for test_case_name in data.keys():
+    for test_case_name in data:
         middle_json = FILES_DIR / f"{test_case_name}_middle.json"
         if not middle_json.exists():
             continue

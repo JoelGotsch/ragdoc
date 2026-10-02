@@ -45,7 +45,7 @@ def generate_document(excel_file: pd.ExcelFile, config: ExcelConfig | None = Non
     config = ExcelConfig() if config is None else config
     for i, sheet_name in enumerate(excel_file.sheet_names):
         sheet_name = str(sheet_name)
-        if not config.default_params and config.sheet_params and sheet_name not in config.sheet_params.keys():
+        if not config.default_params and config.sheet_params and sheet_name not in config.sheet_params:
             continue
         params = (config.default_params or {}) | config.sheet_params.get(sheet_name, {})
         df = pd.read_excel(excel_file, sheet_name=sheet_name, **params)

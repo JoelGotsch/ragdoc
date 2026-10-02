@@ -83,7 +83,7 @@ def unwrap_idiotic_tables(soup: BeautifulSoup) -> BeautifulSoup:
     return soup
 
 
-_FOOTNOTE_ID_RE = re.compile(r"^(?:footnote|fn|note)[-_]?(\d+)$", re.I)
+_FOOTNOTE_ID_RE = re.compile(r"^(?:footnote|fn|note)[-_]?(\d+)$", re.IGNORECASE)
 
 
 def detect_html_footnotes(soup: BeautifulSoup) -> BeautifulSoup:
@@ -141,7 +141,7 @@ def generate_image(image: Tag) -> Image | None:
         image_type = match.group("image_type")
         kwargs = extract_image_attributes(image)
         return Image(image=content, image_type=image_type, **kwargs)
-    elif download_images and (image_src.startswith("https://") or image_src.startswith("http://")):
+    elif download_images and (image_src.startswith(("https://", "http://"))):
         try:
             response = httpx.get(image_src, timeout=10.0, follow_redirects=True)
         except httpx.HTTPError:
@@ -154,7 +154,6 @@ def generate_image(image: Tag) -> Image | None:
             return Image(image=content, **kwargs)
         else:
             logger.error(f"Failed to download image: {image_src}")
-            pass
 
 
 def _handle_images(element: Tag) -> list[Image]:
