@@ -37,18 +37,19 @@ from ragdoc.parsing.mineru.parser import CoreExtractor, MinerUExtractor
 from ragdoc.parsing.parser import Parser
 
 
-async def parse_mineru_file(path: Path) -> Document:
+async def parse_mineru_file(path: Path | str) -> Document:
     """Parse a MinerU ``_middle.json`` file into a :class:`~ragdoc.document.Document`.
 
     This is the standalone entry point for one-off parsing without going through
     the registry. Equivalent to ``MinerUParser()(path)``.
 
     Args:
-        path: Path to the ``_middle.json`` file produced by MinerU.
+        path: Path (``Path`` or ``str``) to the ``_middle.json`` file produced by MinerU.
 
     Returns:
         Parsed :class:`~ragdoc.document.Document` with ``parser="mineru"``.
     """
+    path = Path(path)
     source = await asyncio.to_thread(parse_middle_json_file, path)  # file read + JSON validation
     extractor = MinerUExtractor()
     return await extractor.parse(source, source_path=path)
@@ -62,7 +63,8 @@ class MinerUParser(Parser):
     :class:`MinerUExtractor` (e.g., one with a modified stage chain) without
     exposing :class:`~ragdoc.parsing.mineru.base.MinerUMiddleDocument` to callers.
 
-    The only key written to ``document.metadata`` is ``"filename"``.  If
+    The parser writes nothing to ``document.metadata`` itself (``"filename"`` is stamped
+    centrally by :func:`ragdoc.parsing.load` / ``IngestPipeline.run``).  If
     discarded content (running headers, footers, …) should be preserved it
     must be emitted as document elements by configuring the extractor — see
     :class:`~ragdoc.parsing.mineru.handlers.ExtractionConfig` for the full
@@ -100,7 +102,8 @@ class MinerUParser(Parser):
     def unavailable_reason(self) -> str:
         return "mineru: install 'ragdoc[pdf-mineru]' for MinerU middle-JSON parsing"
 
-    async def __call__(self, path: Path) -> Document:
+    async def __call__(self, path: Path | str) -> Document:
+        path = Path(path)  # a str path is accepted, like every other parser
         if self.extractor is not None:
             source = await asyncio.to_thread(parse_middle_json_file, path)  # file read + JSON validation
             return await self.extractor.parse(source, source_path=path)

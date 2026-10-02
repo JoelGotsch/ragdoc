@@ -153,7 +153,7 @@ class MinerUExtractor:
     async def parse(
         self,
         source: MinerUMiddleDocument,
-        source_path: Path | None = None,
+        source_path: Path | str | None = None,
     ) -> Document:
         """
         Parse a MinerU document into a :class:`~ragdoc.document.Document`.
@@ -165,14 +165,15 @@ class MinerUExtractor:
                 so that image handlers can resolve relative image paths.
 
         After all stages run, ``document.metadata`` is empty —
-        ``metadata["filename"]`` is stamped centrally by :func:`ragdoc.parsing.load`.
+        ``metadata["filename"]`` is stamped centrally by :func:`ragdoc.parsing.load` /
+        ``IngestPipeline.run``.
         Parsers must not inject any other keys into document metadata; if discarded content
         (headers, footers, …) should be preserved it must be emitted as
         :class:`~ragdoc.document.BaseElement` objects via a custom handler.
         """
         context = ParseContext(source=source)
         if source_path is not None:
-            context.metadata["source_dir"] = source_path.parent
+            context.metadata["source_dir"] = Path(source_path).parent
 
         context = await self._run_stages(context)
         # Provenance (source_path, metadata["filename"]) is stamped centrally by

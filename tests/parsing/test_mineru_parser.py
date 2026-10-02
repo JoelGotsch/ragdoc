@@ -92,3 +92,37 @@ def test_register_registers_correctly() -> None:
     reg = mineru_regs[0]
     assert reg.pattern == "_middle.json"
     assert reg.priority == 50
+
+
+# ---------------------------------------------------------------------------
+# str paths: every other parser accepts one, so MinerU must too
+# ---------------------------------------------------------------------------
+
+_MIDDLE_JSON = Path(__file__).parent / "data" / "mineru" / "bert-paper_middle.json"
+
+
+@pytest.mark.anyio
+async def test_mineru_parser_accepts_str_path() -> None:
+    """``MinerUParser()(str_path)`` used to raise AttributeError ('str' has no attribute 'parent')."""
+    from_path = await MinerUParser()(_MIDDLE_JSON)
+    from_str = await MinerUParser()(str(_MIDDLE_JSON))
+
+    assert from_str.parser == "mineru"
+    assert from_str.content_hash() == from_path.content_hash()
+
+
+@pytest.mark.anyio
+async def test_parse_mineru_file_accepts_str_path() -> None:
+    from ragdoc.parsing.mineru import parse_mineru_file
+
+    document = await parse_mineru_file(str(_MIDDLE_JSON))
+
+    assert document.parser == "mineru"
+    assert len(document.elements) > 0
+
+
+@pytest.mark.anyio
+async def test_mineru_parser_with_custom_extractor_accepts_str_path() -> None:
+    from_str = await MinerUParser(extractor=MinerUExtractor())(str(_MIDDLE_JSON))
+
+    assert from_str.content_hash() == (await MinerUParser()(_MIDDLE_JSON)).content_hash()
