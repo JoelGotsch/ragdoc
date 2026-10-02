@@ -8,6 +8,201 @@ Pre-1.0: breaking changes land at will and are documented here.
 > later phase renamed or removed something an earlier phase introduced, the earlier entry
 > names the **current** API and says so.
 
+### ⚠ Breaking changes (review fixes)
+
+Every entry is *what breaks → what to do instead*. There are no deprecation shims: the old
+form raises or is gone.
+
+**Document model**
+
+- **Unknown constructor keywords and JSON keys raise.** Elements and `Document` use
+  `extra="forbid"`; `Paragraph(html_content=…)`, `Heading(html_content=…)` and
+  `RawText(innerhtml=…)` raise a `ValidationError` naming the `html` field (they used to
+  build an *empty* element silently). → Pass `html=` with the full HTML including the outer
+  tag; custom element subclasses must declare every field they are constructed with.
+- **JSON written by the pre-refactor element model no longer loads** for `Heading`,
+  `Paragraph`, `Table`, `DocumentList` and `RawText` (dumps carrying `html_content` /
+  `innerhtml` / `level` keys). Old `Image` / `Footnote` dumps still load. → Re-ingest the
+  sources (for a `DocumentStore`: run `DocumentStorePipeline` again); there is no loader for
+  the old format.
+- **`RawText` no longer unwraps or rewrites its content.** A single non-`div` root tag is now
+  wrapped verbatim: `RawText(html="<pre>x</pre>")` stores `<div><pre>x</pre></div>` and
+  `.innerhtml` returns `<pre>x</pre>` (it used to store `<div>x</div>`). → Code that relied on
+  the unwrapping must strip the tag itself. `content_hash` changes for documents containing
+  such elements, so they are re-chunked once at Boundary 2.
+- **MinerU code blocks have a new HTML shape**: `<div><pre><code>escaped text</code></pre></div>`
+  with one line per source line (was the raw source text inside the `<div>`). → Nothing to
+  do, but `content_hash` changes once for documents containing code blocks.
+- **Oversized tables and lists split into `Table` / `DocumentList` fragments**, not `RawText`.
+  → Code that looked for `RawText` fragments in splits must look for the original element
+  type. Splits of sources containing an oversized table or list change (count and content), so
+  their chunks are rewritten on the next sync of a changed source.
+
+**Sync and stores**
+
+- **`apply()` no longer writes embeddings back onto the `ChangeSet` you pass in.** → Read
+  vectors from the store (or embed the chunks yourself); the changeset stays exactly the plan.
+- **A store that has a `replace_source(source_id, items)` method is now updated through it**
+  (structural `SourceReplaceStore` detection) instead of `delete_by_source` + `upsert`. → If a
+  custom store already has a method of that name with other semantics, rename it; if it should
+  be used, make it honour the contract (a failure must not leave the source looking unchanged).
+- **Qdrant: a failed multi-batch upsert no longer deletes the affected sources' points.** It
+  deletes only the point ids that call created. Stored sources are no longer removed as a side
+  effect; a source whose write was interrupted reads as "changed" (blank hashes) instead.
+  → Nothing to do; do not rely on a failed upsert emptying the source.
+- **A blank (`""`) or mixed stored hash now means "always changed".** `content_hash_token`
+  returns `None` for `""`; Qdrant `list_source_state()` reports a source whose points disagree
+  on their hashes with blank hashes. → A custom store that stores `""` for "unknown" gets
+  that source re-processed on every run; store the real hash.
+- **`QdrantDocumentStore.get_document` returns `source_hash=None`** for a document stored
+  without one (it used to come back as `""`). → Compare against `None`.
+- **`DocumentPipeline.run_many(on_error="skip")` no longer swallows `KeyboardInterrupt`,
+  `SystemExit` or other non-`Exception` `BaseException`s** — they propagate. → Catch them
+  around `run_many` if you really want to continue.
+
+**LLM layer**
+
+- **The client's own `max_retries` is ignored for ragdoc calls.** For a real `AsyncOpenAI` /
+  `AsyncAzureOpenAI` the library calls through `client.with_options(max_retries=0)`; a call
+  makes `max_retries + 1` HTTP attempts (was up to `(max_retries + 1) × 3` with the SDK
+  default). → Set the retry budget on the ragdoc side (`max_retries` on the processor,
+  settings object or `OpenAIEmbedder`).
+- **`Retry-After` is capped at `backoff_max`** (30 s by default). → Pass a larger
+  `backoff_max` to `retry_llm` / `call_structured` if you call them yourself and want longer
+  waits.
+- **`RagdocConfig.openai_client` is typed `ChatClient | EmbeddingsClient | None`** (was
+  `LLMClient | None`). → Code that reads the field and uses both capabilities must narrow it
+  (or use `resolve_openai_client()` for chat).
+- **`EmbeddingsEndpoint.create` declares `dimensions: int = ...`** (was `int | None = None`),
+  so that a real `AsyncOpenAI` type-checks. → A custom embeddings client typed against the old
+  protocol must accept an omitted `dimensions` rather than `None`.
+- **`OpenAIEmbedder.embed` sends several requests** (`batch_size=256` inputs each) and raises
+  `ValueError` when the endpoint returns a different number of vectors than inputs. → Lower
+  or raise `batch_size` to match your provider's per-request limits.
+
+**Extraction**
+
+- **`KnowledgeGraphExtractor` halves only on size-related failures** (context length,
+  truncated output, malformed structured output, timeout after retries). A 401, 429, 5xx or
+  connection error now fails the source after the shared retry policy instead of triggering
+  halving. → Handle those in `UpdateResult.errors` and re-run.
+- **`KG_GLEANING_MESSAGE` takes only `{next}`** (the `{last}` placeholder is gone) and the
+  gleaning call is a continuation of the first call. → Use `build_kg_gleaning_messages` rather
+  than formatting the constant.
+- **`build_graph_batch_model` returns `tuple[type[GraphBatchBase], type[LocalNode]]`** and
+  `build_node_union` / `build_edge_union` / `KnowledgeGraphExtractor.payload_model` are typed
+  `TypeForm[BaseModel]` (were `BaseModel` types / `Any`). Runtime values are unchanged; type
+  checkers may need an updated annotation.
+- **`EntityQuery.where` values are typed `str | int | bool`.** → Other value types were never
+  matched reliably by the Qdrant filter; convert them.
+- **`MentionStorePipeline` extracts at most `split_concurrency=4` splits of a source at
+  once** (was unbounded), and a failing split cancels the source's other extractions. → Raise
+  `split_concurrency` (or pass a shared `asyncio.Semaphore`) for more parallelism.
+
+**Parsing, processing, chunking, utilities**
+
+- **`ragdoc.utils.fan_out` is removed.** → `ragdoc.utils.run_ordered(factories, concurrency)`
+  with zero-argument coroutine factories: `run_ordered([partial(work, x) for x in xs], 4)`. It
+  returns the results in input order and cancels the siblings when one fails.
+- **Parsers run in a worker thread.** `HTMLParser`, `AzureJSONParser`, `AzureDIParser` and the
+  MinerU extraction now run under `asyncio.to_thread`. → Custom MinerU handlers must not touch
+  event-loop-bound objects; the active `configure()` context is available in the thread.
+- **`LLMChunker` returns one chunk instead of none** when the LLM returns no usable summary
+  (`embedding_content = prompt_content`, with a warning). → Nothing to do unless you relied on
+  the empty result.
+- **`ImageSummaryProcessor` no longer aborts the document on an LLM-call failure for one
+  image** (400, exhausted retries, …): the image is skipped with a warning. → Watch the log
+  for skipped images; programming errors and cancellation still propagate.
+- **Element equality is field-based** (same concrete type and equal fields). It previously
+  also compared private cache state, so reading `.text` could make two identical elements
+  unequal. → Nothing to do.
+
+### Added (review fixes)
+
+- **`ragdoc.pipeline.SourceReplaceStore`** — optional store protocol
+  (`replace_source(source_id, items)`). Implemented by `QdrantVectorStore`,
+  `QdrantMentionStore`, `QdrantDocumentStore` and `LocalDocumentStore`.
+- **`ragdoc.utils.run_ordered`** — the one bounded fan-out helper (generic over the result
+  type, factory-based, cancels siblings on failure).
+- **`ragdoc.llm`**: `without_sdk_retries`, `is_llm_failure`, `is_size_related_failure`.
+- **New parameters**: `OpenAIEmbedder(batch_size=256)`;
+  `openai_image_summarizer(request_timeout=None, max_retries=2)`;
+  `LLMFootnoteResolver(request_timeout=None, max_retries=2)`;
+  `make_llm_reviewer(request_timeout=None, max_retries=2)`;
+  `MentionStorePipeline(split_concurrency=4)` and `MentionStorePipeline.from_document_store(split_concurrency=4)`;
+  `split_at_sentences(overlap_tokens=…)`.
+- **`ragdoc.splitting.token`**: `plan_html_split`, `build_fragment_html`,
+  `build_fragment_element`, `collect_ref_ids`, `HtmlSplitPlan`, `HtmlSplitUnit`,
+  `MIN_SLICE_TOKENS`.
+- **`ragdoc.parsing.mineru`**: `build_code_html`, `extract_code_from_lines`.
+- **`ragdoc.extraction.kg`**: `build_kg_gleaning_messages`, `merge_graph_batches`,
+  `drop_dangling_edges`, `edge_refs`, `payload_kind`, `next_local_index`, and the static base
+  models `GraphBatchBase` / `LocalNode`. `ragdoc.extraction.graph_store` gains
+  `entity_type_for` / `node_entity_type` / `edge_entity_type`.
+- `MinerUParser` and `parse_mineru_file` accept a `str` path, like every other parser.
+
+### Fixed (review fixes)
+
+- **`SyncEngine.run()` is back-pressured.** It used to keep every finished source's items
+  until the writer got to them; producers now hand their result to the writer through a
+  one-slot queue while holding their concurrency slot, so at most `concurrency + 2` sources'
+  items are in memory, independent of corpus size. `run()` and `plan()` close the stream
+  deterministically, so an abort cancels and awaits the running producers before returning.
+- **Updates no longer pass through an empty window where the store allows it.** With a
+  `SourceReplaceStore` the new items are written before the stale ones are removed, so a
+  failed update keeps the previously stored items. Stores without it keep
+  delete-then-upsert: a failed upsert leaves the source empty and the next run re-processes
+  it as new (the docstrings previously claimed the source was left "unapplied").
+- **`apply()` writes source by source** through the same path as `run()` (orphans in
+  `to_delete` first), instead of all stale-deletes followed by all upserts, and **no longer
+  mutates the `ChangeSet`**: it embeds copies, so a saved-then-loaded plan applies exactly
+  like the in-memory one and vectors from one `apply()` cannot leak into a later one.
+- **Qdrant multi-request writes are interruption-safe.** Points are written with blank
+  `source_hash` / `content_hash` and the real hashes are stamped only after every batch has
+  landed, so a cancelled or crashed write never reads as "unchanged". On an error or a
+  cancellation part-way the points that call created are deleted by id (shielded on
+  cancellation); points that existed before are never deleted, and one that was already
+  overwritten is not restored. After a hard crash the partial points remain, with blank
+  hashes, until the next sync replaces them. A write that fits one request is one upsert.
+- **Qdrant `create()` is idempotent on the in-process client.** A second
+  `QdrantVectorStore.create()` (and the document / mention / entity / graph equivalents)
+  against `AsyncQdrantClient(":memory:")` or `path=` raised `ValueError: Collection … already
+  exists`; existence is now checked first. An existing collection is used as is.
+- **`QdrantDocumentStore.get_document` works again**: it strips the index keys the store
+  writes next to the Document dump (strict `Document` validation rejected them).
+- **`LocalDocumentStore` writes atomically** (temp file, fsync, `os.replace`), so a crash
+  never leaves a truncated document, and **one unreadable stored file no longer aborts
+  `list_source_state()`**: it is logged and reported as "always changed" — never treated as
+  an orphan, overwritten by a Boundary-1 re-ingest, and reported in `UpdateResult.errors` for
+  that one source at Boundary 2.
+- **Soup cache**: it is now keyed on the html string's value, which makes it effective for
+  `Footnote` (whose html is rebuilt per access); `Image` no longer caches a parsed copy of its
+  base64 payload and answers `text` / `inline_refs` without building its html.
+- **Oversized tables and lists** are split on row / item boundaries into well-formed
+  fragments (caption, `<colgroup>` and header repeated; `<ol>` numbering continued; rows in
+  `<tbody>` handled; bare text between child tags no longer dropped). The sentence and
+  token-slice tiers now verify the rendered chunk against `max_tokens`.
+- **No more "coroutine … was never awaited"** when a fan-out is interrupted:
+  `DocumentSummarizerProcessor`, `ImageSummaryProcessor`, `LLMHeadingResolver`,
+  `FootnoteProcessor` and `MentionStorePipeline` create each coroutine only when it is about
+  to run, and a failure cancels and awaits the in-flight siblings.
+- **KG extraction**: an edge referencing an unknown node id is dropped with a warning instead
+  of failing the whole source; gleaning sends the first answer back to the model and
+  de-duplicates what it repeats.
+- **`LLMHeadingResolver`** on a document that already has a title: heading levels are still
+  resolved; the document-title judgment is ignored and the two title-removal options are
+  no-ops (documented and pinned by a test).
+- **Linting on current ruff**: tracked non-script files lost their executable bit, and the
+  code passes `ruff check` with ruff 0.16 (the dev dependency is unpinned).
+
+### Not changed, now documented
+
+- A source that yields **no items** stores no change token and is therefore re-produced on
+  every run.
+- A processor-filtered document deletes its stored chunks in direct-mode
+  `VectorStorePipeline`, while `DocumentStorePipeline` keeps the stored Document.
+- `DocumentPipeline.stream()` is not back-pressured and stops at the first failing file.
+
 ### Fixed (review remediation — correctness)
 
 - **Default chunk ids are valid vector-store point ids.** `mint_chunk_id` now emits a
@@ -19,13 +214,14 @@ Pre-1.0: breaking changes land at will and are documented here.
   across splits, and knowledge-graph edge references are rewritten to the finalized mention
   ids (new `rewrite_edge_refs`). Previously a source that was split could silently overwrite
   mentions and lose edges.
-- **Qdrant batched upsert**: when a batch fails part-way, the store makes a best-effort
-  rollback — it deletes the affected sources' points — so the next sync re-processes them
-  instead of treating a partially written source as unchanged. Those sources are missing
-  from the collection until that next sync.
-- **Unreadable files no longer abort a sync.** Hashing errors are captured per path
-  (`SyncPlanInput.pre_failed`) and reported in `UpdateResult.errors`; a file that could not
-  be read is never treated as an orphan.
+- **Qdrant batched upsert**: a batch failing part-way can no longer leave a partially
+  written source looking unchanged. (First implemented as a source-wide rollback that deleted
+  the affected sources' points; replaced by the blank-then-stamp write and id-scoped rollback
+  described under *Fixed (review fixes)* above, which never removes previously stored points.)
+- **Unreadable files no longer abort a sync.** Hashing errors on source files are captured
+  per path (`SyncPlanInput.pre_failed`) and reported in `UpdateResult.errors`; a file that
+  could not be read is never treated as an orphan. (The same now holds for an unreadable
+  *stored* document in `LocalDocumentStore` — see above.)
 - **`LocalDocumentStore`**: the filename is the authoritative `source_id`. A hand-edited
   `source_id` inside the stored JSON is re-stamped on read (with a warning) and can no
   longer orphan live chunks.
@@ -67,7 +263,8 @@ Pre-1.0: breaking changes land at will and are documented here.
   (`ragdoc.rendering.resolve_renderer`, `ragdoc.utils.resolve_tokenizer`), one
   `mint_entity_id`, shared `aiofiles` helpers for the local extraction stores.
 - `MentionStorePipeline` defaults its splitter to `TokenSplitter()`; per-split extraction
-  and the knowledge-graph halving fallback run concurrently; blocking pandoc render/split
+  (bounded by `split_concurrency` since the review fixes above) and the two halves of the
+  knowledge-graph halving fallback run concurrently; blocking pandoc render/split
   call sites are wrapped in `asyncio.to_thread`.
 
 ### Changed (documentation and notebooks)
@@ -219,8 +416,9 @@ Pre-1.0: breaking changes land at will and are documented here.
   unavailable until the extra is installed.
 - `ragdoc.rendering.serialize_metadata_value` renamed to `format_metadata_value` (it formats
   for display; the canonical serializer stays `ragdoc.metadata.serialize_metadata_value`).
-- Cross-package underscore helpers got public homes: `ragdoc.utils.concurrency.fan_out` /
-  `resolve_semaphore` (from `processing._concurrency`) and `ragdoc.utils.normalize_text`
+- Cross-package underscore helpers got public homes: `ragdoc.utils.concurrency.resolve_semaphore`
+  and `fan_out` (from `processing._concurrency`; `fan_out` has since been replaced by
+  `run_ordered`, see *Breaking changes* above) and `ragdoc.utils.normalize_text`
   (from `_normalize_text`).
 
 ### Removed (Phase 8)
@@ -238,16 +436,17 @@ Pre-1.0: breaking changes land at will and are documented here.
 
 - **`ragdoc.llm` — one module for every LLM call**: structural client protocols
   (`ChatClient` for `chat.completions.parse`, `EmbeddingsClient` for `embeddings.create`, and
-  the `LLMClient` intersection that `RagdocConfig.openai_client` now holds — `AsyncOpenAI` /
-  `AsyncAzureOpenAI` satisfy all three structurally); `resolve_openai_client()` (the single
+  their intersection `LLMClient` — `AsyncOpenAI` / `AsyncAzureOpenAI` satisfy all three
+  structurally); `resolve_openai_client()` (the single
   fallback policy: explicit → `get_config().openai_client` → `LLMNotConfiguredError`, fail-loud
   at construction); `call_structured()` (one structured-output call on the **non-beta**
   `client.chat.completions.parse`); and the generic retry engine `retry_llm()` (shared with
   `OpenAIEmbedder`). `ChatClient`/`EmbeddingsClient`/`LLMClient` are exported from the `ragdoc`
   root. The module never imports `openai` at module level (exception classes load lazily),
   ready for the Phase 8 extras split.
-- **One retry policy everywhere** (transport errors only): 429 (honoring a parseable
-  `Retry-After` header), connection/timeout errors, and 5xx are retried with full-jitter
+- **One retry policy everywhere** (transport errors only): 429 (a parseable `Retry-After`
+  header replaces the computed delay, capped at `backoff_max` since the review fixes above),
+  connection/timeout errors, and 5xx are retried with full-jitter
   exponential backoff (`min(backoff_max, backoff_base * 2**attempt) * uniform(0.5, 1.5)`);
   other 4xx, `pydantic.ValidationError`, and non-openai errors raise immediately. A model
   refusal (`parsed is None` or empty `choices`) raises **`LLMRefusalError`** and is never
@@ -269,8 +468,10 @@ Pre-1.0: breaking changes land at will and are documented here.
   entity-resolution reviewer). Per-site degrade semantics are deliberately preserved: heading →
   `[]`, image summary → skip-with-warning, footnote → `None`, reviewer → `ReviewResult()`;
   summarizer/chunker/extraction raise.
-- **`RagdocConfig.openai_client` is now typed `LLMClient | None`** (was `Any | None`); invalid
-  objects fail validation at `configure()` time. There is no `client: Any` left in the library.
+- **`RagdocConfig.openai_client` is typed** (was `Any | None`): `LLMClient | None` in this
+  phase, widened to `ChatClient | EmbeddingsClient | None` by the review fixes above. Invalid
+  objects fail validation when the `RagdocConfig` is built. There is no `client: Any` left in
+  the library.
 - **Default models bumped**: `default_llm_model` / `default_image_llm_model` are now `gpt-4.1`
   (were the two-year-old `gpt-4o-2024-08-06` snapshot). Kept within the gpt-4.x family because
   every call site pins `temperature=0.0`, which reasoning-family models reject.
@@ -386,7 +587,9 @@ Pre-1.0: breaking changes land at will and are documented here.
 - **`BaseElement.html` is a plain stored field on `Heading`, `Paragraph`, `Table`,
   `DocumentList`, and `RawText`** (Decision D5-A), each with a normalizing `field_validator`
   (Heading: first `<h1>`–`<h6>` tag re-serialized by bs4, else text escaped + `<h1>`-wrapped;
-  Paragraph/Table/DocumentList: `.strip()`; RawText: normalized to a single outer `<div>`).
+  Paragraph/Table/DocumentList: `.strip()`; RawText: guaranteed a single outer `<div>` — a
+  single root `<div>` passes through, anything else is wrapped verbatim; since the review
+  fixes above the content is never unwrapped or re-serialized).
   The `html_content`/`innerhtml` dual-storage split, the `@computed_field html`
   property/abstract-setter machinery, `_fields_from_html`, the `_parse_html_input`
   before-validator, and the seven per-subclass `fset` blocks are **gone**. Construct with
@@ -398,10 +601,11 @@ Pre-1.0: breaking changes land at will and are documented here.
   Footnote's html embeds the live `id="footnote-{id}"`. `Image(html='<img …/>')` /
   `Footnote(html='<aside …>')` still work via before-validators; the parsing helpers are public
   standalone functions `image_fields_from_html` / `footnote_fields_from_html`.
-- **Identity-keyed soup cache**: derived accessors (`text`, `inline_refs`, `footnote_ids`,
-  `image_ids`, `level`, `innerhtml`) share one cached BeautifulSoup per element, invalidated by
-  string-object identity on assignment — at most one parse per element per pipeline pass
-  (previously a fresh parse per access). `html_tag` deliberately stays fresh-parse (it returns
+- **Soup cache**: derived accessors (`text`, `inline_refs`, `footnote_ids`, `image_ids`,
+  `level`, …) share one cached BeautifulSoup per element — at most one parse per element per
+  pipeline pass (previously a fresh parse per access). The cache is keyed on the html string's
+  value (introduced identity-keyed; changed by the review fixes above, which also made `Image`
+  bypass it). `html_tag` deliberately stays fresh-parse (it returns
   a mutable `Tag`). `BaseElement` now has `validate_assignment=True`: every field assignment
   re-validates and re-normalizes.
 - **`from_html` removed; `from_markdown` is typed** — `cls(html=…)` replaces `from_html(…)`;
@@ -410,8 +614,9 @@ Pre-1.0: breaking changes land at will and are documented here.
   value) instead of a blind `except Exception: pass`.
 - **Serialization shape**: `model_dump()` now emits `html` as a real field for the five
   stored-html classes (no `html_content`/`innerhtml` keys) and **no** `html` key for
-  Image/Footnote. Old dumps happen to load under the new model (the old computed `"html"` key
-  feeds the new field) — pinned by a test but **not promised**; new dumps are the format.
+  Image/Footnote. **Dumps written by the old model do not load** for the five stored-html
+  classes (see *Breaking changes* above — unknown keys are rejected); new dumps are the format
+  and round-trip for every element type.
 - **Splits own their metadata**: every splitter output `Document` copies the parent's metadata
   dict at construction (previously shared by reference and compensated downstream), and the
   `split_document` no-split path **no longer mutates the input document** — it returns a
@@ -470,16 +675,19 @@ Pre-1.0: breaking changes land at will and are documented here.
     and mention pipelines: counted `processed` and its stale stored artifacts are **deleted**.
     (`DocumentStorePipeline` is the exception since the review remediation above: it keeps
     the stored Document and counts the source as skipped.)
-  - `apply()` performs delete-then-upsert with per-source error isolation everywhere: a source
-    whose stale-delete failed is recorded in `errors` and **not** upserted (previously the
-    mention path could mix old and new mentions; the docstore path did no stale-delete).
+  - `apply()` isolates errors per source everywhere, and on the delete-then-upsert path a
+    source whose stale-delete failed is recorded in `errors` and **not** upserted (previously
+    the mention path could mix old and new mentions; the docstore path did no stale-delete).
+    Stores implementing `SourceReplaceStore` are updated with `replace_source` instead — see
+    the review fixes above.
   - Error handling is `except Exception` at every per-source site (was `except BaseException`):
     `asyncio.CancelledError`, `KeyboardInterrupt`, `SystemExit`, and custom `BaseException`
     subclasses now always propagate. `UpdateResult.errors` is
     `list[tuple[str, Exception]]` (was `BaseException`).
 - **`DocumentStorePipeline.run()` is now streaming** (was literally `apply(plan(...))`):
-  each source is written as soon as it is produced (per-source durability on abort); updates go
-  delete-then-upsert. Same end state.
+  each source is written as soon as it is produced, so sources written before an abort stay
+  written. Same end state when nothing fails. (How an update is written — `replace_source`
+  or delete-then-upsert — is described under the review fixes above.)
 - `UpdateResult` moved to `ragdoc.pipeline.sync` (still re-exported from `ragdoc.pipeline`).
 - `MentionStorePipeline.plan()/apply()` payload type is now `ChangeSet[Mention[P]]`
   (load with `ChangeSet[Mention[P]].load(path)`).
@@ -507,6 +715,41 @@ Pre-1.0: breaking changes land at will and are documented here.
   does not use it).
 - **`ragdoc.extraction.changeset`** (`MentionChangeSet`, `MentionSourceChange`) — use
   `ChangeSet[Mention[P]]` / `SourceChange[Mention[P]]` from `ragdoc.pipeline.changeset`.
+
+### Fixed (Phase 0 — eight bug fixes)
+
+- **xlsx**: `ExcelConfig.sheet_params` was silently discarded whenever `default_params` was
+  set (operator precedence). Per-sheet parameters are now merged over the defaults.
+- **Merging**: markup injection into a `Heading` in `ragdoc.merging` was a silent no-op (the
+  update targeted a read-only property); it now takes effect.
+- **Qdrant**: all five stores skipped payload-index creation when the collection already
+  existed. Indexes are now ensured on every `create()`, each tolerating "already exists".
+- **HTML parser**: remote images are fetched with `httpx` (10 s timeout, redirects followed)
+  instead of `requests.get` without a timeout. `httpx` is a declared dependency.
+- **LLM refusals** (`parsed` / `content` is `None`) raise a clear error in `LLMChunker`, skip
+  the image with a warning in `ImageSummaryProcessor`, and leave the footnote unresolved in
+  `LLMFootnoteResolver`, instead of failing with `AttributeError`.
+- **`LLMFootnoteResolver`**: a failed LLM call is no longer reported as a confident
+  "candidate 1"; the footnote stays unresolved and a warning is logged.
+- **Token splitter**: the token slice measured a combined render but cut by a separately
+  rendered overhead, dropping or duplicating text at the seam. It now renders and tokenizes
+  the content only.
+
+### Removed (Phase 0)
+
+- **`SyncFootnoteProcessor`** — a sync wrapper (forbidden in an async-only library) whose only
+  reachable path crashed. Use `FootnoteProcessor()`.
+
+### Changed (Phase 1 — licence, packaging, hygiene)
+
+- **Licence**: the project is Apache-2.0 (`LICENSE`, `NOTICE`, PEP 639 licence metadata).
+- **Docs match the code**: `CLAUDE.md` and the contributor docs were rewritten from the
+  current tooling (ruff, basedpyright in *standard* mode, uv); a root `CONTRIBUTING.md` was
+  added; the quickstart examples use `DocumentPipeline` instead of a hand-built `Chunk(...)`.
+- **Notebooks**: all notebooks pass `marimo check` and are wrapped in
+  `tests/test_notebooks.py`; CI gained a `marimo check` job.
+- **Linting**: ruff's `B`, `ASYNC` and `BLE` rule families are enabled (blind `except`s
+  narrowed, `zip(strict=…)` added); tests use `xfail_strict` and a 300 s timeout.
 
 ## 0.1.0 — 2026-07-04
 
