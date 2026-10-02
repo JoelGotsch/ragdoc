@@ -23,8 +23,8 @@ pytest.importorskip("qdrant_client", reason="qdrant extra not installed")
 from qdrant_client import AsyncQdrantClient
 
 from ragdoc.chunking import Chunk
-from ragdoc.document import Document, Paragraph
 from ragdoc.chunking.provenance import mint_chunk_id
+from ragdoc.document import Document, Paragraph
 from ragdoc.extraction.dates import FuzzyDate
 from ragdoc.extraction.entity import Entity, LocalEntityStore
 from ragdoc.extraction.mention import Mention

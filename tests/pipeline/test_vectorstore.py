@@ -19,8 +19,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ragdoc.chunking import Chunk
 from ragdoc.document import Document
-from ragdoc.pipeline import DocumentPipeline, EmbedderConfig, VectorStorePipeline
+from ragdoc.pipeline import ChangeSet, DocumentPipeline, EmbedderConfig, VectorStorePipeline
 from ragdoc.pipeline.embedders import Embedder
 from ragdoc.pipeline.sync import UpdateResult, file_hash
 
@@ -357,3 +358,84 @@ async def test_run_directory_discovers_files(tmp_path, vstore):
     (tmp_path / "b.html").write_text("B", encoding="utf-8")
     result = await make_vs_pipeline(vstore).run_directory(tmp_path, glob="*.html")
     assert set(result.processed) == {"a.html", "b.html"}
+
+
+# ---------------------------------------------------------------------------
+# apply() never mutates the plan it is given
+# ---------------------------------------------------------------------------
+
+
+class _ConstantEmbedder:
+    """Deterministic embedder: every text gets the same vector."""
+
+    def __init__(self, vector: list[float]) -> None:
+        self._vector = vector
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return [list(self._vector) for _ in texts]
+
+
+def _stored_dump(store: MemoryVectorStore) -> dict[str, dict]:
+    return {chunk_id: chunk.model_dump(mode="json") for chunk_id, chunk in store.stored.items()}
+
+
+@pytest.mark.anyio
+async def test_apply_leaves_the_plan_equal_to_its_saved_copy(make_files, vstore, tmp_path):
+    """apply() embeds copies: the plan a caller holds is still the plan that was saved."""
+    paths = make_files({"a.html": "A", "b.html": "B"})
+    pipeline = make_vs_pipeline(vstore, embedders={"dense": EmbedderConfig(_ConstantEmbedder([1.0, 2.0]))})
+    changeset = await pipeline.plan(paths)
+    saved = tmp_path / "plan.json"
+    changeset.save(saved)
+
+    await pipeline.apply(changeset)
+
+    assert changeset == ChangeSet[Chunk].load(saved)
+    assert all(chunk.named_embeddings == {} for change in changeset.to_add for chunk in change.items)
+    # ... while the store received the embedded chunks.
+    assert [chunk.named_embeddings for chunk in vstore.stored.values()] == [{"dense": [1.0, 2.0]}] * 2
+
+
+@pytest.mark.anyio
+async def test_saved_then_loaded_plan_applies_like_the_in_memory_plan(make_files, tmp_path):
+    paths = make_files({"a.html": "A", "b.html": "B"})
+    embedders = {"dense": EmbedderConfig(_ConstantEmbedder([1.0, 2.0]))}
+    in_memory_store, reloaded_store = MemoryVectorStore(), MemoryVectorStore()
+    changeset = await make_vs_pipeline(in_memory_store, embedders=embedders).plan(paths)
+    saved = tmp_path / "plan.json"
+    changeset.save(saved)
+
+    await make_vs_pipeline(in_memory_store, embedders=embedders).apply(changeset)
+    await make_vs_pipeline(reloaded_store, embedders=embedders).apply(ChangeSet[Chunk].load(saved))
+
+    assert _stored_dump(in_memory_store) == _stored_dump(reloaded_store)
+    assert len(reloaded_store.stored) == 2
+
+
+@pytest.mark.anyio
+async def test_reapplying_a_plan_with_other_embedders_carries_no_vectors_over(make_files):
+    """Vectors from an earlier apply() must not ride along into a later one under another name."""
+    paths = make_files({"a.html": "A"})
+    first_store, second_store = MemoryVectorStore(), MemoryVectorStore()
+    first = make_vs_pipeline(first_store, embedders={"old": EmbedderConfig(_ConstantEmbedder([9.0]))})
+    second = make_vs_pipeline(second_store, embedders={"new": EmbedderConfig(_ConstantEmbedder([1.0]))})
+    changeset = await first.plan(paths)
+
+    await first.apply(changeset)
+    await second.apply(changeset)
+
+    assert [chunk.named_embeddings for chunk in second_store.stored.values()] == [{"new": [1.0]}]
+
+
+@pytest.mark.anyio
+async def test_apply_keeps_vectors_the_plan_already_carries(make_files, vstore):
+    """A plan edited to carry its own vectors keeps them (configured embedders add theirs)."""
+    paths = make_files({"a.html": "A"})
+    pipeline = make_vs_pipeline(vstore, embedders={"dense": EmbedderConfig(_ConstantEmbedder([1.0]))})
+    changeset = await pipeline.plan(paths)
+    changeset.to_add[0].items[0].named_embeddings["custom"] = [7.0]
+
+    await pipeline.apply(changeset)
+
+    assert [chunk.named_embeddings for chunk in vstore.stored.values()] == [{"custom": [7.0], "dense": [1.0]}]
+    assert changeset.to_add[0].items[0].named_embeddings == {"custom": [7.0]}

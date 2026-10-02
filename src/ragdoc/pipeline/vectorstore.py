@@ -317,6 +317,11 @@ class VectorStorePipeline(Generic[TMetadata]):
         deleted and each source is written (updates via the store's ``replace_source`` when
         it has one, else delete-then-upsert).
 
+        *changeset* is not mutated — embedding runs on copies of its chunks, so the plan still
+        equals its saved copy afterwards and a saved-then-loaded plan applies identically.
+        Vectors a (hand-edited) plan already carries in ``named_embeddings`` are kept; the
+        configured embedders add theirs (overwriting equal names).
+
         Args:
             changeset: The (possibly hand-edited) ChangeSet to apply.
 

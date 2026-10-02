@@ -181,7 +181,8 @@ PreWriteHook = Callable[[list[T]], Awaitable[None]]
 """Pre-write hook, called with the items about to be written (mutates in place — embedding).
 
 :meth:`SyncEngine.run` calls it once per source; :meth:`SyncEngine.apply` calls it once with
-the whole changeset's items (embed-first).
+the whole changeset's items (embed-first) — there it receives **copies**, so the caller's
+changeset is left untouched.
 """
 
 
@@ -531,6 +532,12 @@ class SyncEngine(Generic[T]):
         ``upsert``; a source whose stale-delete failed is **not** upserted — no old/new
         mixing).
 
+        *changeset* itself is **never mutated**: when a ``pre_write`` hook is configured it
+        runs on copies of the items, so the changeset still equals its saved copy afterwards
+        and can be applied again (by this or another pipeline) with the same result as a
+        freshly loaded one. Vectors computed by one ``apply()`` are therefore not kept on the
+        plan — every ``apply()`` embeds again.
+
         Returns:
             :class:`UpdateResult` (``skipped`` is always empty — apply cannot know
             plan-time skips).
@@ -539,6 +546,12 @@ class SyncEngine(Generic[T]):
         changes = [(sc, True) for sc in changeset.to_add] + [(sc, False) for sc in changeset.to_update]
 
         if self._pre_write is not None:
+            # pre_write mutates its items (embedding). Work on copies so the caller's changeset
+            # stays exactly the plan that was reviewed / saved — see the docstring.
+            changes = [
+                (sc.model_copy(update={"items": [item.model_copy(deep=True) for item in sc.items]}), is_new)
+                for sc, is_new in changes
+            ]
             all_items = [item for sc, _ in changes for item in sc.items]
             try:
                 await self._pre_write(all_items)
