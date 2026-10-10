@@ -120,8 +120,10 @@ dev = [
     "types-aiofiles>=25.1.0.20260409",
     "nest-asyncio>=1.6.0",
     "pytest-timeout>=2.3.0",
-    "ruff>=0.8.0",
-    "basedpyright>=1.31.0",
+    # Exact pins: new ruff/basedpyright releases add default rules and checks,
+    # so floating versions break CI without any code change. Bump deliberately.
+    "ruff==0.15.22",
+    "basedpyright==1.39.5",
     "pandas-stubs>=2.2.0.240218,<3",  # type stubs for the xlsx extra (basedpyright)
     "numpy>=1.26.4,<3",  # tests touching extraction/resolution
 ]
