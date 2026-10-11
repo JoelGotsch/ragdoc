@@ -46,6 +46,7 @@ from typing import TYPE_CHECKING, Generic, Literal, cast
 
 from ragdoc.chunking.provenance import resolve_chunk_provenance
 from ragdoc.metadata import TMetadata
+from ragdoc.utils.concurrency import resolve_semaphore
 
 logger = logging.getLogger(__name__)
 
@@ -401,7 +402,7 @@ class DocumentPipeline(Generic[TMetadata]):
         n_total = len(source_list)
         logger.info(f"Starting batch: {n_total} files, concurrency={limit}")
         result = PipelineResult()
-        semaphore = asyncio.Semaphore(limit)
+        semaphore = resolve_semaphore(limit)
         completed = 0
 
         async def _run_one(path: Path) -> None:
@@ -462,7 +463,7 @@ class DocumentPipeline(Generic[TMetadata]):
         limit = concurrency if concurrency is not None else self._concurrency
         source_list = list(sources)
         logger.info(f"Streaming {len(source_list)} files, concurrency={limit}")
-        semaphore = asyncio.Semaphore(limit)
+        semaphore = resolve_semaphore(limit)
 
         async def _run_one(path: Path) -> list[Chunk]:
             async with semaphore:

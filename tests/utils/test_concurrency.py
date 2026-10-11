@@ -195,3 +195,19 @@ async def test_run_ordered_cancellation_of_the_caller_cancels_the_work():
         await task
 
     assert sorted(cancelled) == [0, 1]
+
+
+@pytest.mark.parametrize("concurrency", [0, -1])
+def test_resolve_semaphore_rejects_concurrency_below_one(concurrency: int):
+    # Semaphore(0) is valid asyncio but grants no permits: every waiter would block forever.
+    with pytest.raises(ValueError, match="concurrency must be >= 1"):
+        resolve_semaphore(concurrency)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("concurrency", [0, -1])
+async def test_run_ordered_rejects_concurrency_below_one_instead_of_hanging(concurrency: int):
+    tracker = _Tracker()
+    with pytest.raises(ValueError, match="concurrency must be >= 1"):
+        await asyncio.wait_for(run_ordered([partial(tracker.work, 1)], concurrency), timeout=1)
+    assert tracker.peak == 0  # rejected before any factory was called

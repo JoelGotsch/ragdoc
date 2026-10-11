@@ -217,3 +217,21 @@ async def test_stream_cancels_pending_tasks_when_consumer_stops_early():
     await stream.aclose()  # closing the generator runs its finally: cancel + gather
 
     assert sorted(cancelled) == ["slow-1.html", "slow-2.html"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("method", ["run_many", "stream"])
+async def test_batch_entry_points_reject_concurrency_below_one(method: str):
+    import asyncio
+
+    from ragdoc.pipeline import DocumentPipeline
+
+    async def parser(path: Path) -> Document:
+        return make_document(title="t", body="b")
+
+    pipeline = DocumentPipeline(parser=parser)
+    with pytest.raises(ValueError, match="concurrency must be >= 1"):
+        if method == "run_many":
+            await asyncio.wait_for(pipeline.run_many([Path("a.html")], concurrency=0), timeout=1)
+        else:
+            await asyncio.wait_for(anext(aiter(pipeline.stream([Path("a.html")], concurrency=0))), timeout=1)
