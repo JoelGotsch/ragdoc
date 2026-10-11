@@ -14,9 +14,16 @@ T = TypeVar("T")
 
 
 def resolve_semaphore(concurrency: int | asyncio.Semaphore) -> asyncio.Semaphore:
-    """Return an ``asyncio.Semaphore`` from an int, or pass through an existing one."""
+    """Return an ``asyncio.Semaphore`` from an int, or pass through an existing one.
+
+    Raises:
+        ValueError: If *concurrency* is an int below 1. ``Semaphore(0)`` is valid asyncio but
+            grants no permits, so every waiter would block forever.
+    """
     if isinstance(concurrency, asyncio.Semaphore):
         return concurrency
+    if concurrency < 1:
+        raise ValueError(f"concurrency must be >= 1, got {concurrency}")
     return asyncio.Semaphore(concurrency)
 
 
@@ -51,6 +58,9 @@ async def run_ordered(
 
     Returns:
         One result per factory, in the order of *factories*.
+
+    Raises:
+        ValueError: If *concurrency* is an int below 1 (checked before any factory is called).
     """
     if isinstance(concurrency, int) and concurrency == 1:
         return [await factory() for factory in factories]

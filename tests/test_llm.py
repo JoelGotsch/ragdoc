@@ -651,7 +651,9 @@ def test_real_async_openai_type_checks_against_protocols():
     pytest.importorskip("basedpyright", reason="basedpyright not installed")
     check_file = Path(__file__).parent / "typecheck_openai_clients.py"
     proc = subprocess.run(
-        [sys.executable, "-m", "basedpyright", str(check_file)],
+        # --pythonpath pins import resolution to this interpreter; otherwise basedpyright
+        # discovers one from the environment, which in CI is not the tox venv with openai.
+        [sys.executable, "-m", "basedpyright", "--pythonpath", sys.executable, str(check_file)],
         capture_output=True,
         text=True,
         cwd=Path(__file__).parent.parent,
