@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Light only: opt out of browser auto-dark and Dark Reader, which lighten the text but
+       leave the white panels and literal SVG fills bright (white text on white). -->
+  <meta name="color-scheme" content="only light">
+  <meta name="darkreader-lock">
+  <title>{{TITLE}}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ── Tokens (references/style-guide.md) ─────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      color-scheme: only light;
+      --color-paper:        #f5f5f5;
+      --color-paper-2:      #ececec;
+      --color-ink:          #2d3142;
+      --color-muted:        #4f5d75;
+      --color-soft:         #5a6580;
+      --color-rule:         rgba(45,49,66,0.12);
+      --color-rule-solid:   #bfc0c0;   /* borders only, never text (1.8:1) */
+      --color-faint:        #666e80;   /* quietest text allowed: ≥4.6:1 on white and paper */
+      --color-accent:       #bf4520;
+      --color-accent-tint:  rgba(191,69,32,0.08);
+      --color-link:         #2e5aa8;
+      --color-white:        #ffffff;
+      --font-sans:  'Geist', system-ui, sans-serif;
+      --font-serif: 'Instrument Serif', serif;
+      --font-mono:  'Geist Mono', ui-monospace, monospace;
+    }
+
+    /* ── Page ──────────────────────────────────────────────────────────── */
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      line-height: 1.55;
+      padding: 3rem 2rem 4rem;
+    }
+    .frame { max-width: 1200px; margin: 0 auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.75rem, 2.6vw + 0.75rem, 2.5rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.12;
+      margin-bottom: 1rem;
+    }
+    h2 {
+      font-family: var(--font-serif);
+      font-size: 1.5rem;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      margin: 3rem 0 1rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--color-rule);
+    }
+    h3 { font-size: 1rem; font-weight: 600; margin: 2rem 0 0.75rem; }
+    h4 { font-size: 0.875rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: var(--color-muted); }
+
+    /* Header meta: base → head pins */
+    .meta {
+      display: grid;
+      grid-template-columns: max-content 1fr;
+      gap: 0.25rem 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--color-muted);
+      margin: 1rem 0 1.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--color-white);
+      border: 1px solid var(--color-rule);
+      border-radius: 6px;
+    }
+    .meta dt { letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.66rem; align-self: baseline; }
+    .meta dd { overflow-wrap: anywhere; }
+    .meta .sha { color: var(--color-soft); }
+
+    nav.toc { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; color: var(--color-muted); margin-bottom: 1rem; }
+    nav.toc a { color: var(--color-muted); text-decoration: none; margin-right: 1.25rem; }
+    nav.toc a:hover { color: var(--color-ink); }
+
+    /* ── Prose ─────────────────────────────────────────────────────────── */
+    .prose { max-width: 78ch; }
+    .prose p, .prose ul, .prose ol, .prose table { margin-bottom: 0.9rem; }
+    .prose ul, .prose ol { padding-left: 1.4rem; }
+    .prose li { margin-bottom: 0.3rem; }
+    .prose li::marker { color: var(--color-soft); }
+    .prose strong { font-weight: 600; }
+    .prose em { font-family: var(--font-serif); font-style: italic; font-size: 1.05em; }
+    .prose a { color: var(--color-link); text-decoration: none; border-bottom: 1px solid rgba(46,90,168,0.3); }
+    .prose a:hover { border-bottom-color: var(--color-link); }
+    .prose code, .meta code, .lens code {
+      font-family: var(--font-mono);
+      font-size: 0.86em;
+      background: rgba(45,49,66,0.06);
+      padding: 0.08em 0.3em;
+      border-radius: 3px;
+    }
+    .prose table { border-collapse: collapse; font-size: 0.875rem; width: 100%; }
+    .prose th, .prose td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--color-rule); vertical-align: top; }
+    .prose th { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-muted); font-weight: 500; }
+
+    /* Source link (filled by resolve.py): a hairline-underlined inline anchor */
+    a.src { color: var(--color-ink); text-decoration: none; border-bottom: 1px dashed rgba(45,49,66,0.35); }
+    a.src:hover { color: var(--color-link); border-bottom-color: var(--color-link); }
+    a.src code { background: transparent; padding: 0; }
+
+    /* ── Callout ───────────────────────────────────────────────────────── */
+    .callout {
+      max-width: 78ch;
+      margin: 1.25rem 0;
+      padding: 0.9rem 1.1rem;
+      background: var(--color-white);
+      border: 1px solid var(--color-rule);
+      border-left: 3px solid var(--color-muted);
+      border-radius: 6px;
+    }
+    .callout > p:last-child, .callout > ul:last-child { margin-bottom: 0; }
+    .callout-title { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.4rem; }
+    .callout-warning { border-left-color: var(--color-accent); }
+    .callout-warning .callout-title { color: var(--color-accent); }
+    .callout-danger  { border-left-color: var(--color-accent); background: var(--color-accent-tint); }
+    .callout-danger  .callout-title { color: var(--color-accent); }
+    .callout-success { border-left-color: var(--color-link); }
+    .callout-success .callout-title { color: var(--color-link); }
+
+    /* ── Code peek (body generated by resolve.py) ──────────────────────── */
+    figure.peek { margin: 1.25rem 0; border: 1px solid var(--color-rule); border-radius: 6px; background: var(--color-white); overflow: hidden; }
+    figure.peek figcaption {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.6rem;
+      font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-muted);
+      padding: 0.5rem 0.9rem; border-bottom: 1px solid var(--color-rule); background: var(--color-paper);
+    }
+    .peek-path { color: var(--color-ink); }
+    .peek-lines { color: var(--color-soft); }
+    .peek-side { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; border: 0.8px solid var(--color-rule-solid); border-radius: 2px; padding: 0.05em 0.4em; }
+    .peek-side-base { border-style: dashed; }
+    .peek-link { margin-left: auto; color: var(--color-link); text-decoration: none; }
+    figure.peek pre {
+      font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.5;
+      padding: 0.7rem 0.9rem; overflow-x: auto; tab-size: 4; color: var(--color-ink);
+    }
+    figure.peek .ln { display: inline-block; width: 3.2em; color: var(--color-faint); text-align: right; margin-right: 1em; user-select: none; }
+    figure.peek .peek-note {
+      font-family: var(--font-serif); font-style: italic; font-size: 0.95rem; color: var(--color-muted);
+      padding: 0.6rem 0.9rem; border-top: 1px solid var(--color-rule);
+    }
+    figure.peek .peek-unresolved { padding: 0.7rem 0.9rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-accent); }
+
+    /* ── Diagram figure ────────────────────────────────────────────────── */
+    figure.diagram { margin: 1.5rem 0 2rem; }
+    figure.diagram figcaption {
+      display: flex; align-items: baseline; gap: 0.75rem;
+      font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    figure.diagram figcaption .svg-link { margin-left: auto; letter-spacing: 0.06em; text-transform: none; color: var(--color-link); text-decoration: none; }
+    /* The SVG holds its readable width (its inline min-width equals the viewBox width);
+       the wrapper scrolls on narrow screens instead of the whole page. */
+    .diagram-container { width: 100%; overflow-x: auto; border: 1px solid var(--color-rule); border-radius: 6px; }
+    figure.diagram svg { width: 100%; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; border: none; }
+      figure.diagram svg { min-width: 0 !important; }
+    }
+
+    /* ── Collapsible subsections ───────────────────────────────────────── */
+    details.sub { margin: 1rem 0; border: 1px solid var(--color-rule); border-radius: 6px; background: var(--color-white); }
+    details.sub > summary { cursor: pointer; padding: 0.7rem 1rem; font-weight: 600; font-size: 0.95rem; list-style: none; }
+    details.sub > summary::-webkit-details-marker { display: none; }
+    details.sub > summary::before { content: "▸"; display: inline-block; width: 1.1em; color: var(--color-soft); transition: transform 0.15s; }
+    details.sub[open] > summary::before { transform: rotate(90deg); }
+    details.sub > .sub-body { padding: 0.25rem 1rem 1rem; border-top: 1px solid var(--color-rule); }
+
+    /* ── File lenses (bodies generated by resolve.py) ──────────────────── */
+    .lens { margin: 0.6rem 0; border: 1px solid var(--color-rule); border-radius: 6px; background: var(--color-white); }
+    .lens > summary { cursor: pointer; padding: 0.6rem 0.9rem; font-size: 0.9rem; font-weight: 600; display: flex; gap: 0.75rem; align-items: baseline; list-style: none; }
+    .lens > summary::-webkit-details-marker { display: none; }
+    .lens-stat { margin-left: auto; font-family: var(--font-mono); font-size: 0.66rem; font-weight: 400; letter-spacing: 0.06em; color: var(--color-muted); white-space: nowrap; }
+    .lens-note { font-family: var(--font-serif); font-style: italic; font-size: 0.95rem; color: var(--color-muted); padding: 0 0.9rem 0.5rem; }
+    ul.lens-files, ul.uncategorized { list-style: none; padding: 0.25rem 0.9rem 0.7rem; font-family: var(--font-mono); font-size: 0.74rem; }
+    ul.lens-files li, ul.uncategorized li { display: grid; grid-template-columns: 1fr max-content max-content; gap: 0 1rem; padding: 0.15rem 0; border-top: 1px solid var(--color-rule); }
+    ul.lens-files li:first-child { border-top: none; }
+    ul.lens-files a { color: var(--color-ink); text-decoration: none; overflow-wrap: anywhere; }
+    ul.lens-files a:hover { color: var(--color-link); }
+    .add { color: var(--color-link); } .del { color: var(--color-accent); }
+    .status { font-size: 0.6rem; letter-spacing: 0.12em; color: var(--color-soft); align-self: center; }
+    ul.uncategorized:empty::after { content: "none — every changed file is in a lens"; color: var(--color-soft); }
+
+    footer { margin-top: 4rem; padding-top: 1rem; border-top: 1px solid var(--color-rule); font-family: var(--font-mono); font-size: 0.66rem; color: var(--color-muted); letter-spacing: 0.04em; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <header>
+      <p class="eyebrow">Code review · {{REPO_NAME}}</p>
+      <h1>{{TITLE}}</h1>
+      <!-- meta:start -->
+      <dl class="meta">
+        <dt>Base</dt><dd><code>{{BASE_REF}}</code> <span class="sha">{{BASE_SHA}}</span></dd>
+        <dt>Head</dt><dd><code>{{HEAD_REF}}</code> <span class="sha">{{HEAD_SHA}}</span></dd>
+        <dt>Compare</dt><dd>{{COMPARE}}</dd>
+        <dt>Written</dt><dd>{{DATE}}</dd>
+      </dl>
+      <!-- meta:end -->
+      <nav class="toc">
+        <a href="#what-why">What / why</a>
+        <a href="#design">Design</a>
+        <a href="#implementation">Implementation</a>
+        <a href="#files">Files</a>
+      </nav>
+    </header>
+
+    <main>
+      <section id="what-why">
+        <h2>What / why</h2>
+        <div class="prose">
+          <p>[TODO what the change is, and why it was made.]</p>
+        </div>
+      </section>
+
+      <section id="design">
+        <h2>Design</h2>
+        <div class="prose">
+          <p>[TODO components, data and control flow; main decisions and trade-offs.]</p>
+        </div>
+      </section>
+
+      <section id="implementation">
+        <h2>Implementation</h2>
+        <div class="prose">
+          <p>[TODO walk the changed code in reading order, starting at the entry point.]</p>
+        </div>
+      </section>
+
+      <section id="files">
+        <h2>Files</h2>
+        <div class="prose">
+          <p>Changed files grouped into lenses, in reading order. Bodies are generated from <code>git diff --numstat</code> by <code>resolve.py</code>.</p>
+        </div>
+        <!-- lenses:start -->
+        <details class="lens" open>
+          <summary>[TODO lens title] <span class="lens-stat"></span></summary>
+          <ul class="lens-files" data-files="[TODO space-separated paths or globs]"></ul>
+        </details>
+        <!-- lenses:end -->
+        <h4>Not in any lens</h4>
+        <ul class="uncategorized" data-auto></ul>
+      </section>
+    </main>
+
+    <footer>Written with the review-whiteboard skill · pinned to <code>{{HEAD_SHA}}</code> · verify anchors with <code>resolve.py</code></footer>
+  </div>
+</body>
+</html>
