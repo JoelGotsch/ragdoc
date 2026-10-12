@@ -3,7 +3,8 @@
 This module contains only the Pydantic output models. All prompt-building logic,
 factory functions, and processors live in the per-element-type modules:
 
-- ``summary_image``  — image summarization
+- ``summary_image``     — image summarization
+- ``summary_document``  — whole-document summarization
 """
 
 from __future__ import annotations
@@ -29,3 +30,9 @@ class ImageSummary(BaseModel):
             "and should be excluded from document content."
         ),
     )
+
+
+class DocumentSummary(BaseModel):
+    """Structured result returned by a document summarization call."""
+
+    summary: str = Field(description="Concise, retrieval-optimised summary of the supplied content.")

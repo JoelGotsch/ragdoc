@@ -15,7 +15,7 @@ from ragdoc.parsing.parser import Parser
 
 def _make_doc(parser_name: str, title: str = "doc") -> Document:
     return Document(
-        elements=[Heading(level=1, innerhtml=title)],
+        elements=[Heading(html=f"<h1>{title}</h1>")],
         parser=parser_name,
     )
 

@@ -24,7 +24,7 @@ uv run pytest-watcher tests/         # watch mode
 uv run ruff check src tests          # lint
 uv run ruff check src tests --fix    # lint + autofix
 uv run ruff format src tests         # format (black-compatible, line-length 120)
-uv run basedpyright                  # type check (strict)
+uv run basedpyright                  # type check (standard mode)
 ```
 These mirror the CI jobs; tox wraps them as `tox -e lint` and `tox -e type`.
 
@@ -48,7 +48,7 @@ Four principles govern all design decisions:
 
 1. **`Document` is the single source of truth.** Every stage operates on structured `Document` objects. Never pass rendered strings between stages. The `Document` model is the unifying interface throughout parsing, processing, splitting, and chunking.
 
-2. **The library is async-only.** All public entry points are `async`. Do not add sync convenience wrappers. Callers use `asyncio.run(...)` or their own event loop.
+2. **The library is async-only.** All public entry points are `async`. Do not add sync convenience wrappers. Callers use `asyncio.run(...)` or their own event loop. Blocking work (every built-in parser — HTML, pandoc, xlsx, pdf, Azure DI, MinerU — plus PIL transforms, file hashing, splitter/chunker rendering) is wrapped in `asyncio.to_thread` at orchestration points; local-store file I/O uses `aiofiles`. Consequence: parser internals, including custom MinerU handlers, run in a worker thread (the active `configure()` context is copied into it).
 
 3. **Chunkers own the embedding content strategy.** The library produces two text representations per chunk (`prompt_content` and `embedding_content`), but the chunker decides how:
    - **`SimpleChunker`** — sets `embedding_content = prompt_content` (no LLM calls). Use when a single rendering suffices.
@@ -56,7 +56,7 @@ Four principles govern all design decisions:
 
    Rendering uses `render_for_prompt` (full-fidelity structured text) or `render_raw` (with base64 images). There is no separate embedding renderer — chunkers handle that concern.
 
-4. **Source provenance and metadata propagate through the entire pipeline.** `Document.source_path` is an explicit field set by parsers. Parsers also write `document.metadata["filename"] = path.name` — the bare filename lives in metadata, not as a first-class field. Provenance propagates through splitting and chunking into `Chunk.source_path` (optional on Chunk). `Document.metadata` is a dict that carries both **user-defined custom data** and **library-written informational fields** (e.g. `filename` set by parsers, `split_sequence`/`split_total` set by `split_document`). The rule for library-written metadata keys is: **no other part of the library may read or branch on them** — they exist purely for external consumers (retrieval clients, self-query filters). Keys that drive internal library behavior (change detection, deletion) belong as first-class fields on `Chunk` instead (`source_id`, `source_hash`). Any key/value present in `document.metadata` will arrive on the final chunks. Processors must not drop or overwrite metadata. Splitters copy the parent document's `source_path` and `metadata` to each split. Chunkers forward both into `Chunk`. **`VectorStorePipeline` never injects into `chunk.metadata`** — provenance (`source_id`, `source_hash`) lives in dedicated first-class `Chunk` fields, not in metadata.
+4. **Source provenance and metadata propagate through the entire pipeline.** `Document.source_path` is an explicit field and `document.metadata["filename"] = path.name` carries the bare filename (in metadata, not as a first-class field). Both are stamped **centrally** by `stamp_provenance` — called by `parsing.load()` and by `IngestPipeline.run()` — not by the individual parsers. Provenance propagates through splitting and chunking into `Chunk.source_path` (optional on Chunk). `Document.metadata` is a dict that carries both **user-defined custom data** and **library-written informational fields** (e.g. `filename` stamped at load time, `split_sequence`/`split_total` set by `split_document`). The rule for library-written metadata keys is: **no other part of the library may read or branch on them** — they exist purely for external consumers (retrieval clients, self-query filters). Keys that drive internal library behavior (change detection, deletion) belong as first-class fields on `Chunk` instead (`source_id`, `source_hash`). Any key/value present in `document.metadata` will arrive on the final chunks. Processors must not drop or overwrite metadata. Splitters copy the parent document's `source_path` and `metadata` to each split. Chunkers forward both into `Chunk`. **`VectorStorePipeline` never injects into `chunk.metadata`** — provenance (`source_id`, `source_hash`) lives in dedicated first-class `Chunk` fields, not in metadata.
 
 ### Pipeline
 
@@ -67,10 +67,14 @@ PARSING → PROCESSING ─┐
                        ↓
               (post-split PROCESSING, e.g. summarizers)
                        ↓
-                   CHUNKING ← (chunker owns embedding strategy)
-                       ↓
-               Chunk
+                   CHUNKING ← (chunker owns embedding strategy)      EXTRACTION ← (Extractor on splits
+                       ↓                                                  ↓         → typed Mentions)
+                     Chunk                                             Mention → Entity → Graph
 ```
+
+Chunking and extraction are parallel consumers of the split documents: chunks feed vector stores, mentions feed the knowledge-graph layers (see the Extraction section).
+
+The pipeline classes are split at the sync boundaries: **`IngestPipeline`** (parser + processors + `source_id_fn`; Boundary 1) and **`ChunkPipeline`** (splitter + chunker + `chunk_id_fn` + `metadata_type`; Boundary 2). **`DocumentPipeline`** composes both for the direct path (`pipeline.ingest` / `pipeline.chunk`); its flat kwargs (`DocumentPipeline(splitter=…)`) delegate into freshly built sub-pipelines. A stage on the wrong side is a `TypeError` at construction (there is no parameter for it) — do not add boundary-validation predicates or runtime rejections.
 
 The pipeline is **not strictly linear**:
 - Splitting uses rendering internally to measure token budgets → splitting is rendering-aware.
@@ -80,68 +84,101 @@ The pipeline is **not strictly linear**:
 
 ### Core Model
 
-`Document` is the central model. It contains a list of `BaseElement` subclasses (Heading, Paragraph, Table, Image, DocumentList, Footnote, RawText). Elements hold content as `innerhtml` (HTML string) with visual properties stored as **inline CSS** (e.g., `font-size`, `font-weight`, `text-align`). This CSS-in-HTML convention enables universal processors that work across all parsers without parser-specific fields.
+`Document` is the central model. It contains a list of `BaseElement` subclasses (Heading, Paragraph, Table, Image, DocumentList, Footnote, RawText). Elements hold content as `html` — the full HTML including the outer tag — with visual properties stored as **inline CSS** (e.g., `font-size`, `font-weight`, `text-align`). This CSS-in-HTML convention enables universal processors that work across all parsers without parser-specific fields. `html` is a **stored field with a normalizing validator** on Heading/Paragraph/Table/DocumentList/RawText, and a **derived property (with setter)** on Image and Footnote (their html is a projection of structured fields). The RawText validator guarantees only the outer `<div>`: a single root `<div>` passes through, anything else is wrapped verbatim (content is never unwrapped or re-serialized; literal `<`/`>`/`&` must be HTML-escaped by the caller, as MinerU code blocks do via `build_code_html` → `<div><pre><code>escaped</code></pre></div>`). Derived accessors (`text`, `inline_refs`, `level`, …) share one cached BeautifulSoup per element, keyed on the html string's **value** (identity is only the fast path — Footnote builds a new html string per access); `Image` never caches a soup and answers `text`/`inline_refs` without building its html; `html_tag` is deliberately fresh-parse (it returns a mutable `Tag`). Element equality is field-based (same concrete type, equal fields) — cache state never participates. Elements and `Document` use `extra="forbid"`: an unknown constructor keyword or JSON key raises, and the pre-refactor spellings `html_content=` / RawText `innerhtml=` raise an error naming `html` (they are not aliases — see the no-backwards-compatibility rule below). Elements use `validate_assignment=True`, so `element.html = value` re-normalizes; setters fail loud on values the model cannot represent (`Heading.level` accepts only 1–6; `Image.html` assignment re-derives all fields, resetting absent attributes to `None`, and raises on a missing `<img>` tag or non-`data:` src). `concat_documents(first, second, *, metadata_policy)` / `join_documents` concatenate documents (there is no `|` operator) — not to be confused with the alignment-based `ragdoc.merging.merge_documents`.
 
 Cross-document relationships use `ExternalRef` (parent/child/related); within-document references (images, footnotes, tables embedded in text) use `InlineRef` with `<ref id='...'/>` placeholders in HTML. The `Renderer` resolves these placeholders during rendering.
 
-### Stage 1: Parsing (`src/ragdoc/parsing/`: `html/`, `pandoc/`, `xlsx/`, `azure_di/`, `textract/`, `mineru/`)
+### Stage 1: Parsing (`src/ragdoc/parsing/`: `html/`, `pandoc/`, `xlsx/`, `azure_di/`, `mineru/`, `pdf_basic/`, `ragdoc_json/`)
 
-Each parser converts a format → `Document`, sets `document.parser` (provenance string, e.g., `"mineru"`, `"azure_di"`), sets `document.source_path`, and writes `document.metadata["filename"] = path.name`. Processors check `document.parser` to adjust behavior.
+Each parser converts a format → `Document` and sets parser-specific fields (e.g. `document.parser = "mineru"`). File provenance is stamped **centrally** via `stamp_provenance` (`parser`, `source_path`, `metadata["filename"]` — each only if the parser left it unset), called by `parsing.load()` and again by `IngestPipeline.run()` (so an explicit `parser=` callable that bypasses `load()` gets the same provenance) — individual parsers do not stamp it (two exceptions set it themselves: the live `azure_di` path and `ragdoc_json` in `JSON_FILE` provenance mode). Processors check `document.parser` to adjust behavior.
+
+Parsers declare availability via `Parser.is_available()` / `unavailable_reason()`: resolution skips parsers whose extra/credentials are missing and raises an actionable `ValueError` at resolve time when nothing usable matches. `.pdf` resolves by priority to `azure_di` (40) > `pdf_basic` (10, pymupdf, zero-config via the `pdf` extra); `mineru` (50) is registered for MinerU's `_middle.json` output, not for `.pdf`, and `ragdoc_json` (60) for `.ragdoc.json` snapshots.
 
 ### Stage 2: Processing (`src/ragdoc/processing/`)
 
 - `DocumentProcessor` (async ABC) — all processors subclass this; pure-sync processors simply don't `await`
 - `ProcessingPipeline` — chains processors in sequence
 
-Built-in processors: `HeadingLevelProcessor`, `TitleDetectionProcessor`, `LLMHeadingResolver`, `FootnoteProcessor`, `EmptyDocumentFilter`. Pluggable strategies use `Protocol` (e.g., `FootnoteResolver`).
+Built-in processors: `HeadingLevelProcessor`, `TitleDetectionProcessor`, `LLMHeadingResolver`, `FootnoteProcessor`, `EmptyDocumentFilter`, `ImageSummaryProcessor`, `DocumentSummarizerProcessor`, `DocumentDumpProcessor`. Pluggable strategies use `Protocol` (e.g., `FootnoteResolver`). See `docs/guide/processing.md` for the catalog and ordering.
 
-Processors may return `None` to drop a document. `ProcessingPipeline` short-circuits on `None`; `DocumentPipeline._process_one()` returns `[]` chunks for filtered documents.
+Processors may return `None` to drop a document. `ProcessingPipeline` short-circuits on `None`; `IngestPipeline.run()` returns `None` and `DocumentPipeline.run()` returns `[]` chunks for filtered documents.
 
 ### Stage 3: Rendering (`src/ragdoc/rendering/`)
 
-`Renderer` converts `Document` → formatted string. Element renderers use `singledispatch`. Two rendering strategies: `render_for_prompt` (full-fidelity text for LLM context) and `render_raw` (full fidelity with base64 images). Output formats: HTML, MARKDOWN, GFM, RST, PLAIN (via pypandoc).
+`Renderer` converts `Document` → formatted string. Element renderers use `singledispatch`. Two rendering strategies: `render_for_prompt` (full-fidelity text for LLM context) and `render_raw` (full fidelity with base64 images). Output formats: HTML (returned as is), MARKDOWN / GFM / RST (via pypandoc), PLAIN (BeautifulSoup `get_text()`).
 
 ### Stage 4–5: Splitting & Chunking (`src/ragdoc/splitting/`, `src/ragdoc/chunking/`)
 
-`split_document()` splits by heading hierarchy and token budget. Output of chunking is `Chunk` (id, source_path, source_id, source_hash, prompt_content, embedding_content, metadata) for loading into vector stores.
+`split_document()` splits by heading hierarchy and token budget. An element that alone exceeds the budget is cut on structural boundaries first — table rows, list items, block children (`plan_html_split`) — into well-formed fragments of the **same element type** (`Table` / `DocumentList`, with caption/colgroup/thead repeated and `<ol>` numbering continued; `RawText` only for generic containers); only a single unit that is still too large falls through to the sentence and token tiers, which also verify the rendered result against the budget. Every split copies the parent's `metadata` dict at construction (mutation-isolated); elements are shared across splits by reference (by design). The no-split path returns a shallow copy — the input document is never mutated. Output of chunking is `Chunk` (id, source_path, source_id, source_hash, content_hash, prompt_content, embedding_content, metadata) for loading into vector stores.
 
-**Chunkers** (`src/ragdoc/chunking/`): `SimpleChunker` — pure rendering, one chunk per document (`embedding_content = prompt_content`). `LLMChunker` — calls LLM to produce N topic summaries, returns N chunks with the same `prompt_content` but distinct `embedding_content` per topic. Both implement the `Chunker` ABC.
+**Chunkers** (`src/ragdoc/chunking/`): `SimpleChunker` — pure rendering, one chunk per document (`embedding_content = prompt_content`). `LLMChunker` — calls LLM to produce N topic summaries, returns N chunks with the same `prompt_content` but distinct `embedding_content` per topic; if the LLM returns no usable summary it falls back to one chunk with `embedding_content = prompt_content` (with a warning) so the split never vanishes from the index. Both implement the `Chunker` ABC.
 
 ### Stage 6: Sync (`src/ragdoc/pipeline/`)
 
-Incremental synchronisation follows a **plan → apply** shape across two boundaries plus a direct path. Every sync pipeline exposes `plan()` (compute a reviewable `ChangeSet`, no store writes), `apply()` (write it), and `run = apply(plan(...))`.
+Incremental synchronisation follows a **plan → apply** shape across two boundaries plus a direct path. Every sync pipeline exposes `plan()` (compute a reviewable `ChangeSet`, no store writes), `apply()` (write it), and `run()`. `run()` is **not** literally `apply(plan(...))`: it is a separate streaming path through the same engine that writes each source as it is produced. It uses the same change detection and, when no source fails, reaches the same end state. `run()` is **back-pressured** — a producer keeps its concurrency slot until the writer has taken its result, so at most `concurrency + 2` sources' items are in memory regardless of corpus size (so nothing on the write path may acquire a *shared* concurrency semaphore). `apply()` holds the whole changeset, runs `pre_write` on **copies** (it never mutates the `ChangeSet` it is given — a saved-then-loaded plan applies identically), and then writes source by source.
+
+**One engine, three pipelines.** All sync pipelines (`VectorStorePipeline`, `DocumentStorePipeline`, `MentionStorePipeline`) are thin compositions over the generic streaming core `SyncEngine[T]` (`pipeline/sync.py`) — do not re-implement change detection, orphan handling, or write discipline in a pipeline. The engine owns: token comparison against `store.list_source_state()`, per-source concurrency, per-source error isolation (`except Exception`, never `BaseException` — cancellation propagates, and the running producers are cancelled and awaited first), the write discipline with an optional `pre_write` hook (embedding; `apply()` calls it whole-corpus-first, `run()` per source), and opt-in orphan deletion.
+
+**Write discipline (what is and is not guaranteed).** A new source is `upsert`ed. An update goes through `replace_source` when the store implements the optional `SourceReplaceStore` protocol (`QdrantVectorStore`, `QdrantMentionStore`, `QdrantDocumentStore`, `LocalDocumentStore`): new items land **before** stale ones are removed, so a write that fails while the new items are being written keeps the previously stored items. Any other store gets `delete_by_source` then `upsert`: a failed delete skips the upsert (no old/new mixing), a failed upsert leaves the source **empty** and the next run re-processes it as new. Nothing is a transaction across the corpus. Qdrant writes spanning several requests are *blank-then-stamp*: points are written with blank `source_hash`/`content_hash` and the real hashes are stamped by a final `set_payload`, so an interrupted write never reads as "unchanged". When a batch of a **multi-batch** write fails or is cancelled, the points that call created are deleted by id (shielded on cancellation); pre-existing points are never deleted and an already-overwritten one is not restored. There is no cleanup for a single-request write or for a failure in the later steps of a replace (order: write new → delete stale → stamp): a failure at the stale delete leaves old and new points side by side, one at the stamp leaves only the new points — with blank hashes either way, so the source is re-processed. After a hard crash no cleanup runs — the partial points stay, with blank hashes, until the next sync replaces them. `list_source_state` reports a source whose points disagree on their hashes as blank. `LocalDocumentStore` writes atomically (temp file + `os.replace`) and reports an unreadable stored file as "always changed" instead of aborting the listing. Two non-guarantees: a source yielding **zero items** stores no token and is re-produced on every run; and a processor-filtered document deletes its stored chunks / mentions in direct-mode `VectorStorePipeline` and `MentionStorePipeline` but keeps its stored Document in `DocumentStorePipeline`. Also: `plan()` only logs sources that fail during hashing or production (they are absent from the `ChangeSet`; `apply()` cannot report them), and `content_hash` ignores metadata, so a metadata-only edit of a stored Document does not re-chunk.
+
+**Producers.** A pipeline contributes only (a) resolution of its request into a `SyncPlanInput` and (b) a producer coroutine `SyncSource -> SourceChange[T] | None` (`None` ⇒ unavailable, warn + skip; empty `items` ⇒ source yields nothing, stale entries deleted — `DocumentStorePipeline` deliberately returns `None` for processor-filtered documents so a transient filter never deletes the stored copy). Resolution failures (e.g. an unreadable file during hashing) never abort the run: `build_current_map` captures them per path, they surface in `UpdateResult.errors` via `SyncPlanInput.pre_failed`, and the failed source stays in `live_source_ids` so it is never orphan-deleted. Sinks satisfy the structural `SourceSyncStore[T]` protocol (`upsert`/`delete_by_source`/`list_source_state`). See `docs/guide/sync-engine.md`.
 
 **Two change-detection hashes** (first-class, never in `chunk.metadata`):
 - `source_hash` — SHA-256 of the **raw source-file bytes** (Boundary 1 / direct path).
-- `content_hash` — `Document.content_hash()`, renderer-stable (Boundary 2). `None` ⇒ treated as "always changed".
+- `content_hash` — `Document.content_hash()`, a canonical-JSON hash over `(title, elements)` (pandoc-free, dependency-stable; Boundary 2).
 
-**Provenance ownership.** `DocumentPipeline` owns `source_id_fn` (`Path -> str`, default `p.name`); it stamps `document.source_id` and chunkers propagate `source_id`/`source_hash`/`content_hash` onto every `Chunk` (with fallbacks, so the fields — required on `Chunk` — are never None). The file-byte `hash_fn` is a sync concern living on the sync pipelines. **There is no `ProvenanceProcessor`** (do not add one).
+A stored hash that is `None` **or blank (`""`)** ⇒ "always changed", on both paths (`source_hash_token` / `content_hash_token`); stores rely on this to flag partially written or unreadable sources.
+
+**Provenance ownership.** `IngestPipeline` owns `source_id_fn` (`Path -> str`, default `p.name`); it stamps `document.source_id`, and `chunking/provenance.py` (`resolve_chunk_provenance`) is the single fallback chain stamping `source_id`/`source_hash`/`content_hash` onto every `Chunk`. `source_id` is never None (falls back `source_id → source_path → doc.id`); `source_hash` is **honestly optional** (`str | None`) — the file-byte hash from the sync pipelines' `hash_fn`, never faked from the content hash. **Chunk ids are minted by `ChunkPipeline.run`** (not by chunkers) via `mint_chunk_id` over `(source_id, split_sequence, chunk_ordinal, content_hash)` — deterministic and collision-free across identical-content splits, emitted as a canonical UUID string (a valid Qdrant point id); override with `ChunkPipeline(chunk_id_fn=…)`. The file-byte `hash_fn` is a sync concern living on the sync pipelines. **There is no `ProvenanceProcessor`** (do not add one).
 
 `source_id_fn` strategies: `lambda p: p.name` (default), `str(p)` (full path), `str(p.relative_to(base_dir))` (portable). Duplicate source_ids raise `ValueError` before any processing.
 
-**Pipelines:**
-- `VectorStorePipeline(pipeline, vector_store, embedders=None, document_store=None, hash_fn=…, concurrency=10)`:
-  - **Direct mode** (no `document_store`): `plan(paths)` hashes files, compares `source_hash` via `vector_store.list_source_state()`, chunks changed files. `apply()` embeds **all** chunks first (non-destructive), then per source delete-then-upsert.
-  - **Mode 2** (`document_store` set): `plan(source_ids=None)` reads Documents from the store, compares `content_hash`, re-chunks changed ones via `DocumentPipeline.chunk_document` (no parser).
-- `DocumentStorePipeline(pipeline, document_store, …)` — Boundary 1: parses/processes files into Documents and syncs them into a `DocumentStore` (payload is `Document`, no embedding). Uses `DocumentPipeline.parse_and_process`.
+**Pipelines** (each takes the boundary-appropriate pipeline type, which has no parameter for a stage from the other side — a misplaced stage keyword is a `TypeError`, not a runtime rejection; the class of the pipeline object itself is checked only by the type checker):
+- `VectorStorePipeline(pipeline: DocumentPipeline, vector_store, embedders=None, hash_fn=…, concurrency=10)` — **direct mode**: `plan(paths)` hashes files, compares `source_hash` via `vector_store.list_source_state()`, chunks changed files. `apply()` embeds **all** chunks first (non-destructive: if embedding fails the store is untouched), deletes the orphans in `to_delete`, then writes source by source (see *Write discipline* above).
+- `VectorStorePipeline.from_document_store(chunk: ChunkPipeline, vector_store, document_store, embedders=None, concurrency=10)` — **Boundary 2**: `plan(source_ids=None)` reads Documents from the store, compares `content_hash`, re-chunks changed ones via `ChunkPipeline.run` (a `ChunkPipeline` cannot carry a parser or processors).
+- `DocumentStorePipeline(ingest: IngestPipeline, document_store, …)` — Boundary 1: parses/processes files into Documents and syncs them into a `DocumentStore` (payload is `Document`, no embedding; an `IngestPipeline` cannot carry a splitter or chunker). Uses `IngestPipeline.run`.
 
 `delete_orphans` defaults to **`False`** (footgun guard: in direct mode only pass your complete corpus). `UpdateResult` (`processed`/`skipped`/`deleted`/`errors`) is keyed on `source_id`.
 
 **Stores** (`src/ragdoc/pipeline/stores.py`):
-- `VectorStore` protocol — `upsert` / `delete` / `delete_by_source` / `list_source_ids` / `list_source_state() -> {source_id: SourceState}`. (`get_source_hash` is retained but unused — superseded by the bulk `list_source_state`.) Index on `chunk.source_id`/`chunk.source_hash`, not metadata.
+- `VectorStore` protocol — `upsert` / `delete` / `delete_by_source` / `list_source_ids` / `list_source_state() -> {source_id: SourceState}`. Index on `chunk.source_id`/`chunk.source_hash`, not metadata. (`get_source_hash` was removed — the bulk `list_source_state` superseded it.)
 - `DocumentStore` protocol — `upsert` / `delete_by_source` / `get_document` / `list_source_ids` / `list_source_state`.
+- `SourceReplaceStore` protocol (`pipeline/sync.py`, exported from `ragdoc.pipeline`) — optional `replace_source(source_id, items)`; detected structurally by the engine. Contract: a failure must not leave the source looking "unchanged" and should leave the previous items in place.
 - `SourceState(source_hash, content_hash)` — bulk change-detection state.
-- `LocalDocumentStore` — filesystem-backed `DocumentStore` (one JSON file per source); index-free, so manual edits to stored documents are detected at Boundary 2.
+- `LocalDocumentStore` — filesystem-backed `DocumentStore` (one JSON file per source, written atomically); index-free, so manual edits to stored documents are detected at Boundary 2.
+- Qdrant stores (`integrations/`, shared base `_qdrant_base.py`) — `create()` is idempotent on a server and on the in-process client (`collection_exists` first; an existing collection is used as is and still gains missing payload indexes).
 
-**`ChangeSet[T]`** (`changeset.py`) — serializable plan artifact (`to_add`/`to_update`/`to_delete`); `save()`/`load()` (call `load` on the concrete type, e.g. `ChangeSet[Chunk].load(path)`). Edit it between `plan()` and `apply()` for human-in-the-loop review.
+**`ChangeSet[T]`** (`changeset.py`) — serializable plan artifact (`to_add`/`to_update`/`to_delete`); `save()`/`load()` (call `load` on the concrete type, e.g. `ChangeSet[Chunk].load(path)`). Edit it between `plan()` and `apply()` for human-in-the-loop review. `apply()` leaves it untouched (embeddings are computed on copies), so it can be saved, compared or applied again afterwards.
 
-### Refactor Status
+### Extraction (`src/ragdoc/extraction/`)
 
-The codebase is mid-refactor (see `REFACTOR_TODO.md`). Phases 1–3 are complete. Phase 4 (updating parsers to set `document.parser` and store CSS) and Phase 5 (folder restructuring to `parsing/`, `splitting/`, `chunking/`) are in progress. `mineru/middleware/` is deprecated in favor of `processing/`.
+Structured extraction is a **first-class typed stage**, not a processor. The `Extractor[PayloadT]` protocol (`extractor.py`) is `async extract(document) -> list[Mention[PayloadT]]` — extractors **return** mentions and never read or write `document.metadata` keys of their own (each mention's locator *copies* the document metadata). Do not route extraction results through metadata; the explicit opt-in `as_processor(extractor, metadata_key=...)` adapter exists solely for document-dump consumers.
+
+- **`StructuredExtractor(payload_model, ...)`** (`structured.py`) — extracts one caller-supplied Pydantic model; the model's docstring + `Field` descriptions are the LLM schema.
+- **`KnowledgeGraphExtractor(schema, ...)`** (`kg.py`) — multi-type node + edge extraction against a `GraphSchema`; rewrites chunk-local edge refs to real mention ids; recursive halving fallback on **size-related** LLM failures only (`ragdoc.llm.is_size_related_failure` — a 401 or 429 is not halved); an edge referencing an unknown local id is dropped with a warning; the optional gleaning pass is a continuation (`[system, user, assistant(first answer), user]`) whose result is merged and de-duplicated. **`GraphSchema.patterns` are enforced**: legal triples are injected into the system prompt (`render_patterns_prompt`) and every extracted edge is validated against `allowed_pattern_kinds(schema)` — violations drop (counted + warned) or raise per `ExtractionSettings.on_pattern_violation`. Every edge type must appear in ≥1 pattern (declaration-time rule); union sizes are checked at extractor construction against `settings.max_union_size`.
+- **`ExtractionSettings`** (env prefix `EXTRACTION_`) — `system_prompt` and `request_timeout` are honored by both extractors; the validator never injects a built-in default prompt (each extractor resolves its own fallback). KG knobs: `gleaning`, `max_union_size`, `halving_max_depth`, `halving_min_chars`, `on_pattern_violation`.
+- Shared extraction plumbing (`resolve_model`, `parse_with_retry`, `build_messages`) lives once in `extraction/_llm.py`; `parse_with_retry` is a thin adapter mapping `ExtractionSettings` onto `ragdoc.llm.call_structured` — do not inline retry loops in extractors. Default renderer/tokenizer resolution is library-wide, not extraction-specific: `ragdoc.rendering.resolve_renderer` / `ragdoc.utils.resolve_tokenizer` (re-exported by `_llm.py`; also used by `LLMChunker` and `DocumentSummarizerProcessor`) — never inline the `Renderer(MARKDOWN, render_for_prompt)` / `GPTTokenizer()` fallback.
+- `Mention.source_hash` is honestly optional (`str | None`), mirroring `Chunk` — the real file-byte hash in direct-mode sync, `None` otherwise, never faked from the content hash. Mention ordinals run per source across splits (`MentionStorePipeline` re-stamps them before `finalize_mention` re-mints ids) and edge payload refs are rewritten to the finalized mention ids via `rewrite_edge_refs`.
+- **`MentionStorePipeline(ingest: IngestPipeline, extractor, mention_store, ...)`** — the mention analogue of the sync pipelines (same `plan`/`apply`/`run`); Boundary-2 mode is the separate constructor `MentionStorePipeline.from_document_store(extractor, mention_store, document_store, ...)` (no ingest/parser/processors parameter exists there). Consumes `extract()` directly and rejects non-`Extractor` arguments with `TypeError`. Splits of one source are extracted with bounded concurrency (`split_concurrency`, default 4; an int is per source, a shared `asyncio.Semaphore` is a cross-source budget); a failing split fails the source and cancels its siblings.
+
+### LLM reliability layer (`src/ragdoc/llm.py`)
+
+**Every LLM call in the library goes through `ragdoc.llm` — never call an OpenAI client directly, and never use the deprecated `beta.chat.completions` namespace.**
+
+- **Protocols:** `ChatClient` (`chat.completions.parse`) and `EmbeddingsClient` (`embeddings.create`) are narrow structural protocols — call sites demand only what they use. `LLMClient` is their intersection (a client usable for both, e.g. `AsyncOpenAI`). `RagdocConfig.openai_client` is typed `ChatClient | EmbeddingsClient | None` — it accepts a chat-only or an embeddings-only client, and each consumer demands the capability it uses. All three protocols are exported from the `ragdoc` root.
+- **Client resolution:** `resolve_openai_client(explicit)` = explicit → `get_config().openai_client` → `LLMNotConfiguredError` (also raised when the configured client is embeddings-only: the chat capability is demanded). Call it in `__init__` (fail-loud at construction), never lazily at request time. Exception: `LLMHeadingResolver` keeps its settings-based factory (base_url + api_key → `AsyncOpenAI`) as a documented layer above this chain.
+- **One retry policy, one retry layer** (`retry_llm`, used by `call_structured` and `OpenAIEmbedder`): retry 429 / connection / timeout / 5xx with exponential backoff and ±50 % jitter (`min(backoff_max, base * 2**attempt) * uniform(0.5, 1.5)`); a parseable `Retry-After` on a 429 replaces the computed delay but is **capped at `backoff_max`** (default 30 s). Never retry other 4xx, `ValidationError`, non-openai errors, or `LLMRefusalError` (`parsed is None` — a refusal is deterministic, retrying burns tokens). For a real `openai.AsyncOpenAI` both call paths go through `without_sdk_retries(client)` (`client.with_options(max_retries=0)`), so the SDK's own retries do not stack underneath: exactly `max_retries + 1` HTTP attempts, and the client's own `max_retries` is ignored for ragdoc calls. A custom structural client is called as-is.
+- **Timeouts:** every LLM call site takes a per-request timeout (`request_timeout` / `timeout`; `None` = the client's own default), forwarded through this layer; most also expose the `max_retries` budget.
+- **Failure classification lives here** — `is_llm_failure(exc)` (an LLM-call failure rather than a bug; drives per-item skip-with-warning) and `is_size_related_failure(exc)` (would a smaller input plausibly succeed; drives KG halving). Do not re-implement these at call sites.
+- **Degrade semantics are per-site, not unified** — the shared policy governs *transport* only. Preserve these failure products: heading resolver → `[]`, image summary → skip-with-warning per image (any `is_llm_failure`; bugs and cancellation propagate), footnote resolver → `None`, entity reviewer → `ReviewResult()` on a refusal only (any other LLM failure raises), `LLMChunker` → raise on call failure but fall back to one chunk on an empty summary list; summarizer / extractors → raise (KG halving catches **size-related** failures only and halves on top).
+- **`OpenAIEmbedder`** sends at most `batch_size` (default 256) inputs per request, in order, and raises if the endpoint returns a different number of vectors than inputs.
+- No module-level `import openai` in `ragdoc/llm.py` (exception classes load lazily) — keep it that way for the Phase 8 extras split.
+- Every call site sends an explicit `temperature` (default `0.0`; hard-coded in `LLMChunker`, the image summarizer and `LLMFootnoteResolver`, a setting elsewhere), so default models must stay in the gpt-4.x family (reasoning models reject non-default temperature).
 
 ## Collaboration Guidelines
 
 - **Drive work to completion autonomously.** When the user has authorized a task, do every step you have the means to do — run the tests, install missing deps, fix the venv, capture snapshot values, amend commits. Don't hand the user shell commands to run when you can run them yourself. Don't gate-keep with "want me to X?" prompts on follow-through. Reserve confirmation for actions you genuinely cannot reverse on your own (pushing to a shared remote when no credentials are available, sending messages, destructive ops). The devcontainer has `.venv-devcontainer/` (set via `UV_PROJECT_ENVIRONMENT`); use it. If a tool isn't installed, install it. If the environment legitimately blocks you (no GPU, no network, no creds), state that in one sentence and structure the hand-off as one clean recipe — not multiple round-trips.
+- **No backwards-compatibility promise (yet).** The library is pre-1.0 and does not keep old spellings alive: no deprecated aliases, no shims for renamed fields/keywords, no loaders for data written by earlier versions. Prefer a clear, loud error over silently accepting an old form. Instead, **every breaking change must be listed in the PR description** under a "Breaking changes" heading (what breaks, and what to do instead) and recorded in `CHANGELOG.md`.
 - **Before making structural model changes** (adding/removing fields on `Document`, `BaseElement` subclasses, or other core Pydantic models), stop and ask the user with all implications noted. Do not proceed autonomously.
 - **When changing any public API** (signatures, imports, field names, class names), check all notebooks in `docs/notebooks/` and update them. A notebook that crashes or produces wrong output is a bug.
 
@@ -154,31 +191,36 @@ Notebooks in `docs/notebooks/` are living documentation and must execute correct
 uv run marimo check docs/notebooks/*.py
 ```
 
-**2. pytest execution** — marimo notebooks are pure Python; pytest runs them and discovers `test_*` cells natively (no plugin needed):
+**2. pytest execution** — marimo notebooks are pure Python and marimo exposes every `test_*` cell as a test function, which pytest collects and runs (each test runs the cell's upstream cells first):
 ```bash
 uv run pytest docs/notebooks/
 ```
+Two pieces of config make this work — keep them: `python_files` in `pyproject.toml` includes `docs/notebooks/*.py` (the notebook filenames don't match `test_*.py`; `testpaths` stays `tests`, so a bare `uv run pytest` does **not** run this layer), and `docs/conftest.py` awaits test cells whose upstream cells are async (pytest cannot run those on its own).
 
 **3. `test_*` cells inside notebooks** — name assertion cells `test_*`. These serve dual purpose: pytest runs them in CI, and readers see exactly what outputs to expect without running the notebook. Good test cells are readable documentation:
 ```python
 @app.cell
 def test_document_parsed(doc):
     assert len(doc.elements) > 0, "document must have elements after parsing"
-    assert doc.filename is not None
+    assert doc.metadata["filename"] == "report.html"
+    return
 ```
+Test cells are plain `def` even when the cells they depend on are `async`. Assert on values the notebook computed — never on things that cannot fail (`is not None`, `len(x) >= 0`).
 
-**4. `tests/test_notebooks.py`** — wrap every notebook with `app.run()` for assertions in the main test suite:
+**4. `tests/test_notebooks.py`** — wrap every notebook with `app.run()` for assertions in the main test suite (`app.run()` is synchronous, so these are plain sync tests):
 ```python
-from docs.notebooks.pipeline_walkthrough import app
+def test_quickstart_notebook():
+    from docs.notebooks.quickstart import app
 
-@pytest.mark.anyio
-async def test_pipeline_walkthrough():
-    outputs, defs = app.run()
-    assert "chunks" in defs
-    assert len(defs["chunks"]) > 0
+    _outputs, defs = app.run()
+    chunks = defs["chunks"]
+    assert len(chunks) == 1
+    assert "Quarterly Report" in chunks[0].prompt_content
 ```
 
-CI (`tests.yaml`) runs all four layers. See `/documentation-best-practices` for the full documentation workflow.
+**Offline by default.** Notebooks must execute without credentials or network: use a temp-dir corpus, `SimpleChunker`, a deterministic fake embedder, and an in-memory store (`AsyncQdrantClient(":memory:")` or a small in-notebook `VectorStore`). Cells that genuinely need an LLM are gated — `mo.stop(...)` (or an `if`) on the API key — so they skip cleanly; never leave API calls commented out, because commented-out code is not checked against the current API.
+
+CI (`ci.yml`) runs all four layers: the `notebooks` job runs layer 1 (`marimo check`) and layers 2–3 (`pytest docs/notebooks/`); layer 4 runs inside the `test` job as part of the main suite. See `/documentation-guidelines` for the full documentation workflow.
 
 ## Plan Guidelines
 
@@ -210,10 +252,11 @@ Once an option is chosen, create `plans/PLAN-<topic>.md` with:
 
 - **Models:** Pydantic `BaseModel` with `Field(description="...")` on every field. Use `@property` (not `@computed_field`) for computed values.
 - **Functions:** Extract reusable logic into standalone functions (not private methods), so they can be tested independently.
+- **Bounded fan-out:** use `ragdoc.utils.concurrency.run_ordered(factories, concurrency)` — it takes zero-argument coroutine *factories* (`functools.partial(fn, arg)`), returns results in input order, and on a failure cancels and awaits the siblings. Never build a list of coroutine objects and await them in a loop (a failure leaves the rest un-awaited).
 - **Type hints:** Strict — no `Any`, no `**kwargs`. Use `Callable` type aliases for injectable functions (e.g., `SizeToLevelMapper`).
 - **CSS extraction functions:** Always return `None` when a property is absent (not a default value).
 - **Naming:** Processors = `*Processor`, LLM-based async resolvers = `*Resolver`, Protocols describe capability, standalone functions = `verb_noun`.
-- **Formatter / linter:** ruff (line-length=120; lint + import-sort + format). Type checking: basedpyright (strict). Config lives in `pyproject.toml`.
+- **Formatter / linter:** ruff (line-length=120; lint + import-sort + format). Type checking: basedpyright (standard mode). Config lives in `pyproject.toml`.
 
 ### Async-only conventions
 
@@ -229,4 +272,4 @@ uv add <package>           # production
 uv add --dev <package>     # dev only
 ```
 
-Optional extras: `azure-di`, `pdf-mineru`, `qdrant`. Local dependency: `aa-utils` at `C:/DEV/aa-utils`.
+Optional extras: `llm` (openai + pillow), `tokenizers` (transformers), `xlsx` (pandas + openpyxl), `pdf` (pymupdf), `azure-di`, `pdf-mineru`, `qdrant`, `extraction`. The base install is lean — optional imports are lazy and fail with an actionable 'pip install ragdoc[<extra>]' message.

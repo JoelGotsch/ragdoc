@@ -57,19 +57,8 @@ class MultiSourceParser(Parser):
         )
         register_parser(merger)
 
-    Args:
-        primary: The primary parser.
-        secondary: The secondary parser.
-        secondary_resolver: Optional resolver that maps the primary path to the
-            secondary file path.  When ``None``, both parsers receive the same
-            path.
-        merge: Merge function ``(doc_a, doc_b) -> Document``.  Defaults to
-            :func:`~ragdoc.merging.merge.merge_documents`.
-        name: Registry name.  Defaults to ``"multi_source"``.
-        patterns: Suffix patterns to register under.  Defaults to ``[]``.
-        priority: Registry priority.  Defaults to ``0``.
-        description: Human-readable description.  Auto-derived from primary and
-            secondary descriptions if not supplied.
+    See each field's description for its semantics; ``description`` is
+    auto-derived from the primary and secondary descriptions when not supplied.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

@@ -2,7 +2,7 @@
 
 > Run interactively: `marimo edit docs/notebooks/document_model.py`
 
-The [`Document`](../api/document.md#Document) is the central data structure in ragdoc.
+The [`Document`](../api/document.md#document) is the central data structure in ragdoc.
 Every pipeline stage — parsing, processing, splitting, and chunking — operates on `Document`
 objects. It is the single source of truth throughout the pipeline.
 
@@ -12,52 +12,71 @@ A `Document` is a Pydantic model containing:
 
 - **`id`** — Unique identifier (UUID string)
 - **`title`** — Optional document title
-- **`elements`** — Ordered list of [`BaseElement`](../api/document.md#BaseElement) subclasses
-- **`filename`** — Name of the source file (e.g. `"report.pdf"`), set by parsers
-- **`source_path`** — Full path to the source file (e.g. `"/data/report.pdf"`), set by parsers
-- **`metadata`** — Arbitrary key-value metadata (dict) for user-defined custom data
-- **`external_refs`** — List of [`ExternalRef`](../api/document.md#ExternalRef) for cross-document links
-- **`parser`** — Provenance string set by the parser (e.g. `"azure_di"`, `"pandoc"`)
+- **`elements`** — Ordered list of [`BaseElement`](../api/document.md#baseelement) subclasses
+- **`source_path`** — Full path to the source file (e.g. `"/data/report.pdf"`)
+- **`source_id`** / **`source_hash`** — Sync identity and file-byte hash, stamped by the pipelines (`None` on a hand-built document)
+- **`metadata`** — Key-value metadata (dict): your own custom data plus a few library-written
+  informational keys such as `filename` (the bare source filename, e.g. `"report.pdf"`)
+- **`external_refs`** — List of [`ExternalRef`](../api/document.md#externalref) for cross-document links
+- **`parser`** — Name of the parser that produced the document (e.g. `"azure_di"`, `"pandoc"`)
 
-`filename` and `source_path` are explicit first-class fields — not stored in `metadata`.
-Parsers set them automatically; they propagate through splitting and into `Chunk`.
+`source_path` is a first-class field; the bare filename lives in `metadata["filename"]`.
+Both, and `parser`, are stamped by [`load()`](../api/parsing.md#load) (and by the pipelines
+when you pass a custom parser). `source_path` and `metadata` propagate through splitting and
+into `Chunk`; `parser` is not copied to splits.
 
 ```python
 from ragdoc.document import Document, Heading, Paragraph
 
 doc = Document(
     title="Annual Report",
-    filename="annual_report.docx",
     source_path="/data/annual_report.docx",
     elements=[
-        Heading(innerhtml="Introduction", level=1),
-        Paragraph(html_content="<p>This report covers...</p>"),
+        Heading(html="<h1>Introduction</h1>"),
+        Paragraph(html="<p>This report covers...</p>"),
     ],
-    metadata={"year": 2024},
+    metadata={"year": 2024, "filename": "annual_report.docx"},
 )
 ```
 
 ## Element types
 
-All elements inherit from [`BaseElement`](../api/document.md#BaseElement):
+All elements inherit from [`BaseElement`](../api/document.md#baseelement):
 
 | Type | Description |
 |------|-------------|
-| [`Heading`](../api/document.md#Heading) | Section heading with `level` (1–6) and `innerhtml` |
-| [`Paragraph`](../api/document.md#Paragraph) | Body text with HTML content |
-| [`Table`](../api/document.md#Table) | Table with HTML content (`<table>...</table>`) |
-| [`Image`](../api/document.md#Image) | Image with base64 data, alt text, and optional `text_representation` |
-| [`DocumentList`](../api/document.md#DocumentList) | Ordered or unordered list |
-| [`Footnote`](../api/document.md#Footnote) | Footnote definition with number and text |
-| [`RawText`](../api/document.md#RawText) | Raw HTML content (pre-formatted blocks) |
+| [`Heading`](../api/document.md#heading) | Section heading; stored `html` carries the outer `<h1>`–`<h6>` tag (`level` is derived) |
+| [`Paragraph`](../api/document.md#paragraph) | Body text with HTML content |
+| [`Table`](../api/document.md#table) | Table with HTML content (`<table>...</table>`) |
+| [`Image`](../api/document.md#image) | Image with base64 data, alt text, and optional `text_representation` |
+| [`DocumentList`](../api/document.md#documentlist) | Ordered or unordered list |
+| [`Footnote`](../api/document.md#footnote) | Footnote definition with number and text |
+| [`RawText`](../api/document.md#rawtext) | Raw HTML content (pre-formatted blocks), always inside one outer `<div>` |
+
+A few rules hold for every element:
+
+- **Unknown keywords raise.** Elements and `Document` are strict (`extra="forbid"`): a
+  misspelled or outdated constructor keyword — or an unknown key in JSON passed to
+  `model_validate` — is a `ValidationError`, never silently dropped. The pre-refactor
+  spellings `html_content=` and `RawText(innerhtml=…)` are not aliases; the error names the
+  `html` field. Custom element subclasses inherit this, so declare every field you pass.
+- **`RawText` only guarantees its wrapper.** A value that is exactly one root `<div>…</div>`
+  is stored unchanged; anything else (plain text, several sibling tags, a single `<table>` or
+  `<pre>`) is wrapped verbatim in a `<div>`. The content is never unwrapped or re-serialized,
+  and `RawText.innerhtml` returns it byte for byte. It is still HTML, so escape literal text
+  yourself: `RawText(html=f"<pre><code>{html.escape(code)}</code></pre>")`.
+- **Equality is by value.** Two elements are equal when they have the same concrete type and
+  equal field values. Internal caches (the parsed HTML behind `.text` / `.inline_refs`) never
+  affect equality, so an element equals its own `model_copy()` and its JSON round-trip.
 
 ### Image `text_representation`
 
 `Image` elements have an optional `text_representation` field. This is populated by
-`ImageSummaryProcessor` and is used by `render_for_prompt` as a text fallback when
-the image cannot be displayed. The `ImageSummary` model also includes a `decorative`
-boolean field that allows the processor to flag worthless images (e.g. decorative
-borders) so they can be skipped during rendering.
+`ImageSummaryProcessor`. `render_for_prompt` never emits image data: an image renders as its
+`text_representation`, else its `alt` text, else `[Unprocessed Image]`. The `ImageSummary`
+model also has a `decorative` flag; for a decorative image the processor leaves
+`text_representation` as `None` — the image is not removed from the document or the
+rendering.
 
 ```python
 # ImageSummaryProcessor writes here:
@@ -75,27 +94,28 @@ and inline tables are represented.
 ```python
 # A paragraph referencing an image inline:
 para = Paragraph(
-    html_content='<p>As shown in <ref id="fig-1" rel="image"/>, revenue grew...</p>'
+    html='<p>As shown in <ref id="fig-1" rel="image"/>, revenue grew...</p>'
 )
 # The renderer resolves <ref> tags to the rendered content of the referenced element.
 ```
 
-The [`InlineRef`](../api/document.md#InlineRef) model is derived from the HTML — it is
+The [`InlineRef`](../api/document.md#inlineref) model is derived from the HTML — it is
 not stored as a field. The HTML is the single source of truth.
 
 ## Cross-document references
 
-[`ExternalRef`](../api/document.md#ExternalRef) records relationships between documents —
-typically parent/child links created by the splitter:
+[`ExternalRef`](../api/document.md#externalref) records relationships between documents —
+such as the `external-parent` link every split carries back to its source document (the
+splitters do not write `external-child` links onto the source):
 
 ```python
 from ragdoc.document import ExternalRef
 
-# After splitting, child documents carry a reference to their parent:
+# What a splitter sets on each split:
 child_doc.external_refs = [
     ExternalRef(target_id=parent_doc.id, rel_type="external-parent")
 ]
-# And the parent carries references to all its children:
+# The reverse link is yours to add if you want it:
 parent_doc.external_refs = [
     ExternalRef(target_id=child_doc.id, rel_type="external-child")
 ]
@@ -112,8 +132,27 @@ doc.tables        # list[Table]
 doc.images        # list[Image]
 doc.footnotes     # list[Footnote]
 
-doc.main_heading  # Heading | None  (the first h1)
+doc.main_heading  # Heading | None  (lowest level number, then earliest by page/position)
 ```
+
+## Concatenating documents
+
+`concat_documents(first, second)` appends `second`'s elements after `first`'s and returns a
+new `Document` (inputs are not mutated); `join_documents([...])` folds a list left-to-right.
+There is no `|` operator on `Document`.
+
+```python
+from ragdoc.document import concat_documents, join_documents
+
+combined = concat_documents(part_one, part_two)                          # metadata: first wins
+combined = concat_documents(part_one, part_two, metadata_policy="strict")  # raise on conflicting keys
+whole = join_documents([part_one, part_two, appendix])
+```
+
+When both documents have a title, an `<h1>` carrying the second title is inserted between
+the two element lists. The result has a new `id` and no `source_id` / `source_hash`.
+This is plain concatenation — to *align* two parses of the same source, see the
+[Merging Guide](merging.md).
 
 ## See Also
 

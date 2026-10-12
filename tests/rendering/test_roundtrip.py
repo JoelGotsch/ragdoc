@@ -28,21 +28,21 @@ def reference_html():
 
     doc = Document(
         elements=[
-            Heading(innerhtml="Document Title", level=1),
-            Heading(innerhtml="Section with <em>italic heading</em>", level=2),
-            Heading(innerhtml="Subsection", level=3),
-            Heading(innerhtml="Deep heading", level=4),
-            Paragraph(html_content="<p>Plain paragraph.</p>"),
-            Paragraph(html_content="<p><strong>Bold</strong>, <em>italic</em>, <code>code</code>.</p>"),
-            Paragraph(html_content="<p>Math: E\u2009=\u2009<math>mc<sup>2</sup></math></p>"),
-            Paragraph(html_content='<p style="text-align: center;">Centred paragraph.</p>'),
-            Paragraph(html_content="<p>Entities: a &amp; b, x &lt; y, z &gt; w.</p>"),
-            Paragraph(html_content=f'<p>Text with footnote<ref id="{fn1.id}" rel="footnote"/>.</p>'),
+            Heading(html="<h1>Document Title</h1>"),
+            Heading(html="<h2>Section with <em>italic heading</em></h2>"),
+            Heading(html="<h3>Subsection</h3>"),
+            Heading(html="<h4>Deep heading</h4>"),
+            Paragraph(html="<p>Plain paragraph.</p>"),
+            Paragraph(html="<p><strong>Bold</strong>, <em>italic</em>, <code>code</code>.</p>"),
+            Paragraph(html="<p>Math: E\u2009=\u2009<math>mc<sup>2</sup></math></p>"),
+            Paragraph(html='<p style="text-align: center;">Centred paragraph.</p>'),
+            Paragraph(html="<p>Entities: a &amp; b, x &lt; y, z &gt; w.</p>"),
+            Paragraph(html=f'<p>Text with footnote<ref id="{fn1.id}" rel="footnote"/>.</p>'),
             fn1,
-            Paragraph(html_content=f'<p>See <ref id="{img_inline.id}" rel="image"/> for details.</p>'),
+            Paragraph(html=f'<p>See <ref id="{img_inline.id}" rel="image"/> for details.</p>'),
             img_inline,
             Paragraph(
-                html_content=(
+                html=(
                     f'<p>Combined<ref id="{fn2.id}" rel="footnote"/> and <ref id="{img_inline.id}" rel="image"/>.</p>'
                 )
             ),
@@ -50,13 +50,13 @@ def reference_html():
             fn_orphan,
             img_standalone,
             Table(
-                html_content=(
+                html=(
                     "<table><thead><tr><th>Col A</th><th>Col B</th></tr></thead>"
                     "<tbody><tr><td>R1C1</td><td>R1C2 with <em>markup</em></td></tr></tbody></table>"
                 )
             ),
-            DocumentList(html_content="<ul><li>Apple</li><li>Banana</li></ul>"),
-            DocumentList(html_content="<ol><li>First</li><li>Second</li></ol>"),
+            DocumentList(html="<ul><li>Apple</li><li>Banana</li></ul>"),
+            DocumentList(html="<ol><li>First</li><li>Second</li></ol>"),
         ]
     )
     renderer = Renderer(format=OutputFormat.HTML, element_renderer=render_raw)
@@ -105,22 +105,22 @@ def test_roundtrip_paragraph_count(doc):
 
 
 def test_roundtrip_rich_markup_preserved(doc):
-    htmls = [p.html_content for p in doc.paragraphs]
+    htmls = [p.html for p in doc.paragraphs]
     assert any("<strong>" in h and "<em>" in h and "<code>" in h for h in htmls)
 
 
 def test_roundtrip_math_preserved(doc):
-    htmls = [p.html_content for p in doc.paragraphs]
+    htmls = [p.html for p in doc.paragraphs]
     assert any("<math>" in h and "<sup>" in h for h in htmls)
 
 
 def test_roundtrip_inline_style_preserved(doc):
-    htmls = [p.html_content for p in doc.paragraphs]
+    htmls = [p.html for p in doc.paragraphs]
     assert any("text-align: center" in h for h in htmls)
 
 
 def test_roundtrip_entities(doc):
-    combined = " ".join(p.html_content for p in doc.paragraphs)
+    combined = " ".join(p.html for p in doc.paragraphs)
     # BS4 may normalise &amp; -> & in text but keep it encoded in HTML attr context;
     # accept either form as the round-trip is structure-preserving, not byte-exact.
     assert "a &amp; b" in combined or "a & b" in combined
@@ -183,27 +183,27 @@ def test_roundtrip_table_present(doc):
 
 def test_roundtrip_table_has_headers(doc):
     table = doc.tables[0]
-    assert "<th>" in table.html_content
+    assert "<th>" in table.html
 
 
 def test_roundtrip_cell_markup_preserved(doc):
     table = doc.tables[0]
-    assert "<em>" in table.html_content
+    assert "<em>" in table.html
 
 
 # --- TestRoundtripLists ---
 
 
 def test_roundtrip_ul_present(doc):
-    assert any("<ul>" in lst.html_content for lst in doc.lists)
+    assert any("<ul>" in lst.html for lst in doc.lists)
 
 
 def test_roundtrip_ol_present(doc):
-    assert any("<ol>" in lst.html_content for lst in doc.lists)
+    assert any("<ol>" in lst.html for lst in doc.lists)
 
 
 def test_roundtrip_list_item_content(doc):
-    all_list_html = " ".join(lst.html_content for lst in doc.lists)
+    all_list_html = " ".join(lst.html for lst in doc.lists)
     assert "Apple" in all_list_html
     assert "Banana" in all_list_html
     assert "First" in all_list_html

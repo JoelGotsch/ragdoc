@@ -3,8 +3,8 @@
 > Run interactively: `marimo edit docs/notebooks/parsing.py`
 
 Parsing is the first stage of the pipeline. It converts a raw file into a structured
-[`Document`](document-model.md) object. Each parser sets `document.parser` to a provenance
-string so downstream processors can adjust behavior.
+[`Document`](document-model.md) object. `document.parser` records which parser produced it,
+so downstream processors can adjust behavior.
 
 ## Quick start
 
@@ -20,7 +20,7 @@ document = await load("report.docx")
 Pass `parser=` to force a specific parser by name:
 
 ```python
-document = await load("result.json", parser="azure_di")
+document = await load("result.json", parser="azure_json")
 ```
 
 ## Built-in parser registry
@@ -29,22 +29,40 @@ ragdoc registers parsers for common file types at import time. Resolution is bas
 suffix matching — longer patterns take precedence, and within the same pattern the
 highest-priority parser wins:
 
-| Pattern | Parser | Name | Priority |
-|---------|--------|------|----------|
-| `.html`, `.htm` | HTML | `html` | — |
-| `.docx`, `.doc` | Pandoc | `pandoc` | — |
-| `.xlsx` | Excel | `xlsx` | — |
-| `.azure.json` | Azure DI (JSON) | `azure_json` | — |
-| `.pdf` | Azure DI (live) | `azure_di` | 40 |
-| `_middle.json` | MinerU | `mineru` | 50 |
-| `.ragdoc.json` | RagdocJson | `ragdoc_json` | 60 |
+| Pattern | Parser | Name | Priority | Extra |
+|---------|--------|------|----------|-------|
+| `.html`, `.htm` | HTML | `html` | — | — |
+| `.docx` (`.doc` is registered but not readable, see below) | Pandoc | `pandoc` | — | — |
+| `.xlsx` | Excel | `xlsx` | — | `xlsx` |
+| `.azure.json` | Azure DI (JSON) | `azure_json` | — | — |
+| `.pdf` | pymupdf (local) | `pdf_basic` | 10 | `pdf` |
+| `.pdf` | Azure DI (live) | `azure_di` | 40 | `azure-di` + credentials |
+| `_middle.json` | MinerU | `mineru` | 50 | `pdf-mineru` |
+| `.ragdoc.json` | RagdocJson | `ragdoc_json` | 60 | — |
 
-For PDFs, `load("report.pdf")` dispatches directly to Azure Document Intelligence —
-no extra call needed.
+Resolution also checks **availability**: a parser whose extra isn't installed (or whose
+credentials aren't configured, for `azure_di`) is skipped in favour of the next-best
+available one, and if *nothing* usable matches you get an actionable error at resolve
+time telling you which extra to install.
+
+### PDF options
+
+| Extra | Parser | Fidelity | Setup |
+|---|---|---|---|
+| `pdf` | `pdf_basic` | Text + font-size headings (pymupdf) | zero config |
+| `azure-di` | `azure_di` | Full layout, tables, figures | Azure credentials |
+| `pdf-mineru` | `mineru` | Full layout via MinerU `_middle.json` | run MinerU separately |
+
+With `ragdoc[pdf]` installed, `load("report.pdf")` just works; configure Azure DI when you
+need higher fidelity — the registry then prefers it automatically for `.pdf`. MinerU is not a
+`.pdf` parser: run MinerU yourself and `load()` the `*_middle.json` it writes.
 
 ## Available parsers
 
-### Word documents (`.docx`, `.doc`)
+### Word documents (`.docx`)
+
+> Legacy `.doc` files resolve to the pandoc parser but fail: pandoc has no `doc` reader.
+> Convert them to `.docx` first.
 
 Uses [Pandoc](https://pandoc.org/) to convert Word documents to HTML, then parses the
 HTML into a `Document`.
@@ -74,6 +92,16 @@ document = await load("data.xlsx")
 # document.parser == "xlsx"
 ```
 
+### Basic local PDF (`.pdf`)
+
+`pdf_basic` (the `pdf` extra) parses PDFs locally with pymupdf: text extraction plus
+font-size/bold heading detection. Zero configuration, no network.
+
+```python
+document = await load("report.pdf")
+# document.parser == "pdf_basic"   (when no higher-fidelity PDF parser is available)
+```
+
 ### Azure Document Intelligence (`.azure.json`, `.pdf`)
 
 Parses the JSON output from Azure Document Intelligence into a `Document`. This is the
@@ -86,7 +114,7 @@ There are two registered parsers: `azure_json` for static `.azure.json` result f
 document = await load("result.azure.json")
 # document.parser == "azure_di"  (parsed by the "azure_json" registry entry)
 
-document = await load("report.pdf")   # invokes Azure DI directly
+document = await load("report.pdf")   # invokes Azure DI (when credentials are configured)
 # document.parser == "azure_di"       (parsed by the "azure_di" registry entry)
 ```
 
@@ -104,7 +132,7 @@ Requires the `pdf-mineru` extra: `uv add ragdoc[pdf-mineru]`.
 
 #### What the parser extracts
 
-`CoreExtractionMiddleware` (the default) converts every MinerU block into document
+`CoreExtractor` (the default) converts every MinerU block into document
 elements:
 
 | MinerU block | Produces | Notes |
@@ -112,12 +140,28 @@ elements:
 | `TitleBlock` | `Heading` | CSS `font-size` + optional `text-align: center` |
 | `TextBlock` | `Paragraph` | CSS `font-size` + optional `text-align: center` |
 | `ListBlock` | `DocumentList` | CSS applied to `<ul>` tag |
-| `CodeBlock` | `Paragraph?` + `RawText` | caption before body |
+| `CodeBlock` | `Paragraph?` + `RawText` | caption before body; the code is escaped text in `<div><pre><code>…</code></pre></div>`, one line per source line |
 | `TableBlock` | `Paragraph?` + `Table` + `RawText?` | caption, HTML table, footnote |
 | `ImageBlock` | `Image?` + `Paragraph?` | Pillow load from disk + caption |
 
 Discarded blocks (headers, footers, page numbers, asides, footnotes) are handled
 by the discarded-handler table — see [Default discarded-block handling](#default-discarded-block-handling).
+
+A code block's `RawText` carries the source **HTML-escaped** inside `<pre><code>`
+(built by `build_code_html`), so `<`, `>` and `&` in code or XML snippets are text — never
+parsed as markup or as `<ref/>` placeholders — and line breaks survive into every output
+format:
+
+```python
+from ragdoc.parsing.mineru import build_code_html
+
+build_code_html("if a < b:\n    swap(a, b)")
+# '<div><pre><code>if a &lt; b:\n    swap(a, b)</code></pre></div>'
+```
+
+Parsing runs in a worker thread (`asyncio.to_thread`), so custom handlers execute off the
+event loop: they must be plain synchronous functions and should not touch event-loop-bound
+objects.
 
 #### Image loading
 
@@ -132,29 +176,25 @@ document = await load("output/report_middle.json")
 # Images in output/images/*.png are loaded automatically
 ```
 
-If Pillow is not installed or an image file is not found, the `Image` element is silently
-skipped and a warning is recorded on the document context (not raised as an exception).
+Image loading needs Pillow, which ships with the `llm` extra (not with `pdf-mineru`). If
+Pillow is missing, the file is not found, or the image cannot be decoded, the `Image` element
+is skipped — logged or noted on the internal parse context, never raised — and nothing about
+it appears on the returned `Document`.
 
-#### Metadata from discarded blocks
+#### Discarded blocks never reach `Document.metadata`
 
-Headers and other discarded-block text that gets stored by `handle_discarded_as_metadata`
-is automatically propagated to `Document.metadata` after parsing:
-
-```python
-document = await load("report_middle.json")
-print(document.metadata.get("headers"))
-# [{"page": 1, "text": "Confidential — Draft v1"}, ...]
-```
-
-The accumulated keys depend on which discarded handlers are active (see the default table
-below). Internal context keys are never forwarded.
+The MinerU parser writes nothing to `document.metadata` (`"filename"` is stamped by
+`load()` / the pipeline). To keep running headers or footers, emit them as elements with
+`handle_discarded_as_raw_text` (see below). `handle_discarded_as_metadata` only accumulates
+text in the parse context (`context.metadata`), for a custom extraction stage to read; it does
+not forward anything to the document.
 
 #### Default discarded-block handling
 
 | Block type | Default handler | Effect |
 |---|---|---|
-| `HEADER` | `handle_discarded_as_metadata` | stored in `document.metadata["headers"]` |
-| `FOOTER` | `handle_discarded_as_footnote` | numbered regex → `Footnote`, else warn + drop |
+| `HEADER` | `handle_discarded_drop` | dropped silently |
+| `FOOTER` | `handle_discarded_drop` | dropped silently |
 | `PAGE_NUMBER` | `handle_discarded_drop` | dropped silently |
 | `ASIDE_TEXT` | `handle_discarded_drop` | dropped silently |
 | `PAGE_FOOTNOTE` | `handle_discarded_as_footnote` | numbered regex → `Footnote`, else warn + drop |
@@ -165,17 +205,17 @@ Every handler is a plain callable in `ExtractionConfig`. Replace any single entr
 change that block type's behaviour without touching anything else:
 
 ```python
-from ragdoc.parsing.mineru import MinerUParser, MinerUExtractor, CoreExtractionMiddleware
+from ragdoc.parsing.mineru import MinerUParser, MinerUExtractor, CoreExtractor
 from ragdoc.parsing.mineru.handlers import ExtractionConfig, handle_discarded_as_raw_text
 from ragdoc.parsing.mineru.base import DiscardedBlockType
 from pathlib import Path
 
-# Emit page headers as RawText elements instead of storing them in metadata
+# Emit page headers as RawText elements instead of dropping them (the default)
 config = ExtractionConfig()
 config.discarded_handlers[DiscardedBlockType.HEADER] = handle_discarded_as_raw_text
 
-extractor = MinerUExtractor(use_default_middlewares=False)
-extractor.use(CoreExtractionMiddleware(config=config))
+extractor = MinerUExtractor(use_default_stages=False)
+extractor.use(CoreExtractor(config=config))
 
 parser = MinerUParser(extractor=extractor)
 document = await parser(Path("report_middle.json"))
@@ -195,7 +235,7 @@ Four reusable discarded-block handlers are provided:
 
 | Function | Produces | Use case |
 |---|---|---|
-| `handle_discarded_as_metadata` | `[]` | accumulate text in `document.metadata` |
+| `handle_discarded_as_metadata` | `[]` | accumulate text in the parse context for a custom stage (not in `document.metadata`) |
 | `handle_discarded_as_footnote` | `Footnote` or `[]` | numbered `N text` pattern |
 | `handle_discarded_as_raw_text` | `RawText` | preserve text as a document element |
 | `handle_discarded_drop` | `[]` | discard silently |
@@ -216,7 +256,7 @@ levels based on font size — the same mechanism used by the HTML and Azure DI p
 ### ragdoc JSON snapshots (`.ragdoc.json`)
 
 Deserializes `.ragdoc.json` files produced by
-[`DocumentDumpProcessor`](../api/processing.md#DocumentDumpProcessor) back into
+[`DocumentDumpProcessor`](../api/processing.md#documentdumpprocessor) back into
 `Document` objects. Registered at priority 60 — the highest of any built-in parser —
 so `.ragdoc.json` files always resolve here, even if another parser also matches.
 
@@ -259,7 +299,7 @@ document = await proc.process(document)  # writes cache/{stem}_{id[:8]}.ragdoc.j
 
 ### Registering a custom parser
 
-Subclass [`Parser`](../api/parsing.md#Parser) and register an instance:
+Subclass [`Parser`](../api/parsing.md#parser) and register an instance:
 
 ```python
 from pathlib import Path
@@ -276,7 +316,7 @@ class MyParser(Parser):
 
     async def __call__(self, path: Path) -> Document:
         # parse a custom format
-        return Document(...)
+        return Document(elements=[])  # build your elements here
 
 
 register_parser(MyParser())
@@ -401,36 +441,24 @@ the merge strategy and nesting `MultiSourceParser` for three-way merges.
 
 ## What parsers produce
 
-All parsers produce a `Document` where:
+Every parser produces a `Document` where:
 
-- Elements store content as `innerhtml` (HTML string)
+- Elements store content as `html` (full HTML including the outer tag)
 - Visual properties (font size, weight, alignment) are stored as **inline CSS** on the HTML tags
 - `document.parser` is set to identify the source parser
 - Inline references (`<ref id="..." rel="..."/>`) are embedded in HTML for images and footnotes
-- `document.metadata["filename"]` is set to the source filename (e.g. `"report.docx"`)
-- `document.source_path` is set to the full path as a string (e.g. `"/data/report.docx"`)
+
+File provenance is added by `load()` and `IngestPipeline.run()` (via `stamp_provenance`), not
+by the parser classes: `document.metadata["filename"]` (e.g. `"report.docx"`),
+`document.source_path` (e.g. `"/data/report.docx"`), and `document.parser` if the parser left
+it unset. A parser called directly — `await HTMLParser()(path)` — returns a document without
+`source_path` and `filename`; call `stamp_provenance` yourself if you need them.
 
 The CSS-in-HTML convention is what allows processors like
-[`HeadingLevelProcessor`](../api/processing.md#HeadingLevelProcessor) to work uniformly
+[`HeadingLevelProcessor`](../api/processing.md#headinglevelprocessor) to work uniformly
 across all parsers without parser-specific logic.
 
 ---
-
-## Legacy API
-
-`from_path()` and `load_document()` are still available but **deprecated**. Use `load()`
-instead:
-
-```python
-# Deprecated
-from ragdoc.parsing import from_path, load_document
-source = from_path("report.docx")
-document = load_document(source)
-
-# Preferred
-from ragdoc.parsing import load
-document = await load("report.docx")
-```
 
 ## See Also
 

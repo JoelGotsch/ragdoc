@@ -6,7 +6,8 @@ Covers:
 - apply(): documents stored and retrievable via get_document; list_source_state reflects them.
 - run() == apply(plan()); re-run skips unchanged.
 - delete_orphans True removes documents absent from the run set.
-- a document filtered to None by processing is not stored.
+- a document filtered to None by processing is not stored; a previously stored copy
+  is preserved (skip-with-warning, never delete-on-filter).
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from ragdoc.document import Document
-from ragdoc.pipeline import DocumentPipeline
+from ragdoc.pipeline import IngestPipeline
 from ragdoc.pipeline.document_store_pipeline import DocumentStorePipeline
 from ragdoc.processing.base import DocumentProcessor
 
@@ -49,7 +50,7 @@ def make_doc_pipeline(doc_store, processors=None, source_id_fn=None) -> Document
     if source_id_fn is not None:
         dp_kwargs["source_id_fn"] = source_id_fn
     return DocumentStorePipeline(
-        pipeline=DocumentPipeline(parser=_parse, processors=processors, **dp_kwargs),
+        ingest=IngestPipeline(parser=_parse, processors=processors, **dp_kwargs),
         document_store=doc_store,
     )
 
@@ -135,7 +136,7 @@ async def test_run_second_run_skips_unchanged(make_files, doc_store):
 
 @pytest.mark.anyio
 async def test_run_update_replaces_document(tmp_path, doc_store):
-    from ragdoc.pipeline.vectorstore import _file_hash
+    from ragdoc.pipeline.sync import file_hash
 
     p = tmp_path / "doc.html"
     p.write_text("v1", encoding="utf-8")
@@ -147,7 +148,7 @@ async def test_run_update_replaces_document(tmp_path, doc_store):
 
     stored = await doc_store.get_document("doc.html")
     assert stored is not None
-    assert stored.source_hash == _file_hash(p)  # replaced with the v2 file's hash
+    assert stored.source_hash == file_hash(p)  # replaced with the v2 file's hash
     assert await doc_store.list_source_ids() == {"doc.html"}  # still one source
 
 
@@ -181,13 +182,58 @@ async def test_delete_orphans_true_removes_absent(make_files, doc_store):
 # ---------------------------------------------------------------------------
 
 
+class DropAll(DocumentProcessor):
+    async def process(self, document):
+        return None
+
+
 @pytest.mark.anyio
 async def test_filtered_document_not_stored(make_files, doc_store):
-    class DropAll(DocumentProcessor):
-        async def process(self, document):
-            return None
-
+    """A filtered source is skipped with a warning: nothing stored, nothing deleted."""
     paths = make_files({"doc.html": "content"})
     result = await make_doc_pipeline(doc_store, processors=[DropAll()]).run(paths)
+    assert result.skipped == ["doc.html"]  # filtered ⇒ unavailable-style skip, not processed
     assert result.processed == []
     assert doc_store.stored == {}
+
+
+@pytest.mark.anyio
+async def test_filtered_document_preserves_stored_copy(tmp_path, doc_store, caplog):
+    """A previously-stored source whose new version is filtered keeps its stored Document.
+
+    A transient LLM/filter misclassification must not destroy durable state (nor cascade
+    into chunk deletion via a later Boundary-2 delete_orphans run).
+    """
+
+    class DropV2(DocumentProcessor):
+        async def process(self, document):
+            if any("v2" in getattr(el, "html", "") for el in document.elements):
+                return None
+            return document
+
+    p = tmp_path / "doc.html"
+    p.write_text("v1", encoding="utf-8")
+    pipeline = make_doc_pipeline(doc_store, processors=[DropV2()])
+    await pipeline.run([p])
+    assert "doc.html" in doc_store.stored
+    stored_v1 = doc_store.stored["doc.html"]
+
+    p.write_text("v2 now filtered", encoding="utf-8")
+    with caplog.at_level("WARNING"):
+        result = await pipeline.run([p])
+    assert result.skipped == ["doc.html"] and result.processed == []
+    assert doc_store.stored["doc.html"] is stored_v1  # stored copy preserved
+    assert any("filtered by processing" in rec.message for rec in caplog.records)
+
+
+@pytest.mark.anyio
+async def test_filtered_document_source_still_orphan_deletable_when_vanished(make_files, doc_store):
+    """Preserving on filter must not weaken genuine deletion: a source absent from the
+    input set is still removed under delete_orphans=True."""
+    paths = make_files({"a.html": "A", "b.html": "B"})
+    pipeline = make_doc_pipeline(doc_store)
+    await pipeline.run(paths)
+
+    result = await pipeline.run([paths[0]], delete_orphans=True)
+    assert result.deleted == ["b.html"]
+    assert await doc_store.list_source_ids() == {"a.html"}

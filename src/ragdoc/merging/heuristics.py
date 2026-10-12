@@ -50,9 +50,7 @@ def markup_richness_score(html: str) -> int:
     soup = BeautifulSoup(html, "html.parser")
     score = 0
     for tag in soup.find_all(True):
-        if tag.name in _RICH_TAGS:
-            score += 1
-        elif tag.name == "span" and tag.get("style"):
+        if tag.name in _RICH_TAGS or (tag.name == "span" and tag.get("style")):
             score += 1
         elif tag.name == "ref":
             score += 2
@@ -134,7 +132,7 @@ def select_heading(
     winning_inner = h_b.innerhtml if score_b > score_a else h_a.innerhtml
 
     # Build result: apply winning level to winning innerhtml
-    result = Heading(html_content=f"<h{winning_level}>{winning_inner}</h{winning_level}>")
+    result = Heading(html=f"<h{winning_level}>{winning_inner}</h{winning_level}>")
     return result
 
 

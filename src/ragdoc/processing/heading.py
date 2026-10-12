@@ -201,7 +201,7 @@ def compute_size_to_level_mapping(
         return {}
 
     # Get unique sizes > 0, sorted descending
-    unique_sizes = sorted(set(s for s in effective_sizes if s > 0), reverse=True)
+    unique_sizes = sorted({s for s in effective_sizes if s > 0}, reverse=True)
 
     if not unique_sizes:
         return {}
@@ -563,9 +563,8 @@ class TitleDetectionProcessor(DocumentProcessor):
         # Find minimum heading level
         min_level = None
         for element in document.elements:
-            if isinstance(element, Heading) and element.level > 0:
-                if min_level is None or element.level < min_level:
-                    min_level = element.level
+            if isinstance(element, Heading) and element.level > 0 and (min_level is None or element.level < min_level):
+                min_level = element.level
 
         if min_level is None or min_level == 1:
             return

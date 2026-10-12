@@ -95,7 +95,7 @@ def anchor_footnote_document() -> Document:
     )
 
     body = Paragraph(
-        html_content=(
+        html=(
             "<p>"
             "This is the main body of my content. "
             "I have a footnote link for this line "

@@ -32,8 +32,7 @@ def _(mo):
     | [`render_raw`][ragdoc.rendering.render_raw] | Full fidelity, no transformation — for debugging |
 
     `render_for_prompt` is the primary renderer used throughout the pipeline. For `Image`
-    elements, it uses `text_representation` as a text fallback when the image cannot be
-    displayed directly.
+    elements it emits text only: `text_representation`, else `alt`, else `[Unprocessed Image]`.
     """)
     return
 
@@ -51,16 +50,16 @@ def _(mo):
 
 @app.cell
 def _():
-    from ragdoc.document import Document, Heading, Paragraph, Table
-    from ragdoc.rendering import Renderer, render_for_prompt, OutputFormat
+    from ragdoc.document import Document, Heading, Image, Paragraph, Table
+    from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
 
     # Build a minimal sample document
     sample_doc = Document(
         title="Sample Document",
         elements=[
-            Heading(innerhtml="Introduction", level=1),
-            Paragraph(html_content="<p>This document explains the rendering system.</p>"),
-            Table(html_content="<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>"),
+            Heading(html="<h1>Introduction</h1>"),
+            Paragraph(html="<p>This document explains the rendering system.</p>"),
+            Table(html="<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>"),
         ],
         metadata={"source": "sample.docx", "date": "2024-01-01"},
     )
@@ -76,7 +75,7 @@ def _():
     print("--- PROMPT ---")
     print(prompt_text)
     return (
-        Document, Heading, OutputFormat, Paragraph, Renderer, Table,
+        Document, Heading, Image, OutputFormat, Paragraph, Renderer, Table,
         prompt_renderer, prompt_text,
         render_for_prompt, sample_doc,
     )
@@ -98,7 +97,8 @@ def _(mo):
     | `OutputFormat.RST` | reStructuredText |
     | `OutputFormat.PLAIN` | Plain text (all markup stripped) |
 
-    Format conversion is done via [pypandoc](https://github.com/NicklasTegner/pypandoc).
+    MARKDOWN, GFM and RST are converted with [pypandoc](https://github.com/NicklasTegner/pypandoc);
+    HTML is returned as is; PLAIN is the HTML's text content.
     """)
     return
 
@@ -132,28 +132,25 @@ def _(mo):
     ## Image text_representation
 
     When `ImageSummaryProcessor` sets `image.text_representation`, `render_for_prompt` uses
-    it as a text fallback when the image cannot be displayed directly.
+    it as the image's text (falling back to `alt`, then `[Unprocessed Image]`).
     """)
     return
 
 
 @app.cell
-def _(OutputFormat, Renderer, prompt_renderer, sample_doc):
-    from ragdoc.document import Image
-
+def _(Document, Heading, Image, prompt_renderer):
     # Demonstrate text_representation on an Image element
     img = Image(alt="Chart")
     img.text_representation = "A simple bar chart showing quarterly revenue."
 
-    from ragdoc.document import Document, Heading
     img_doc = Document(elements=[
-        Heading(innerhtml="Report", level=1),
+        Heading(html="<h1>Report</h1>"),
         img,
     ])
 
     print("--- PROMPT (uses image.text_representation as fallback) ---")
     print(prompt_renderer.render(img_doc))
-    return (img,)
+    return (img, img_doc)
 
 
 @app.cell(hide_code=True)
@@ -161,8 +158,9 @@ def _(mo):
     mo.md(r"""
     ## Cross-document references
 
-    Pass an [`ExternalRefProvider`][ragdoc.rendering.ExternalRefProvider] to access parent
-    documents and siblings during rendering. A plain `dict[str, Document]` works:
+    Pass an [`ExternalRefProvider`][ragdoc.rendering.ExternalRefProvider] to make other
+    documents available to custom element renderers (the built-in renderers do not use it).
+    A plain `dict[str, Document]` works:
     """)
     return
 
@@ -170,8 +168,8 @@ def _(mo):
 @app.cell
 def _(Document, Heading, OutputFormat, Paragraph, Renderer, render_for_prompt):
     all_documents = [
-        Document(title="Parent", elements=[Heading(innerhtml="Parent", level=1)]),
-        Document(title="Child", elements=[Paragraph(html_content="<p>Child content.</p>")]),
+        Document(title="Parent", elements=[Heading(html="<h1>Parent</h1>")]),
+        Document(title="Child", elements=[Paragraph(html="<p>Child content.</p>")]),
     ]
     all_docs = {doc.id: doc for doc in all_documents}
 
@@ -196,9 +194,8 @@ def _(mo):
 
 
 @app.cell
-def _(render_for_prompt):
+def _(Image, render_for_prompt):
     from ragdoc.rendering.base import RenderContext
-    from ragdoc.document import Image
 
     @render_for_prompt.register(Image)
     def render_image_custom(element: Image, ctx: RenderContext, inline: bool = False) -> str:
@@ -206,7 +203,7 @@ def _(render_for_prompt):
         return f"<figure><img alt='{alt}'/></figure>"
 
     print("Custom Image renderer registered for render_for_prompt.")
-    return (Image, RenderContext, render_image_custom)
+    return (RenderContext, render_image_custom)
 
 
 @app.cell(hide_code=True)

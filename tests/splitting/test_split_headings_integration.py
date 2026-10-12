@@ -3,15 +3,14 @@
 import pytest
 
 from ragdoc.document import Document
-from ragdoc.parsing import HTMLFile, load_file
+from ragdoc.parsing.html import load_html
 from ragdoc.splitting import split_by_headings
 
 
 @pytest.fixture
 def html_documents(html_file_path) -> list[Document]:
     """Load HTML file and split into documents by heading."""
-    html_file = HTMLFile(file_path=html_file_path)
-    return split_by_headings(load_file(html_file))
+    return split_by_headings(load_html(html_file_path))
 
 
 def test_split_document_naive_count(html_documents):
@@ -83,8 +82,7 @@ def test_split_document_with_image(html_documents):
 @pytest.fixture
 def description_list_documents(description_list_file_path):
     """Load description list HTML file and split into documents."""
-    html_file = HTMLFile(file_path=str(description_list_file_path))
-    return split_by_headings(load_file(html_file))
+    return split_by_headings(load_html(description_list_file_path))
 
 
 def test_split_description_list_sections(description_list_documents):
@@ -103,8 +101,7 @@ def test_split_description_list_sections(description_list_documents):
 
 def test_split_preserves_document_title(description_list_file_path):
     """Test that split preserves the original document title."""
-    html_file = HTMLFile(file_path=str(description_list_file_path))
-    document = load_file(html_file)
+    document = load_html(description_list_file_path)
     documents = split_by_headings(document)
 
     assert document.title == "Description List Test"

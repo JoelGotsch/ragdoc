@@ -19,11 +19,12 @@ import pytest
 pytest.importorskip("pylatexenc", reason="pdf_mineru extra not installed")
 
 from ragdoc.document import Document, Heading
-from ragdoc.parsing.mineru.base import MinerUMiddleDocument, _latex_to_text
-from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUExtractor as MinerUParser
+from ragdoc.parsing.mineru.base import MinerUMiddleDocument
+from ragdoc.parsing.mineru.parser import CoreExtractor, MinerUExtractor as MinerUParser
 from ragdoc.processing.heading import HeadingLevelProcessor
 from ragdoc.processing.heading_llm import HeadingResponse, LLMHeadingResolver
-from ragdoc.utils.helpers import _normalize_text
+from ragdoc.utils.helpers import normalize_text
+from tests.latex_text import latex_to_text
 
 TEST_CASES_FILE = Path(__file__).parent.parent / "data" / "test_cases.json"
 MINERU_DIR = Path(__file__).parent.parent / "parsing" / "data" / "mineru"
@@ -31,7 +32,7 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures" / "heading_llm"
 
 
 def _norm(text: str) -> str:
-    return re.sub(r"\s+", "", _normalize_text(_latex_to_text(text))).strip()
+    return re.sub(r"\s+", "", normalize_text(latex_to_text(text))).strip()
 
 
 def _find_classified_heading(doc: Document, heading_text: str) -> Heading | None:
@@ -93,8 +94,8 @@ _TEST_CASES, _MIDDLE_DOCS, _FIXTURES = _load_raw()
 
 async def _parse_and_process(name: str) -> Document:
     """Return a freshly parsed, HeadingLevelProcessor-processed Document."""
-    parser = MinerUParser(use_default_middlewares=False)
-    parser.use(CoreExtractionMiddleware())
+    parser = MinerUParser(use_default_stages=False)
+    parser.use(CoreExtractor())
     doc = await parser.parse(_MIDDLE_DOCS[name])
     return await HeadingLevelProcessor(trust_parser_levels=False).process(doc)
 
@@ -107,7 +108,7 @@ def _make_resolver(response_content: str) -> LLMHeadingResolver:
     mock_response.choices[0].message.parsed = heading_response
     mock_response.choices[0].message.refusal = None
     mock_client = MagicMock()
-    mock_client.beta.chat.completions.parse = AsyncMock(return_value=mock_response)
+    mock_client.chat.completions.parse = AsyncMock(return_value=mock_response)
     return LLMHeadingResolver(client=mock_client)
 
 

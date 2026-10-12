@@ -34,7 +34,7 @@ Consumer notes
 from __future__ import annotations
 
 import json
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from pydantic import BaseModel
 from typing_extensions import Required, TypedDict
@@ -72,10 +72,13 @@ Keys must be strings. Values must be MetadataValue (JSON-serializable).
 
 
 class BaseMetadata(TypedDict, total=False):
-    """Metadata keys that every ragdoc parser sets by convention.
+    """Metadata keys the library itself writes onto ``Document.metadata``.
 
-    ``filename`` is required (set by all parsers via ``path.name``) while all
-    other keys declared in subclasses default to optional (``total=False``).
+    ``filename`` is required. It is stamped at load time by
+    :func:`~ragdoc.parsing.registry.stamp_provenance` (called by ``ragdoc.parsing.load`` and
+    ``IngestPipeline.run``) as ``path.name`` — not by the individual parsers, so a parser
+    called directly leaves it unset. All other keys declared in subclasses default to optional
+    (``total=False``).
 
     Projects extend this TypedDict to declare their own keys::
 
@@ -84,7 +87,8 @@ class BaseMetadata(TypedDict, total=False):
             document_date: str | None
 
     Use ``Required[T]`` (from ``typing_extensions``) to mark a key required in
-    your subclass — the runtime check in ``DocumentPipeline`` will enforce it::
+    your subclass — ``ChunkPipeline(metadata_type=...)`` (also reachable as
+    ``DocumentPipeline(metadata_type=...)``) enforces it at chunk time::
 
         from typing import Annotated
         from typing_extensions import Required
@@ -94,7 +98,7 @@ class BaseMetadata(TypedDict, total=False):
             document_date: str | None      # optional
 
     Attributes:
-        filename: Set by all parsers: ``path.name``.
+        filename: The source file's bare name (``path.name``), stamped at load time.
         split_sequence: 1-based reading-order position of this document in
             the split list returned by ``split_document()``.  ``1`` for a document
             that was not split (split_total is also ``1``).
@@ -105,7 +109,7 @@ class BaseMetadata(TypedDict, total=False):
             (``split_sequence < split_total``).
     """
 
-    filename: Required[str]  # set by all parsers: path.name
+    filename: Required[str]  # stamped at load time (stamp_provenance): path.name
     split_sequence: int | None  # set by split_document: 1-based position in the split list
     split_total: int | None  # set by split_document: total number of splits from the same source
 
@@ -117,6 +121,22 @@ Used to parametrise ``Chunk[TMetadata]``, ``Document[TMetadata]``,
 ``DocumentPipeline[TMetadata]``, and ``VectorStorePipeline[TMetadata]``
 so that metadata keys are typed end-to-end.
 """
+
+
+def copy_metadata(metadata: TMetadata) -> TMetadata:
+    """Shallow-copy a metadata dict, preserving its TypedDict type.
+
+    Splitters copy the parent document's metadata into every output split at construction
+    (mutation isolation); a plain ``dict(...)`` widens the static type to ``dict[str, object]``,
+    so this helper carries the ``TMetadata`` type through the copy.
+
+    Args:
+        metadata: The metadata mapping to copy.
+
+    Returns:
+        A new dict with the same (shallow) contents and the same static type.
+    """
+    return cast("TMetadata", dict(metadata))
 
 
 # ---------------------------------------------------------------------------
@@ -145,12 +165,13 @@ def metadata_json_schema(metadata_type: type) -> dict:
     Example:
         ```python
         import ragdoc
+        from ragdoc.metadata import metadata_json_schema
 
         class MyMetadata(ragdoc.BaseMetadata, total=False):
             document_name: str | None
             document_date: str | None
 
-        schema = ragdoc.metadata_json_schema(MyMetadata)
+        schema = metadata_json_schema(MyMetadata)
         # → {"properties": {"filename": {...}, "document_name": {...}, ...}, ...}
         system_prompt = f"Filter by these fields: {json.dumps(schema)}"
         ```

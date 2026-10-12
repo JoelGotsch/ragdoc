@@ -4,6 +4,7 @@ import logging
 from typing import Protocol, runtime_checkable
 
 from ragdoc.document import Document, ExternalRef, Heading
+from ragdoc.metadata import copy_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def split_by_headings(document: Document) -> list[Document]:
         Document(
             elements=group,
             source_path=document.source_path,
-            metadata=document.metadata,
+            metadata=copy_metadata(document.metadata),
             title=document.title,
             external_refs=[parent_ref],
         )

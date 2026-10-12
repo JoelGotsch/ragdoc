@@ -61,3 +61,29 @@ Utility classes and functions used throughout the ragdoc pipeline.
       show_root_heading: true
       show_source: true
       heading_level: 4
+
+### normalize_text
+
+::: ragdoc.utils.helpers.normalize_text
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+## Concurrency
+
+### run_ordered
+
+::: ragdoc.utils.concurrency.run_ordered
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4
+
+### resolve_semaphore
+
+::: ragdoc.utils.concurrency.resolve_semaphore
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 4

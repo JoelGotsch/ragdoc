@@ -1,5 +1,5 @@
 """
-Integration tests for the MinerU CoreExtractionMiddleware pipeline.
+Integration tests for the MinerU CoreExtractor pipeline.
 
 These tests build minimal MinerUMiddleDocument fixtures in-memory and verify
 end-to-end pipeline behaviour: block dispatch order, caption placement,
@@ -39,7 +39,7 @@ from ragdoc.parsing.mineru.handlers import (
     ExtractionConfig,
     handle_discarded_as_raw_text,
 )
-from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUExtractor
+from ragdoc.parsing.mineru.parser import CoreExtractor, MinerUExtractor
 
 # ---------------------------------------------------------------------------
 # Fixture factories (shared with test_handlers.py but duplicated to keep files independent)
@@ -159,7 +159,7 @@ def test_code_caption_precedes_code_body():
 def test_table_html_content_preserved():
     tables = [el for el in _RICH_PARSED.elements if isinstance(el, Table)]
     assert len(tables) == 1
-    assert "<th>A</th>" in tables[0].html_content
+    assert "<th>A</th>" in tables[0].html
 
 
 # ---------------------------------------------------------------------------
@@ -205,8 +205,8 @@ def test_header_handler_swapped_to_raw_text():
     """Swapping HEADER handler to handle_discarded_as_raw_text emits a RawText element."""
     config = ExtractionConfig()
     config.discarded_handlers[DiscardedBlockType.HEADER] = handle_discarded_as_raw_text
-    extractor = MinerUExtractor(use_default_middlewares=False)
-    extractor.use(CoreExtractionMiddleware(config=config))
+    extractor = MinerUExtractor(use_default_stages=False)
+    extractor.use(CoreExtractor(config=config))
     doc = asyncio.run(extractor.parse(_HEADER_DOC))
     raw_texts = [el for el in doc.elements if isinstance(el, RawText)]
     assert any("Confidential" in el.innerhtml for el in raw_texts)
@@ -269,7 +269,9 @@ async def test_parser_field_set_to_mineru(tmp_path):
 
 @pytest.mark.anyio
 async def test_source_path_and_filename_set(tmp_path):
+    """Extractor sets only parser-specific fields; provenance is stamped by parsing.load()."""
     source = tmp_path / "report_middle.json"
     doc = await MinerUExtractor().parse(MinerUMiddleDocument(pdf_info=[]), source_path=source)
-    assert doc.metadata["filename"] == "report_middle.json"
-    assert doc.source_path == str(source)
+    assert doc.parser == "mineru"
+    assert doc.source_path == ""
+    assert "filename" not in doc.metadata

@@ -1,10 +1,11 @@
-"""Tests for the debug_footnotes utility."""
+"""Tests for the debug_footnotes repo script (scripts/, not shipped in the wheel)."""
 
-from ragdoc.document import Document, Footnote, Heading, Paragraph
-from ragdoc.utils.debug_footnotes import (
+from scripts.debug_footnotes import (
     describe_orphan_footnotes,
     describe_orphan_footnotes_batch,
 )
+
+from ragdoc.document import Document, Footnote, Heading, Paragraph
 
 # =============================================================================
 # Helpers
@@ -12,7 +13,7 @@ from ragdoc.utils.debug_footnotes import (
 
 
 def _make_heading(text: str, **kwargs) -> Heading:
-    return Heading(html_content=f"<h1>{text}</h1>", **kwargs)
+    return Heading(html=f"<h1>{text}</h1>", **kwargs)
 
 
 def _make_footnote(fn_id: str, number: int, text: str, **kwargs) -> Footnote:
@@ -20,7 +21,7 @@ def _make_footnote(fn_id: str, number: int, text: str, **kwargs) -> Footnote:
 
 
 def _make_paragraph(html: str) -> Paragraph:
-    return Paragraph(html_content=f"<p>{html}</p>")
+    return Paragraph(html=f"<p>{html}</p>")
 
 
 # =============================================================================

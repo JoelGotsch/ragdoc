@@ -107,10 +107,8 @@ class DocumentDumpProcessor(DocumentProcessor):
             async with aiofiles.open(path, "w", encoding="utf-8") as f:
                 await f.write(content)
             logger.debug(f"DocumentDumpProcessor: wrote {path}")
-        except Exception:
-            logger.debug(
-                f"DocumentDumpProcessor: aiofiles unavailable or failed, falling back to sync write for {path}"
-            )
+        except OSError:
+            logger.debug(f"DocumentDumpProcessor: async write failed, falling back to sync write for {path}")
             path.write_text(content, encoding="utf-8")
 
         return document

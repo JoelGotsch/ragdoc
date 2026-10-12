@@ -1,11 +1,11 @@
-"""Unit tests for serialize_metadata_value (pure function)."""
+"""Unit tests for format_metadata_value (pure function)."""
 
 import json
 
 import pytest
 from pydantic import BaseModel
 
-from ragdoc.rendering.elements import serialize_metadata_value
+from ragdoc.rendering.elements import format_metadata_value
 
 # --- Helper models ---
 
@@ -43,43 +43,43 @@ class _OuterModel(BaseModel):
     ],
 )
 def test_serialize_metadata_scalar(value, expected):
-    assert serialize_metadata_value(value) == expected
+    assert format_metadata_value(value) == expected
 
 
 def test_serialize_metadata_dict():
-    result = serialize_metadata_value({"a": 1, "b": "x"})
+    result = format_metadata_value({"a": 1, "b": "x"})
     assert json.loads(result) == {"a": 1, "b": "x"}
 
 
 def test_serialize_metadata_nested_dict():
     """Recursively nested dicts are JSON-serialized."""
     value = {"outer": {"inner": [1, 2, 3]}}
-    result = serialize_metadata_value(value)
+    result = format_metadata_value(value)
     assert json.loads(result) == {"outer": {"inner": [1, 2, 3]}}
 
 
 def test_serialize_metadata_list():
-    result = serialize_metadata_value([1, "two", 3.0])
+    result = format_metadata_value([1, "two", 3.0])
     assert json.loads(result) == [1, "two", 3.0]
 
 
 def test_serialize_metadata_nested_list():
     """Recursively nested lists are JSON-serialized."""
     value = [[1, 2], ["a", "b"]]
-    result = serialize_metadata_value(value)
+    result = format_metadata_value(value)
     assert json.loads(result) == [[1, 2], ["a", "b"]]
 
 
 def test_serialize_metadata_pydantic_model():
     model = _SampleModel(name="doc", count=5)
-    result = serialize_metadata_value(model)
+    result = format_metadata_value(model)
     assert json.loads(result) == {"name": "doc", "count": 5}
 
 
 def test_serialize_metadata_pydantic_nested_in_dict():
     """Pydantic models inside a plain dict are serialized via MetadataEncoder."""
     value = {"nested": _SampleModel(name="x", count=1)}
-    result = serialize_metadata_value(value)
+    result = format_metadata_value(value)
     parsed = json.loads(result)
     assert parsed == {"nested": {"name": "x", "count": 1}}
 
@@ -93,7 +93,7 @@ def test_serialize_metadata_deeply_nested_pydantic_fields():
     """
     inner = _InnerModel(additional_data={"region": "EMEA", "priority": "high"})
     outer = _OuterModel(name="quarterly-report", metadata={"section-a": inner})
-    result = serialize_metadata_value(outer)
+    result = format_metadata_value(outer)
     parsed = json.loads(result)
     assert parsed["name"] == "quarterly-report"
     assert parsed["metadata"]["section-a"]["additional_data"]["region"] == "EMEA"
@@ -111,7 +111,7 @@ def test_serialize_metadata_pydantic_deeply_nested_in_plain_dict():
     inner = _InnerModel(additional_data={"region": "EMEA"})
     outer = _OuterModel(name="quarterly-report", metadata={"section-a": inner})
     plain_dict_wrapper = {"report": outer}
-    result = serialize_metadata_value(plain_dict_wrapper)
+    result = format_metadata_value(plain_dict_wrapper)
     parsed = json.loads(result)
     assert parsed["report"]["name"] == "quarterly-report"
     assert parsed["report"]["metadata"]["section-a"]["additional_data"]["region"] == "EMEA"

@@ -26,18 +26,17 @@ import logging
 from collections.abc import Awaitable, Callable
 from functools import partial
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Literal, TypeAlias
-
-from PIL import Image as PILModule
-from PIL.Image import Image as PILImage
+from typing import TYPE_CHECKING, Literal, TypeAlias
 
 from ragdoc.document import Image
-from ragdoc.processing._concurrency import _fan_out
+from ragdoc.llm import ChatClient, call_structured, is_llm_failure, resolve_openai_client
 from ragdoc.processing.base import DocumentProcessor
 from ragdoc.processing.summary_base import ImageSummary
+from ragdoc.utils.concurrency import run_ordered
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
+    from PIL.Image import Image as PILImage
 
     from ragdoc.document import Document
 
@@ -68,12 +67,24 @@ Ensure that the extracted data is comprehensive and correctly formatted. Respond
 IMAGE_USER_MESSAGE = "Please analyze the provided image."
 
 
+def _import_pil_module():
+    """Lazy PIL import — pillow lives behind the 'llm' extra."""
+    try:
+        from PIL import Image as pil_module
+    except ImportError as exc:
+        raise ImportError(
+            "Image transformations require pillow, installed with the 'llm' extra: pip install 'ragdoc[llm]'"
+        ) from exc
+    return pil_module
+
+
 def _remove_alpha_channel(image: PILImage, background: str = "white") -> PILImage:
     """Composite image onto a solid background to remove the alpha channel."""
     if "A" not in image.mode:
         return image
-    bg = PILModule.new("RGBA", image.size, background)
-    return PILModule.alpha_composite(bg, image)
+    pil_module = _import_pil_module()
+    bg = pil_module.new("RGBA", image.size, background)
+    return pil_module.alpha_composite(bg, image)
 
 
 DEFAULT_TRANSFORMATIONS: list[Callable[[PILImage], PILImage]] = [
@@ -82,7 +93,7 @@ DEFAULT_TRANSFORMATIONS: list[Callable[[PILImage], PILImage]] = [
 
 
 def _to_pil(image_bytes: bytes) -> PILImage:
-    return PILModule.open(BytesIO(image_bytes))
+    return _import_pil_module().open(BytesIO(image_bytes))
 
 
 def _pil_to_base64(image: PILImage) -> str:
@@ -127,7 +138,7 @@ def build_image_messages(
         image_detail: OpenAI vision detail level.
 
     Returns:
-        A ``messages`` list suitable for ``client.beta.chat.completions.parse``.
+        A ``messages`` list suitable for ``client.chat.completions.parse``.
     """
     user_content: list = [{"type": "text", "text": user_message}]
     if context:
@@ -156,10 +167,12 @@ ImageMessagesFn: TypeAlias = Callable[[str, str, "str | None"], "list[ChatComple
 
 
 def openai_image_summarizer(
-    client: Any,
+    client: ChatClient,
     model: str | None = None,
     create_messages: ImageMessagesFn = build_image_messages,
     transformations: list[Callable[[PILImage], PILImage]] | None = None,
+    request_timeout: float | None = None,
+    max_retries: int = 2,
 ) -> ImageSummarizeFn:
     """Create an :data:`ImageSummarizeFn` backed by the OpenAI structured-output API.
 
@@ -173,6 +186,10 @@ def openai_image_summarizer(
         transformations: PIL transforms applied before encoding.
             ``None`` uses :data:`DEFAULT_TRANSFORMATIONS` (alpha-channel removal).
             Pass ``[]`` to skip all transformations.
+        request_timeout: Per-request LLM timeout in seconds (``None`` uses the client's
+            configured timeout — 600 s for a default ``AsyncOpenAI``).
+        max_retries: Maximum additional attempts on retryable transport failures
+            (shared policy, see :mod:`ragdoc.llm`).
 
     Returns:
         An async callable ``(image, context) -> ImageSummary``.
@@ -187,21 +204,25 @@ def openai_image_summarizer(
             raise ValueError("Image has no base64 content to summarize.")
         image_bytes = base64.b64decode(image.image)
         if _transforms:
-            pil = apply_image_transformations(image_bytes, _transforms)
-            b64 = _pil_to_base64(pil)
+            # PIL decode/transform/encode is CPU-bound — run off the event loop.
+            pil = await asyncio.to_thread(apply_image_transformations, image_bytes, _transforms)
+            b64 = await asyncio.to_thread(_pil_to_base64, pil)
             img_type = "png"  # PIL always saves as PNG after transforms
         else:
             b64 = image.image  # already base64; skip PIL round-trip
             img_type = image.image_type
 
         messages = create_messages(b64, img_type, context)
-        comp = await client.beta.chat.completions.parse(
+        return await call_structured(
+            client,
             model=resolved_model,
             messages=messages,
-            temperature=0,
             response_format=ImageSummary,
+            temperature=0.0,
+            timeout=request_timeout,
+            max_retries=max_retries,
+            log_prefix="ImageSummary",
         )
-        return comp.choices[0].message.parsed
 
     return _summarize
 
@@ -217,11 +238,25 @@ class ImageSummaryProcessor(DocumentProcessor):
     Skips images that already have a ``text_representation``. Images are processed
     with bounded concurrency (default: sequential).
 
+    Degrade semantics — **skip-with-warning, per image**: when summarizing one image fails
+    with an LLM-call failure (:func:`ragdoc.llm.is_llm_failure`: a refusal, any
+    ``openai.OpenAIError`` such as a 400 for an unsupported image or a rate limit that
+    outlived the shared retry policy, a structured-output validation error), an unreadable
+    image (``OSError``) or a ``ValueError``, that image keeps ``text_representation=None``,
+    one WARNING is logged, and the remaining images are still processed. A systemic failure
+    (e.g. an invalid API key) therefore yields one warning per image and a document without
+    image summaries — never an exception. Everything else propagates: programming errors
+    (``TypeError``, ``AttributeError``, …) and cancellation. A custom ``summarize`` callable
+    that wants its own failures contained should raise :class:`ragdoc.llm.LLMError`
+    (or ``ValueError`` / ``OSError``).
+
     Args:
         summarize: An :data:`ImageSummarizeFn` callable ``(image, context) -> ImageSummary``.
             When ``None``, falls back to
-            ``openai_image_summarizer(get_config().openai_client)`` at
-            :meth:`process` time.
+            ``openai_image_summarizer(get_config().openai_client)`` — resolved at
+            construction, raising :class:`~ragdoc.llm.LLMNotConfiguredError` when no
+            client is configured (fail-loud, never at :meth:`process` time). A custom
+            ``summarize`` fn needs no client.
         context_fn: Optional ``(image, document) -> str | None`` injecting
             per-image context into the LLM prompt.
         concurrency: Maximum number of images summarized concurrently.  Accepts
@@ -248,19 +283,17 @@ class ImageSummaryProcessor(DocumentProcessor):
         context_fn: Callable[[Image, Document], str | None] | None = None,
         concurrency: int | asyncio.Semaphore = 1,
     ):
-        self._summarize = summarize
+        if summarize is None:
+            # Fail-loud at construction (library client policy): a missing client raises
+            # LLMNotConfiguredError here, never mid-pipeline. A custom summarize fn skips
+            # client resolution entirely.
+            summarize = openai_image_summarizer(resolve_openai_client(None))
+        self._summarize: ImageSummarizeFn = summarize
         self._context_fn = context_fn
         self._concurrency = concurrency
 
-    def _get_summarize(self) -> ImageSummarizeFn:
-        if self._summarize is not None:
-            return self._summarize
-        from ragdoc.config import get_config
-
-        return openai_image_summarizer(get_config().openai_client)
-
     async def process(self, document: Document) -> Document:
-        summarize = self._get_summarize()
+        summarize = self._summarize
         all_images = [img for img in document.images if img.image is not None]
         images = [img for img in all_images if not img.text_representation]
         skipped = len(all_images) - len(images)
@@ -269,8 +302,7 @@ class ImageSummaryProcessor(DocumentProcessor):
                 f"ImageSummaryProcessor: {len(images)} images to summarize"
                 + (f" ({skipped} skipped: already summarized)" if skipped else "")
             )
-        coros: list[Awaitable[None]] = [self._process_one(summarize, img, document) for img in images]
-        await _fan_out(coros, self._concurrency)
+        await run_ordered([partial(self._process_one, summarize, img, document) for img in images], self._concurrency)
         return document
 
     async def _process_one(
@@ -279,8 +311,6 @@ class ImageSummaryProcessor(DocumentProcessor):
         image: Image,
         document: Document,
     ) -> None:
-        from PIL import UnidentifiedImageError
-
         context = self._context_fn(image, document) if self._context_fn else None
         try:
             result = await summarize(image, context)
@@ -288,5 +318,21 @@ class ImageSummaryProcessor(DocumentProcessor):
                 image.text_representation = None
             else:
                 image.text_representation = result.text_representation or result.summary
-        except (UnidentifiedImageError, OSError):
+        except OSError:
+            # PIL's UnidentifiedImageError subclasses OSError, so this also covers unreadable
+            # image payloads without importing PIL here (pillow lives behind the 'llm' extra).
             logger.exception(f"Failed to summarize image {image.id}: image type {image.image_type!r} not supported")
+        except ValueError as exc:
+            # No base64 content, undecodable base64, schema-validation failure (pydantic's
+            # ValidationError is a ValueError).
+            logger.warning(f"Failed to summarize image {image.id}: {exc}")
+        except Exception as exc:
+            # Contain per-image *LLM-call* failures — a refusal, a 400 for one bad image, an
+            # auth/permission error, or transport retries exhausted (the shared retry policy
+            # already ran inside the summarize fn). One bad image must not abort the document;
+            # the image keeps text_representation=None (skip-with-warning). Anything that is not
+            # an LLM failure (TypeError, AttributeError, ... — a bug) propagates, as does
+            # cancellation (BaseException, never caught here).
+            if not is_llm_failure(exc):
+                raise
+            logger.warning(f"Failed to summarize image {image.id}: {exc!r}")

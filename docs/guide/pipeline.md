@@ -30,11 +30,22 @@ pipeline = DocumentPipeline()
 chunks = await pipeline.run(Path("report.docx"))
 ```
 
+`DocumentPipeline` is the composition of two sub-pipelines, split at the sync boundaries:
+
+- **`IngestPipeline`** (`pipeline.ingest`) — parse → process → stamp `source_id`. Boundary 1.
+- **`ChunkPipeline`** (`pipeline.chunk`) — split → chunk → mint chunk ids. Boundary 2.
+
+Flat kwargs (`DocumentPipeline(splitter=..., processors=...)`) delegate into freshly built
+sub-pipelines; you can equivalently pass pre-built ones
+(`DocumentPipeline(ingest=IngestPipeline(...), chunk=ChunkPipeline(...))`). A stage on the
+wrong side is a `TypeError` at construction — an `IngestPipeline` has no splitter/chunker
+parameter, a `ChunkPipeline` has no parser/processors parameter.
+
 `DocumentPipeline` defaults:
 
 | Stage | Default |
 |-------|---------|
-| Parser | `AutoParser` — picks parser from file extension |
+| Parser | [`load`](../api/parsing.md#load) — picks parser from file extension via the registry |
 | Processors | none (identity pass-through) |
 | Splitter | none — whole document → one chunk |
 | Chunker | `SimpleChunker` — one chunk per document |
@@ -42,7 +53,7 @@ chunks = await pipeline.run(Path("report.docx"))
 ### Adding a splitter
 
 To split documents into retrieval-sized chunks, pass a
-[`TokenSplitter`](../api/pipeline.md#TokenSplitter).
+[`TokenSplitter`](../api/pipeline.md#tokensplitter).
 Chunk size is independent of your LLM's context window — chunks are sized
 for retrieval quality, typically 1/50th to 1/10th of the context window.
 Test different `max_tokens` values for your use case:
@@ -88,31 +99,36 @@ document.metadata["document_date"] = _extract_date(document)
 document.metadata = {"document_name": _extract_name(document)}
 ```
 
-`document.metadata["filename"]` is set by every parser and is the primary provenance
-key used throughout the pipeline. Replacing the dict loses it silently.
+`document.metadata["filename"]` is stamped when the file is loaded and travels with the
+document onto every chunk. Replacing the dict loses it silently (and a `metadata_type`
+check, which requires `filename`, then fails).
 
 ### Custom parser
 
-Any callable `(Path) -> Document` satisfies the `Parser` protocol:
+Any **async** callable `(Path) -> Document` can be passed as `parser=`. The pipeline stamps
+provenance (`parser`, `source_path`, `metadata["filename"]`, `source_id`) on the returned
+document, so the parser only has to produce the elements:
 
 ```python
 from pathlib import Path
-from ragdoc.document import Document
+from ragdoc.document import Document, Paragraph
 from ragdoc.pipeline import DocumentPipeline
 
 async def my_parser(path: Path) -> Document:
-    # e.g. call an internal API, parse a custom format, …
-    return Document(...)
+    # e.g. call a web API, parse a custom format, …
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return Document(elements=[Paragraph(html=f"<p>{line}</p>") for line in lines if line])
 
 pipeline = DocumentPipeline(parser=my_parser)
 ```
 
 ### Deterministic chunk IDs
 
-`SimpleChunker` now uses
-[`Document.content_hash()`](../api/document.md#Document.content_hash) as the
-default chunk ID.  The same file content always produces the same chunk IDs,
-making vector-store upserts idempotent:
+Chunk ids are minted by `ChunkPipeline.run` — the single id authority —
+using `ragdoc.chunking.provenance.mint_chunk_id` over
+`(source_id, split_sequence, chunk_ordinal, content_hash)`.  The same file content always
+produces the same chunk IDs (idempotent vector-store upserts), and two identical-content
+splits of one source still get distinct ids:
 
 ```python
 chunks1 = await pipeline.run(Path("report.docx"))
@@ -121,6 +137,11 @@ chunks2 = await pipeline.run(Path("report.docx"))
 assert chunks1[0].id == chunks2[0].id  # always True for the same content
 ```
 
+Override the scheme with `ChunkPipeline(chunk_id_fn=...)` (or the delegating
+`DocumentPipeline(chunk_id_fn=...)`)
+(`(source_id, split_sequence, chunk_ordinal, content_hash) -> str`).  Chunkers used
+standalone (outside a pipeline) leave `Chunk.id` at its uuid4 default.
+
 ---
 
 ## Scenario D — Concurrent processing and streaming
@@ -128,7 +149,7 @@ assert chunks1[0].id == chunks2[0].id  # always True for the same content
 ### Processing many files
 
 `run_many` fans out across a list of paths and returns a
-[`PipelineResult`](../api/pipeline.md#PipelineResult) with all chunks
+[`PipelineResult`](../api/pipeline.md#pipelineresult) with all chunks
 aggregated:
 
 ```python
@@ -144,7 +165,8 @@ print(f"Produced {len(result.chunks)} chunks from {len(paths)} files")
 
 ### Error handling
 
-By default errors propagate immediately (`on_error="raise"`).
+By default errors propagate immediately (`on_error="raise"`); files already in flight are not
+cancelled and finish in the background.
 Use `on_error="skip"` to collect failures and continue:
 
 ```python
@@ -158,15 +180,27 @@ for path, exc in result.errors:
     print(f"  FAILED {path}: {exc}")
 ```
 
-### Streaming (memory-efficient)
+### Streaming
 
-`stream` yields a batch of chunks per file as it completes, so you can hand
-off each batch (e.g. to a vector store) before the next file starts:
+`stream` yields one batch of chunks per file as it completes, so you can hand
+off each batch (e.g. to a vector store) instead of collecting the whole corpus first:
 
 ```python
 async for batch in pipeline.stream(paths, concurrency=4):
     await vector_store.upsert(batch)
 ```
+
+Two things to know about `stream`:
+
+- It is **not back-pressured**. `concurrency` bounds how many files are processed at once,
+  but all files are scheduled up front and finished batches wait in memory until you consume
+  them — a consumer slower than the pipeline accumulates them.
+- It **stops at the first failing file**: the exception propagates out of the loop and the
+  remaining work is cancelled (`on_error="skip"` applies to `run_many` only).
+
+For syncing into a store, prefer [`VectorStorePipeline.run`](#scenario-b-incremental-update):
+it isolates failures per source and holds at most `concurrency + 2` sources' chunks in memory,
+however large the corpus is.
 
 ---
 
@@ -194,6 +228,10 @@ TokenSplitter(
 so that a corpus of documents can be kept in sync with a vector store
 incrementally — only changed or new files are re-processed.
 
+> All sync pipelines share one plan/apply/run engine — change detection, error isolation,
+> orphan deletion, and the review workflow are described once in the
+> [Sync Engine Guide](sync-engine.md).
+
 The **vector store is the single source of truth** for provenance.  Each chunk
 carries `source_id` and `source_hash` as first-class fields, so the pipeline
 can detect unchanged sources, clean up stale chunks, and discover orphans —
@@ -203,7 +241,7 @@ all without any local state file.
 
 ```python
 from pathlib import Path
-from ragdoc.pipeline import VectorStorePipeline, TokenSplitter
+from ragdoc.pipeline import DocumentPipeline, TokenSplitter, VectorStorePipeline
 
 vs_pipeline = VectorStorePipeline(
     pipeline=DocumentPipeline(splitter=TokenSplitter()),
@@ -238,7 +276,7 @@ result = await vs_pipeline.run(paths)
 | Case | What happens |
 |------|-------------|
 | **New file** | Parsed, chunked, upserted; `source_id` / `source_hash` / `content_hash` set on each chunk. |
-| **Modified file** (byte hash changed) | Old chunks deleted by `source_id`, file re-processed, new chunks upserted. |
+| **Modified file** (byte hash changed) | File re-processed and its stored chunks replaced. With a store that implements `SourceReplaceStore` (e.g. `QdrantVectorStore`) the new chunks are written before the stale ones are removed; otherwise the old chunks are deleted by `source_id` and the new ones upserted. |
 | **Removed file** (path no longer in source list) | Kept by default; deleted only with `delete_orphans=True`. |
 
 Orphan deletion is **opt-in** and must be requested explicitly:
@@ -252,10 +290,19 @@ print(result.deleted)  # ["old_report.docx"]  (source IDs, not paths)
 
 ### plan() / apply()
 
-`run()` is `apply(plan(...))`. Call them separately to review changes before they reach the
-store — `plan()` returns a serializable `ChangeSet` and does not touch the store:
+`run()` reaches the same end state as `apply(plan(...))`, but it is a separate streaming
+path: it writes each source as soon as it is ready and is back-pressured, so memory stays
+bounded by `concurrency`, not by corpus size (see the [Sync Engine Guide](sync-engine.md)).
+Call `plan()` and `apply()` yourself to review changes before they reach the store —
+`plan()` returns a serializable `ChangeSet` and does not touch the store. `apply()` embeds
+the whole change set first (if embedding fails, the store is untouched) and then writes
+source by source; it holds the whole change set in memory and does not modify the
+`ChangeSet` you pass in:
 
 ```python
+from ragdoc.chunking import Chunk
+from ragdoc.pipeline import ChangeSet
+
 changeset = await vs_pipeline.plan(paths)
 changeset.save(Path("review/changes.json"))
 # ... inspect / edit the JSON ...
@@ -273,19 +320,30 @@ result = await vs_pipeline.run_directory(Path("docs/"), glob="**/*.docx")
 
 ### Error handling
 
-Per-file exceptions are collected in `UpdateResult.errors` rather than propagated:
+Per-source exceptions are collected in `UpdateResult.errors` (keyed on `source_id`, like
+the rest of `UpdateResult`) rather than propagated:
 
 ```python
 result = await vs_pipeline.run(paths)
-for path, exc in result.errors:
-    print(f"FAILED {path}: {exc}")
+for source_id, exc in result.errors:
+    print(f"FAILED {source_id}: {exc}")
 ```
+
+Always check `errors` after a sync: a source listed there was not (fully) written. What the
+store then holds for it depends on the store and on where the write failed — with
+`QdrantVectorStore` an update that fails while the new chunks are being written keeps the
+previously stored chunks (a failure in the later stale-delete or hash-stamp step can leave old
+and new chunks side by side, or only the new ones, with blank hashes); with a store that only
+offers delete-then-upsert a failed upsert leaves the source empty. Either way the source
+reads as changed and the next run re-processes it. Cancellation (`asyncio.CancelledError`) is never collected: it propagates,
+and sources already written stay written. The details are in the Sync Engine Guide under
+[Write discipline](sync-engine.md#write-discipline).
 
 ---
 
 ## Scenario C — Qdrant vector store
 
-[`QdrantVectorStore`](../api/integrations.md#QdrantVectorStore) is the built-in
+[`QdrantVectorStore`](../api/integrations.md#qdrantvectorstore) is the built-in
 concrete implementation of `VectorStore`, backed by `qdrant-client`'s
 `AsyncQdrantClient`.
 
@@ -299,18 +357,31 @@ uv add "ragdoc[qdrant]"
 
 ```python
 from pathlib import Path
+from openai import AsyncOpenAI
 from qdrant_client import AsyncQdrantClient
 from ragdoc.integrations.vector_stores import QdrantVectorStore
-from ragdoc.pipeline import DocumentPipeline, VectorStorePipeline, TokenSplitter
+from ragdoc.pipeline import (
+    DocumentPipeline,
+    EmbedderConfig,
+    OpenAIEmbedder,
+    TokenSplitter,
+    VectorStorePipeline,
+)
 
 client = AsyncQdrantClient("http://localhost:6333")
 
 # create() creates the collection (and a source_id payload index) if it doesn't exist.
-# Safe to call on every startup — it is idempotent.
+# It is idempotent — safe to call on every startup, against a server or the in-process client.
 store = await QdrantVectorStore.create(client, "my_docs", vector_size=1536)
 
 pipeline = DocumentPipeline(splitter=TokenSplitter(max_tokens=4000))
-vs_pipeline = VectorStorePipeline(pipeline=pipeline, vector_store=store)
+vs_pipeline = VectorStorePipeline(
+    pipeline=pipeline,
+    vector_store=store,
+    # Qdrant needs a vector per chunk: configure at least one embedder
+    # (or server-side sparse vectors on the store).
+    embedders={"dense": EmbedderConfig(OpenAIEmbedder(AsyncOpenAI(), model="text-embedding-3-small"))},
+)
 
 result = await vs_pipeline.run(list(Path("docs/").glob("**/*.docx")))
 print(f"processed: {len(result.processed)}, skipped: {len(result.skipped)}")
@@ -318,29 +389,39 @@ print(f"processed: {len(result.processed)}, skipped: {len(result.skipped)}")
 
 ### Payload schema
 
-Each Qdrant point stores the full `Chunk` as payload.  The provenance fields
-(`source_id`, `source_hash`) live at the top level — they are **not** injected
-into the user-facing `metadata` dict:
+Each Qdrant point stores the `Chunk` as payload (everything except `id`, which is the
+point id, and the vectors).  The provenance fields (`source_id`, `source_hash`,
+`content_hash`) live at the top level — they are **not** injected into the `metadata` dict:
 
 | Payload key | Chunk field | Purpose |
 |---|---|---|
 | `source_id` | `chunk.source_id` | Groups chunks by source for cleanup |
-| `source_hash` | `chunk.source_hash` | Detects whether the source has changed |
+| `source_hash` | `chunk.source_hash` | File-byte hash: detects whether the source file has changed |
+| `content_hash` | `chunk.content_hash` | Document content hash: change detection when chunking from a `DocumentStore` |
 | `source_path` | `chunk.source_path` | Full path to the source file |
 | `prompt_content` | `chunk.prompt_content` | Full-fidelity text for LLM context |
 | `embedding_content` | `chunk.embedding_content` | Text used to generate the embedding |
-| `metadata` | `chunk.metadata` | User-defined key/value data |
+| `metadata` | `chunk.metadata` | Document metadata (your keys plus library-written ones such as `filename`) |
 | `created_at` | `chunk.created_at` | ISO 8601 creation timestamp |
 
 ### Performance notes
 
-- `create()` adds a Qdrant payload index on `source_id`, turning filter operations
-  in `list_source_state` and `delete_by_source` from O(n) scans into O(log n) lookups.
-- `upsert()` batches points in groups of 100 to avoid gRPC message size limits.
+- `create()` adds a Qdrant payload index on `source_id`, so `delete_by_source` and the
+  stale-chunk delete of an update filter by index instead of scanning.
+- `list_source_state()` — called once per `plan()` / `run()` — scrolls every point (three
+  payload keys, no vectors, 1000 per page), so each sync costs one O(n) pass over the
+  collection.
+- `upsert()` batches points in groups of 100 to avoid gRPC message size limits. A write
+  spanning several batches is made detectable rather than atomic: points are written with
+  blank change-detection hashes and the real hashes are stamped once every batch has landed,
+  so an interrupted write is re-processed by the next sync (see
+  [What the Qdrant stores guarantee](sync-engine.md#what-the-qdrant-stores-guarantee)).
+- `create()` is idempotent — safe to call on every start, against a server or the in-process
+  client. An existing collection is used as is.
 - `list_source_ids()` uses scroll pagination (1000 points per page) so it works
   correctly at any collection size.
 
-For a full production example including processors and `LLMChunker`, see the
+For a runnable end-to-end example (in-process Qdrant, no credentials needed), see the
 [Qdrant Pipeline notebook](../notebooks/qdrant_pipeline/).
 
 ---
@@ -350,9 +431,15 @@ For a full production example including processors and `LLMChunker`, see the
 Any object implementing the `VectorStore` protocol satisfies the requirements.
 The protocol requires five async methods — implementations should index on
 `chunk.source_id` and `chunk.source_hash` (first-class fields, not
-`chunk.metadata`):
+`chunk.metadata`). Optionally add `replace_source(source_id, chunks)`
+([`SourceReplaceStore`](../api/pipeline.md#sourcereplacestore)) if your backend can write a
+source's new chunks before removing the old ones; without it, updates are written as
+delete-then-upsert:
 
 ```python
+from ragdoc.chunking import Chunk
+from ragdoc.pipeline import SourceState
+
 class MyVectorStore:
     async def upsert(self, chunks: list[Chunk]) -> list[str]:
         ids = [await self._db.insert(c) for c in chunks]
@@ -380,8 +467,8 @@ class MyVectorStore:
 
 ### Provenance fields
 
-Each chunk upserted by `VectorStorePipeline` has two first-class fields set
-before upsert — these are **not** injected into `chunk.metadata`:
+Each chunk upserted by `VectorStorePipeline` carries these first-class fields —
+they are **not** injected into `chunk.metadata`:
 
 | Field | Value | Purpose |
 |-------|-------|---------|
@@ -402,11 +489,11 @@ vs_pipeline = VectorStorePipeline(pipeline=doc_pipeline, vector_store=my_vector_
 
 A third field, `chunk.content_hash` (`Document.content_hash()`), is also set — it drives
 re-chunking when a stored Document is edited in the two-stage `DocumentStore` workflow
-(`DocumentStorePipeline` → editing → `VectorStorePipeline(document_store=...)`).
+(`DocumentStorePipeline` → editing → `VectorStorePipeline.from_document_store(...)`).
 
 ---
 
-## Scenario D — two-stage with a `DocumentStore`
+## Scenario E — two-stage with a `DocumentStore`
 
 Parse once, chunk many ways. `DocumentStorePipeline` syncs parsed+processed `Document`s into a
 `DocumentStore` (Boundary 1); you can then edit them and re-chunk into the vector store
@@ -418,21 +505,33 @@ resolution).
 | `LocalDocumentStore` | one JSON file per source on disk | local dev, single machine, hand-editing | — |
 | `QdrantDocumentStore` | one Qdrant point per source | shared across workers/containers | `qdrant` |
 
+Each stage takes the boundary-appropriate pipeline type, which has no parameter for a stage
+from the other side (so a misplaced stage keyword is a `TypeError`): `DocumentStorePipeline` takes an `IngestPipeline` (no
+splitter/chunker parameter exists), and the Boundary-2 vector sync is a separate
+constructor — `VectorStorePipeline.from_document_store` — taking a `ChunkPipeline`
+(no parser/processors parameter exists).
+
 ```python
-from ragdoc.pipeline import DocumentPipeline, DocumentStorePipeline, VectorStorePipeline
+from ragdoc.pipeline import ChunkPipeline, DocumentStorePipeline, IngestPipeline, VectorStorePipeline
 from ragdoc.integrations.document_stores import QdrantDocumentStore
 
 doc_store = await QdrantDocumentStore.create(client, "my_documents")
 
 # Stage 1: parse + process → DocumentStore (no chunking)
-await DocumentStorePipeline(pipeline=DocumentPipeline(...), document_store=doc_store).run(paths)
+await DocumentStorePipeline(
+    ingest=IngestPipeline(processors=[...]),
+    document_store=doc_store,
+).run(paths)
 
 # ... edit stored Documents (any worker) ...
 
 # Stage 2: chunk + embed only the documents whose content_hash changed
-vs = VectorStorePipeline(pipeline=DocumentPipeline(chunker=...), vector_store=store,
-                         document_store=doc_store)
-await vs.run(source_ids=None)   # None → all documents in the store
+vs = VectorStorePipeline.from_document_store(
+    chunk=ChunkPipeline(splitter=..., chunker=...),
+    vector_store=store,
+    document_store=doc_store,
+)
+await vs.run()   # sources=None → all documents in the store
 ```
 
 `QdrantDocumentStore` stores each Document as a single point with a **throwaway 1-dim vector**
@@ -446,5 +545,7 @@ splitting or dropping image data.
 ## See Also
 
 - [API Reference: Pipeline](../api/pipeline.md)
+- [Sync Engine Guide](sync-engine.md) — the shared plan/apply/run core behind Scenarios B/E
+- [Processing Guide](processing.md) — the processor catalog and ordering
 - [Chunking Guide](chunking.md) — `SimpleChunker`, `LLMChunker`
 - [Splitting Guide](splitting.md) — lower-level splitting API

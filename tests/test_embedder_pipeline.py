@@ -32,7 +32,12 @@ def make_embedder(vectors: list[list[float]]) -> Embedder:
 
 
 def make_chunk(**overrides: object) -> Chunk:
-    defaults: dict = dict(prompt_content="prompt text", embedding_content="embed text", source_id="s", source_hash="h")
+    defaults: dict = {
+        "prompt_content": "prompt text",
+        "embedding_content": "embed text",
+        "source_id": "s",
+        "source_hash": "h",
+    }
     return Chunk(**(defaults | overrides))  # type: ignore[arg-type]
 
 
@@ -220,3 +225,176 @@ async def test_embed_order_preserved() -> None:
 
     assert chunk_a.named_embeddings["dense"] == vec_a
     assert chunk_b.named_embeddings["dense"] == vec_b
+
+
+# ---------------------------------------------------------------------------
+# OpenAIEmbedder retry behavior (shared LLM layer)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_embedder_retries_rate_limit(monkeypatch):
+    """OpenAIEmbedder survives one 429 via the shared retry_llm policy."""
+    import httpx
+    import openai
+
+    import ragdoc.llm
+    from ragdoc.pipeline.embedders import OpenAIEmbedder
+
+    sleeps: list[float] = []
+
+    async def _fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    monkeypatch.setattr(ragdoc.llm, "_sleep", _fake_sleep)
+
+    rate_limit = openai.RateLimitError(
+        "rate limited",
+        response=httpx.Response(429, request=httpx.Request("POST", "https://api.test/v1")),
+        body=None,
+    )
+    item = MagicMock()
+    item.index = 0
+    item.embedding = [0.1, 0.2]
+    ok_response = MagicMock()
+    ok_response.data = [item]
+
+    client = MagicMock()
+    client.embeddings.create = AsyncMock(side_effect=[rate_limit, ok_response])
+
+    embedder = OpenAIEmbedder(client, model="text-embedding-3-small")
+    vectors = await embedder.embed(["hello"])
+
+    assert vectors == [[0.1, 0.2]]
+    assert client.embeddings.create.call_count == 2
+    assert len(sleeps) == 1
+
+
+@pytest.mark.anyio
+async def test_embedder_forwards_timeout_and_dimensions():
+    """timeout/dimensions are forwarded only when set (omitted parameters stay omitted)."""
+    from ragdoc.pipeline.embedders import OpenAIEmbedder
+
+    item = MagicMock()
+    item.index = 0
+    item.embedding = [0.5]
+    response = MagicMock()
+    response.data = [item]
+
+    client = MagicMock()
+    client.embeddings.create = AsyncMock(return_value=response)
+    embedder = OpenAIEmbedder(client, model="m", dimensions=64, timeout=9.0)
+    await embedder.embed(["x"])
+    kwargs = client.embeddings.create.call_args.kwargs
+    assert kwargs["dimensions"] == 64
+    assert kwargs["timeout"] == 9.0
+
+    client2 = MagicMock()
+    client2.embeddings.create = AsyncMock(return_value=response)
+    embedder2 = OpenAIEmbedder(client2, model="m")
+    await embedder2.embed(["x"])
+    kwargs2 = client2.embeddings.create.call_args.kwargs
+    assert "dimensions" not in kwargs2
+    assert "timeout" not in kwargs2
+
+
+# ---------------------------------------------------------------------------
+# OpenAIEmbedder batching
+# ---------------------------------------------------------------------------
+
+
+class _FakeEmbeddings:
+    """Fake ``embeddings`` endpoint: records each request and returns items in REVERSED order.
+
+    Each vector encodes its text (``[float(text)]``), so order mix-ups are observable.
+    """
+
+    def __init__(self, fail_on_call: int | None = None, drop_last: bool = False) -> None:
+        self.requests: list[list[str]] = []
+        self._fail_on_call = fail_on_call
+        self._drop_last = drop_last
+
+    async def create(self, *, model: str, input: list[str], dimensions: int = 0, timeout: float | None = None):  # type: ignore[no-untyped-def]
+        from types import SimpleNamespace
+
+        self.requests.append(list(input))
+        if self._fail_on_call == len(self.requests):
+            raise RuntimeError("embedding batch failed")
+        items = [SimpleNamespace(index=i, embedding=[float(text)]) for i, text in enumerate(input)]
+        if self._drop_last:
+            items = items[:-1]
+        return SimpleNamespace(data=list(reversed(items)))
+
+
+class _FakeEmbeddingsClient:
+    def __init__(self, embeddings: _FakeEmbeddings) -> None:
+        self.embeddings = embeddings
+
+
+@pytest.mark.anyio
+async def test_embedder_batches_requests_and_preserves_order():
+    """A large corpus is split into requests of at most batch_size inputs; output order == input order."""
+    from ragdoc.pipeline.embedders import OpenAIEmbedder
+
+    endpoint = _FakeEmbeddings()
+    embedder = OpenAIEmbedder(_FakeEmbeddingsClient(endpoint), model="m", batch_size=3)
+    texts = [str(i) for i in range(8)]
+
+    vectors = await embedder.embed(texts)
+
+    assert endpoint.requests == [["0", "1", "2"], ["3", "4", "5"], ["6", "7"]]
+    assert vectors == [[float(i)] for i in range(8)]
+
+
+@pytest.mark.anyio
+async def test_embedder_default_batch_size_bounds_request_size():
+    """The default never sends an unbounded request (OpenAI caps inputs per request)."""
+    from ragdoc.pipeline.embedders import OpenAIEmbedder
+
+    endpoint = _FakeEmbeddings()
+    embedder = OpenAIEmbedder(_FakeEmbeddingsClient(endpoint), model="m")
+    vectors = await embedder.embed([str(i) for i in range(5000)])
+
+    assert len(vectors) == 5000
+    assert len(endpoint.requests) > 1
+    assert max(len(r) for r in endpoint.requests) <= 2048  # OpenAI's hard per-request input limit
+    assert vectors[4999] == [4999.0]
+
+
+@pytest.mark.anyio
+async def test_embedder_single_request_when_texts_fit_one_batch():
+    from ragdoc.pipeline.embedders import OpenAIEmbedder
+
+    endpoint = _FakeEmbeddings()
+    embedder = OpenAIEmbedder(_FakeEmbeddingsClient(endpoint), model="m", batch_size=3)
+    assert await embedder.embed(["1", "2", "3"]) == [[1.0], [2.0], [3.0]]
+    assert len(endpoint.requests) == 1
+
+
+@pytest.mark.anyio
+async def test_embedder_failing_batch_raises_and_stops():
+    """A failing batch propagates (no partial result) and later batches are not requested."""
+    from ragdoc.pipeline.embedders import OpenAIEmbedder
+
+    endpoint = _FakeEmbeddings(fail_on_call=2)
+    embedder = OpenAIEmbedder(_FakeEmbeddingsClient(endpoint), model="m", batch_size=2)
+    with pytest.raises(RuntimeError, match="embedding batch failed"):
+        await embedder.embed(["0", "1", "2", "3", "4", "5"])
+    assert len(endpoint.requests) == 2
+
+
+@pytest.mark.anyio
+async def test_embedder_rejects_short_response():
+    """Fewer vectors than inputs would silently misalign chunks and vectors — fail loud instead."""
+    from ragdoc.pipeline.embedders import OpenAIEmbedder
+
+    embedder = OpenAIEmbedder(_FakeEmbeddingsClient(_FakeEmbeddings(drop_last=True)), model="m")
+    with pytest.raises(ValueError, match="2 embeddings for 3 inputs"):
+        await embedder.embed(["0", "1", "2"])
+
+
+def test_embedder_rejects_non_positive_batch_size():
+    from ragdoc.pipeline.embedders import OpenAIEmbedder
+
+    with pytest.raises(ValueError, match="batch_size"):
+        OpenAIEmbedder(_FakeEmbeddingsClient(_FakeEmbeddings()), batch_size=0)

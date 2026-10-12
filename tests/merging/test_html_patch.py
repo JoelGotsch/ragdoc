@@ -7,23 +7,23 @@ from ragdoc.merging.html_patch import DocumentHtmlPatch, HtmlMergeOperation, com
 
 
 def test_html_patch_compute_returns_patch():
-    doc_a = Document(elements=[Paragraph(html_content="<p>Hello</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>Hello</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Hello</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>Hello</p>")])
     patch = compute_html_patch(doc_a, doc_b)
     assert isinstance(patch, DocumentHtmlPatch)
 
 
 def test_html_patch_has_operations():
-    doc_a = Document(elements=[Paragraph(html_content="<p>text</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>text</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>text</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>text</p>")])
     patch = compute_html_patch(doc_a, doc_b)
     assert isinstance(patch.operations, list)
     assert len(patch.operations) > 0
 
 
 def test_html_patch_operations_are_html_merge_operations():
-    doc_a = Document(elements=[Paragraph(html_content="<p>content</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>content</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>content</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>content</p>")])
     patch = compute_html_patch(doc_a, doc_b)
     for op in patch.operations:
         assert isinstance(op, HtmlMergeOperation)
@@ -39,24 +39,24 @@ def test_html_patch_source_parsers_set():
 
 def test_html_patch_serializable():
     """DocumentHtmlPatch is JSON-serializable."""
-    doc_a = Document(elements=[Paragraph(html_content="<p>text</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>text</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>text</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>text</p>")])
     patch = compute_html_patch(doc_a, doc_b)
     json_str = patch.model_dump_json()
     assert "operations" in json_str
 
 
 def test_html_patch_apply_returns_document():
-    doc_a = Document(elements=[Paragraph(html_content="<p>Hello</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>Hello</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>Hello</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>Hello</p>")])
     patch = compute_html_patch(doc_a, doc_b)
     result = patch.apply()
     assert isinstance(result, Document)
 
 
 def test_html_patch_apply_sets_parser_merged():
-    doc_a = Document(elements=[Paragraph(html_content="<p>text</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>text</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>text</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>text</p>")])
     patch = compute_html_patch(doc_a, doc_b)
     result = patch.apply()
     assert result.parser == "merged"
@@ -73,8 +73,8 @@ def test_html_patch_apply_sets_metadata():
 
 def test_html_patch_manual_override_honored():
     """Caller can replace op.selected before apply(); result reflects the override."""
-    doc_a = Document(elements=[Paragraph(html_content="<p>From A</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>From B</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>From A</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>From B</p>")])
     patch = compute_html_patch(doc_a, doc_b)
     for op in patch.operations:
         op.selected = ["<p>Custom override</p>"]
@@ -84,8 +84,8 @@ def test_html_patch_manual_override_honored():
 
 def test_html_patch_empty_selected_produces_empty_document():
     """Clearing all selected produces an empty Document."""
-    doc_a = Document(elements=[Paragraph(html_content="<p>text</p>")])
-    doc_b = Document(elements=[Paragraph(html_content="<p>text</p>")])
+    doc_a = Document(elements=[Paragraph(html="<p>text</p>")])
+    doc_b = Document(elements=[Paragraph(html="<p>text</p>")])
     patch = compute_html_patch(doc_a, doc_b)
     for op in patch.operations:
         op.selected = []
@@ -99,14 +99,14 @@ def test_html_patch_merge_documents_html_equivalent_to_patch_apply():
 
     doc_a = Document(
         elements=[
-            Paragraph(html_content="<p>Shared paragraph</p>"),
-            Paragraph(html_content="<p>Only in A</p>"),
+            Paragraph(html="<p>Shared paragraph</p>"),
+            Paragraph(html="<p>Only in A</p>"),
         ]
     )
     doc_b = Document(
         elements=[
-            Paragraph(html_content="<p>Shared paragraph</p>"),
-            Paragraph(html_content="<p>Only in B</p>"),
+            Paragraph(html="<p>Shared paragraph</p>"),
+            Paragraph(html="<p>Only in B</p>"),
         ]
     )
     direct = merge_documents_html(doc_a, doc_b)

@@ -219,8 +219,8 @@ async def test_heading_level_processor_skips_html_parser():
     doc = Document(
         parser="html",
         elements=[
-            Heading(innerhtml="Title", level=1),
-            Heading(innerhtml="Section", level=2),
+            Heading(html="<h1>Title</h1>"),
+            Heading(html="<h2>Section</h2>"),
         ],
     )
 
@@ -237,7 +237,7 @@ async def test_heading_level_processor_skips_pandoc_parser():
     doc = Document(
         parser="pandoc",
         elements=[
-            Heading(innerhtml="Title", level=1),
+            Heading(html="<h1>Title</h1>"),
         ],
     )
 
@@ -253,8 +253,8 @@ async def test_heading_level_processor_processes_mineru_parser():
     doc = Document(
         parser="mineru",
         elements=[
-            Heading(innerhtml='<span style="font-size: 24pt;">Big Title</span>', level=1),
-            Heading(innerhtml='<span style="font-size: 14pt;">Small Section</span>', level=1),
+            Heading(html='<h1><span style="font-size: 24pt;">Big Title</span></h1>'),
+            Heading(html='<h1><span style="font-size: 14pt;">Small Section</span></h1>'),
         ],
     )
 
@@ -271,8 +271,8 @@ async def test_heading_level_processor_custom_size_to_level_mapper():
     doc = Document(
         parser="mineru",
         elements=[
-            Heading(innerhtml='<span style="font-size: 24pt;">Big Title</span>', level=1),
-            Heading(innerhtml='<span style="font-size: 14pt;">Small Section</span>', level=1),
+            Heading(html='<h1><span style="font-size: 24pt;">Big Title</span></h1>'),
+            Heading(html='<h1><span style="font-size: 14pt;">Small Section</span></h1>'),
         ],
     )
 
@@ -292,7 +292,7 @@ async def test_heading_level_processor_custom_mapper_called_with_effective_sizes
     doc = Document(
         parser="mineru",
         elements=[
-            Heading(innerhtml='<span style="font-size: 10pt; text-align: center;">CENTERED CAPS</span>', level=1),
+            Heading(html='<h1><span style="font-size: 10pt; text-align: center;">CENTERED CAPS</span></h1>'),
         ],
     )
 
@@ -320,7 +320,7 @@ async def test_title_detection_skips_if_title_exists():
     doc = Document(
         title="Existing Title",
         elements=[
-            Heading(innerhtml="Another Title", level=1),
+            Heading(html="<h1>Another Title</h1>"),
         ],
     )
 
@@ -336,7 +336,7 @@ async def test_title_detection_detects_simple_title():
     """Processor detects and extracts a simple title."""
     doc = Document(
         elements=[
-            Heading(innerhtml="Document Title", level=1, page=1),
+            Heading(html="<h1>Document Title</h1>", page=1),
             Paragraph(html="<p>Some content</p>"),
         ]
     )
@@ -353,8 +353,8 @@ async def test_title_detection_skips_metadata_looking_headings():
     """Processor skips headings that look like metadata."""
     doc = Document(
         elements=[
-            Heading(innerhtml="REF-2024/123", level=1, page=1),  # Doc code
-            Heading(innerhtml="Real Document Title", level=1, page=1),
+            Heading(html="<h1>REF-2024/123</h1>", page=1),  # Doc code
+            Heading(html="<h1>Real Document Title</h1>", page=1),
             Paragraph(html="<p>Content</p>"),
         ]
     )
@@ -371,8 +371,8 @@ async def test_title_detection_remove_elements_before_title():
     doc = Document(
         elements=[
             Paragraph(html="<p>Metadata stuff</p>"),
-            Heading(innerhtml="12-March-2024", level=2, page=1),
-            Heading(innerhtml="The Real Title", level=1, page=1),
+            Heading(html="<h2>12-March-2024</h2>", page=1),
+            Heading(html="<h1>The Real Title</h1>", page=1),
             Paragraph(html="<p>Content</p>"),
         ]
     )
@@ -393,9 +393,9 @@ async def test_title_detection_recalculates_heading_levels():
     """Processor shifts heading levels after title removal."""
     doc = Document(
         elements=[
-            Heading(innerhtml="Title", level=1, page=1),
-            Heading(innerhtml="Section", level=2),
-            Heading(innerhtml="Subsection", level=3),
+            Heading(html="<h1>Title</h1>", page=1),
+            Heading(html="<h2>Section</h2>"),
+            Heading(html="<h3>Subsection</h3>"),
         ]
     )
 
@@ -414,7 +414,7 @@ async def test_title_detection_respects_max_title_page():
     """Processor only considers headings on early pages."""
     doc = Document(
         elements=[
-            Heading(innerhtml="Late Title", level=1, page=10),
+            Heading(html="<h1>Late Title</h1>", page=10),
         ]
     )
 
@@ -430,8 +430,8 @@ async def test_title_detection_respects_min_title_length():
     """Processor skips very short headings."""
     doc = Document(
         elements=[
-            Heading(innerhtml="OK", level=1, page=1),  # Too short
-            Heading(innerhtml="A Real Title Here", level=1, page=1),
+            Heading(html="<h1>OK</h1>", page=1),  # Too short
+            Heading(html="<h1>A Real Title Here</h1>", page=1),
         ]
     )
 
@@ -445,7 +445,7 @@ async def test_title_detection_respects_min_title_length():
 
 
 def _make_doc_with_heading_levels(levels: list[int]) -> Document:
-    return Document(elements=[Heading(innerhtml=f"H{lvl}", level=lvl) for lvl in levels])
+    return Document(elements=[Heading(html=f"<h{lvl}>H{lvl}</h{lvl}>") for lvl in levels])
 
 
 def test_normalize_heading_levels_no_gaps_unchanged():
@@ -476,7 +476,7 @@ def test_normalize_heading_levels_duplicate_levels_preserved():
 
 
 def test_normalize_heading_levels_no_headings():
-    doc = Document(elements=[Paragraph(innerhtml="text")])
+    doc = Document(elements=[Paragraph(html="<p>text</p>")])
     result = normalize_heading_levels(doc)
     assert result is doc
 

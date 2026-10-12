@@ -24,7 +24,6 @@ pytest.importorskip("pydantic_settings", reason="pydantic_settings not installed
 from ragdoc.chunking.chunk import Chunk
 from ragdoc.chunking.llm import DocumentTopicSummaries, LLMChunker
 from ragdoc.document import Document, Heading
-from ragdoc.parsing.mineru.base import _latex_to_text
 from ragdoc.parsing.multi_source import MultiSourceParser
 from ragdoc.parsing.registry import get_parser
 from ragdoc.pipeline import DocumentPipeline, VectorStorePipeline
@@ -37,8 +36,9 @@ from ragdoc.processing.heading_llm import (
     LLMHeadingResolver,
 )
 from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
-from ragdoc.utils.helpers import _normalize_text
+from ragdoc.utils.helpers import normalize_text
 from ragdoc.utils.tokenizer import GPTTokenizer
+from tests.latex_text import latex_to_text
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -81,8 +81,7 @@ def _load_test_case() -> dict:
 def mineru_to_html_resolver(path: Path) -> Path | None:
     """Map mineru/*_middle.json → html/*.html in the test data tree."""
     stem = path.stem  # e.g. "tesla-q4-2024-update_middle"
-    if stem.endswith("_middle"):
-        stem = stem[: -len("_middle")]
+    stem = stem.removesuffix("_middle")
     candidate = path.parent.parent / "html" / f"{stem}.html"
     return candidate if candidate.exists() else None
 
@@ -90,8 +89,7 @@ def mineru_to_html_resolver(path: Path) -> Path | None:
 def mineru_to_pandoc_resolver(path: Path) -> Path | None:
     """Map mineru/*_middle.json → pandoc/*.docx in the test data tree."""
     stem = path.stem
-    if stem.endswith("_middle"):
-        stem = stem[: -len("_middle")]
+    stem = stem.removesuffix("_middle")
     candidate = path.parent.parent / "pandoc" / f"{stem}.docx"
     return candidate if candidate.exists() else None
 
@@ -103,7 +101,7 @@ def mineru_to_pandoc_resolver(path: Path) -> Path | None:
 
 def _norm(text: str) -> str:
     """Normalise text for fuzzy comparison (whitespace + LaTeX + NFKC)."""
-    return re.sub(r"\s+", "", _normalize_text(_latex_to_text(text))).strip()
+    return re.sub(r"\s+", "", normalize_text(latex_to_text(text))).strip()
 
 
 def _find_heading(doc: Document, heading_text: str) -> Heading | None:
@@ -202,7 +200,7 @@ def _make_heading_mock_client(response: HeadingResponse) -> MagicMock:
     mock_response.choices[0].message.parsed = response
     mock_response.choices[0].message.refusal = None
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(return_value=mock_response)
+    client.chat.completions.parse = AsyncMock(return_value=mock_response)
     return client
 
 
@@ -225,7 +223,7 @@ def _make_chunker_mock(summaries_per_call: int = 3) -> MagicMock:
         return resp
 
     client = MagicMock()
-    client.beta.chat.completions.parse = AsyncMock(side_effect=_respond)
+    client.chat.completions.parse = AsyncMock(side_effect=_respond)
     return client
 
 
@@ -252,12 +250,6 @@ class MemoryVectorStore:
         self.delete_calls.append(list(ids))
         for id_ in ids:
             self.stored.pop(id_, None)
-
-    async def get_source_hash(self, source_id: str) -> str | None:
-        for chunk in self.stored.values():
-            if chunk.source_id == source_id:
-                return chunk.source_hash
-        return None
 
     async def delete_by_source(self, source_id: str) -> None:
         to_delete = [cid for cid, c in self.stored.items() if c.source_id == source_id]

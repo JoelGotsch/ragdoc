@@ -16,7 +16,7 @@ def _(mo):
     mo.md(r"""
     # Example Pipeline using Mineru
 
-    In this example we will use the output of [Mineru](https://github.com/opendatalab/mineru)'s hybrid output (_middle.json file) and show how to parse, process, split, summarize, and render it using RagDoc.
+    In this example we will use the output of [Mineru](https://github.com/opendatalab/mineru)'s hybrid output (_middle.json file) and construct the parser for it. (The full parse → process → split → render walkthrough is in the pipeline walkthrough notebook.)
     """)
     return
 
@@ -25,7 +25,9 @@ def _(mo):
 def _():
     from ragdoc.parsing.mineru import MinerUParser
 
-    return
+    parser = MinerUParser()
+    print(f"MinerUParser ready — parses MinerU _middle.json files, sets document.parser={'mineru'!r}")
+    return (MinerUParser, parser)
 
 
 if __name__ == "__main__":

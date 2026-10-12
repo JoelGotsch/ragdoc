@@ -13,13 +13,13 @@ When the same document is parsed by two different parsers (e.g. MinerU for layou
 | Function | `merge_documents` / `compute_patch` | `merge_documents_html` / `compute_html_patch` |
 | Mechanism | Aligns structured elements directly | Render → HTML diff → reparse |
 | Inspectable intermediate | `DocumentPatch` (typed operations) | `DocumentHtmlPatch` (HTML strings) |
-| Standalone Images | ✓ preserved (base64 + URL) | ✓ preserved (base64 + URL) |
+| Standalone Images | ✓ preserved (base64) | ✓ preserved (base64) |
 | Inline Image refs (`<ref>`) | ✓ intact | ✓ intact |
 | Footnote elements | ✓ preserved | ✓ preserved (via `<aside>`) |
 | Footnote inline refs | ✓ intact | ✓ reconstructed after reparse |
-| doc_a-unique elements | ✓ preserved | ✓ preserved |
+| doc_a-unique elements | ✗ dropped (`DELETE_A`; override `resolved_elements` to keep) | ✓ preserved (except in low-similarity replace blocks) |
 | Heading hierarchy detection | ✓ parser-name trust | ✓ distribution heuristic |
-| Page / bounding-box metadata | ✓ preserved | ✗ lost (architectural) |
+| Page / bounding-box metadata | ✓ preserved, except aligned headings (rebuilt: lose `page`, `bounding_box`, `metadata`, `id`) | ✗ lost (architectural) |
 
 Use **Approach A** when:
 - You need to inspect or override individual merge decisions.
@@ -209,7 +209,7 @@ for op in patch.operations:
 
 # Override a specific decision before applying
 from ragdoc.document import Paragraph
-patch.operations[2].resolved_elements = [Paragraph(html_content="<p>Custom</p>")]
+patch.operations[2].resolved_elements = [Paragraph(html="<p>Custom</p>")]
 
 merged = patch.apply()
 ```
@@ -303,7 +303,7 @@ Approach B loses page numbers, bounding boxes, and element-level metadata — `r
 
 ### Images
 
-Both approaches handle `Image` elements with base64 data or HTTP URLs:
+Both approaches handle `Image` elements (base64 data; `Image` has no URL form):
 
 ```python
 # base64 round-trips correctly through Approach B

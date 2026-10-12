@@ -16,8 +16,16 @@ import pytest
 pytest.importorskip("pylatexenc", reason="pdf_mineru extra not installed")
 
 from ragdoc.chunking.chunk import Chunk
-from ragdoc.parsing.registry import get_parser
+from ragdoc.document import Document
+from ragdoc.parsing import load
 from ragdoc.pipeline import DocumentPipeline, VectorStorePipeline
+
+
+async def _parse_mineru(path: Path) -> Document:
+    # Provenance (source_path / metadata["filename"]) is stamped by parsing.load();
+    # a raw Parser instance would leave those fields unset.
+    return await load(path, parser="mineru")
+
 
 _DATA_DIR = Path(__file__).parent.parent / "parsing" / "data" / "mineru"
 _MINERU_FILE = _DATA_DIR / "attention-is-all-you-need_middle.json"
@@ -42,12 +50,6 @@ class _MemoryVectorStore:
     async def delete(self, ids: list[str]) -> None:
         for id_ in ids:
             self.stored.pop(id_, None)
-
-    async def get_source_hash(self, source_id: str) -> str | None:
-        for chunk in self.stored.values():
-            if chunk.source_id == source_id:
-                return chunk.source_hash
-        return None
 
     async def delete_by_source(self, source_id: str) -> None:
         to_delete = [cid for cid, c in self.stored.items() if c.source_id == source_id]
@@ -76,7 +78,7 @@ class _MemoryVectorStore:
 @pytest.mark.anyio
 async def test_chunks_have_source_path_and_metadata_filename():
     """Chunks must carry source_path and metadata["filename"] from the parsed document."""
-    chunks = await DocumentPipeline(parser=get_parser("mineru")).run(_MINERU_FILE)
+    chunks = await DocumentPipeline(parser=_parse_mineru).run(_MINERU_FILE)
 
     assert chunks, "Pipeline produced no chunks"
     for chunk in chunks:
@@ -94,7 +96,7 @@ async def test_vector_store_pipeline_sets_source_id_and_source_hash():
     """VectorStorePipeline must set source_id and source_hash on every chunk."""
     vstore = _MemoryVectorStore()
     result = await VectorStorePipeline(
-        pipeline=DocumentPipeline(parser=get_parser("mineru")),
+        pipeline=DocumentPipeline(parser=_parse_mineru),
         vector_store=vstore,
     ).run([_MINERU_FILE])
 

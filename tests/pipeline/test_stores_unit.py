@@ -159,6 +159,58 @@ async def test_local_document_store_upsert_requires_source_id(tmp_path: Path):
 
 
 @pytest.mark.anyio
+async def test_local_document_store_filename_is_authoritative_over_edited_source_id(tmp_path: Path, caplog):
+    """A human editing the JSON-internal source_id must not change the store's keying.
+
+    The filename is the authoritative key: state listing and lookups keep using the
+    filename-derived id, and get_document re-stamps the internal field (with a warning).
+    """
+    from ragdoc.pipeline.local_document_store import LocalDocumentStore
+
+    store = LocalDocumentStore(tmp_path)
+    await store.upsert([_doc("a.pdf", "h", body="Body.")])
+
+    # Simulate the human edit: change the source_id field inside the JSON file.
+    path = store._doc_path("a.pdf")
+    edited = Document.model_validate_json(path.read_text(encoding="utf-8"))
+    edited.source_id = "renamed.pdf"
+    path.write_text(edited.model_dump_json(indent=2), encoding="utf-8")
+
+    assert await store.list_source_ids() == {"a.pdf"}
+    assert set(await store.list_source_state()) == {"a.pdf"}  # not "renamed.pdf"
+
+    with caplog.at_level("WARNING"):
+        loaded = await store.get_document("a.pdf")
+    assert loaded is not None
+    assert loaded.source_id == "a.pdf"  # re-stamped to the filename-derived id
+    assert any("source_id" in rec.message for rec in caplog.records)
+
+
+@pytest.mark.anyio
+async def test_local_document_store_edited_source_id_does_not_orphan_live_chunks(tmp_path: Path):
+    """End-to-end: after a source_id edit, a Boundary-2 sync with delete_orphans must not
+    delete the source's chunks (its id stays in the store's live set)."""
+    from ragdoc.pipeline import ChunkPipeline, VectorStorePipeline
+    from ragdoc.pipeline.local_document_store import LocalDocumentStore
+
+    store = LocalDocumentStore(tmp_path / "docs")
+    await store.upsert([_doc("a.pdf", "h", body="Body.")])
+    vec = MemoryVectorStore()
+    pipeline = VectorStorePipeline.from_document_store(chunk=ChunkPipeline(), vector_store=vec, document_store=store)
+    await pipeline.run()
+    assert "a.pdf" in await vec.list_source_ids()
+
+    path = store._doc_path("a.pdf")
+    edited = Document.model_validate_json(path.read_text(encoding="utf-8"))
+    edited.source_id = "renamed.pdf"
+    path.write_text(edited.model_dump_json(indent=2), encoding="utf-8")
+
+    result = await pipeline.run(delete_orphans=True)
+    assert result.deleted == []
+    assert "a.pdf" in await vec.list_source_ids()
+
+
+@pytest.mark.anyio
 async def test_local_document_store_detects_manual_file_edit(tmp_path: Path):
     """A human editing the stored JSON changes content_hash (no stale cached index)."""
     from ragdoc.pipeline.local_document_store import LocalDocumentStore
@@ -171,7 +223,7 @@ async def test_local_document_store_detects_manual_file_edit(tmp_path: Path):
     # Simulate a manual edit: load, change content, write back to the same file.
     loaded = await store.get_document("a.pdf")
     assert loaded is not None
-    loaded.elements[-1].html_content = "<p>Edited body, totally different.</p>"
+    loaded.elements[-1].html = "<p>Edited body, totally different.</p>"
     store._doc_path("a.pdf").write_text(loaded.model_dump_json(indent=2), encoding="utf-8")
 
     after = (await store.list_source_state())["a.pdf"].content_hash

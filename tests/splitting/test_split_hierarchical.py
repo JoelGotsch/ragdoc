@@ -1,13 +1,12 @@
 """Tests for split_hierarchical."""
 
-import pytest
-
 from ragdoc.document import Document, Footnote, Heading, Paragraph
 from ragdoc.splitting.hierarchical import split_hierarchical
 
 
 def h(level: int, text: str = "") -> Heading:
-    return Heading(innerhtml=text or f"H{level}", level=level)
+    inner = text or f"H{level}"
+    return Heading(html=f"<h{level}>{inner}</h{level}>")
 
 
 def p(text: str = "para") -> Paragraph:
@@ -231,27 +230,20 @@ def test_split_preserves_metadata():
 
 
 # ---------------------------------------------------------------------------
-# Ref-awareness: footnotes across split boundaries (known bug)
+# Ref-awareness: footnotes across split boundaries
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(strict=False, reason="split_hierarchical lacks ref-awareness (known bug)")
 def test_footnote_stranded_across_heading_split_boundary():
-    """Footnote physically after a split-level heading but referenced by paragraph before it
-    ends up in the wrong split — demonstrating the ref-blindness of split_hierarchical.
-
-    Root cause: split_hierarchical assigns elements to chunks purely by their physical
-    position relative to headings. It does not use build_element_groups, so a Footnote
-    element that lives after the split boundary is placed in the second split even when
-    it is referenced (via <ref rel="footnote"/>) by a paragraph in the first split.
+    """A footnote physically after a split-level heading but referenced by a paragraph
+    before it must travel with its referencing paragraph.
 
     Document structure:
         h2a, para_with_ref → split 1 (para_with_ref contains <ref id=fn1.id .../>)
         h2b, fn1, para_b   → split 2 (fn1 is the footnote body)
 
-    Expected (correct): fn1 travels with para_with_ref into split 1.
-    Actual (current bug): fn1 stays in split 2, leaving split 1 with a missing ref
-    and split 2 with an orphaned footnote.
+    fn1 must end up in split 1, next to para_with_ref — not stranded in split 2
+    as an orphaned footnote.
     """
     fn1 = Footnote(number=1, innerhtml="Footnote body text.")
     para_with_ref = Paragraph(html=f'<p>Text with footnote.<ref id="{fn1.id}" rel="footnote"/></p>')
@@ -269,9 +261,8 @@ def test_footnote_stranded_across_heading_split_boundary():
 
     assert para_with_ref in split_a.elements, "para_with_ref should be in split_a"
 
-    # fn1 should follow its referencing paragraph into split_a, not stay in split_b
+    # fn1 must follow its referencing paragraph into split_a, not stay in split_b
     assert fn1 in split_a.elements, (
-        f"BUG: fn1 (id={fn1.id!r}) ended up in split_b but is referenced from "
-        "para_with_ref in split_a. split_hierarchical lacks ref-awareness."
+        f"fn1 (id={fn1.id!r}) ended up in split_b but is referenced from para_with_ref in split_a"
     )
     assert fn1 not in split_b.elements

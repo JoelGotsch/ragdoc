@@ -3,32 +3,34 @@
 > Run interactively: `marimo edit docs/notebooks/chunking.py`
 
 Chunking is the final stage of the pipeline. It materializes a [`Document`](document-model.md)
-(or split section) into a [`Chunk`](../api/chunking.md#Chunk) — a
+(or split section) into a [`Chunk`](../api/chunking.md#chunk) — a
 flat, self-contained record ready to be loaded into a vector store.
 
 ## What is a Chunk?
 
-A [`Chunk`](../api/chunking.md#Chunk) is a Pydantic model with:
+A [`Chunk`](../api/chunking.md#chunk) is a Pydantic model with:
 
 | Field | Description |
 |-------|-------------|
-| `id` | Unique identifier (UUID string) |
+| `id` | Unique identifier (UUID string; minted deterministically by `ChunkPipeline.run`) |
 | `prompt_content` | Full-fidelity text for LLM context windows and BM25 search |
 | `embedding_content` | Compact semantic text for dense vector search |
-| `metadata["filename"]` | Name of the source file (set by parsers in `document.metadata`) |
 | `source_path` | Full path to the source file (propagated from `Document.source_path`) |
-| `metadata` | Key-value metadata from the source document |
-| `embedding` | Optional pre-computed embedding vector (list[float]) |
+| `source_id` | Stable source identity used for incremental sync (from `IngestPipeline`'s `source_id_fn`) |
+| `source_hash` | SHA-256 of the raw source-file bytes (`None` outside the sync pipelines) |
+| `content_hash` | Canonical-JSON hash of the parsed document content |
+| `metadata` | Key-value metadata from the source document (includes `metadata["filename"]`, stamped at load time) |
+| `named_embeddings` | Embedding vectors keyed by embedder name (populated by `VectorStorePipeline`) |
 | `created_at` | Timestamp of creation |
 
 For `SimpleChunker`, `embedding_content` equals `prompt_content`. Only `LLMChunker` produces distinct `embedding_content` per topic.
 
 ## Creating chunks
 
-Combine the [`Renderer`](../api/rendering.md#Renderer) with `Chunk`:
+Combine the [`Renderer`](../api/rendering.md#renderer) with `Chunk`:
 
 ```python
-from ragdoc import Renderer, render_for_prompt, OutputFormat
+from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
 from ragdoc.chunking import Chunk
 from ragdoc.splitting import split_by_headings
 
@@ -41,12 +43,12 @@ renderer = Renderer(
     metadata_keys=["source", "date"],
 )
 
-# SimpleChunker sets embedding_content = prompt_content
+# SimpleChunker does exactly this: embedding_content = prompt_content
 chunks = [
     Chunk(
-        prompt_content=renderer.render(section),
-        embedding_content=renderer.render(section),
-        filename=section.filename,
+        prompt_content=(rendered := renderer.render(section)),
+        embedding_content=rendered,
+        source_id=section.source_id or section.source_path or section.id,  # required
         source_path=section.source_path,
         metadata=section.metadata,
     )
@@ -54,14 +56,24 @@ chunks = [
 ]
 ```
 
-## Provenance fields
-
-`filename` and `source_path` are explicit first-class fields on `Chunk` (not stored in
-`metadata`). They are propagated automatically through splitting, so every split section
-already carries them — chunkers just forward them:
+In practice, prefer `SimpleChunker` (or a `ChunkPipeline`, which also mints deterministic
+chunk ids and stamps provenance) over constructing `Chunk` objects by hand:
 
 ```python
-# Parsers set these; they propagate through splits automatically:
+from ragdoc.chunking import SimpleChunker
+
+chunker = SimpleChunker(prompt_renderer=renderer)
+chunks = [chunk for section in sections for chunk in await chunker.chunk(section)]
+```
+
+## Provenance fields
+
+`source_path`, `source_id`, `source_hash`, and `content_hash` are explicit first-class
+fields on `Chunk`; the bare filename lives in `metadata["filename"]` (stamped onto the
+`Document` by `load()` and propagated automatically through splitting):
+
+```python
+# load() stamps these; they propagate through splits automatically:
 print(document.metadata["filename"])  # "annual_report_2024.docx"
 print(document.source_path)          # "/data/annual_report_2024.docx"
 
@@ -69,14 +81,16 @@ print(document.source_path)          # "/data/annual_report_2024.docx"
 chunk = Chunk(
     prompt_content=...,
     embedding_content=...,
+    source_id=section.source_id or section.source_path or section.id,  # required
     source_path=section.source_path,
+    metadata=section.metadata,  # carries metadata["filename"]
 )
 ```
 
 ## Metadata inheritance
 
 When you split a document, child sections inherit parent metadata. Set metadata on the
-source document before parsing and it will flow through to all chunks:
+document before splitting and it will flow through to all chunks:
 
 ```python
 document.metadata["department"] = "Finance"
@@ -87,14 +101,9 @@ document.metadata["year"] = 2024
 
 ## Loading into a vector store
 
-`Chunk` is designed to map directly to vector store document schemas.
-For LlamaIndex, use the integration helper:
-
-```python
-from ragdoc.integrations.llama_index import document_fragment_to_node_dict
-
-node_dicts = [document_fragment_to_node_dict(f) for f in chunks]
-```
+`Chunk` is designed to map directly to vector store document schemas. Use
+[`VectorStorePipeline`](../api/pipeline.md#vectorstorepipeline) to embed and
+upsert chunks with incremental change detection.
 
 ## Prompt vs embedding content
 
@@ -106,11 +115,14 @@ A `Chunk` carries two content fields:
 With `SimpleChunker`, `embedding_content` equals `prompt_content` — one renderer is used
 for both. Only `LLMChunker` produces distinct `embedding_content` by generating N topic
 summaries per document, each becoming a separate chunk with unique `embedding_content`
-but shared `prompt_content`.
+but shared `prompt_content`. If the LLM returns no usable summary (an empty or all-blank
+list), `LLMChunker` logs a warning and emits one chunk with `embedding_content` equal to
+`prompt_content`, so the document never silently disappears from the index. A failed LLM call
+(after retries) or a refusal still raises.
 
 ## See Also
 
 - [API Reference: Chunking](../api/chunking.md)
-- [API Reference: Integrations](../api/integrations.md) — LlamaIndex helpers
+- [API Reference: Integrations](../api/integrations.md) — vector store integrations
 - [Rendering Guide](rendering.md) — understanding the rendering system
 - [Splitting Guide](splitting.md) — preparing documents before chunking

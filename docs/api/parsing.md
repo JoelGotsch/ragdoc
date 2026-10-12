@@ -10,6 +10,14 @@ Functions and source types for loading documents from files.
       show_source: true
       heading_level: 3
 
+## stamp_provenance
+
+::: ragdoc.parsing.registry.stamp_provenance
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 3
+
 ## Parser
 
 ::: ragdoc.parsing.parser.Parser
@@ -84,32 +92,27 @@ Functions and source types for loading documents from files.
 
 ---
 
-## Legacy API
+## Basic PDF Parser (`pdf` extra)
 
-!!! warning "Deprecated"
-    `load_document` and `from_path` are deprecated. Use [`load`](#load) instead.
+### PdfBasicParser
 
-### load_document
-
-::: ragdoc.parsing.load_document
+::: ragdoc.parsing.pdf_basic.PdfBasicParser
     options:
       show_root_heading: true
       show_source: true
       heading_level: 4
 
-### from_path
+### parse_pdf_basic
 
-::: ragdoc.parsing.from_path
+::: ragdoc.parsing.pdf_basic.load.parse_pdf_basic
     options:
       show_root_heading: true
       show_source: true
       heading_level: 4
-
----
 
 ## MinerU Parser
 
-See the [MinerU guide](../guide/parsing.md#mineru-_middle-json) for an overview of
+See the [MinerU guide](../guide/parsing.md#mineru-_middlejson) for an overview of
 handler swapping, image loading, and metadata propagation.
 
 ### MinerUParser
@@ -136,9 +139,9 @@ handler swapping, image loading, and metadata propagation.
       show_source: true
       heading_level: 4
 
-### CoreExtractionMiddleware
+### CoreExtractor
 
-::: ragdoc.parsing.mineru.CoreExtractionMiddleware
+::: ragdoc.parsing.mineru.CoreExtractor
     options:
       show_root_heading: true
       show_source: true
@@ -252,8 +255,24 @@ handler swapping, image loading, and metadata propagation.
       show_source: true
       heading_level: 5
 
+#### build_code_html
+
+::: ragdoc.parsing.mineru.build_code_html
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 5
+
+#### extract_code_from_lines
+
+::: ragdoc.parsing.mineru.extract_code_from_lines
+    options:
+      show_root_heading: true
+      show_source: true
+      heading_level: 5
+
 !!! note "MinerUMiddleDocument is internal"
-    `MinerUMiddleDocument` is an internal type produced by the MinerU library.
+    `MinerUMiddleDocument` is ragdoc's internal Pydantic model of MinerU's `_middle.json`.
     It is not part of the public API and is not documented here.
     Use `MinerUParser`, `parse_mineru_file`, or `MinerUExtractor` instead.
 
@@ -287,54 +306,11 @@ handler swapping, image loading, and metadata propagation.
 
 ---
 
-## Source Types
-
-The following source types are used by the legacy `load_document` API and are still
-available for direct use.
-
-### HTMLSource
-
-::: ragdoc.parsing.html.HTMLSource
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
-
-### PandocFile
-
-::: ragdoc.parsing.pandoc.PandocFile
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
-
-### ExcelSource
-
-::: ragdoc.parsing.xlsx.ExcelSource
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
+## Parser Configuration
 
 ### ExcelConfig
 
 ::: ragdoc.parsing.xlsx.ExcelConfig
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
-
-### AzureJSONFile
-
-::: ragdoc.parsing.azure_di.AzureJSONFile
-    options:
-      show_root_heading: true
-      show_source: true
-      heading_level: 4
-
-### AzureAnalyzeRun
-
-::: ragdoc.parsing.azure_di.AzureAnalyzeRun
     options:
       show_root_heading: true
       show_source: true

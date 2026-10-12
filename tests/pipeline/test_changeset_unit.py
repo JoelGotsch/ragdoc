@@ -4,6 +4,7 @@ Covers:
 - ChangeSet[Chunk] save -> load round-trip PRESERVES chunk.id and created_at
   (idempotent upsert depends on this).
 - ChangeSet[Document] round-trip.
+- ChangeSet[Mention[Event]] round-trip (generic-of-concrete-generic payload).
 - Editing the saved JSON between save and load is reflected after load.
 - to_delete is preserved.
 
@@ -16,8 +17,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from pydantic import BaseModel, Field
+
 from ragdoc.chunking import Chunk
 from ragdoc.document import Document, Paragraph
+from ragdoc.extraction.mention import Mention
 from ragdoc.pipeline.changeset import ChangeSet, SourceChange
 
 
@@ -48,7 +52,7 @@ def test_changeset_chunk_round_trip_preserves_id_and_created_at(tmp_path: Path):
 
 
 def test_changeset_document_round_trip(tmp_path: Path):
-    doc = Document(elements=[Paragraph(html_content="<p>hi</p>")], source_id="d.pdf")
+    doc = Document(elements=[Paragraph(html="<p>hi</p>")], source_id="d.pdf")
     cs: ChangeSet[Document] = ChangeSet(to_update=[SourceChange(source_id="d.pdf", source_hash="h", items=[doc])])
     p = tmp_path / "cs.json"
     cs.save(p)
@@ -58,6 +62,34 @@ def test_changeset_document_round_trip(tmp_path: Path):
     assert reloaded_doc.id == doc.id
     assert reloaded_doc.source_id == "d.pdf"
     assert len(reloaded_doc.elements) == 1
+
+
+class Event(BaseModel):
+    """An event mentioned in a document (test payload)."""
+
+    title: str = Field(description="Short event title.")
+
+
+def test_changeset_mention_round_trip(tmp_path: Path):
+    """ChangeSet[Mention[Event]] — Pydantic resolves a generic of a concrete generic."""
+    mention = Mention[Event](
+        mention_id="m-1",
+        source_id="a.pdf",
+        source_hash="h",
+        content_hash="ch",
+        payload=Event(title="Launch"),
+    )
+    cs: ChangeSet[Mention[Event]] = ChangeSet(
+        to_add=[SourceChange(source_id="a.pdf", source_hash="h", content_hash="ch", items=[mention])]
+    )
+    p = tmp_path / "cs.json"
+    cs.save(p)
+
+    loaded = ChangeSet[Mention[Event]].load(p)
+    reloaded = loaded.to_add[0].items[0]
+    assert reloaded.mention_id == "m-1"
+    assert reloaded.payload == Event(title="Launch")
+    assert reloaded.content_hash == "ch"
 
 
 def test_changeset_to_delete_preserved(tmp_path: Path):

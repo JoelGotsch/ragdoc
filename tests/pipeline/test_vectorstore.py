@@ -1,7 +1,7 @@
 """Tests for VectorStorePipeline (plan / apply, Mode 1 direct path).
 
 Covers:
-- _file_hash(): 64-char hex, content-stable.
+- file_hash(): 64-char hex, content-stable.
 - plan(): new -> to_add; changed hash -> to_update; unchanged -> skipped (not in ChangeSet);
   plan() does not touch the store; collision raises before processing.
 - delete_orphans: default False (no deletion); True -> to_delete.
@@ -19,10 +19,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ragdoc.chunking import Chunk
 from ragdoc.document import Document
-from ragdoc.pipeline import DocumentPipeline, EmbedderConfig, VectorStorePipeline
+from ragdoc.pipeline import ChangeSet, DocumentPipeline, EmbedderConfig, VectorStorePipeline
 from ragdoc.pipeline.embedders import Embedder
-from ragdoc.pipeline.vectorstore import UpdateResult, _file_hash
+from ragdoc.pipeline.sync import UpdateResult, file_hash
 
 from .conftest import MemoryVectorStore, make_document
 
@@ -49,29 +50,33 @@ def vstore() -> MemoryVectorStore:
     return MemoryVectorStore()
 
 
-def make_vs_pipeline(vstore, source_id_fn=None, embedders=None) -> VectorStorePipeline:
+def make_vs_pipeline(vstore, source_id_fn=None, embedders=None, hash_fn=None) -> VectorStorePipeline:
     async def _parse(path: Path) -> Document:
         return make_document(title=path.stem, body=path.read_text(encoding="utf-8"))
 
     dp_kwargs = {}
     if source_id_fn is not None:
         dp_kwargs["source_id_fn"] = source_id_fn
+    vs_kwargs = {}
+    if hash_fn is not None:
+        vs_kwargs["hash_fn"] = hash_fn
     return VectorStorePipeline(
         pipeline=DocumentPipeline(parser=_parse, **dp_kwargs),
         vector_store=vstore,
         embedders=embedders,
+        **vs_kwargs,
     )
 
 
 # ---------------------------------------------------------------------------
-# _file_hash
+# file_hash
 # ---------------------------------------------------------------------------
 
 
 def test_file_hash_is_64_char_hex(tmp_path: Path):
     p = tmp_path / "f.txt"
     p.write_text("hello", encoding="utf-8")
-    h = _file_hash(p)
+    h = file_hash(p)
     assert len(h) == 64 and all(c in "0123456789abcdef" for c in h)
 
 
@@ -79,7 +84,7 @@ def test_file_hash_content_stable(tmp_path: Path):
     a, b = tmp_path / "a", tmp_path / "b"
     a.write_text("same", encoding="utf-8")
     b.write_text("same", encoding="utf-8")
-    assert _file_hash(a) == _file_hash(b)
+    assert file_hash(a) == file_hash(b)
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +201,7 @@ async def test_apply_update_deletes_stale_chunks_before_upsert(tmp_path, vstore)
     await pipeline.run([p])
     assert old_ids.isdisjoint(set(vstore.stored.keys()))
     # source_hash updated to the new file's hash
-    assert all(c.source_hash == _file_hash(p) for c in vstore.stored.values())
+    assert all(c.source_hash == file_hash(p) for c in vstore.stored.values())
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +237,7 @@ async def test_run_empty_sources(vstore):
 async def test_run_chunks_carry_provenance(make_files, vstore):
     paths = make_files({"doc.html": "Content"})
     await make_vs_pipeline(vstore).run(paths)
-    expected_hash = _file_hash(paths[0])
+    expected_hash = file_hash(paths[0])
     for chunk in vstore.stored.values():
         assert chunk.source_id == "doc.html"
         assert chunk.source_hash == expected_hash
@@ -285,6 +290,47 @@ async def test_run_one_bad_source_does_not_block_others(tmp_path, vstore):
     assert [sid for sid, _ in result.errors] == ["bad.html"]
 
 
+def _flaky_hash(path: Path) -> str:
+    """hash_fn that fails for c.html (simulates an unreadable file)."""
+    if path.name == "c.html":
+        raise PermissionError("unreadable")
+    return file_hash(path)
+
+
+@pytest.mark.anyio
+async def test_run_unreadable_file_isolated_others_sync(make_files, vstore):
+    """One unhashable file: the other sources still sync, and the failure lands in errors."""
+    paths = make_files({"a.html": "A", "b.html": "B", "c.html": "C"})
+    result = await make_vs_pipeline(vstore, hash_fn=_flaky_hash).run(paths)
+
+    assert set(result.processed) == {"a.html", "b.html"}
+    assert [(sid, type(exc)) for sid, exc in result.errors] == [("c.html", PermissionError)]
+    assert await vstore.list_source_ids() == {"a.html", "b.html"}
+
+
+@pytest.mark.anyio
+async def test_run_unreadable_file_is_not_orphan_deleted(make_files, vstore):
+    """A source whose hash failed is live-but-unreadable: delete_orphans must not remove its chunks."""
+    paths = make_files({"a.html": "A", "b.html": "B", "c.html": "C"})
+    await make_vs_pipeline(vstore).run(paths)  # seed all three, incl. c.html
+
+    result = await make_vs_pipeline(vstore, hash_fn=_flaky_hash).run(paths, delete_orphans=True)
+    assert result.deleted == []
+    assert "c.html" in await vstore.list_source_ids()
+    assert [sid for sid, _ in result.errors] == ["c.html"]
+
+
+@pytest.mark.anyio
+async def test_plan_unreadable_file_not_in_changeset_nor_orphaned(make_files, vstore):
+    paths = make_files({"a.html": "A", "b.html": "B", "c.html": "C"})
+    await make_vs_pipeline(vstore).run(paths)
+
+    changeset = await make_vs_pipeline(vstore, hash_fn=_flaky_hash).plan(paths, delete_orphans=True)
+    planned = {sc.source_id for sc in changeset.to_add + changeset.to_update}
+    assert "c.html" not in planned
+    assert "c.html" not in changeset.to_delete
+
+
 # ---------------------------------------------------------------------------
 # custom source_id_fn (on the DocumentPipeline)
 # ---------------------------------------------------------------------------
@@ -312,3 +358,84 @@ async def test_run_directory_discovers_files(tmp_path, vstore):
     (tmp_path / "b.html").write_text("B", encoding="utf-8")
     result = await make_vs_pipeline(vstore).run_directory(tmp_path, glob="*.html")
     assert set(result.processed) == {"a.html", "b.html"}
+
+
+# ---------------------------------------------------------------------------
+# apply() never mutates the plan it is given
+# ---------------------------------------------------------------------------
+
+
+class _ConstantEmbedder:
+    """Deterministic embedder: every text gets the same vector."""
+
+    def __init__(self, vector: list[float]) -> None:
+        self._vector = vector
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        return [list(self._vector) for _ in texts]
+
+
+def _stored_dump(store: MemoryVectorStore) -> dict[str, dict]:
+    return {chunk_id: chunk.model_dump(mode="json") for chunk_id, chunk in store.stored.items()}
+
+
+@pytest.mark.anyio
+async def test_apply_leaves_the_plan_equal_to_its_saved_copy(make_files, vstore, tmp_path):
+    """apply() embeds copies: the plan a caller holds is still the plan that was saved."""
+    paths = make_files({"a.html": "A", "b.html": "B"})
+    pipeline = make_vs_pipeline(vstore, embedders={"dense": EmbedderConfig(_ConstantEmbedder([1.0, 2.0]))})
+    changeset = await pipeline.plan(paths)
+    saved = tmp_path / "plan.json"
+    changeset.save(saved)
+
+    await pipeline.apply(changeset)
+
+    assert changeset == ChangeSet[Chunk].load(saved)
+    assert all(chunk.named_embeddings == {} for change in changeset.to_add for chunk in change.items)
+    # ... while the store received the embedded chunks.
+    assert [chunk.named_embeddings for chunk in vstore.stored.values()] == [{"dense": [1.0, 2.0]}] * 2
+
+
+@pytest.mark.anyio
+async def test_saved_then_loaded_plan_applies_like_the_in_memory_plan(make_files, tmp_path):
+    paths = make_files({"a.html": "A", "b.html": "B"})
+    embedders = {"dense": EmbedderConfig(_ConstantEmbedder([1.0, 2.0]))}
+    in_memory_store, reloaded_store = MemoryVectorStore(), MemoryVectorStore()
+    changeset = await make_vs_pipeline(in_memory_store, embedders=embedders).plan(paths)
+    saved = tmp_path / "plan.json"
+    changeset.save(saved)
+
+    await make_vs_pipeline(in_memory_store, embedders=embedders).apply(changeset)
+    await make_vs_pipeline(reloaded_store, embedders=embedders).apply(ChangeSet[Chunk].load(saved))
+
+    assert _stored_dump(in_memory_store) == _stored_dump(reloaded_store)
+    assert len(reloaded_store.stored) == 2
+
+
+@pytest.mark.anyio
+async def test_reapplying_a_plan_with_other_embedders_carries_no_vectors_over(make_files):
+    """Vectors from an earlier apply() must not ride along into a later one under another name."""
+    paths = make_files({"a.html": "A"})
+    first_store, second_store = MemoryVectorStore(), MemoryVectorStore()
+    first = make_vs_pipeline(first_store, embedders={"old": EmbedderConfig(_ConstantEmbedder([9.0]))})
+    second = make_vs_pipeline(second_store, embedders={"new": EmbedderConfig(_ConstantEmbedder([1.0]))})
+    changeset = await first.plan(paths)
+
+    await first.apply(changeset)
+    await second.apply(changeset)
+
+    assert [chunk.named_embeddings for chunk in second_store.stored.values()] == [{"new": [1.0]}]
+
+
+@pytest.mark.anyio
+async def test_apply_keeps_vectors_the_plan_already_carries(make_files, vstore):
+    """A plan edited to carry its own vectors keeps them (configured embedders add theirs)."""
+    paths = make_files({"a.html": "A"})
+    pipeline = make_vs_pipeline(vstore, embedders={"dense": EmbedderConfig(_ConstantEmbedder([1.0]))})
+    changeset = await pipeline.plan(paths)
+    changeset.to_add[0].items[0].named_embeddings["custom"] = [7.0]
+
+    await pipeline.apply(changeset)
+
+    assert [chunk.named_embeddings for chunk in vstore.stored.values()] == [{"custom": [7.0], "dense": [1.0]}]
+    assert changeset.to_add[0].items[0].named_embeddings == {"custom": [7.0]}

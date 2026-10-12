@@ -29,24 +29,16 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Annotated, get_args, get_origin
-
-try:
-    from qdrant_client import AsyncQdrantClient, models
-    from qdrant_client.http.exceptions import UnexpectedResponse
-except ImportError as _e:
-    raise ImportError(
-        "qdrant-client is not installed. "
-        "Install it with: uv add --optional qdrant qdrant-client  "
-        "or: pip install 'ragdoc[qdrant]'"
-    ) from _e
+from typing import Annotated, get_args, get_origin
 
 from ragdoc.chunking import Chunk
+from ragdoc.integrations._qdrant_base import (
+    AsyncQdrantClient,
+    _create_index_ignore_conflict,
+    _QdrantCollectionStore,
+    models,
+)
 from ragdoc.pipeline.stores import SourceState
-
-if TYPE_CHECKING:
-    pass
-
 
 # ---------------------------------------------------------------------------
 # QdrantIndex annotation marker
@@ -124,19 +116,7 @@ async def register_indexes_from_type(
             continue
         for meta in get_args(hint)[1:]:
             if isinstance(meta, QdrantIndex):
-                try:
-                    await client.create_payload_index(
-                        collection_name=collection_name,
-                        field_name=field_name,
-                        field_schema=meta.schema_type,
-                    )
-                except UnexpectedResponse as exc:
-                    if exc.status_code != 409:
-                        raise
-
-
-_SCROLL_BATCH = 1000
-_UPSERT_BATCH = 100
+                await _create_index_ignore_conflict(client, collection_name, field_name, meta.schema_type)
 
 
 # ---------------------------------------------------------------------------
@@ -225,24 +205,12 @@ def _chunk_to_point(
     )
 
 
-def _source_id_filter(source_id: str) -> models.Filter:
-    """Build a Qdrant Filter matching points with the given source_id."""
-    return models.Filter(
-        must=[
-            models.FieldCondition(
-                key="source_id",
-                match=models.MatchValue(value=source_id),
-            )
-        ]
-    )
-
-
 # ---------------------------------------------------------------------------
 # QdrantVectorStore
 # ---------------------------------------------------------------------------
 
 
-class QdrantVectorStore:
+class QdrantVectorStore(_QdrantCollectionStore):
     """Async VectorStore backed by Qdrant, implementing ragdoc's VectorStore protocol.
 
     Args:
@@ -260,7 +228,7 @@ class QdrantVectorStore:
     Example — dense + BM25::
 
         from ragdoc.integrations.vector_stores import QdrantVectorStore, ServerSideVector
-        from ragdoc.pipeline import prompt_content_text
+        from ragdoc.pipeline import DocumentPipeline, EmbedderConfig, VectorStorePipeline, prompt_content_text
 
         store = await QdrantVectorStore.create(
             client,
@@ -268,8 +236,8 @@ class QdrantVectorStore:
             vector_size=1536,
             sparse_vectors={"sparse": ServerSideVector("Qdrant/bm25", text_fn=prompt_content_text)},
         )
-        pipeline = VectorStorePipeline(document_pipeline, store, embedders={"dense": EmbedderConfig(my_embedder)})
-        await pipeline.sync(paths)
+        sync = VectorStorePipeline(DocumentPipeline(), store, embedders={"dense": EmbedderConfig(my_embedder)})
+        result = await sync.run(paths)
     """
 
     def __init__(
@@ -278,8 +246,7 @@ class QdrantVectorStore:
         collection_name: str,
         sparse_vectors: dict[str, ServerSideVector] | None = None,
     ) -> None:
-        self._client = client
-        self._collection_name = collection_name
+        super().__init__(client, collection_name)
         self._sparse_vectors = sparse_vectors or {}
 
     # ------------------------------------------------------------------
@@ -299,9 +266,13 @@ class QdrantVectorStore:
     ) -> QdrantVectorStore:
         """Create the collection (if it does not exist) and return a store instance.
 
-        A payload index on ``source_id`` is created so that
-        :meth:`get_source_hash` and :meth:`delete_by_source` filter in O(log n)
-        rather than O(n).
+        Idempotent — safe to call on every startup, on a server and on the in-process local
+        client alike. An existing collection is kept **as is**: its data stays, and its vector
+        configuration is neither compared with these arguments nor altered.
+
+        A payload index on ``source_id`` is created so that :meth:`delete_by_source` and
+        the stale-chunk delete of :meth:`replace_source` filter by index.
+        (:meth:`list_source_state` scrolls the whole collection regardless.)
 
         When *sparse_vectors* are provided the collection is created with
         **named** dense and sparse vector fields, enabling hybrid retrieval:
@@ -331,37 +302,25 @@ class QdrantVectorStore:
         Returns:
             A ready-to-use :class:`QdrantVectorStore`.
         """
-        try:
-            if sparse_vectors:
-                # Named-vector layout: separate dense and sparse fields.
-                vectors_cfg: models.VectorParams | dict[str, models.VectorParams] = {
-                    dense_vector_name: models.VectorParams(size=vector_size, distance=distance)
-                }
-                sparse_cfg: dict[str, models.SparseVectorParams] = {
-                    name: models.SparseVectorParams() for name in sparse_vectors
-                }
-                await client.create_collection(
-                    collection_name=collection_name,
-                    vectors_config=vectors_cfg,
-                    sparse_vectors_config=sparse_cfg,
-                )
-            else:
-                # Single unnamed vector — backward-compatible layout.
-                await client.create_collection(
-                    collection_name=collection_name,
-                    vectors_config=models.VectorParams(size=vector_size, distance=distance),
-                )
-            # Create a payload index on source_id for efficient filtering.
-            await client.create_payload_index(
-                collection_name=collection_name,
-                field_name="source_id",
-                field_schema=models.PayloadSchemaType.KEYWORD,
-            )
-        except UnexpectedResponse as exc:
-            if exc.status_code == 409:  # Collection already exists — ignore
-                pass
-            else:
-                raise
+        if sparse_vectors:
+            # Named-vector layout: separate dense and sparse fields.
+            vectors_cfg: models.VectorParams | dict[str, models.VectorParams] = {
+                dense_vector_name: models.VectorParams(size=vector_size, distance=distance)
+            }
+            sparse_cfg: dict[str, models.SparseVectorParams] | None = {
+                name: models.SparseVectorParams() for name in sparse_vectors
+            }
+        else:
+            # Single unnamed vector — backward-compatible layout.
+            vectors_cfg = models.VectorParams(size=vector_size, distance=distance)
+            sparse_cfg = None
+        await cls._ensure_collection(
+            client,
+            collection_name,
+            vectors_cfg,
+            sparse_vectors_config=sparse_cfg,
+            payload_indexes={"source_id": models.PayloadSchemaType.KEYWORD},
+        )
 
         if metadata_type is not None:
             await register_indexes_from_type(metadata_type, client, collection_name)
@@ -390,13 +349,34 @@ class QdrantVectorStore:
         if not chunks:
             return []
         points = [_chunk_to_point(c, self._sparse_vectors or None) for c in chunks]
-        # Batch to avoid exceeding gRPC message size limits.
-        for i in range(0, len(points), _UPSERT_BATCH):
-            batch = points[i : i + _UPSERT_BATCH]
-            await self._client.upsert(
-                collection_name=self._collection_name,
-                points=batch,
-            )
+        await self._batched_upsert(points)
+        return [c.id for c in chunks]
+
+    async def replace_source(self, source_id: str, chunks: list[Chunk]) -> list[str]:
+        """Replace every chunk stored for *source_id* with *chunks*, new-before-old.
+
+        Implements :class:`~ragdoc.pipeline.sync.SourceReplaceStore`: the new chunks are
+        written first, then only the stale ones (ids not in *chunks*) are deleted, and the
+        change-detection hashes are stamped last. A failure before the stale delete leaves
+        the previously stored chunks in place, and an interrupted replacement always reads
+        as "changed" on the next sync.
+
+        Args:
+            source_id: The source whose stored chunks are replaced.
+            chunks: The source's complete new chunk set (all must carry *source_id*).
+
+        Returns:
+            IDs of the written chunks in the same order as *chunks*.
+
+        Raises:
+            ValueError: If a chunk belongs to another source, or has no embeddings and no
+                ``sparse_vectors`` are configured.
+        """
+        foreign = sorted({c.source_id for c in chunks if c.source_id != source_id})
+        if foreign:
+            raise ValueError(f"replace_source({source_id!r}) received chunks of other sources: {foreign}")
+        points = [_chunk_to_point(c, self._sparse_vectors or None) for c in chunks]
+        await self._replace_source(source_id, points)
         return [c.id for c in chunks]
 
     async def delete(self, ids: list[str]) -> None:
@@ -412,36 +392,13 @@ class QdrantVectorStore:
             points_selector=models.PointIdsList(points=list(ids)),
         )
 
-    async def get_source_hash(self, source_id: str) -> str | None:
-        """Return the stored hash for *source_id*, or ``None`` if not present.
-
-        Args:
-            source_id: The source identity key.
-
-        Returns:
-            The ``source_hash`` string, or ``None`` if no chunks exist for this source.
-        """
-        results, _ = await self._client.scroll(
-            collection_name=self._collection_name,
-            scroll_filter=_source_id_filter(source_id),
-            with_payload=["source_hash"],
-            with_vectors=False,
-            limit=1,
-        )
-        if not results:
-            return None
-        return (results[0].payload or {}).get("source_hash")
-
     async def delete_by_source(self, source_id: str) -> None:
         """Delete all chunks whose ``source_id`` equals *source_id*.
 
         Args:
             source_id: The source identity key identifying chunks to remove.
         """
-        await self._client.delete(
-            collection_name=self._collection_name,
-            points_selector=_source_id_filter(source_id),
-        )
+        await self._delete_by_source_filter(source_id)
 
     async def list_source_ids(self) -> set[str]:
         """Return all distinct ``source_id`` values stored in this collection.
@@ -451,52 +408,14 @@ class QdrantVectorStore:
         Returns:
             Set of source identity strings.
         """
-        source_ids: set[str] = set()
-        offset: str | int | None = None
-        while True:
-            results, next_offset = await self._client.scroll(
-                collection_name=self._collection_name,
-                scroll_filter=None,
-                with_payload=["source_id"],
-                with_vectors=False,
-                limit=_SCROLL_BATCH,
-                offset=offset,
-            )
-            for point in results:
-                sid = (point.payload or {}).get("source_id")
-                if sid is not None:
-                    source_ids.add(sid)
-            if next_offset is None:
-                break
-            offset = next_offset  # type: ignore[reportAssignmentType]  # qdrant PointId is str | int at runtime
-        return source_ids
+        return await self._collect_source_ids()
 
     async def list_source_state(self) -> dict[str, SourceState]:
         """Return ``source_id`` -> :class:`SourceState` for every source, in one scan.
 
-        Scrolls the whole collection once, recording the first ``source_hash`` /
-        ``content_hash`` seen per ``source_id`` (all chunks of a source share them).
+        Scrolls the whole collection once (hash payload keys only, no vectors). A source
+        reports its hashes only when all of its chunks agree on them; a source whose chunks
+        disagree — half-replaced or interrupted mid-write — is reported with blank hashes,
+        which change detection reads as "always changed".
         """
-        state: dict[str, SourceState] = {}
-        offset: str | int | None = None
-        while True:
-            results, next_offset = await self._client.scroll(
-                collection_name=self._collection_name,
-                scroll_filter=None,
-                with_payload=["source_id", "source_hash", "content_hash"],
-                with_vectors=False,
-                limit=_SCROLL_BATCH,
-                offset=offset,
-            )
-            for point in results:
-                payload = point.payload or {}
-                sid = payload.get("source_id")
-                if sid is not None and sid not in state:
-                    state[sid] = SourceState(
-                        source_hash=payload.get("source_hash") or "",
-                        content_hash=payload.get("content_hash"),
-                    )
-            if next_offset is None:
-                break
-            offset = next_offset  # type: ignore[reportAssignmentType]  # qdrant PointId is str | int at runtime
-        return state
+        return await self._list_source_state()

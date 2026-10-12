@@ -21,6 +21,19 @@ from ragdoc.processing.base import (
     DocumentProcessor,
     ProcessingPipeline,
 )
+from ragdoc.processing.dump import DocumentDumpProcessor, FileNamer, default_file_namer
+from ragdoc.processing.filters import EmptyDocumentFilter
+from ragdoc.processing.footnote import (
+    FootnoteCandidate,
+    FootnoteProcessor,
+    FootnoteResolver,
+    LLMFootnoteResolver,
+    SimpleFootnoteResolver,
+    apply_ref_patches,
+    build_footnote_pattern,
+    find_footnote_candidates,
+    score_footnote_candidates,
+)
 from ragdoc.processing.heading import (
     HeadingLevelProcessor,
     HeadingVisualInfo,
@@ -33,44 +46,60 @@ from ragdoc.processing.heading import (
     is_bold,
     is_centered,
 )
+from ragdoc.processing.heading_llm import (
+    HeadingInfo,
+    LLMHeadingResolver,
+    LLMHeadingResolverSettings,
+)
+from ragdoc.processing.summary_base import DocumentSummary, ImageSummary
+from ragdoc.processing.summary_document import (
+    SUMMARY_SYSTEM_PROMPT,
+    DocumentSummarizerProcessor,
+    DocumentSummarizerSettings,
+    build_summary_messages,
+    pack_summaries,
+)
 
 try:
-    from ragdoc.processing.heading_llm import (
-        HeadingInfo,
-        LLMHeadingResolver,
-        LLMHeadingResolverSettings,
+    from ragdoc.processing.summary_image import (
+        DEFAULT_TRANSFORMATIONS,
+        ImageSummarizeFn,
+        ImageSummaryProcessor,
+        build_image_messages,
+        openai_image_summarizer,
     )
 except ImportError:
-    pass  # pydantic_settings not installed; LLMHeadingResolver unavailable
-from ragdoc.processing.dump import DocumentDumpProcessor, FileNamer, default_file_namer
-from ragdoc.processing.filters import EmptyDocumentFilter
-from ragdoc.processing.footnote import (
-    FootnoteCandidate,
-    FootnoteProcessor,
-    FootnoteResolver,
-    LLMFootnoteResolver,
-    SimpleFootnoteResolver,
-    SyncFootnoteProcessor,
-    apply_ref_patches,
-    build_footnote_pattern,
-    find_footnote_candidates,
-    score_footnote_candidates,
-)
-from ragdoc.processing.summary_base import ImageSummary
-from ragdoc.processing.summary_image import (
-    DEFAULT_TRANSFORMATIONS,
-    ImageSummarizeFn,
-    ImageSummaryProcessor,
-    build_image_messages,
-    openai_image_summarizer,
-)
+    pass  # pillow not installed ('llm' extra); the module __getattr__ below raises an actionable error
+
+# Names that live behind an extra: accessing them without the extra installed
+# fails with an actionable install hint instead of a bare AttributeError.
+_OPTIONAL_HINTS = {
+    "ImageSummaryProcessor": "llm",
+    "openai_image_summarizer": "llm",
+    "build_image_messages": "llm",
+    "ImageSummarizeFn": "llm",
+    "DEFAULT_TRANSFORMATIONS": "llm",
+}
+
+
+def __getattr__(name: str) -> object:
+    if name in _OPTIONAL_HINTS:
+        extra = _OPTIONAL_HINTS[name]
+        raise ImportError(f"{name} requires the '{extra}' extra: pip install 'ragdoc[{extra}]'")
+    raise AttributeError(name)
+
 
 __all__ = [
     "DEFAULT_TRANSFORMATIONS",
+    "SUMMARY_SYSTEM_PROMPT",
     # Document dump
     "DocumentDumpProcessor",
     # Base classes
     "DocumentProcessor",
+    # Document summary
+    "DocumentSummarizerProcessor",
+    "DocumentSummarizerSettings",
+    "DocumentSummary",
     # Filters
     "EmptyDocumentFilter",
     "FileNamer",
@@ -94,10 +123,10 @@ __all__ = [
     "ProcessingPipeline",
     "SimpleFootnoteResolver",
     "SizeToLevelMapper",
-    "SyncFootnoteProcessor",
     "TitleDetectionProcessor",
     "apply_ref_patches",
     "build_image_messages",
+    "build_summary_messages",
     "compute_size_to_level_mapping",
     "default_file_namer",
     # Standalone functions
@@ -107,4 +136,5 @@ __all__ = [
     "is_bold",
     "is_centered",
     "openai_image_summarizer",
+    "pack_summaries",
 ]

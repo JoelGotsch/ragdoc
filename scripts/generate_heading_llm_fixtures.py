@@ -19,7 +19,7 @@ from openai import AsyncOpenAI
 
 from ragdoc.document import Document
 from ragdoc.parsing.mineru.base import MinerUMiddleDocument
-from ragdoc.parsing.mineru.parser import CoreExtractionMiddleware, MinerUParser
+from ragdoc.parsing.mineru.parser import CoreExtractor, MinerUExtractor as MinerUParser
 from ragdoc.processing.heading import HeadingLevelProcessor
 from ragdoc.processing.heading_llm import HeadingResponse, LLMHeadingResolver, LLMHeadingResolverSettings
 
@@ -37,8 +37,8 @@ async def make_scenarios() -> list[tuple[str, Document]]:
     with open(TEST_CASES_FILE, encoding="utf-8") as f:
         cases = json.load(f)
 
-    parser = MinerUParser(use_default_middlewares=False)
-    parser.use(CoreExtractionMiddleware())
+    parser = MinerUParser(use_default_stages=False)
+    parser.use(CoreExtractor())
 
     scenarios: list[tuple[str, Document]] = []
     for name in cases:
@@ -122,15 +122,11 @@ async def main() -> None:
     #     raise SystemExit("OPENAI_API_KEY environment variable is not set.")
 
     FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
-    from httpx import AsyncClient
-
     settings = LLMHeadingResolverSettings()
-    http_client = AsyncClient(verify=False) # str(Path(__file__).parent.parent / 'certs' / 'ca-bundle-all.crt'))
     openai_client = AsyncOpenAI(
         max_retries=3,
         api_key=settings.api_key.get_secret_value(),
         base_url=settings.base_url,
-        http_client=http_client,
     )
     # resolver = LLMHeadingResolver(client, settings)
     resolver = LLMHeadingResolver(client=openai_client)
