@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg style="color-scheme: only light" width="1120" height="620" viewBox="0 0 1120 620" role="img" aria-labelledby="sync-stack-title sync-stack-desc" xmlns="http://www.w3.org/2000/svg" id="sync-stack-root">
+              <title id="sync-stack-title">Call stack of VectorStorePipeline.run on main versus split/8-review-fixes</title>
+              <desc id="sync-stack-desc">On main, run calls apply(plan()): _plan_from_paths hashes on the event loop and gathers every source, _process compares source_hash catching BaseException, chunk_document fakes source_hash from content_hash; apply then embeds all chunks, deletes all stale points, and upserts with a plain batched loop. On head, run calls engine.run on a resolved SyncPlanInput: build_current_map hashes in threads, SyncEngine.run consumes a back-pressured stream, _evaluate compares tokens catching Exception only, DocumentPipeline.run composes ingest and chunk, and _write_change embeds one source then _write_source picks replace_source, which writes blanked points, deletes stale ones, and stamps hashes.</desc>
+              <defs>
+      <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');
+      #sync-stack-root { --color-paper:#f5f5f5;--color-ink:#2d3142;--color-muted:#4f5d75;--color-accent:#bf4520;--font-sans:'Geist',system-ui,sans-serif;--font-serif:'Instrument Serif',serif;--font-mono:'Geist Mono',ui-monospace,monospace }
+      #sync-stack-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #sync-stack-root .sync-stack-name { font: 600 11px 'Geist', system-ui, sans-serif; fill: #2d3142; }
+      #sync-stack-root .sync-stack-sub { font: 500 9px 'Geist Mono', ui-monospace, monospace; fill: #5a6580; }
+      #sync-stack-root .sync-stack-badge { font: 600 9px 'Geist Mono', ui-monospace, monospace; fill: #2d3142; }
+      #sync-stack-root .sync-stack-eyebrow { font: 500 7px 'Geist Mono', ui-monospace, monospace; fill: #5a6580; letter-spacing: 0.18em; text-transform: uppercase; }
+      #sync-stack-root .sync-stack-legend { font: 500 8px 'Geist Mono', ui-monospace, monospace; fill: #4f5d75; letter-spacing: 0.06em; }</style>
+                <marker id="sync-stack-sync-stack-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+              </defs>
+              <style>
+                .sync-stack-name { font: 600 11px 'Geist', system-ui, sans-serif; fill: #2d3142; }
+                .sync-stack-sub { font: 500 9px 'Geist Mono', ui-monospace, monospace; fill: #5a6580; }
+                .sync-stack-badge { font: 600 9px 'Geist Mono', ui-monospace, monospace; fill: #2d3142; }
+                .sync-stack-eyebrow { font: 500 7px 'Geist Mono', ui-monospace, monospace; fill: #5a6580; letter-spacing: 0.18em; text-transform: uppercase; }
+                .sync-stack-legend { font: 500 8px 'Geist Mono', ui-monospace, monospace; fill: #4f5d75; letter-spacing: 0.06em; }
+              </style>
+              <rect data-k="bg" x="0" y="0" width="1120" height="620" fill="#f5f5f5"/>
+
+              <text x="24" y="18" class="sync-stack-eyebrow">base · main @ 33cfbca5</text>
+              <text x="576" y="18" class="sync-stack-eyebrow">head · split/8-review-fixes @ d74b653a</text>
+
+              <!-- base connectors -->
+              <path d="M36,88 V120 H48" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M60,140 V172 H72" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M84,192 V224 H96" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M36,88 V276 H48" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M60,296 V328 H72" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M60,296 V380 H72" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M60,296 V432 H72" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+
+              <!-- head connectors -->
+              <path d="M588,88 V120 H600" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M588,88 V172 H600" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M612,192 V224 H624" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M636,244 V276 H648" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M660,296 V328 H672" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M612,192 V380 H624" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M636,400 V432 H648" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M660,452 V484 H672" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+              <path d="M684,504 V536 H696" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-stack-sync-stack-arrow)"/>
+
+              <!-- base frames -->
+              <g class="frame" data-k="frame" data-side="base" data-source="base/src/ragdoc/pipeline/vectorstore.py#L339-L369">
+                <rect x="24" y="48" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="24" y="48" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="36" y="65" class="sync-stack-name">VectorStorePipeline.run — apply(plan(…))</text>
+                <text x="36" y="79" class="sync-stack-sub">pipeline/vectorstore.py:L339-L369</text>
+                <rect x="396" y="61" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="404" y="71" class="sync-stack-badge" text-anchor="middle">Δ</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="base" data-source="base/src/ragdoc/pipeline/vectorstore.py#L147-L206">
+                <rect x="48" y="100" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="48" y="100" width="400" height="40" rx="6" fill="#2d3142" fill-opacity="0.02" stroke="#2d3142" stroke-opacity="0.55" stroke-dasharray="4,3"/>
+                <text x="60" y="117" class="sync-stack-name">_plan_from_paths — hash on the loop, gather every source</text>
+                <text x="60" y="131" class="sync-stack-sub">pipeline/vectorstore.py:L147-L206</text>
+                <rect x="420" y="113" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="428" y="123" class="sync-stack-badge" text-anchor="middle">−</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="base" data-source="base/src/ragdoc/pipeline/vectorstore.py#L177-L200">
+                <rect x="72" y="152" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="72" y="152" width="400" height="40" rx="6" fill="#2d3142" fill-opacity="0.02" stroke="#2d3142" stroke-opacity="0.55" stroke-dasharray="4,3"/>
+                <text x="84" y="169" class="sync-stack-name">_process — compare source_hash; except BaseException</text>
+                <text x="84" y="183" class="sync-stack-sub">pipeline/vectorstore.py:L177-L200</text>
+                <rect x="444" y="165" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="452" y="175" class="sync-stack-badge" text-anchor="middle">−</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="base" data-source="base/src/ragdoc/pipeline/linear.py#L258-L300">
+                <rect x="96" y="204" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="96" y="204" width="400" height="40" rx="6" fill="#2d3142" fill-opacity="0.02" stroke="#2d3142" stroke-opacity="0.55" stroke-dasharray="4,3"/>
+                <text x="108" y="221" class="sync-stack-name">chunk_document — source_hash faked from content_hash</text>
+                <text x="108" y="235" class="sync-stack-sub">pipeline/linear.py:L258-L300</text>
+                <rect x="468" y="217" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="476" y="227" class="sync-stack-badge" text-anchor="middle">−</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="base" data-source="base/src/ragdoc/pipeline/vectorstore.py#L268-L333">
+                <rect x="48" y="256" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="48" y="256" width="400" height="40" rx="6" fill="#2d3142" fill-opacity="0.02" stroke="#2d3142" stroke-opacity="0.55" stroke-dasharray="4,3"/>
+                <text x="60" y="273" class="sync-stack-name">apply — embed all, delete all stale, then upsert all</text>
+                <text x="60" y="287" class="sync-stack-sub">pipeline/vectorstore.py:L268-L333</text>
+                <rect x="420" y="269" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="428" y="279" class="sync-stack-badge" text-anchor="middle">−</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="base" data-source="base/src/ragdoc/pipeline/vectorstore.py#L371-L385">
+                <rect x="72" y="308" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="72" y="308" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="84" y="325" class="sync-stack-name">_embed_chunks — the whole corpus at once</text>
+                <text x="84" y="339" class="sync-stack-sub">pipeline/vectorstore.py:L371-L385</text>
+                <rect x="444" y="321" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="452" y="331" class="sync-stack-badge" text-anchor="middle">Δ</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="base" data-source="base/src/ragdoc/integrations/vector_stores/qdrant.py#L435-L444">
+                <rect x="72" y="360" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="72" y="360" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="84" y="377" class="sync-stack-name">QdrantVectorStore.delete_by_source — stale first</text>
+                <text x="84" y="391" class="sync-stack-sub">integrations/vector_stores/qdrant.py:L435-L444</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="base" data-source="base/src/ragdoc/integrations/vector_stores/qdrant.py#L375-L400">
+                <rect x="72" y="412" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="72" y="412" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="84" y="429" class="sync-stack-name">QdrantVectorStore.upsert — batched loop, no rollback</text>
+                <text x="84" y="443" class="sync-stack-sub">integrations/vector_stores/qdrant.py:L375-L400</text>
+                <rect x="444" y="425" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="452" y="435" class="sync-stack-badge" text-anchor="middle">Δ</text>
+              </g>
+
+              <!-- head frames -->
+              <g class="frame" data-k="frame" data-side="head" data-source="head/src/ragdoc/pipeline/vectorstore.py#L335-L369">
+                <rect x="576" y="48" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="576" y="48" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="588" y="65" class="sync-stack-name">VectorStorePipeline.run — engine.run(_resolve(…))</text>
+                <text x="588" y="79" class="sync-stack-sub">pipeline/vectorstore.py:L335-L369</text>
+                <rect x="948" y="61" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="956" y="71" class="sync-stack-badge" text-anchor="middle">Δ</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="head" data-source="head/src/ragdoc/pipeline/sync.py#L260-L325">
+                <rect x="600" y="100" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="600" y="100" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="612" y="117" class="sync-stack-name">build_current_map — hash in threads; unreadable → errors</text>
+                <text x="612" y="131" class="sync-stack-sub">pipeline/sync.py:L260-L325</text>
+                <rect x="972" y="113" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="980" y="123" class="sync-stack-badge" text-anchor="middle">+</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="head" data-source="head/src/ragdoc/pipeline/sync.py#L481-L523">
+                <rect x="600" y="152" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="600" y="152" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="612" y="169" class="sync-stack-name">SyncEngine.run — consume the stream, write per source</text>
+                <text x="612" y="183" class="sync-stack-sub">pipeline/sync.py:L481-L523</text>
+                <rect x="972" y="165" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="980" y="175" class="sync-stack-badge" text-anchor="middle">+</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="head" data-source="head/src/ragdoc/pipeline/sync.py#L390-L450">
+                <rect x="624" y="204" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="624" y="204" width="400" height="40" rx="6" fill="#bf4520" fill-opacity="0.08" stroke="#bf4520" stroke-width="1.2"/>
+                <text x="636" y="221" class="sync-stack-name">_stream — semaphore + 1-slot handoff (back-pressure)</text>
+                <text x="636" y="235" class="sync-stack-sub">pipeline/sync.py:L390-L450</text>
+                <rect x="996" y="217" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="1004" y="227" class="sync-stack-badge" text-anchor="middle">+</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="head" data-source="head/src/ragdoc/pipeline/sync.py#L371-L388">
+                <rect x="648" y="256" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="648" y="256" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="660" y="273" class="sync-stack-name">_evaluate — token compare; except Exception only</text>
+                <text x="660" y="287" class="sync-stack-sub">pipeline/sync.py:L371-L388</text>
+                <rect x="1020" y="269" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="1028" y="279" class="sync-stack-badge" text-anchor="middle">+</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="head" data-source="head/src/ragdoc/pipeline/linear.py#L369-L383">
+                <rect x="672" y="308" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="672" y="308" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="684" y="325" class="sync-stack-name">DocumentPipeline.run = ingest.run ∘ chunk.run</text>
+                <text x="684" y="339" class="sync-stack-sub">pipeline/linear.py:L369-L383</text>
+                <rect x="1044" y="321" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="1052" y="331" class="sync-stack-badge" text-anchor="middle">Δ</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="head" data-source="head/src/ragdoc/pipeline/sync.py#L613-L630">
+                <rect x="624" y="360" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="624" y="360" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="636" y="377" class="sync-stack-name">_write_change — pre_write (embed this source), then write</text>
+                <text x="636" y="391" class="sync-stack-sub">pipeline/sync.py:L613-L630</text>
+                <rect x="996" y="373" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="1004" y="383" class="sync-stack-badge" text-anchor="middle">+</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="head" data-source="head/src/ragdoc/pipeline/sync.py#L589-L611">
+                <rect x="648" y="412" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="648" y="412" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="660" y="429" class="sync-stack-name">_write_source — isinstance(store, SourceReplaceStore)</text>
+                <text x="660" y="443" class="sync-stack-sub">pipeline/sync.py:L589-L611</text>
+                <rect x="1020" y="425" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="1028" y="435" class="sync-stack-badge" text-anchor="middle">+</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="head" data-source="head/src/ragdoc/integrations/_qdrant_base.py#L262-L289">
+                <rect x="672" y="464" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="672" y="464" width="400" height="40" rx="6" fill="#bf4520" fill-opacity="0.08" stroke="#bf4520" stroke-width="1.2"/>
+                <text x="684" y="481" class="sync-stack-name">_replace_source — write blanked → delete stale → stamp</text>
+                <text x="684" y="495" class="sync-stack-sub">integrations/_qdrant_base.py:L262-L289</text>
+                <rect x="1044" y="477" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="1052" y="487" class="sync-stack-badge" text-anchor="middle">+</text>
+              </g>
+              <g class="frame" data-k="frame" data-side="head" data-source="head/src/ragdoc/integrations/_qdrant_base.py#L304-L330">
+                <rect x="696" y="516" width="400" height="40" rx="6" fill="#f5f5f5"/>
+                <rect x="696" y="516" width="400" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="708" y="533" class="sync-stack-name">_write_blanked · _stamp_hashes — rollback ids; stamp</text>
+                <text x="708" y="547" class="sync-stack-sub">integrations/_qdrant_base.py:L304-L330 · L350-L367</text>
+                <rect x="1068" y="529" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="1076" y="539" class="sync-stack-badge" text-anchor="middle">+</text>
+              </g>
+
+              <!-- legend -->
+              <line x1="24" y1="580" x2="1096" y2="580" stroke="#2d3142" stroke-opacity="0.12"/>
+              <rect x="24" y="593" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="32" y="603" class="sync-stack-badge" text-anchor="middle">+</text>
+              <text x="48" y="603" class="sync-stack-legend">new on head</text>
+              <rect x="140" y="593" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="148" y="603" class="sync-stack-badge" text-anchor="middle">−</text>
+              <text x="164" y="603" class="sync-stack-legend">gone on head</text>
+              <rect x="260" y="593" width="16" height="14" rx="2" fill="#bfc0c0" fill-opacity="0.35"/><text x="268" y="603" class="sync-stack-badge" text-anchor="middle">Δ</text>
+              <text x="284" y="603" class="sync-stack-legend">same name, changed body</text>
+              <rect x="440" y="593" width="24" height="14" rx="2" fill="#bf4520" fill-opacity="0.08" stroke="#bf4520" stroke-width="1.2"/>
+              <text x="472" y="603" class="sync-stack-legend">focal: where the guarantee changed</text>
+              <rect x="680" y="593" width="24" height="14" rx="2" fill="#2d3142" fill-opacity="0.02" stroke="#2d3142" stroke-opacity="0.55" stroke-dasharray="4,3"/>
+              <text x="712" y="603" class="sync-stack-legend">removed path</text>
+            </svg>

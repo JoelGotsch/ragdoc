@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg style="color-scheme: only light" width="1120" height="620" viewBox="0 0 1120 620" role="img" aria-labelledby="sync-run-title sync-run-desc" xmlns="http://www.w3.org/2000/svg" id="sync-run-root">
+              <title id="sync-run-title">VectorStorePipeline.run() on one updated source over Qdrant</title>
+              <desc id="sync-run-desc">The caller invokes run(paths) on VectorStorePipeline, which hashes the files and hands a SyncPlanInput to SyncEngine. The engine reads the store's source state in one scroll, then for each changed source runs the DocumentPipeline producer under a semaphore, embeds that source's chunks, and calls replace_source on the Qdrant store, which upserts the new points with blank hashes, deletes stale points, and finally stamps the real hashes as a commit marker. The engine returns an UpdateResult.</desc>
+              <defs>
+      <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');
+      #sync-run-root { --color-paper:#f5f5f5;--color-ink:#2d3142;--color-muted:#4f5d75;--color-accent:#bf4520;--font-sans:'Geist',system-ui,sans-serif;--font-serif:'Instrument Serif',serif;--font-mono:'Geist Mono',ui-monospace,monospace }
+      #sync-run-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #sync-run-root .sync-run-name { font: 600 11px 'Geist', system-ui, sans-serif; fill: #2d3142; }
+      #sync-run-root .sync-run-sub { font: 500 9px 'Geist Mono', ui-monospace, monospace; fill: #5a6580; }
+      #sync-run-root .sync-run-msg { font: 500 10px 'Geist', system-ui, sans-serif; fill: #2d3142; }
+      #sync-run-root .sync-run-msg-accent { font: 600 10px 'Geist', system-ui, sans-serif; fill: #bf4520; }
+      #sync-run-root .sync-run-eyebrow { font: 500 7px 'Geist Mono', ui-monospace, monospace; fill: #5a6580; letter-spacing: 0.18em; text-transform: uppercase; }</style>
+                <marker id="sync-run-sync-run-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+                <marker id="sync-run-sync-run-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+              </defs>
+              <style>
+                .sync-run-name { font: 600 11px 'Geist', system-ui, sans-serif; fill: #2d3142; }
+                .sync-run-sub { font: 500 9px 'Geist Mono', ui-monospace, monospace; fill: #5a6580; }
+                .sync-run-msg { font: 500 10px 'Geist', system-ui, sans-serif; fill: #2d3142; }
+                .sync-run-msg-accent { font: 600 10px 'Geist', system-ui, sans-serif; fill: #bf4520; }
+                .sync-run-eyebrow { font: 500 7px 'Geist Mono', ui-monospace, monospace; fill: #5a6580; letter-spacing: 0.18em; text-transform: uppercase; }
+              </style>
+              <rect data-k="bg" x="0" y="0" width="1120" height="620" fill="#f5f5f5"/>
+
+              <!-- lifelines -->
+              <line x1="120" y1="64" x2="120" y2="604" stroke="#2d3142" stroke-opacity="0.55" stroke-dasharray="3,3"/>
+              <line x1="340" y1="64" x2="340" y2="604" stroke="#2d3142" stroke-opacity="0.55" stroke-dasharray="3,3"/>
+              <line x1="560" y1="64" x2="560" y2="604" stroke="#2d3142" stroke-opacity="0.55" stroke-dasharray="3,3"/>
+              <line x1="780" y1="64" x2="780" y2="604" stroke="#2d3142" stroke-opacity="0.55" stroke-dasharray="3,3"/>
+              <line x1="1000" y1="64" x2="1000" y2="604" stroke="#2d3142" stroke-opacity="0.55" stroke-dasharray="3,3"/>
+
+              <!-- fragment: per changed source -->
+              <rect x="528" y="264" width="572" height="300" rx="8" fill="none" stroke="#2d3142" stroke-opacity="0.55" stroke-dasharray="4,3"/>
+              <rect x="572" y="268" width="284" height="11" fill="#f5f5f5"/>
+              <text x="576" y="276" class="sync-run-eyebrow">loop · per changed source, ≤ concurrency at a time</text>
+
+              <!-- activation bars -->
+              <rect x="336" y="96" width="8" height="476" fill="#2d3142" fill-opacity="0.06" stroke="#4f5d75" stroke-width="0.8"/>
+              <rect x="556" y="176" width="8" height="412" fill="#2d3142" fill-opacity="0.06" stroke="#4f5d75" stroke-width="0.8"/>
+              <rect x="776" y="296" width="8" height="42" fill="#2d3142" fill-opacity="0.06" stroke="#4f5d75" stroke-width="0.8"/>
+              <rect x="996" y="212" width="8" height="16" fill="#2d3142" fill-opacity="0.06" stroke="#4f5d75" stroke-width="0.8"/>
+              <rect x="996" y="412" width="8" height="140" fill="#2d3142" fill-opacity="0.06" stroke="#4f5d75" stroke-width="0.8"/>
+
+              <!-- messages -->
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/pipeline/vectorstore.py#L335-L369">
+                <line x1="120" y1="100" x2="336" y2="100" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-run-sync-run-arrow)"/>
+                <text x="124" y="94" class="sync-run-msg">run(paths)</text>
+              </g>
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/pipeline/sync.py#L260-L325">
+                <path d="M344,130 H384 V150 H348" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-run-sync-run-arrow)"/>
+                <rect x="386" y="135" width="312" height="13" fill="#f5f5f5"/>
+                <text x="390" y="145" class="sync-run-msg">_resolve: hash files in threads; unreadable → pre_failed</text>
+              </g>
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/pipeline/sync.py#L481-L523">
+                <line x1="344" y1="180" x2="556" y2="180" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-run-sync-run-arrow)"/>
+                <text x="348" y="174" class="sync-run-msg">run(SyncPlanInput, delete_orphans)</text>
+              </g>
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/integrations/_qdrant_base.py#L170-L200">
+                <line x1="564" y1="216" x2="996" y2="216" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-run-sync-run-arrow)"/>
+                <rect x="564" y="201" width="380" height="13" fill="#f5f5f5"/>
+                <text x="568" y="210" class="sync-run-msg">list_source_state() → {source_id: SourceState}; mixed hashes ⇒ blank</text>
+              </g>
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/pipeline/sync.py#L390-L450">
+                <line x1="564" y1="300" x2="776" y2="300" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-run-sync-run-arrow)"/>
+                <rect x="564" y="285" width="390" height="13" fill="#f5f5f5"/>
+                <text x="568" y="294" class="sync-run-msg">producer(src) under the semaphore; slot held until the writer takes it</text>
+              </g>
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/pipeline/vectorstore.py#L208-L227">
+                <line x1="776" y1="334" x2="564" y2="334" stroke="#4f5d75" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#sync-run-sync-run-arrow)"/>
+                <text x="772" y="328" class="sync-run-msg" text-anchor="end">SourceChange[Chunk] + file source_hash</text>
+              </g>
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/pipeline/vectorstore.py#L381-L394">
+                <path d="M564,364 H604 V384 H568" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-run-sync-run-arrow)"/>
+                <rect x="606" y="369" width="230" height="13" fill="#f5f5f5"/>
+                <text x="610" y="379" class="sync-run-msg">pre_write(items): embed this source only</text>
+              </g>
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/pipeline/sync.py#L589-L611">
+                <line x1="564" y1="416" x2="996" y2="416" stroke="#bf4520" stroke-width="1.2" marker-end="url(#sync-run-sync-run-arrow-accent)"/>
+                <rect x="564" y="401" width="404" height="13" fill="#f5f5f5"/>
+                <text x="568" y="410" class="sync-run-msg-accent">replace_source(source_id, chunks): the store satisfies SourceReplaceStore</text>
+              </g>
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/integrations/_qdrant_base.py#L304-L330">
+                <path d="M996,448 H956 V468 H992" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-run-sync-run-arrow)"/>
+                <rect x="576" y="453" width="378" height="13" fill="#f5f5f5"/>
+                <text x="950" y="463" class="sync-run-msg" text-anchor="end">1 · upsert new points, hashes blank (rollback created ids on failure)</text>
+              </g>
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/integrations/_qdrant_base.py#L262-L289">
+                <path d="M996,488 H956 V508 H992" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#sync-run-sync-run-arrow)"/>
+                <rect x="660" y="493" width="294" height="13" fill="#f5f5f5"/>
+                <text x="950" y="503" class="sync-run-msg" text-anchor="end">2 · delete stale points: same source_id, id ∉ new ids</text>
+              </g>
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/integrations/_qdrant_base.py#L350-L367">
+                <path d="M996,528 H956 V548 H992" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#sync-run-sync-run-arrow-accent)"/>
+                <rect x="676" y="533" width="278" height="13" fill="#f5f5f5"/>
+                <text x="950" y="543" class="sync-run-msg-accent" text-anchor="end">3 · set_payload real hashes by id (commit marker)</text>
+              </g>
+              <g class="msg" data-k="msg" data-source="head/src/ragdoc/pipeline/sync.py#L223-L243">
+                <line x1="556" y1="592" x2="120" y2="592" stroke="#4f5d75" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#sync-run-sync-run-arrow)"/>
+                <rect x="120" y="577" width="280" height="13" fill="#f5f5f5"/>
+                <text x="124" y="586" class="sync-run-msg">UpdateResult(processed, skipped, deleted, errors)</text>
+              </g>
+
+              <!-- actors -->
+              <g class="actor" data-k="actor">
+                <rect x="24" y="24" width="192" height="40" rx="6" fill="#4f5d75" fill-opacity="0.10" stroke="#5a6580" stroke-width="1"/>
+                <text x="120" y="41" class="sync-run-name" text-anchor="middle">Caller</text>
+                <text x="120" y="54" class="sync-run-sub" text-anchor="middle">asyncio.run(…)</text>
+              </g>
+              <g class="actor" data-k="actor">
+                <rect x="244" y="24" width="192" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="340" y="41" class="sync-run-name" text-anchor="middle">VectorStorePipeline</text>
+                <text x="340" y="54" class="sync-run-sub" text-anchor="middle">pipeline/vectorstore.py</text>
+              </g>
+              <g class="actor" data-k="actor">
+                <rect x="464" y="24" width="192" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="560" y="41" class="sync-run-name" text-anchor="middle">SyncEngine[Chunk]</text>
+                <text x="560" y="54" class="sync-run-sub" text-anchor="middle">pipeline/sync.py</text>
+              </g>
+              <g class="actor" data-k="actor">
+                <rect x="684" y="24" width="192" height="40" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="780" y="41" class="sync-run-name" text-anchor="middle">DocumentPipeline</text>
+                <text x="780" y="54" class="sync-run-sub" text-anchor="middle">producer · pipeline/linear.py</text>
+              </g>
+              <g class="actor" data-k="actor">
+                <rect x="904" y="24" width="192" height="40" rx="6" fill="#2d3142" fill-opacity="0.05" stroke="#4f5d75" stroke-width="1"/>
+                <text x="1000" y="41" class="sync-run-name" text-anchor="middle">QdrantVectorStore</text>
+                <text x="1000" y="54" class="sync-run-sub" text-anchor="middle">integrations/_qdrant_base.py</text>
+              </g>
+            </svg>

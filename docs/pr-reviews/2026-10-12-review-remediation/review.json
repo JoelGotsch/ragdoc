@@ -1,0 +1,18 @@
+{
+  "title": "Review remediation: SyncEngine, LLM layer, strict element model",
+  "slug": "2026-10-12-review-remediation",
+  "created": "2026-10-12",
+  "repository": {
+    "name": "ragdoc",
+    "remote": "git@github.com:JoelGotsch/ragdoc.git",
+    "web": "https://github.com/JoelGotsch/ragdoc"
+  },
+  "base": {
+    "ref": "main",
+    "sha": "33cfbca547dad0b0eaf7bf3c2f4e1ee4b0b6ef95"
+  },
+  "head": {
+    "ref": "split/8-review-fixes",
+    "sha": "d74b653a9235307055c637eb200864fc937f0e6a"
+  }
+}

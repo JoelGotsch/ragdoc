@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg style="color-scheme: only light" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="replace-flow-title replace-flow-desc" xmlns="http://www.w3.org/2000/svg" id="replace-flow-root">
+              <title id="replace-flow-title">replace_source: write blanked, delete stale, stamp hashes, and the failure exits</title>
+              <desc id="replace-flow-desc">replace_source first upserts the new points with blank hashes. If a batch fails or is cancelled, the ids this call created are deleted and the error is re-raised, leaving the old points intact so the source is re-processed. Otherwise stale points of the same source are deleted and the real hashes are stamped by set_payload, after which the source reads as unchanged. A failure at the delete or stamp step leaves old and new points side by side or unstamped, with blank hashes, so the next run re-processes the source.</desc>
+              <defs>
+      <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');
+      #replace-flow-root { --color-paper:#f5f5f5;--color-ink:#2d3142;--color-muted:#4f5d75;--color-accent:#bf4520;--font-sans:'Geist',system-ui,sans-serif;--font-serif:'Instrument Serif',serif;--font-mono:'Geist Mono',ui-monospace,monospace }
+      #replace-flow-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #replace-flow-root .replace-flow-name { font: 600 11px 'Geist', system-ui, sans-serif; fill: #2d3142; }
+      #replace-flow-root .replace-flow-sub { font: 500 9px 'Geist Mono', ui-monospace, monospace; fill: #5a6580; }
+      #replace-flow-root .replace-flow-lbl { font: 500 8px 'Geist Mono', ui-monospace, monospace; fill: #4f5d75; letter-spacing: 0.06em; }
+      #replace-flow-root .replace-flow-note { font: italic 14px 'Instrument Serif', serif; fill: #4f5d75; }</style>
+                <marker id="replace-flow-replace-flow-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+                <marker id="replace-flow-replace-flow-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+              </defs>
+              <style>
+                .replace-flow-name { font: 600 11px 'Geist', system-ui, sans-serif; fill: #2d3142; }
+                .replace-flow-sub { font: 500 9px 'Geist Mono', ui-monospace, monospace; fill: #5a6580; }
+                .replace-flow-lbl { font: 500 8px 'Geist Mono', ui-monospace, monospace; fill: #4f5d75; letter-spacing: 0.06em; }
+                .replace-flow-note { font: italic 14px 'Instrument Serif', serif; fill: #4f5d75; }
+              </style>
+              <rect data-k="bg" x="0" y="0" width="960" height="540" fill="#f5f5f5"/>
+
+              <!-- edges -->
+              <g class="edge" data-k="edge"><path d="M300,68 V108" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#replace-flow-replace-flow-arrow-accent)"/></g>
+              <g class="edge" data-k="edge"><path d="M300,156 V196" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#replace-flow-replace-flow-arrow-accent)"/></g>
+              <g class="edge" data-k="edge">
+                <path d="M300,260 V300" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#replace-flow-replace-flow-arrow-accent)"/>
+                <text x="308" y="284" class="replace-flow-lbl">no</text>
+              </g>
+              <g class="edge" data-k="edge"><path d="M300,348 V384" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#replace-flow-replace-flow-arrow-accent)"/></g>
+              <g class="edge" data-k="edge"><path d="M300,432 V472" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#replace-flow-replace-flow-arrow-accent)"/></g>
+              <g class="edge" data-k="edge">
+                <path d="M390,228 H550" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#replace-flow-replace-flow-arrow)"/>
+                <text x="462" y="222" class="replace-flow-lbl">yes</text>
+              </g>
+              <g class="edge" data-k="edge"><path d="M700,252 V304" fill="none" stroke="#4f5d75" stroke-width="1" marker-end="url(#replace-flow-replace-flow-arrow)"/></g>
+
+              <!-- nodes -->
+              <g class="node" data-k="node" data-source="head/src/ragdoc/integrations/_qdrant_base.py#L262-L289">
+                <rect x="150" y="28" width="300" height="40" rx="20" fill="#f5f5f5"/>
+                <rect x="150" y="28" width="300" height="40" rx="20" fill="#4f5d75" fill-opacity="0.10" stroke="#5a6580" stroke-width="1"/>
+                <text x="300" y="52" class="replace-flow-name" text-anchor="middle">replace_source(source_id, items)</text>
+              </g>
+              <g class="node" data-k="node" data-source="head/src/ragdoc/integrations/_qdrant_base.py#L304-L330">
+                <rect x="140" y="108" width="320" height="48" rx="6" fill="#f5f5f5"/>
+                <rect x="140" y="108" width="320" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="300" y="128" class="replace-flow-name" text-anchor="middle">1 · upsert the new points</text>
+                <text x="300" y="142" class="replace-flow-sub" text-anchor="middle">hashes blank · _write_blanked</text>
+              </g>
+              <g class="node" data-k="node">
+                <polygon points="300,196 390,228 300,260 210,228" fill="#f5f5f5"/>
+                <polygon points="300,196 390,228 300,260 210,228" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="300" y="226" class="replace-flow-name" text-anchor="middle">a batch failed</text>
+                <text x="300" y="239" class="replace-flow-sub" text-anchor="middle">or was cancelled?</text>
+              </g>
+              <g class="node" data-k="node" data-source="head/src/ragdoc/integrations/_qdrant_base.py#L262-L289">
+                <rect x="140" y="300" width="320" height="48" rx="6" fill="#f5f5f5"/>
+                <rect x="140" y="300" width="320" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="300" y="320" class="replace-flow-name" text-anchor="middle">2 · delete the stale points</text>
+                <text x="300" y="334" class="replace-flow-sub" text-anchor="middle">same source_id ∧ id ∉ new ids</text>
+              </g>
+              <g class="node" data-k="node" data-source="head/src/ragdoc/integrations/_qdrant_base.py#L350-L367">
+                <rect x="140" y="384" width="320" height="48" rx="6" fill="#f5f5f5"/>
+                <rect x="140" y="384" width="320" height="48" rx="6" fill="#bf4520" fill-opacity="0.08" stroke="#bf4520" stroke-width="1.2"/>
+                <text x="300" y="404" class="replace-flow-name" text-anchor="middle">3 · set_payload the real hashes</text>
+                <text x="300" y="418" class="replace-flow-sub" text-anchor="middle">_stamp_hashes · the commit marker</text>
+              </g>
+              <g class="node" data-k="node">
+                <rect x="150" y="472" width="300" height="40" rx="20" fill="#f5f5f5"/>
+                <rect x="150" y="472" width="300" height="40" rx="20" fill="#2d3142" fill-opacity="0.05" stroke="#4f5d75" stroke-width="1"/>
+                <text x="300" y="496" class="replace-flow-name" text-anchor="middle">source reads as unchanged next run</text>
+              </g>
+              <g class="node" data-k="node" data-source="head/src/ragdoc/integrations/_qdrant_base.py#L332-L348">
+                <rect x="550" y="204" width="300" height="48" rx="6" fill="#f5f5f5"/>
+                <rect x="550" y="204" width="300" height="48" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1"/>
+                <text x="700" y="224" class="replace-flow-name" text-anchor="middle">delete the ids this call created</text>
+                <text x="700" y="238" class="replace-flow-sub" text-anchor="middle">_rollback_created · shielded on cancel</text>
+              </g>
+              <g class="node" data-k="node">
+                <rect x="540" y="304" width="320" height="40" rx="20" fill="#f5f5f5"/>
+                <rect x="540" y="304" width="320" height="40" rx="20" fill="#2d3142" fill-opacity="0.05" stroke="#4f5d75" stroke-width="1"/>
+                <text x="700" y="328" class="replace-flow-name" text-anchor="middle">re-raised · old points intact · re-processed</text>
+              </g>
+
+              <!-- annotation -->
+              <path d="M556,396 C 520,396 500,408 464,408" fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3"/>
+              <circle cx="464" cy="408" r="2" fill="#4f5d75"/>
+              <text x="560" y="392" class="replace-flow-note">
+                <tspan x="560" dy="0">Failure at step 2 or 3: old and new points</tspan>
+                <tspan x="560" dy="18">side by side, or new points unstamped —</tspan>
+                <tspan x="560" dy="18">blank hashes, so the next run redoes it.</tspan>
+              </text>
+            </svg>
