@@ -32,13 +32,16 @@ def _(mo):
     | Field | Description |
     |-------|-------------|
     | `id` | Unique identifier (UUID string) |
+    | `source_id` | Sync identity key of the source document (required) |
+    | `source_hash` | SHA-256 of the source file bytes; `None` outside the sync pipelines (never faked from the content hash) |
+    | `content_hash` | Canonical-JSON hash of the parsed document content |
     | `prompt_content` | Full-fidelity text for LLM context windows and BM25 search |
     | `embedding_content` | Compact semantic text for dense vector search |
     | `metadata` | Key-value metadata from the source document |
-    | `embedding` | Optional pre-computed embedding vector (list[float]) |
+    | `named_embeddings` | Embedding vectors keyed by embedder name (filled by `VectorStorePipeline`) |
     | `created_at` | Timestamp of creation |
 
-    The two content fields come from the two rendering paths.
+    `prompt_content` is rendered from the document; the chunker decides `embedding_content`.
     """)
     return
 
@@ -51,10 +54,10 @@ def _():
     sample_doc = Document(
         title="Q3 Report",
         elements=[
-            Heading(innerhtml="Q3 Report", level=1),
-            Paragraph(html_content="<p>Revenue increased by 12% year-over-year.</p>"),
-            Heading(innerhtml="Financial Summary", level=2),
-            Table(html_content=(
+            Heading(html="<h1>Q3 Report</h1>"),
+            Paragraph(html="<p>Revenue increased by 12% year-over-year.</p>"),
+            Heading(html="<h2>Financial Summary</h2>"),
+            Table(html=(
                 "<table>"
                 "<tr><th>Metric</th><th>Q3 2023</th><th>Q3 2024</th></tr>"
                 "<tr><td>Revenue</td><td>$10M</td><td>$11.2M</td></tr>"
@@ -82,8 +85,8 @@ def _(mo):
 
 @app.cell
 def _(sample_doc):
-    from ragdoc import Renderer, render_for_prompt, OutputFormat
     from ragdoc.chunking import Chunk
+    from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt
     from ragdoc.splitting import split_by_headings
 
     sections = split_by_headings(sample_doc)
@@ -100,6 +103,10 @@ def _(sample_doc):
         Chunk(
             prompt_content=renderer.render(section),
             embedding_content=renderer.render(section),
+            # source_id is required: the pipelines stamp it via source_id_fn; set it yourself
+            # when building chunks by hand. source_hash is optional (the file-byte hash, set
+            # only by the sync pipelines).
+            source_id="q3_report.docx",
             metadata=section.metadata,
         )
         for section in sections
@@ -143,7 +150,7 @@ def _(mo):
     ## Metadata inheritance
 
     When you split a document, child sections inherit parent metadata. Set metadata on the
-    source document before parsing and it will flow through to all chunks.
+    document before splitting and it will flow through to all chunks.
     """)
     return
 
@@ -160,15 +167,14 @@ def _(mo):
     mo.md(r"""
     ## Loading into a vector store
 
-    `Chunk` is designed to map directly to vector store document schemas. For LlamaIndex:
+    `Chunk` is designed to map directly to vector store document schemas. Use
+    `VectorStorePipeline` to embed and upsert chunks with incremental change detection.
     """)
     return
 
 
 @app.cell
 def _(chunks):
-    # from ragdoc.integrations.llama_index import document_fragment_to_node_dict
-    # node_dicts = [document_fragment_to_node_dict(c) for c in chunks]
     print(f"Chunks ready for upsert: {len(chunks)}")
     print(f"First chunk id: {chunks[0].id}")
     return
@@ -180,7 +186,7 @@ def _(mo):
     ## See Also
 
     - [API Reference: Chunking][ragdoc.chunking]
-    - [API Reference: Integrations][ragdoc.integrations] — LlamaIndex helpers
+    - [API Reference: Integrations][ragdoc.integrations] — vector store integrations
     - [Rendering notebook](rendering.py) — understanding the two rendering paths
     - [Splitting notebook](splitting.py) — preparing documents before chunking
     """)

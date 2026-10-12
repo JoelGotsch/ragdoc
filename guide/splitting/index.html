@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -581,6 +581,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -700,6 +706,34 @@
     
   
     Parsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processing
   
 
     
@@ -886,6 +920,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#token-budget-splitting-split_document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token-budget splitting: split_document
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#parent-child-relationships" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1001,6 +1046,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../sync-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction & Knowledge Graphs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../custom-metadata/" class="md-nav__link">
         
   
@@ -1037,6 +1138,10 @@
   
     
     
+      
+        
+      
+        
       
         
       
@@ -1150,6 +1255,34 @@
     
   
     Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
   
 
     
@@ -1318,6 +1451,34 @@
     
   
     Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction
   
 
     
@@ -1619,6 +1780,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#token-budget-splitting-split_document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Token-budget splitting: split_document
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#parent-child-relationships" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1697,7 +1869,7 @@ document into sections that are:</p>
 <li>Semantically coherent (bounded by headings)</li>
 <li>Still structured <code>Document</code> objects (not plain text)</li>
 </ul>
-<p>Each resulting document carries <a href="../../api/document/#ExternalRef"><code>ExternalRef</code></a> entries
+<p>Each resulting document carries <a href="../../api/document/#externalref"><code>ExternalRef</code></a> entries
 that record the parent-child relationship back to the source document.</p>
 <h2 id="split-functions">Split functions<a class="headerlink" href="#split-functions" title="Permanent link">&para;</a></h2>
 <p>ragdoc provides two splitting strategies in <a href="../../api/splitting/"><code>ragdoc.splitting</code></a>:</p>
@@ -1711,48 +1883,94 @@ that record the parent-child relationship back to the source document.</p>
 </code></pre></div>
 <p>Use this when you want uniform granularity — one section per heading regardless of depth.</p>
 <h3 id="split_hierarchical"><code>split_hierarchical</code><a class="headerlink" href="#split_hierarchical" title="Permanent link">&para;</a></h3>
-<p>Splits recursively by the lowest heading level that produces at least two parts:</p>
+<p>Splits once, at the lowest heading level that occurs at least twice; parent headings are
+prepended to each part as context (<code>split_document</code> applies it recursively):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.splitting</span><span class="w"> </span><span class="kn">import</span> <span class="n">split_hierarchical</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">sections</span> <span class="o">=</span> <span class="n">split_hierarchical</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Result: list[Document] where each document may contain sub-headings</span>
 </code></pre></div>
 <p>Use this when you want larger, more self-contained sections that preserve sub-structure.</p>
+<h2 id="token-budget-splitting-split_document">Token-budget splitting: <code>split_document</code><a class="headerlink" href="#token-budget-splitting-split_document" title="Permanent link">&para;</a></h2>
+<p><a href="../../api/splitting/#split_document"><code>split_document</code></a> (what
+<a href="../../api/pipeline/#tokensplitter"><code>TokenSplitter</code></a> calls) combines the heading strategies
+with a token budget. A document that fits is returned as one split; otherwise it is split
+hierarchically by headings, and sections that still do not fit are packed element by element.</p>
+<p>An <strong>element that alone exceeds the budget</strong> — a 300-row table, a very long list — is cut on
+its own structural boundaries first:</p>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Cut at</th>
+<th>Each fragment is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Table</td>
+<td>rows (including rows in <code>&lt;tbody&gt;</code> / <code>&lt;tfoot&gt;</code>)</td>
+<td>a well-formed <code>Table</code>; caption, <code>&lt;colgroup&gt;</code> and header are repeated</td>
+</tr>
+<tr>
+<td>List</td>
+<td>items (<code>&lt;dt&gt;</code>/<code>&lt;dd&gt;</code> pairs stay together)</td>
+<td>a <code>DocumentList</code>; an <code>&lt;ol&gt;</code> continues its numbering via <code>start</code></td>
+</tr>
+<tr>
+<td>Other container</td>
+<td>block children</td>
+<td>a <code>RawText</code> wrapped in the original outer tag</td>
+</tr>
+</tbody>
+</table>
+<p>Fragments keep the outer tag with its attributes and inherit <code>page</code>, <code>bounding_box</code> and
+<code>metadata</code>; referenced elements (<code>&lt;ref id="…"/&gt;</code>) follow the fragment that contains their
+reference. Every fragment is measured through the renderer and halved on unit boundaries until
+it fits. Only a <strong>single</strong> row or item that is still too large falls through to the text
+tiers — sentence splitting, then a token slice with <code>overlap_tokens</code> of overlap — which work
+on rendered text and also verify the rendered result against <code>max_tokens</code>. An element with
+bare text between its child tags is not cut structurally (the text would be lost); it goes to
+the text tiers directly.</p>
 <h2 id="parent-child-relationships">Parent-child relationships<a class="headerlink" href="#parent-child-relationships" title="Permanent link">&para;</a></h2>
-<p>After splitting, each child document has an <code>external_refs</code> entry pointing to its parent,
-and the parent has entries pointing to all children:</p>
+<p>After splitting, each split carries one <code>external-parent</code> entry in <code>external_refs</code> pointing
+to the source document. The source document is not modified — no <code>external-child</code> entries
+are written to it; add them yourself if you need them:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">sections</span> <span class="o">=</span> <span class="n">split_by_headings</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">sections</span><span class="p">:</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">parent_refs</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">section</span><span class="o">.</span><span class="n">external_refs</span> <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">rel_type</span> <span class="o">==</span> <span class="s2">&quot;external-parent&quot;</span><span class="p">]</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Section &#39;</span><span class="si">{</span><span class="n">section</span><span class="o">.</span><span class="n">title</span><span class="si">}</span><span class="s2">&#39; has parent: </span><span class="si">{</span><span class="n">parent_refs</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">parent_refs</span> <span class="o">=</span> <span class="p">[</span><span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">section</span><span class="o">.</span><span class="n">external_refs</span> <span class="k">if</span> <span class="n">r</span><span class="o">.</span><span class="n">rel_type</span> <span class="o">==</span> <span class="s2">"external-parent"</span><span class="p">]</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Section '</span><span class="si">{</span><span class="n">section</span><span class="o">.</span><span class="n">title</span><span class="si">}</span><span class="s2">' has parent: </span><span class="si">{</span><span class="n">parent_refs</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </code></pre></div>
-<p>These relationships can be used by the renderer's
-<a href="../rendering/#cross-document-references"><code>ExternalRefProvider</code></a> to include
-context from sibling or parent sections in the rendered output.</p>
+<p>A custom element renderer can look related documents up through the renderer's
+<a href="../rendering/#cross-document-references"><code>ExternalRefProvider</code></a>. The built-in renderers do
+not use it, so these relationships do not change the rendered output by themselves.</p>
 <h2 id="post-split-processing">Post-split processing<a class="headerlink" href="#post-split-processing" title="Permanent link">&para;</a></h2>
 <p>Because split results are still <code>Document</code> objects, you can run processors on them after
 splitting. For example, enrich each section independently with any <code>DocumentProcessor</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.splitting</span><span class="w"> </span><span class="kn">import</span> <span class="n">split_by_headings</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.processing</span><span class="w"> </span><span class="kn">import</span> <span class="n">ImageSummaryProcessor</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">sections</span> <span class="o">=</span> <span class="n">split_by_headings</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">processor</span> <span class="o">=</span> <span class="n">ImageSummaryProcessor</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="n">openai_client</span><span class="p">)</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">sections</span> <span class="o">=</span> <span class="p">[</span><span class="k">await</span> <span class="n">processor</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">sections</span><span class="p">]</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.processing.summary_image</span><span class="w"> </span><span class="kn">import</span> <span class="n">openai_image_summarizer</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">sections</span> <span class="o">=</span> <span class="n">split_by_headings</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">processor</span> <span class="o">=</span> <span class="n">ImageSummaryProcessor</span><span class="p">(</span><span class="n">summarize</span><span class="o">=</span><span class="n">openai_image_summarizer</span><span class="p">(</span><span class="n">openai_client</span><span class="p">))</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">sections</span> <span class="o">=</span> <span class="p">[</span><span class="k">await</span> <span class="n">processor</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">section</span><span class="p">)</span> <span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">sections</span><span class="p">]</span>
 </code></pre></div>
 <h2 id="reading-order">Reading order<a class="headerlink" href="#reading-order" title="Permanent link">&para;</a></h2>
 <p><code>split_document</code> writes <code>metadata["split_sequence"]</code> (1-based position) and
 <code>metadata["split_total"]</code> (total split count) into every document it produces —
-including documents that fit within the budget (<code>split_sequence=1, split_total=1</code>).
+including documents that fit within the budget (<code>split_sequence=1, split_total=1</code>). (One gap:
+a document that is over budget but cannot be split any further comes back as a single split
+without these keys.)
 The list it returns is already in reading order, but these keys let you restore
 that order after documents have been stored, retrieved, or reordered:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">splits</span> <span class="o">=</span> <span class="n">split_document</span><span class="p">(</span><span class="n">doc</span><span class="p">,</span> <span class="n">renderer</span><span class="o">=</span><span class="n">renderer</span><span class="p">,</span> <span class="n">max_tokens</span><span class="o">=</span><span class="mi">5000</span><span class="p">)</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># sorting is a no-op here — splits already in order — but it is safe and explicit:</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">ordered</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">splits</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="n">d</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;split_sequence&quot;</span><span class="p">])</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">ordered</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">splits</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="n">d</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">"split_sequence"</span><span class="p">])</span>
 </code></pre></div>
-<p>Both keys propagate automatically to <a href="../../api/chunking/#Chunk"><code>Chunk.metadata</code></a>
+<p>Both keys propagate automatically to <a href="../../api/chunking/#chunk"><code>Chunk.metadata</code></a>
 via the chunker's <code>metadata_fn</code>, so no extra work is needed after chunking.</p>
 <p><code>split_total</code> makes each chunk self-describing: a retrieval client can determine
 whether the chunk has predecessors (<code>split_sequence &gt; 1</code>) or successors
@@ -1842,7 +2060,7 @@ them.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.tabs.link", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

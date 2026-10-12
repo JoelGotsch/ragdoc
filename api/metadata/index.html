@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://joelgotsch.github.io/ragdoc/api/metadata/">
       
       
-        <link rel="prev" href="../pipeline/">
+        <link rel="prev" href="../extraction/">
       
       
         <link rel="next" href="../utils/">
@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -579,6 +579,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -697,6 +703,34 @@
     
   
     Parsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processing
   
 
     
@@ -857,6 +891,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/sync-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction & Knowledge Graphs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/custom-metadata/" class="md-nav__link">
         
   
@@ -895,6 +985,10 @@
   
     
     
+      
+        
+      
+        
       
         
       
@@ -1009,6 +1103,34 @@
     
   
     Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
   
 
     
@@ -1177,6 +1299,34 @@
     
   
     Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction
   
 
     
@@ -1687,16 +1837,20 @@ and a walkthrough of declaring and consuming typed metadata end-to-end.</p>
 
 
 
-        <p>Metadata keys that every ragdoc parser sets by convention.</p>
-<p><code>filename</code> is required (set by all parsers via <code>path.name</code>) while all
-other keys declared in subclasses default to optional (<code>total=False</code>).</p>
+        <p>Metadata keys the library itself writes onto <code>Document.metadata</code>.</p>
+<p><code>filename</code> is required. It is stamped at load time by
+:func:<code>~ragdoc.parsing.registry.stamp_provenance</code> (called by <code>ragdoc.parsing.load</code> and
+<code>IngestPipeline.run</code>) as <code>path.name</code> — not by the individual parsers, so a parser
+called directly leaves it unset. All other keys declared in subclasses default to optional
+(<code>total=False</code>).</p>
 <p>Projects extend this TypedDict to declare their own keys::</p>
 <div class="highlight"><pre><span></span><code>class MyMetadata(ragdoc.BaseMetadata, total=False):
     document_name: str | None
     document_date: str | None
 </code></pre></div>
 <p>Use <code>Required[T]</code> (from <code>typing_extensions</code>) to mark a key required in
-your subclass — the runtime check in <code>DocumentPipeline</code> will enforce it::</p>
+your subclass — <code>ChunkPipeline(metadata_type=...)</code> (also reachable as
+<code>DocumentPipeline(metadata_type=...)</code>) enforces it at chunk time::</p>
 <div class="highlight"><pre><span></span><code>from typing import Annotated
 from typing_extensions import Required
 
@@ -1723,7 +1877,7 @@ class MyMetadata(ragdoc.BaseMetadata, total=False):
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Set by all parsers: <code>path.name</code>.</p>
+                <p>The source file's bare name (<code>path.name</code>), stamped at load time.</p>
               </div>
             </td>
           </tr>
@@ -1802,7 +1956,7 @@ this tells a retrieval client whether the chunk has predecessors
   </span>
 
 <a href="#ragdoc.metadata.TMetadata" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">TMetadata</span> <span class="o">=</span> <span class="n"><span title="typing.TypeVar">TypeVar</span></span><span class="p">(</span><span class="s1">&#39;TMetadata&#39;</span><span class="p">,</span> <span class="n"><span title="typing.TypeVar(bound)">bound</span></span><span class="o">=</span><span class="n"><a class="autorefs autorefs-internal" title="            ragdoc.metadata.BaseMetadata" href="#ragdoc.metadata.BaseMetadata">BaseMetadata</a></span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">TMetadata</span> <span class="o">=</span> <span class="n"><span title="typing.TypeVar">TypeVar</span></span><span class="p">(</span><span class="s1">'TMetadata'</span><span class="p">,</span> <span class="n"><span title="typing.TypeVar(bound)">bound</span></span><span class="o">=</span><span class="n"><a class="autorefs autorefs-internal" title="            ragdoc.metadata.BaseMetadata" href="#ragdoc.metadata.BaseMetadata">BaseMetadata</a></span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents first">
@@ -1898,40 +2052,21 @@ system prompt.</p>
 <details class="example" open>
   <summary>Example</summary>
   <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">ragdoc</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyMetadata</span><span class="p">(</span><span class="n">ragdoc</span><span class="o">.</span><span class="n">BaseMetadata</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">document_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">document_date</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">schema</span> <span class="o">=</span> <span class="n">ragdoc</span><span class="o">.</span><span class="n">metadata_json_schema</span><span class="p">(</span><span class="n">MyMetadata</span><span class="p">)</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># → {&quot;properties&quot;: {&quot;filename&quot;: {...}, &quot;document_name&quot;: {...}, ...}, ...}</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">system_prompt</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Filter by these fields: </span><span class="si">{</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">schema</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.metadata</span><span class="w"> </span><span class="kn">import</span> <span class="n">metadata_json_schema</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">MyMetadata</span><span class="p">(</span><span class="n">ragdoc</span><span class="o">.</span><span class="n">BaseMetadata</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">document_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">document_date</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">schema</span> <span class="o">=</span> <span class="n">metadata_json_schema</span><span class="p">(</span><span class="n">MyMetadata</span><span class="p">)</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># → {"properties": {"filename": {...}, "document_name": {...}, ...}, ...}</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">system_prompt</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Filter by these fields: </span><span class="si">{</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">schema</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
 </code></pre></div>
 </details>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ragdoc/metadata.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-127">127</a></span>
-<span class="normal"><a href="#__codelineno-0-128">128</a></span>
-<span class="normal"><a href="#__codelineno-0-129">129</a></span>
-<span class="normal"><a href="#__codelineno-0-130">130</a></span>
-<span class="normal"><a href="#__codelineno-0-131">131</a></span>
-<span class="normal"><a href="#__codelineno-0-132">132</a></span>
-<span class="normal"><a href="#__codelineno-0-133">133</a></span>
-<span class="normal"><a href="#__codelineno-0-134">134</a></span>
-<span class="normal"><a href="#__codelineno-0-135">135</a></span>
-<span class="normal"><a href="#__codelineno-0-136">136</a></span>
-<span class="normal"><a href="#__codelineno-0-137">137</a></span>
-<span class="normal"><a href="#__codelineno-0-138">138</a></span>
-<span class="normal"><a href="#__codelineno-0-139">139</a></span>
-<span class="normal"><a href="#__codelineno-0-140">140</a></span>
-<span class="normal"><a href="#__codelineno-0-141">141</a></span>
-<span class="normal"><a href="#__codelineno-0-142">142</a></span>
-<span class="normal"><a href="#__codelineno-0-143">143</a></span>
-<span class="normal"><a href="#__codelineno-0-144">144</a></span>
-<span class="normal"><a href="#__codelineno-0-145">145</a></span>
-<span class="normal"><a href="#__codelineno-0-146">146</a></span>
-<span class="normal"><a href="#__codelineno-0-147">147</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-147">147</a></span>
 <span class="normal"><a href="#__codelineno-0-148">148</a></span>
 <span class="normal"><a href="#__codelineno-0-149">149</a></span>
 <span class="normal"><a href="#__codelineno-0-150">150</a></span>
@@ -1944,40 +2079,62 @@ system prompt.</p>
 <span class="normal"><a href="#__codelineno-0-157">157</a></span>
 <span class="normal"><a href="#__codelineno-0-158">158</a></span>
 <span class="normal"><a href="#__codelineno-0-159">159</a></span>
-<span class="normal"><a href="#__codelineno-0-160">160</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-127" name="__codelineno-0-127"></a><span class="k">def</span><span class="w"> </span><span class="nf">metadata_json_schema</span><span class="p">(</span><span class="n">metadata_type</span><span class="p">:</span> <span class="nb">type</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<a id="__codelineno-0-128" name="__codelineno-0-128"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a JSON Schema dict for *metadata_type*, suitable for LLM self-query prompts.</span>
-<a id="__codelineno-0-129" name="__codelineno-0-129"></a>
-<a id="__codelineno-0-130" name="__codelineno-0-130"></a><span class="sd">    Uses ``pydantic.TypeAdapter`` to generate the schema, so all standard</span>
-<a id="__codelineno-0-131" name="__codelineno-0-131"></a><span class="sd">    Pydantic schema customisation applies.  ``Annotated`` extras that Pydantic</span>
-<a id="__codelineno-0-132" name="__codelineno-0-132"></a><span class="sd">    does not recognise (e.g. ``QdrantIndex``) are silently ignored.</span>
-<a id="__codelineno-0-133" name="__codelineno-0-133"></a>
-<a id="__codelineno-0-134" name="__codelineno-0-134"></a><span class="sd">    The result is a plain ``dict`` ready to be ``json.dumps()``-ed into a</span>
-<a id="__codelineno-0-135" name="__codelineno-0-135"></a><span class="sd">    system prompt.</span>
-<a id="__codelineno-0-136" name="__codelineno-0-136"></a>
-<a id="__codelineno-0-137" name="__codelineno-0-137"></a><span class="sd">    Args:</span>
-<a id="__codelineno-0-138" name="__codelineno-0-138"></a><span class="sd">        metadata_type: A TypedDict class (typically a subclass of</span>
-<a id="__codelineno-0-139" name="__codelineno-0-139"></a><span class="sd">            :class:`BaseMetadata`) or any type accepted by</span>
-<a id="__codelineno-0-140" name="__codelineno-0-140"></a><span class="sd">            ``pydantic.TypeAdapter``.</span>
-<a id="__codelineno-0-141" name="__codelineno-0-141"></a>
-<a id="__codelineno-0-142" name="__codelineno-0-142"></a><span class="sd">    Returns:</span>
-<a id="__codelineno-0-143" name="__codelineno-0-143"></a><span class="sd">        JSON Schema dict.</span>
-<a id="__codelineno-0-144" name="__codelineno-0-144"></a>
-<a id="__codelineno-0-145" name="__codelineno-0-145"></a><span class="sd">    Example:</span>
-<a id="__codelineno-0-146" name="__codelineno-0-146"></a><span class="sd">        ```python</span>
-<a id="__codelineno-0-147" name="__codelineno-0-147"></a><span class="sd">        import ragdoc</span>
-<a id="__codelineno-0-148" name="__codelineno-0-148"></a>
-<a id="__codelineno-0-149" name="__codelineno-0-149"></a><span class="sd">        class MyMetadata(ragdoc.BaseMetadata, total=False):</span>
-<a id="__codelineno-0-150" name="__codelineno-0-150"></a><span class="sd">            document_name: str | None</span>
-<a id="__codelineno-0-151" name="__codelineno-0-151"></a><span class="sd">            document_date: str | None</span>
-<a id="__codelineno-0-152" name="__codelineno-0-152"></a>
-<a id="__codelineno-0-153" name="__codelineno-0-153"></a><span class="sd">        schema = ragdoc.metadata_json_schema(MyMetadata)</span>
-<a id="__codelineno-0-154" name="__codelineno-0-154"></a><span class="sd">        # → {&quot;properties&quot;: {&quot;filename&quot;: {...}, &quot;document_name&quot;: {...}, ...}, ...}</span>
-<a id="__codelineno-0-155" name="__codelineno-0-155"></a><span class="sd">        system_prompt = f&quot;Filter by these fields: {json.dumps(schema)}&quot;</span>
-<a id="__codelineno-0-156" name="__codelineno-0-156"></a><span class="sd">        ```</span>
-<a id="__codelineno-0-157" name="__codelineno-0-157"></a><span class="sd">    &quot;&quot;&quot;</span>
-<a id="__codelineno-0-158" name="__codelineno-0-158"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeAdapter</span>
-<a id="__codelineno-0-159" name="__codelineno-0-159"></a>
-<a id="__codelineno-0-160" name="__codelineno-0-160"></a>    <span class="k">return</span> <span class="n">TypeAdapter</span><span class="p">(</span><span class="n">metadata_type</span><span class="p">)</span><span class="o">.</span><span class="n">json_schema</span><span class="p">()</span>
+<span class="normal"><a href="#__codelineno-0-160">160</a></span>
+<span class="normal"><a href="#__codelineno-0-161">161</a></span>
+<span class="normal"><a href="#__codelineno-0-162">162</a></span>
+<span class="normal"><a href="#__codelineno-0-163">163</a></span>
+<span class="normal"><a href="#__codelineno-0-164">164</a></span>
+<span class="normal"><a href="#__codelineno-0-165">165</a></span>
+<span class="normal"><a href="#__codelineno-0-166">166</a></span>
+<span class="normal"><a href="#__codelineno-0-167">167</a></span>
+<span class="normal"><a href="#__codelineno-0-168">168</a></span>
+<span class="normal"><a href="#__codelineno-0-169">169</a></span>
+<span class="normal"><a href="#__codelineno-0-170">170</a></span>
+<span class="normal"><a href="#__codelineno-0-171">171</a></span>
+<span class="normal"><a href="#__codelineno-0-172">172</a></span>
+<span class="normal"><a href="#__codelineno-0-173">173</a></span>
+<span class="normal"><a href="#__codelineno-0-174">174</a></span>
+<span class="normal"><a href="#__codelineno-0-175">175</a></span>
+<span class="normal"><a href="#__codelineno-0-176">176</a></span>
+<span class="normal"><a href="#__codelineno-0-177">177</a></span>
+<span class="normal"><a href="#__codelineno-0-178">178</a></span>
+<span class="normal"><a href="#__codelineno-0-179">179</a></span>
+<span class="normal"><a href="#__codelineno-0-180">180</a></span>
+<span class="normal"><a href="#__codelineno-0-181">181</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-147" name="__codelineno-0-147"></a><span class="k">def</span><span class="w"> </span><span class="nf">metadata_json_schema</span><span class="p">(</span><span class="n">metadata_type</span><span class="p">:</span> <span class="nb">type</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<a id="__codelineno-0-148" name="__codelineno-0-148"></a><span class="w">    </span><span class="sd">"""Return a JSON Schema dict for *metadata_type*, suitable for LLM self-query prompts.</span>
+<a id="__codelineno-0-149" name="__codelineno-0-149"></a>
+<a id="__codelineno-0-150" name="__codelineno-0-150"></a><span class="sd">    Uses ``pydantic.TypeAdapter`` to generate the schema, so all standard</span>
+<a id="__codelineno-0-151" name="__codelineno-0-151"></a><span class="sd">    Pydantic schema customisation applies.  ``Annotated`` extras that Pydantic</span>
+<a id="__codelineno-0-152" name="__codelineno-0-152"></a><span class="sd">    does not recognise (e.g. ``QdrantIndex``) are silently ignored.</span>
+<a id="__codelineno-0-153" name="__codelineno-0-153"></a>
+<a id="__codelineno-0-154" name="__codelineno-0-154"></a><span class="sd">    The result is a plain ``dict`` ready to be ``json.dumps()``-ed into a</span>
+<a id="__codelineno-0-155" name="__codelineno-0-155"></a><span class="sd">    system prompt.</span>
+<a id="__codelineno-0-156" name="__codelineno-0-156"></a>
+<a id="__codelineno-0-157" name="__codelineno-0-157"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-158" name="__codelineno-0-158"></a><span class="sd">        metadata_type: A TypedDict class (typically a subclass of</span>
+<a id="__codelineno-0-159" name="__codelineno-0-159"></a><span class="sd">            :class:`BaseMetadata`) or any type accepted by</span>
+<a id="__codelineno-0-160" name="__codelineno-0-160"></a><span class="sd">            ``pydantic.TypeAdapter``.</span>
+<a id="__codelineno-0-161" name="__codelineno-0-161"></a>
+<a id="__codelineno-0-162" name="__codelineno-0-162"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-163" name="__codelineno-0-163"></a><span class="sd">        JSON Schema dict.</span>
+<a id="__codelineno-0-164" name="__codelineno-0-164"></a>
+<a id="__codelineno-0-165" name="__codelineno-0-165"></a><span class="sd">    Example:</span>
+<a id="__codelineno-0-166" name="__codelineno-0-166"></a><span class="sd">        ```python</span>
+<a id="__codelineno-0-167" name="__codelineno-0-167"></a><span class="sd">        import ragdoc</span>
+<a id="__codelineno-0-168" name="__codelineno-0-168"></a><span class="sd">        from ragdoc.metadata import metadata_json_schema</span>
+<a id="__codelineno-0-169" name="__codelineno-0-169"></a>
+<a id="__codelineno-0-170" name="__codelineno-0-170"></a><span class="sd">        class MyMetadata(ragdoc.BaseMetadata, total=False):</span>
+<a id="__codelineno-0-171" name="__codelineno-0-171"></a><span class="sd">            document_name: str | None</span>
+<a id="__codelineno-0-172" name="__codelineno-0-172"></a><span class="sd">            document_date: str | None</span>
+<a id="__codelineno-0-173" name="__codelineno-0-173"></a>
+<a id="__codelineno-0-174" name="__codelineno-0-174"></a><span class="sd">        schema = metadata_json_schema(MyMetadata)</span>
+<a id="__codelineno-0-175" name="__codelineno-0-175"></a><span class="sd">        # → {"properties": {"filename": {...}, "document_name": {...}, ...}, ...}</span>
+<a id="__codelineno-0-176" name="__codelineno-0-176"></a><span class="sd">        system_prompt = f"Filter by these fields: {json.dumps(schema)}"</span>
+<a id="__codelineno-0-177" name="__codelineno-0-177"></a><span class="sd">        ```</span>
+<a id="__codelineno-0-178" name="__codelineno-0-178"></a><span class="sd">    """</span>
+<a id="__codelineno-0-179" name="__codelineno-0-179"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeAdapter</span>
+<a id="__codelineno-0-180" name="__codelineno-0-180"></a>
+<a id="__codelineno-0-181" name="__codelineno-0-181"></a>    <span class="k">return</span> <span class="n">TypeAdapter</span><span class="p">(</span><span class="n">metadata_type</span><span class="p">)</span><span class="o">.</span><span class="n">json_schema</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -2059,7 +2216,7 @@ system prompt.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.tabs.link", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

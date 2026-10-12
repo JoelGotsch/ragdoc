@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -579,6 +579,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -697,6 +703,34 @@
     
   
     Parsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processing
   
 
     
@@ -857,6 +891,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/sync-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction & Knowledge Graphs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/custom-metadata/" class="md-nav__link">
         
   
@@ -895,6 +985,10 @@
   
     
     
+      
+        
+      
+        
       
         
       
@@ -1009,6 +1103,34 @@
     
   
     Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
   
 
     
@@ -1173,6 +1295,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#split_document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        split_document
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="split_document">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ragdoc.splitting.token.split_document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;split_document
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#split_by_headings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1280,6 +1430,34 @@
     
   
     Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction
   
 
     
@@ -1531,6 +1709,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#split_document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        split_document
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="split_document">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ragdoc.splitting.token.split_document" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;split_document
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#split_by_headings" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1609,7 +1815,349 @@
 <h1 id="splitting-api">Splitting API<a class="headerlink" href="#splitting-api" title="Permanent link">&para;</a></h1>
 <p>Functions for splitting a <code>Document</code> into multiple smaller documents based on heading
 structure.</p>
-<h2 id="split_by_headings">split_by_headings<a class="headerlink" href="#split_by_headings" title="Permanent link">&para;</a></h2>
+<h2 id="split_document">split_document<a class="headerlink" href="#split_document" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="ragdoc.splitting.token.split_document" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">ragdoc.splitting.token.split_document</span>
+
+
+<a href="#ragdoc.splitting.token.split_document" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">split_document</span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">document</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            ragdoc.document.Document" href="../document/#ragdoc.document.Document">Document</a></span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">renderer</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            ragdoc.rendering.base.Renderer (ragdoc.rendering.Renderer)" href="../rendering/#ragdoc.rendering.base.Renderer">Renderer</a></span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">tokenizer</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="            ragdoc.utils.tokenizer.Tokenizer (ragdoc.utils.Tokenizer)" href="../utils/#ragdoc.utils.tokenizer.Tokenizer">Tokenizer</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">max_tokens</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">=</span> <span class="n"><span title="ragdoc.splitting.token.DEFAULT_MAX_TOKENS">DEFAULT_MAX_TOKENS</span></span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">overlap_tokens</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">=</span> <span class="n"><span title="ragdoc.splitting.token.DEFAULT_OVERLAP_TOKENS">DEFAULT_OVERLAP_TOKENS</span></span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-internal" title="            ragdoc.document.Document" href="../document/#ragdoc.document.Document">Document</a></span><span class="p">]</span>
+</code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Split a document into token-bounded chunks using a three-tier strategy.</p>
+<p>Strategy (applied in order):</p>
+<ol>
+<li><strong>Fits</strong> — if the whole document is within <code>max_tokens</code>, return as-is.</li>
+<li><strong>Hierarchical</strong> — attempt :func:<code>~ragdoc.splitting.hierarchical.split_hierarchical</code>.
+   If that yields ≥ 2 parts, recurse on each part.</li>
+<li><strong>Element-level fallback</strong> — if hierarchical cannot split (single heading
+   level or no headings), delegate to :func:<code>split_by_elements</code>, which itself
+   falls back to :func:<code>split_oversized_element</code> for any group that exceeds
+   the budget.</li>
+</ol>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>document</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ragdoc.document.Document" href="../document/#ragdoc.document.Document">Document</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The document to split.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>renderer</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ragdoc.rendering.base.Renderer (ragdoc.rendering.Renderer)" href="../rendering/#ragdoc.rendering.base.Renderer">Renderer</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Renderer for token counting.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>tokenizer</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="            ragdoc.utils.tokenizer.Tokenizer (ragdoc.utils.Tokenizer)" href="../utils/#ragdoc.utils.tokenizer.Tokenizer">Tokenizer</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Tokenizer.  Defaults to GPTTokenizer.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>max_tokens</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Maximum tokens per output chunk.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="ragdoc.splitting.token.DEFAULT_MAX_TOKENS">DEFAULT_MAX_TOKENS</span></code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>overlap_tokens</code>
+            </td>
+            <td>
+                  <code><span title="int">int</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Tokens of overlap for text-level splits.</p>
+              </div>
+            </td>
+            <td>
+                  <code><span title="ragdoc.splitting.token.DEFAULT_OVERLAP_TOKENS">DEFAULT_OVERLAP_TOKENS</span></code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            ragdoc.document.Document" href="../document/#ragdoc.document.Document">Document</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A list of <code>Document</code> objects in reading order. Every document carries</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            ragdoc.document.Document" href="../document/#ragdoc.document.Document">Document</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>metadata["split_sequence"]</code> (1-based position; <code>1</code> for a document that</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            ragdoc.document.Document" href="../document/#ragdoc.document.Document">Document</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>was not split, or <code>1..N</code> for a split document) and <code>metadata["split_total"]</code></p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            ragdoc.document.Document" href="../document/#ragdoc.document.Document">Document</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>(total split count from this source; <code>1</code> for a non-split document).</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            ragdoc.document.Document" href="../document/#ragdoc.document.Document">Document</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Useful for sorting after retrieval:</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="            ragdoc.document.Document" href="../document/#ragdoc.document.Document">Document</a>]</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>sorted(splits, key=lambda d: d.metadata["split_sequence"])</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/ragdoc/splitting/token.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-940"> 940</a></span>
+<span class="normal"><a href="#__codelineno-0-941"> 941</a></span>
+<span class="normal"><a href="#__codelineno-0-942"> 942</a></span>
+<span class="normal"><a href="#__codelineno-0-943"> 943</a></span>
+<span class="normal"><a href="#__codelineno-0-944"> 944</a></span>
+<span class="normal"><a href="#__codelineno-0-945"> 945</a></span>
+<span class="normal"><a href="#__codelineno-0-946"> 946</a></span>
+<span class="normal"><a href="#__codelineno-0-947"> 947</a></span>
+<span class="normal"><a href="#__codelineno-0-948"> 948</a></span>
+<span class="normal"><a href="#__codelineno-0-949"> 949</a></span>
+<span class="normal"><a href="#__codelineno-0-950"> 950</a></span>
+<span class="normal"><a href="#__codelineno-0-951"> 951</a></span>
+<span class="normal"><a href="#__codelineno-0-952"> 952</a></span>
+<span class="normal"><a href="#__codelineno-0-953"> 953</a></span>
+<span class="normal"><a href="#__codelineno-0-954"> 954</a></span>
+<span class="normal"><a href="#__codelineno-0-955"> 955</a></span>
+<span class="normal"><a href="#__codelineno-0-956"> 956</a></span>
+<span class="normal"><a href="#__codelineno-0-957"> 957</a></span>
+<span class="normal"><a href="#__codelineno-0-958"> 958</a></span>
+<span class="normal"><a href="#__codelineno-0-959"> 959</a></span>
+<span class="normal"><a href="#__codelineno-0-960"> 960</a></span>
+<span class="normal"><a href="#__codelineno-0-961"> 961</a></span>
+<span class="normal"><a href="#__codelineno-0-962"> 962</a></span>
+<span class="normal"><a href="#__codelineno-0-963"> 963</a></span>
+<span class="normal"><a href="#__codelineno-0-964"> 964</a></span>
+<span class="normal"><a href="#__codelineno-0-965"> 965</a></span>
+<span class="normal"><a href="#__codelineno-0-966"> 966</a></span>
+<span class="normal"><a href="#__codelineno-0-967"> 967</a></span>
+<span class="normal"><a href="#__codelineno-0-968"> 968</a></span>
+<span class="normal"><a href="#__codelineno-0-969"> 969</a></span>
+<span class="normal"><a href="#__codelineno-0-970"> 970</a></span>
+<span class="normal"><a href="#__codelineno-0-971"> 971</a></span>
+<span class="normal"><a href="#__codelineno-0-972"> 972</a></span>
+<span class="normal"><a href="#__codelineno-0-973"> 973</a></span>
+<span class="normal"><a href="#__codelineno-0-974"> 974</a></span>
+<span class="normal"><a href="#__codelineno-0-975"> 975</a></span>
+<span class="normal"><a href="#__codelineno-0-976"> 976</a></span>
+<span class="normal"><a href="#__codelineno-0-977"> 977</a></span>
+<span class="normal"><a href="#__codelineno-0-978"> 978</a></span>
+<span class="normal"><a href="#__codelineno-0-979"> 979</a></span>
+<span class="normal"><a href="#__codelineno-0-980"> 980</a></span>
+<span class="normal"><a href="#__codelineno-0-981"> 981</a></span>
+<span class="normal"><a href="#__codelineno-0-982"> 982</a></span>
+<span class="normal"><a href="#__codelineno-0-983"> 983</a></span>
+<span class="normal"><a href="#__codelineno-0-984"> 984</a></span>
+<span class="normal"><a href="#__codelineno-0-985"> 985</a></span>
+<span class="normal"><a href="#__codelineno-0-986"> 986</a></span>
+<span class="normal"><a href="#__codelineno-0-987"> 987</a></span>
+<span class="normal"><a href="#__codelineno-0-988"> 988</a></span>
+<span class="normal"><a href="#__codelineno-0-989"> 989</a></span>
+<span class="normal"><a href="#__codelineno-0-990"> 990</a></span>
+<span class="normal"><a href="#__codelineno-0-991"> 991</a></span>
+<span class="normal"><a href="#__codelineno-0-992"> 992</a></span>
+<span class="normal"><a href="#__codelineno-0-993"> 993</a></span>
+<span class="normal"><a href="#__codelineno-0-994"> 994</a></span>
+<span class="normal"><a href="#__codelineno-0-995"> 995</a></span>
+<span class="normal"><a href="#__codelineno-0-996"> 996</a></span>
+<span class="normal"><a href="#__codelineno-0-997"> 997</a></span>
+<span class="normal"><a href="#__codelineno-0-998"> 998</a></span>
+<span class="normal"><a href="#__codelineno-0-999"> 999</a></span>
+<span class="normal"><a href="#__codelineno-0-1000">1000</a></span>
+<span class="normal"><a href="#__codelineno-0-1001">1001</a></span>
+<span class="normal"><a href="#__codelineno-0-1002">1002</a></span>
+<span class="normal"><a href="#__codelineno-0-1003">1003</a></span>
+<span class="normal"><a href="#__codelineno-0-1004">1004</a></span>
+<span class="normal"><a href="#__codelineno-0-1005">1005</a></span>
+<span class="normal"><a href="#__codelineno-0-1006">1006</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-940" name="__codelineno-0-940"></a><span class="k">def</span><span class="w"> </span><span class="nf">split_document</span><span class="p">(</span>
+<a id="__codelineno-0-941" name="__codelineno-0-941"></a>    <span class="n">document</span><span class="p">:</span> <span class="n">Document</span><span class="p">,</span>
+<a id="__codelineno-0-942" name="__codelineno-0-942"></a>    <span class="n">renderer</span><span class="p">:</span> <span class="n">Renderer</span><span class="p">,</span>
+<a id="__codelineno-0-943" name="__codelineno-0-943"></a>    <span class="n">tokenizer</span><span class="p">:</span> <span class="n">Tokenizer</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-944" name="__codelineno-0-944"></a>    <span class="n">max_tokens</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_MAX_TOKENS</span><span class="p">,</span>
+<a id="__codelineno-0-945" name="__codelineno-0-945"></a>    <span class="n">overlap_tokens</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_OVERLAP_TOKENS</span><span class="p">,</span>
+<a id="__codelineno-0-946" name="__codelineno-0-946"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Document</span><span class="p">]:</span>
+<a id="__codelineno-0-947" name="__codelineno-0-947"></a><span class="w">    </span><span class="sd">"""Split a document into token-bounded chunks using a three-tier strategy.</span>
+<a id="__codelineno-0-948" name="__codelineno-0-948"></a>
+<a id="__codelineno-0-949" name="__codelineno-0-949"></a><span class="sd">    Strategy (applied in order):</span>
+<a id="__codelineno-0-950" name="__codelineno-0-950"></a>
+<a id="__codelineno-0-951" name="__codelineno-0-951"></a><span class="sd">    1. **Fits** — if the whole document is within ``max_tokens``, return as-is.</span>
+<a id="__codelineno-0-952" name="__codelineno-0-952"></a><span class="sd">    2. **Hierarchical** — attempt :func:`~ragdoc.splitting.hierarchical.split_hierarchical`.</span>
+<a id="__codelineno-0-953" name="__codelineno-0-953"></a><span class="sd">       If that yields ≥ 2 parts, recurse on each part.</span>
+<a id="__codelineno-0-954" name="__codelineno-0-954"></a><span class="sd">    3. **Element-level fallback** — if hierarchical cannot split (single heading</span>
+<a id="__codelineno-0-955" name="__codelineno-0-955"></a><span class="sd">       level or no headings), delegate to :func:`split_by_elements`, which itself</span>
+<a id="__codelineno-0-956" name="__codelineno-0-956"></a><span class="sd">       falls back to :func:`split_oversized_element` for any group that exceeds</span>
+<a id="__codelineno-0-957" name="__codelineno-0-957"></a><span class="sd">       the budget.</span>
+<a id="__codelineno-0-958" name="__codelineno-0-958"></a>
+<a id="__codelineno-0-959" name="__codelineno-0-959"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-960" name="__codelineno-0-960"></a><span class="sd">        document: The document to split.</span>
+<a id="__codelineno-0-961" name="__codelineno-0-961"></a><span class="sd">        renderer: Renderer for token counting.</span>
+<a id="__codelineno-0-962" name="__codelineno-0-962"></a><span class="sd">        tokenizer: Tokenizer.  Defaults to GPTTokenizer.</span>
+<a id="__codelineno-0-963" name="__codelineno-0-963"></a><span class="sd">        max_tokens: Maximum tokens per output chunk.</span>
+<a id="__codelineno-0-964" name="__codelineno-0-964"></a><span class="sd">        overlap_tokens: Tokens of overlap for text-level splits.</span>
+<a id="__codelineno-0-965" name="__codelineno-0-965"></a>
+<a id="__codelineno-0-966" name="__codelineno-0-966"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-967" name="__codelineno-0-967"></a><span class="sd">        A list of ``Document`` objects in reading order. Every document carries</span>
+<a id="__codelineno-0-968" name="__codelineno-0-968"></a><span class="sd">        ``metadata["split_sequence"]`` (1-based position; ``1`` for a document that</span>
+<a id="__codelineno-0-969" name="__codelineno-0-969"></a><span class="sd">        was not split, or ``1..N`` for a split document) and ``metadata["split_total"]``</span>
+<a id="__codelineno-0-970" name="__codelineno-0-970"></a><span class="sd">        (total split count from this source; ``1`` for a non-split document).</span>
+<a id="__codelineno-0-971" name="__codelineno-0-971"></a><span class="sd">        Useful for sorting after retrieval:</span>
+<a id="__codelineno-0-972" name="__codelineno-0-972"></a><span class="sd">        ``sorted(splits, key=lambda d: d.metadata["split_sequence"])``.</span>
+<a id="__codelineno-0-973" name="__codelineno-0-973"></a><span class="sd">    """</span>
+<a id="__codelineno-0-974" name="__codelineno-0-974"></a>    <span class="n">tokenizer</span> <span class="o">=</span> <span class="n">tokenizer</span> <span class="ow">or</span> <span class="n">_get_default_tokenizer</span><span class="p">()</span>
+<a id="__codelineno-0-975" name="__codelineno-0-975"></a>    <span class="n">doc_label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">Path</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">source_path</span><span class="p">)</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">document</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">)"</span> <span class="k">if</span> <span class="n">document</span><span class="o">.</span><span class="n">source_path</span> <span class="k">else</span> <span class="n">document</span><span class="o">.</span><span class="n">id</span>
+<a id="__codelineno-0-976" name="__codelineno-0-976"></a>
+<a id="__codelineno-0-977" name="__codelineno-0-977"></a>    <span class="k">if</span> <span class="n">tokenizer</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">renderer</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">document</span><span class="p">))</span> <span class="o">&lt;=</span> <span class="n">max_tokens</span><span class="p">:</span>
+<a id="__codelineno-0-978" name="__codelineno-0-978"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"split_document: </span><span class="si">{</span><span class="n">doc_label</span><span class="si">}</span><span class="s2"> fits within </span><span class="si">{</span><span class="n">max_tokens</span><span class="si">}</span><span class="s2"> tokens, no split needed"</span><span class="p">)</span>
+<a id="__codelineno-0-979" name="__codelineno-0-979"></a>        <span class="c1"># Never mutate the input document: return a shallow copy owning a fresh metadata dict.</span>
+<a id="__codelineno-0-980" name="__codelineno-0-980"></a>        <span class="c1"># Elements stay shared by reference — consistent with split behavior generally.</span>
+<a id="__codelineno-0-981" name="__codelineno-0-981"></a>        <span class="n">doc</span> <span class="o">=</span> <span class="n">document</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">"metadata"</span><span class="p">:</span> <span class="p">{</span><span class="o">**</span><span class="n">document</span><span class="o">.</span><span class="n">metadata</span><span class="p">,</span> <span class="s2">"split_sequence"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"split_total"</span><span class="p">:</span> <span class="mi">1</span><span class="p">}})</span>
+<a id="__codelineno-0-982" name="__codelineno-0-982"></a>        <span class="k">return</span> <span class="p">[</span><span class="n">doc</span><span class="p">]</span>
+<a id="__codelineno-0-983" name="__codelineno-0-983"></a>
+<a id="__codelineno-0-984" name="__codelineno-0-984"></a>    <span class="n">splits</span> <span class="o">=</span> <span class="n">split_hierarchical</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+<a id="__codelineno-0-985" name="__codelineno-0-985"></a>
+<a id="__codelineno-0-986" name="__codelineno-0-986"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">splits</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+<a id="__codelineno-0-987" name="__codelineno-0-987"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"split_document: </span><span class="si">{</span><span class="n">doc_label</span><span class="si">}</span><span class="s2"> falling back to element-level split"</span><span class="p">)</span>
+<a id="__codelineno-0-988" name="__codelineno-0-988"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">split_by_elements</span><span class="p">(</span><span class="n">document</span><span class="p">,</span> <span class="n">renderer</span><span class="p">,</span> <span class="n">tokenizer</span><span class="p">,</span> <span class="n">max_tokens</span><span class="p">,</span> <span class="n">overlap_tokens</span><span class="p">)</span>
+<a id="__codelineno-0-989" name="__codelineno-0-989"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-990" name="__codelineno-0-990"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"split_document: </span><span class="si">{</span><span class="n">doc_label</span><span class="si">}</span><span class="s2"> hierarchical split produced </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">splits</span><span class="p">)</span><span class="si">}</span><span class="s2"> parts, recursing"</span><span class="p">)</span>
+<a id="__codelineno-0-991" name="__codelineno-0-991"></a>        <span class="n">result</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Document</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-992" name="__codelineno-0-992"></a>        <span class="k">for</span> <span class="n">split</span> <span class="ow">in</span> <span class="n">splits</span><span class="p">:</span>
+<a id="__codelineno-0-993" name="__codelineno-0-993"></a>            <span class="n">result</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">split_document</span><span class="p">(</span><span class="n">split</span><span class="p">,</span> <span class="n">renderer</span><span class="p">,</span> <span class="n">tokenizer</span><span class="p">,</span> <span class="n">max_tokens</span><span class="p">,</span> <span class="n">overlap_tokens</span><span class="p">))</span>
+<a id="__codelineno-0-994" name="__codelineno-0-994"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"split_document: </span><span class="si">{</span><span class="n">doc_label</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span><span class="si">}</span><span class="s2"> splits"</span><span class="p">)</span>
+<a id="__codelineno-0-995" name="__codelineno-0-995"></a>
+<a id="__codelineno-0-996" name="__codelineno-0-996"></a>    <span class="c1"># Write reading-order provenance into metadata. Only split_document does this —</span>
+<a id="__codelineno-0-997" name="__codelineno-0-997"></a>    <span class="c1"># individual splitters leave split_sequence/split_total absent so the outermost</span>
+<a id="__codelineno-0-998" name="__codelineno-0-998"></a>    <span class="c1"># call owns the numbering. Each split owns its metadata dict (copied at construction),</span>
+<a id="__codelineno-0-999" name="__codelineno-0-999"></a>    <span class="c1"># so in-place stamping is safe.</span>
+<a id="__codelineno-0-1000" name="__codelineno-0-1000"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+<a id="__codelineno-0-1001" name="__codelineno-0-1001"></a>        <span class="n">total</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+<a id="__codelineno-0-1002" name="__codelineno-0-1002"></a>        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">doc</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
+<a id="__codelineno-0-1003" name="__codelineno-0-1003"></a>            <span class="n">doc</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">"split_sequence"</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span>
+<a id="__codelineno-0-1004" name="__codelineno-0-1004"></a>            <span class="n">doc</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">"split_total"</span><span class="p">]</span> <span class="o">=</span> <span class="n">total</span>
+<a id="__codelineno-0-1005" name="__codelineno-0-1005"></a>
+<a id="__codelineno-0-1006" name="__codelineno-0-1006"></a>    <span class="k">return</span> <span class="n">result</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div><h2 id="split_by_headings">split_by_headings<a class="headerlink" href="#split_by_headings" title="Permanent link">&para;</a></h2>
 
 
 <div class="doc doc-object doc-function">
@@ -1704,8 +2252,7 @@ pointing to the source document as its parent.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ragdoc/splitting/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-18">18</a></span>
-<span class="normal"><a href="#__codelineno-0-19">19</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-19">19</a></span>
 <span class="normal"><a href="#__codelineno-0-20">20</a></span>
 <span class="normal"><a href="#__codelineno-0-21">21</a></span>
 <span class="normal"><a href="#__codelineno-0-22">22</a></span>
@@ -1752,55 +2299,56 @@ pointing to the source document as its parent.</p>
 <span class="normal"><a href="#__codelineno-0-63">63</a></span>
 <span class="normal"><a href="#__codelineno-0-64">64</a></span>
 <span class="normal"><a href="#__codelineno-0-65">65</a></span>
-<span class="normal"><a href="#__codelineno-0-66">66</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-18" name="__codelineno-0-18"></a><span class="k">def</span><span class="w"> </span><span class="nf">split_by_headings</span><span class="p">(</span><span class="n">document</span><span class="p">:</span> <span class="n">Document</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Document</span><span class="p">]:</span>
-<a id="__codelineno-0-19" name="__codelineno-0-19"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Split a document at each heading boundary into separate Documents.</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20"></a>
-<a id="__codelineno-0-21" name="__codelineno-0-21"></a><span class="sd">    A new document begins whenever a Heading is encountered and the current</span>
-<a id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="sd">    accumulation is not *only* headings (to avoid empty heading-only fragments).</span>
-<a id="__codelineno-0-23" name="__codelineno-0-23"></a>
-<a id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="sd">    Parent-child relationships: every resulting document gets an ExternalRef</span>
-<a id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="sd">    pointing to the source document as its parent.</span>
-<a id="__codelineno-0-26" name="__codelineno-0-26"></a>
-<a id="__codelineno-0-27" name="__codelineno-0-27"></a><span class="sd">    Args:</span>
-<a id="__codelineno-0-28" name="__codelineno-0-28"></a><span class="sd">        document: The document to split.</span>
-<a id="__codelineno-0-29" name="__codelineno-0-29"></a>
-<a id="__codelineno-0-30" name="__codelineno-0-30"></a><span class="sd">    Returns:</span>
-<a id="__codelineno-0-31" name="__codelineno-0-31"></a><span class="sd">        A list of Documents. If the document has no headings, a single-element</span>
-<a id="__codelineno-0-32" name="__codelineno-0-32"></a><span class="sd">        list containing the original document is returned unchanged.</span>
-<a id="__codelineno-0-33" name="__codelineno-0-33"></a>
-<a id="__codelineno-0-34" name="__codelineno-0-34"></a><span class="sd">    Note:</span>
-<a id="__codelineno-0-35" name="__codelineno-0-35"></a><span class="sd">        Does not set ``split_sequence`` / ``split_total`` in metadata. Call</span>
-<a id="__codelineno-0-36" name="__codelineno-0-36"></a><span class="sd">        :func:`ragdoc.splitting.token.split_document` for reading-order numbering.</span>
-<a id="__codelineno-0-37" name="__codelineno-0-37"></a><span class="sd">    &quot;&quot;&quot;</span>
-<a id="__codelineno-0-38" name="__codelineno-0-38"></a>    <span class="n">split_groups</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-<a id="__codelineno-0-39" name="__codelineno-0-39"></a>    <span class="n">current</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
-<a id="__codelineno-0-40" name="__codelineno-0-40"></a>
-<a id="__codelineno-0-41" name="__codelineno-0-41"></a>    <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">document</span><span class="o">.</span><span class="n">elements</span><span class="p">:</span>
-<a id="__codelineno-0-42" name="__codelineno-0-42"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">Heading</span><span class="p">)</span> <span class="ow">and</span> <span class="n">current</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">Heading</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">current</span><span class="p">):</span>
-<a id="__codelineno-0-43" name="__codelineno-0-43"></a>            <span class="n">split_groups</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current</span><span class="p">)</span>
-<a id="__codelineno-0-44" name="__codelineno-0-44"></a>            <span class="n">current</span> <span class="o">=</span> <span class="p">[</span><span class="n">element</span><span class="p">]</span>
-<a id="__codelineno-0-45" name="__codelineno-0-45"></a>        <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-46" name="__codelineno-0-46"></a>            <span class="n">current</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
-<a id="__codelineno-0-47" name="__codelineno-0-47"></a>
-<a id="__codelineno-0-48" name="__codelineno-0-48"></a>    <span class="k">if</span> <span class="n">current</span><span class="p">:</span>
-<a id="__codelineno-0-49" name="__codelineno-0-49"></a>        <span class="n">split_groups</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current</span><span class="p">)</span>
-<a id="__codelineno-0-50" name="__codelineno-0-50"></a>
-<a id="__codelineno-0-51" name="__codelineno-0-51"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">split_groups</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
-<a id="__codelineno-0-52" name="__codelineno-0-52"></a>        <span class="k">return</span> <span class="p">[</span><span class="n">document</span><span class="p">]</span>
-<a id="__codelineno-0-53" name="__codelineno-0-53"></a>
-<a id="__codelineno-0-54" name="__codelineno-0-54"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;split_by_headings: split into </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">split_groups</span><span class="p">)</span><span class="si">}</span><span class="s2"> sections&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-55" name="__codelineno-0-55"></a>
-<a id="__codelineno-0-56" name="__codelineno-0-56"></a>    <span class="n">parent_ref</span> <span class="o">=</span> <span class="n">ExternalRef</span><span class="p">(</span><span class="n">target_id</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">rel_type</span><span class="o">=</span><span class="s2">&quot;external-parent&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-57" name="__codelineno-0-57"></a>    <span class="k">return</span> <span class="p">[</span>
-<a id="__codelineno-0-58" name="__codelineno-0-58"></a>        <span class="n">Document</span><span class="p">(</span>
-<a id="__codelineno-0-59" name="__codelineno-0-59"></a>            <span class="n">elements</span><span class="o">=</span><span class="n">group</span><span class="p">,</span>
-<a id="__codelineno-0-60" name="__codelineno-0-60"></a>            <span class="n">source_path</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">source_path</span><span class="p">,</span>
-<a id="__codelineno-0-61" name="__codelineno-0-61"></a>            <span class="n">metadata</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">metadata</span><span class="p">,</span>
-<a id="__codelineno-0-62" name="__codelineno-0-62"></a>            <span class="n">title</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">title</span><span class="p">,</span>
-<a id="__codelineno-0-63" name="__codelineno-0-63"></a>            <span class="n">external_refs</span><span class="o">=</span><span class="p">[</span><span class="n">parent_ref</span><span class="p">],</span>
-<a id="__codelineno-0-64" name="__codelineno-0-64"></a>        <span class="p">)</span>
-<a id="__codelineno-0-65" name="__codelineno-0-65"></a>        <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">split_groups</span>
-<a id="__codelineno-0-66" name="__codelineno-0-66"></a>    <span class="p">]</span>
+<span class="normal"><a href="#__codelineno-0-66">66</a></span>
+<span class="normal"><a href="#__codelineno-0-67">67</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-19" name="__codelineno-0-19"></a><span class="k">def</span><span class="w"> </span><span class="nf">split_by_headings</span><span class="p">(</span><span class="n">document</span><span class="p">:</span> <span class="n">Document</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Document</span><span class="p">]:</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20"></a><span class="w">    </span><span class="sd">"""Split a document at each heading boundary into separate Documents.</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21"></a>
+<a id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="sd">    A new document begins whenever a Heading is encountered and the current</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23"></a><span class="sd">    accumulation is not *only* headings (to avoid empty heading-only fragments).</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24"></a>
+<a id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="sd">    Parent-child relationships: every resulting document gets an ExternalRef</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26"></a><span class="sd">    pointing to the source document as its parent.</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27"></a>
+<a id="__codelineno-0-28" name="__codelineno-0-28"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-29" name="__codelineno-0-29"></a><span class="sd">        document: The document to split.</span>
+<a id="__codelineno-0-30" name="__codelineno-0-30"></a>
+<a id="__codelineno-0-31" name="__codelineno-0-31"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-32" name="__codelineno-0-32"></a><span class="sd">        A list of Documents. If the document has no headings, a single-element</span>
+<a id="__codelineno-0-33" name="__codelineno-0-33"></a><span class="sd">        list containing the original document is returned unchanged.</span>
+<a id="__codelineno-0-34" name="__codelineno-0-34"></a>
+<a id="__codelineno-0-35" name="__codelineno-0-35"></a><span class="sd">    Note:</span>
+<a id="__codelineno-0-36" name="__codelineno-0-36"></a><span class="sd">        Does not set ``split_sequence`` / ``split_total`` in metadata. Call</span>
+<a id="__codelineno-0-37" name="__codelineno-0-37"></a><span class="sd">        :func:`ragdoc.splitting.token.split_document` for reading-order numbering.</span>
+<a id="__codelineno-0-38" name="__codelineno-0-38"></a><span class="sd">    """</span>
+<a id="__codelineno-0-39" name="__codelineno-0-39"></a>    <span class="n">split_groups</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-40" name="__codelineno-0-40"></a>    <span class="n">current</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-41" name="__codelineno-0-41"></a>
+<a id="__codelineno-0-42" name="__codelineno-0-42"></a>    <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">document</span><span class="o">.</span><span class="n">elements</span><span class="p">:</span>
+<a id="__codelineno-0-43" name="__codelineno-0-43"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">Heading</span><span class="p">)</span> <span class="ow">and</span> <span class="n">current</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">Heading</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">current</span><span class="p">):</span>
+<a id="__codelineno-0-44" name="__codelineno-0-44"></a>            <span class="n">split_groups</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current</span><span class="p">)</span>
+<a id="__codelineno-0-45" name="__codelineno-0-45"></a>            <span class="n">current</span> <span class="o">=</span> <span class="p">[</span><span class="n">element</span><span class="p">]</span>
+<a id="__codelineno-0-46" name="__codelineno-0-46"></a>        <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-47" name="__codelineno-0-47"></a>            <span class="n">current</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
+<a id="__codelineno-0-48" name="__codelineno-0-48"></a>
+<a id="__codelineno-0-49" name="__codelineno-0-49"></a>    <span class="k">if</span> <span class="n">current</span><span class="p">:</span>
+<a id="__codelineno-0-50" name="__codelineno-0-50"></a>        <span class="n">split_groups</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">current</span><span class="p">)</span>
+<a id="__codelineno-0-51" name="__codelineno-0-51"></a>
+<a id="__codelineno-0-52" name="__codelineno-0-52"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">split_groups</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+<a id="__codelineno-0-53" name="__codelineno-0-53"></a>        <span class="k">return</span> <span class="p">[</span><span class="n">document</span><span class="p">]</span>
+<a id="__codelineno-0-54" name="__codelineno-0-54"></a>
+<a id="__codelineno-0-55" name="__codelineno-0-55"></a>    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"split_by_headings: split into </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">split_groups</span><span class="p">)</span><span class="si">}</span><span class="s2"> sections"</span><span class="p">)</span>
+<a id="__codelineno-0-56" name="__codelineno-0-56"></a>
+<a id="__codelineno-0-57" name="__codelineno-0-57"></a>    <span class="n">parent_ref</span> <span class="o">=</span> <span class="n">ExternalRef</span><span class="p">(</span><span class="n">target_id</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">rel_type</span><span class="o">=</span><span class="s2">"external-parent"</span><span class="p">)</span>
+<a id="__codelineno-0-58" name="__codelineno-0-58"></a>    <span class="k">return</span> <span class="p">[</span>
+<a id="__codelineno-0-59" name="__codelineno-0-59"></a>        <span class="n">Document</span><span class="p">(</span>
+<a id="__codelineno-0-60" name="__codelineno-0-60"></a>            <span class="n">elements</span><span class="o">=</span><span class="n">group</span><span class="p">,</span>
+<a id="__codelineno-0-61" name="__codelineno-0-61"></a>            <span class="n">source_path</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">source_path</span><span class="p">,</span>
+<a id="__codelineno-0-62" name="__codelineno-0-62"></a>            <span class="n">metadata</span><span class="o">=</span><span class="n">copy_metadata</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">metadata</span><span class="p">),</span>
+<a id="__codelineno-0-63" name="__codelineno-0-63"></a>            <span class="n">title</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">title</span><span class="p">,</span>
+<a id="__codelineno-0-64" name="__codelineno-0-64"></a>            <span class="n">external_refs</span><span class="o">=</span><span class="p">[</span><span class="n">parent_ref</span><span class="p">],</span>
+<a id="__codelineno-0-65" name="__codelineno-0-65"></a>        <span class="p">)</span>
+<a id="__codelineno-0-66" name="__codelineno-0-66"></a>        <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">split_groups</span>
+<a id="__codelineno-0-67" name="__codelineno-0-67"></a>    <span class="p">]</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -1920,8 +2468,7 @@ heading in the original document.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ragdoc/splitting/hierarchical.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-7">  7</a></span>
-<span class="normal"><a href="#__codelineno-0-8">  8</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-8">  8</a></span>
 <span class="normal"><a href="#__codelineno-0-9">  9</a></span>
 <span class="normal"><a href="#__codelineno-0-10"> 10</a></span>
 <span class="normal"><a href="#__codelineno-0-11"> 11</a></span>
@@ -2043,130 +2590,131 @@ heading in the original document.</p>
 <span class="normal"><a href="#__codelineno-0-127">127</a></span>
 <span class="normal"><a href="#__codelineno-0-128">128</a></span>
 <span class="normal"><a href="#__codelineno-0-129">129</a></span>
-<span class="normal"><a href="#__codelineno-0-130">130</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-7" name="__codelineno-0-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">split_hierarchical</span><span class="p">(</span><span class="n">document</span><span class="p">:</span> <span class="n">Document</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Document</span><span class="p">]:</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Split a document at a chosen heading level, propagating parent context into each split.</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9"></a>
-<a id="__codelineno-0-10" name="__codelineno-0-10"></a><span class="sd">    Finds the lowest heading level that produces at least 2 splits, then splits the</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11"></a><span class="sd">    document at every heading at exactly that level. Parent headings (levels numerically</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12"></a><span class="sd">    lower than the split level) are prepended to each resulting chunk as context, so</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13"></a><span class="sd">    every split document is self-contained.</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14"></a>
-<a id="__codelineno-0-15" name="__codelineno-0-15"></a><span class="sd">    Context propagation rules:</span>
-<a id="__codelineno-0-16" name="__codelineno-0-16"></a><span class="sd">    - A parent heading encountered *before* the first split-level heading becomes</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17"></a><span class="sd">      context for all chunks (it is prepended but not included in the raw chunk body).</span>
-<a id="__codelineno-0-18" name="__codelineno-0-18"></a><span class="sd">    - A parent heading encountered *inside* a chunk&#39;s body is kept in that chunk&#39;s</span>
-<a id="__codelineno-0-19" name="__codelineno-0-19"></a><span class="sd">      body AND updates the context for all subsequent chunks (using the most recent</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20"></a><span class="sd">      heading seen at each level).</span>
-<a id="__codelineno-0-21" name="__codelineno-0-21"></a><span class="sd">    - Context headings are prepended in their original document order.</span>
-<a id="__codelineno-0-22" name="__codelineno-0-22"></a>
-<a id="__codelineno-0-23" name="__codelineno-0-23"></a><span class="sd">    If no split can be found, a list with the original document is returned.</span>
-<a id="__codelineno-0-24" name="__codelineno-0-24"></a>
-<a id="__codelineno-0-25" name="__codelineno-0-25"></a><span class="sd">    ExternalRef: each split document receives an &quot;external-parent&quot; ref pointing to</span>
-<a id="__codelineno-0-26" name="__codelineno-0-26"></a><span class="sd">    the original document&#39;s id.</span>
-<a id="__codelineno-0-27" name="__codelineno-0-27"></a>
-<a id="__codelineno-0-28" name="__codelineno-0-28"></a><span class="sd">    Ref-awareness: elements are partitioned into ElementGroups before splitting.</span>
-<a id="__codelineno-0-29" name="__codelineno-0-29"></a><span class="sd">    A referenced element (e.g. a Footnote) always travels with the root that references</span>
-<a id="__codelineno-0-30" name="__codelineno-0-30"></a><span class="sd">    it, even when the referenced element is physically positioned after a split-level</span>
-<a id="__codelineno-0-31" name="__codelineno-0-31"></a><span class="sd">    heading in the original document.</span>
-<a id="__codelineno-0-32" name="__codelineno-0-32"></a>
-<a id="__codelineno-0-33" name="__codelineno-0-33"></a><span class="sd">    Examples (heading levels in document order):</span>
-<a id="__codelineno-0-34" name="__codelineno-0-34"></a><span class="sd">        [2, 1, 3, 2, 3, 4, 4, 3] → split_level=2 → [[2,1,3], [1,2,3,4,4,3]]</span>
-<a id="__codelineno-0-35" name="__codelineno-0-35"></a><span class="sd">        [2, 1, 3, 3, 3] → split_level=3 → [[2,1,3], [2,1,3], [2,1,3]]  (h2 and h1 duplicated as context)</span>
-<a id="__codelineno-0-36" name="__codelineno-0-36"></a><span class="sd">        [1, 2, 3, 3, 2, 3] → split_level=2 → [[1,2,3,3], [1,2,3]]</span>
-<a id="__codelineno-0-37" name="__codelineno-0-37"></a><span class="sd">        [1, 2, 3] → no split (only one heading at each level)</span>
-<a id="__codelineno-0-38" name="__codelineno-0-38"></a><span class="sd">        [2, 1, 3, 3, 2] → split_level=2 → [[2,1,3,3], [1,2]]</span>
-<a id="__codelineno-0-39" name="__codelineno-0-39"></a>
-<a id="__codelineno-0-40" name="__codelineno-0-40"></a><span class="sd">    Args:</span>
-<a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="sd">        document: The document to split.</span>
-<a id="__codelineno-0-42" name="__codelineno-0-42"></a>
-<a id="__codelineno-0-43" name="__codelineno-0-43"></a><span class="sd">    Returns:</span>
-<a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">        A list of Documents with ExternalRef relationships set.</span>
-<a id="__codelineno-0-45" name="__codelineno-0-45"></a><span class="sd">        Returns a single-element list if no meaningful split is possible.</span>
-<a id="__codelineno-0-46" name="__codelineno-0-46"></a>
-<a id="__codelineno-0-47" name="__codelineno-0-47"></a><span class="sd">    Note:</span>
-<a id="__codelineno-0-48" name="__codelineno-0-48"></a><span class="sd">        Does not set ``split_sequence`` / ``split_total`` in metadata. Call</span>
-<a id="__codelineno-0-49" name="__codelineno-0-49"></a><span class="sd">        :func:`ragdoc.splitting.token.split_document` for reading-order numbering.</span>
-<a id="__codelineno-0-50" name="__codelineno-0-50"></a><span class="sd">    &quot;&quot;&quot;</span>
-<a id="__codelineno-0-51" name="__codelineno-0-51"></a>    <span class="n">heading_levels</span> <span class="o">=</span> <span class="p">[</span><span class="n">h</span><span class="o">.</span><span class="n">level</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">document</span><span class="o">.</span><span class="n">headings</span><span class="p">]</span>
-<a id="__codelineno-0-52" name="__codelineno-0-52"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">heading_levels</span><span class="p">:</span>
-<a id="__codelineno-0-53" name="__codelineno-0-53"></a>        <span class="k">return</span> <span class="p">[</span><span class="n">document</span><span class="p">]</span>
-<a id="__codelineno-0-54" name="__codelineno-0-54"></a>
-<a id="__codelineno-0-55" name="__codelineno-0-55"></a>    <span class="n">split_level</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">heading_levels</span><span class="p">)</span>
-<a id="__codelineno-0-56" name="__codelineno-0-56"></a>    <span class="k">while</span> <span class="n">heading_levels</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">split_level</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
-<a id="__codelineno-0-57" name="__codelineno-0-57"></a>        <span class="n">split_level</span> <span class="o">+=</span> <span class="mi">1</span>
-<a id="__codelineno-0-58" name="__codelineno-0-58"></a>        <span class="k">if</span> <span class="n">split_level</span> <span class="o">&gt;</span> <span class="nb">max</span><span class="p">(</span><span class="n">heading_levels</span><span class="p">):</span>
-<a id="__codelineno-0-59" name="__codelineno-0-59"></a>            <span class="k">return</span> <span class="p">[</span><span class="n">document</span><span class="p">]</span>
-<a id="__codelineno-0-60" name="__codelineno-0-60"></a>
-<a id="__codelineno-0-61" name="__codelineno-0-61"></a>    <span class="c1"># Scan element groups in document order:</span>
-<a id="__codelineno-0-62" name="__codelineno-0-62"></a>    <span class="c1"># - Headings at level &lt; split_level are &quot;parent context&quot; headings.</span>
-<a id="__codelineno-0-63" name="__codelineno-0-63"></a>    <span class="c1">#   Before the first split-level heading they only update context (preamble).</span>
-<a id="__codelineno-0-64" name="__codelineno-0-64"></a>    <span class="c1">#   Inside a chunk they are included in that chunk&#39;s body AND update context.</span>
-<a id="__codelineno-0-65" name="__codelineno-0-65"></a>    <span class="c1"># - Headings at level == split_level are split points: they close the current</span>
-<a id="__codelineno-0-66" name="__codelineno-0-66"></a>    <span class="c1">#   chunk and start a new one.</span>
-<a id="__codelineno-0-67" name="__codelineno-0-67"></a>    <span class="c1"># - Everything else (non-headings, headings at level &gt; split_level) goes into</span>
-<a id="__codelineno-0-68" name="__codelineno-0-68"></a>    <span class="c1">#   the current chunk, or into preamble_extras if no split has been seen yet.</span>
-<a id="__codelineno-0-69" name="__codelineno-0-69"></a>    <span class="c1"># - ElementGroups carry root + all transitively-referenced elements together,</span>
-<a id="__codelineno-0-70" name="__codelineno-0-70"></a>    <span class="c1">#   so a footnote physically past a heading boundary follows its referencing paragraph.</span>
-<a id="__codelineno-0-71" name="__codelineno-0-71"></a>
-<a id="__codelineno-0-72" name="__codelineno-0-72"></a>    <span class="n">parent_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Heading</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># level → most recent heading</span>
-<a id="__codelineno-0-73" name="__codelineno-0-73"></a>    <span class="n">context_level_order</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># levels in document order of first appearance</span>
-<a id="__codelineno-0-74" name="__codelineno-0-74"></a>
-<a id="__codelineno-0-75" name="__codelineno-0-75"></a>    <span class="n">preamble_extras</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># non-context elements before first split-level heading</span>
-<a id="__codelineno-0-76" name="__codelineno-0-76"></a>    <span class="n">current_chunk</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-<a id="__codelineno-0-77" name="__codelineno-0-77"></a>    <span class="n">current_ctx_snapshot</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Heading</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-<a id="__codelineno-0-78" name="__codelineno-0-78"></a>    <span class="n">raw_chunks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Heading</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
-<a id="__codelineno-0-79" name="__codelineno-0-79"></a>
-<a id="__codelineno-0-80" name="__codelineno-0-80"></a>    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">build_element_groups</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;list[BaseElement]&quot;</span><span class="p">,</span> <span class="n">document</span><span class="o">.</span><span class="n">elements</span><span class="p">)):</span>
-<a id="__codelineno-0-81" name="__codelineno-0-81"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">Heading</span><span class="p">):</span>
-<a id="__codelineno-0-82" name="__codelineno-0-82"></a>            <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">level</span> <span class="o">==</span> <span class="n">split_level</span><span class="p">:</span>
-<a id="__codelineno-0-83" name="__codelineno-0-83"></a>                <span class="k">if</span> <span class="n">current_chunk</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-84" name="__codelineno-0-84"></a>                    <span class="n">raw_chunks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">current_chunk</span><span class="p">,</span> <span class="n">current_ctx_snapshot</span><span class="p">))</span>
-<a id="__codelineno-0-85" name="__codelineno-0-85"></a>                <span class="n">current_ctx_snapshot</span> <span class="o">=</span> <span class="p">[</span><span class="n">parent_context</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span> <span class="k">for</span> <span class="n">lvl</span> <span class="ow">in</span> <span class="n">context_level_order</span><span class="p">]</span>
-<a id="__codelineno-0-86" name="__codelineno-0-86"></a>                <span class="n">current_chunk</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">]</span>
-<a id="__codelineno-0-87" name="__codelineno-0-87"></a>            <span class="k">elif</span> <span class="n">item</span><span class="o">.</span><span class="n">level</span> <span class="o">&lt;</span> <span class="n">split_level</span><span class="p">:</span>
-<a id="__codelineno-0-88" name="__codelineno-0-88"></a>                <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">level</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">context_level_order</span><span class="p">:</span>
-<a id="__codelineno-0-89" name="__codelineno-0-89"></a>                    <span class="n">context_level_order</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">level</span><span class="p">)</span>
-<a id="__codelineno-0-90" name="__codelineno-0-90"></a>                <span class="n">parent_context</span><span class="p">[</span><span class="n">item</span><span class="o">.</span><span class="n">level</span><span class="p">]</span> <span class="o">=</span> <span class="n">item</span>
-<a id="__codelineno-0-91" name="__codelineno-0-91"></a>                <span class="k">if</span> <span class="n">current_chunk</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-92" name="__codelineno-0-92"></a>                    <span class="n">current_chunk</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
-<a id="__codelineno-0-93" name="__codelineno-0-93"></a>                <span class="c1"># else: preamble parent heading — context only, not added to any chunk body</span>
-<a id="__codelineno-0-94" name="__codelineno-0-94"></a>            <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-95" name="__codelineno-0-95"></a>                <span class="c1"># Heading at level &gt; split_level: child heading, treated as content</span>
-<a id="__codelineno-0-96" name="__codelineno-0-96"></a>                <span class="k">if</span> <span class="n">current_chunk</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-97" name="__codelineno-0-97"></a>                    <span class="n">current_chunk</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
-<a id="__codelineno-0-98" name="__codelineno-0-98"></a>                <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-99" name="__codelineno-0-99"></a>                    <span class="n">preamble_extras</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
-<a id="__codelineno-0-100" name="__codelineno-0-100"></a>        <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-101" name="__codelineno-0-101"></a>            <span class="c1"># ElementGroup: root + all referenced elements travel together</span>
-<a id="__codelineno-0-102" name="__codelineno-0-102"></a>            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">ElementGroup</span><span class="p">)</span>
-<a id="__codelineno-0-103" name="__codelineno-0-103"></a>            <span class="k">if</span> <span class="n">current_chunk</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-104" name="__codelineno-0-104"></a>                <span class="n">current_chunk</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">all_elements</span><span class="p">)</span>
-<a id="__codelineno-0-105" name="__codelineno-0-105"></a>            <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-106" name="__codelineno-0-106"></a>                <span class="n">preamble_extras</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">all_elements</span><span class="p">)</span>
-<a id="__codelineno-0-107" name="__codelineno-0-107"></a>
-<a id="__codelineno-0-108" name="__codelineno-0-108"></a>    <span class="k">if</span> <span class="n">current_chunk</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-109" name="__codelineno-0-109"></a>        <span class="n">raw_chunks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">current_chunk</span><span class="p">,</span> <span class="n">current_ctx_snapshot</span><span class="p">))</span>
-<a id="__codelineno-0-110" name="__codelineno-0-110"></a>
-<a id="__codelineno-0-111" name="__codelineno-0-111"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">raw_chunks</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
-<a id="__codelineno-0-112" name="__codelineno-0-112"></a>        <span class="k">return</span> <span class="p">[</span><span class="n">document</span><span class="p">]</span>
-<a id="__codelineno-0-113" name="__codelineno-0-113"></a>
-<a id="__codelineno-0-114" name="__codelineno-0-114"></a>    <span class="n">split_docs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Document</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-<a id="__codelineno-0-115" name="__codelineno-0-115"></a>    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">elements</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">raw_chunks</span><span class="p">):</span>
-<a id="__codelineno-0-116" name="__codelineno-0-116"></a>        <span class="n">prefix</span> <span class="o">=</span> <span class="n">preamble_extras</span> <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="p">[]</span>
-<a id="__codelineno-0-117" name="__codelineno-0-117"></a>        <span class="n">all_elements</span> <span class="o">=</span> <span class="n">ctx</span> <span class="o">+</span> <span class="n">prefix</span> <span class="o">+</span> <span class="n">elements</span>
-<a id="__codelineno-0-118" name="__codelineno-0-118"></a>        <span class="n">doc</span> <span class="o">=</span> <span class="n">Document</span><span class="p">(</span>
-<a id="__codelineno-0-119" name="__codelineno-0-119"></a>            <span class="n">elements</span><span class="o">=</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;list[ElementType]&quot;</span><span class="p">,</span> <span class="n">all_elements</span><span class="p">),</span>
-<a id="__codelineno-0-120" name="__codelineno-0-120"></a>            <span class="n">title</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">title</span><span class="p">,</span>
-<a id="__codelineno-0-121" name="__codelineno-0-121"></a>            <span class="n">source_path</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">source_path</span><span class="p">,</span>
-<a id="__codelineno-0-122" name="__codelineno-0-122"></a>            <span class="n">metadata</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">metadata</span><span class="p">,</span>
-<a id="__codelineno-0-123" name="__codelineno-0-123"></a>        <span class="p">)</span>
-<a id="__codelineno-0-124" name="__codelineno-0-124"></a>        <span class="n">split_docs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
-<a id="__codelineno-0-125" name="__codelineno-0-125"></a>
-<a id="__codelineno-0-126" name="__codelineno-0-126"></a>    <span class="n">parent_ref</span> <span class="o">=</span> <span class="n">ExternalRef</span><span class="p">(</span><span class="n">target_id</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">rel_type</span><span class="o">=</span><span class="s2">&quot;external-parent&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-127" name="__codelineno-0-127"></a>    <span class="k">for</span> <span class="n">doc</span> <span class="ow">in</span> <span class="n">split_docs</span><span class="p">:</span>
-<a id="__codelineno-0-128" name="__codelineno-0-128"></a>        <span class="n">doc</span><span class="o">.</span><span class="n">external_refs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parent_ref</span><span class="p">)</span>
-<a id="__codelineno-0-129" name="__codelineno-0-129"></a>
-<a id="__codelineno-0-130" name="__codelineno-0-130"></a>    <span class="k">return</span> <span class="n">split_docs</span>
+<span class="normal"><a href="#__codelineno-0-130">130</a></span>
+<span class="normal"><a href="#__codelineno-0-131">131</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-8" name="__codelineno-0-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">split_hierarchical</span><span class="p">(</span><span class="n">document</span><span class="p">:</span> <span class="n">Document</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Document</span><span class="p">]:</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9"></a><span class="w">    </span><span class="sd">"""Split a document at a chosen heading level, propagating parent context into each split.</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10"></a>
+<a id="__codelineno-0-11" name="__codelineno-0-11"></a><span class="sd">    Finds the lowest heading level that produces at least 2 splits, then splits the</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12"></a><span class="sd">    document at every heading at exactly that level. Parent headings (levels numerically</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13"></a><span class="sd">    lower than the split level) are prepended to each resulting chunk as context, so</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14"></a><span class="sd">    every split document is self-contained.</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15"></a>
+<a id="__codelineno-0-16" name="__codelineno-0-16"></a><span class="sd">    Context propagation rules:</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17"></a><span class="sd">    - A parent heading encountered *before* the first split-level heading becomes</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18"></a><span class="sd">      context for all chunks (it is prepended but not included in the raw chunk body).</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19"></a><span class="sd">    - A parent heading encountered *inside* a chunk's body is kept in that chunk's</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20"></a><span class="sd">      body AND updates the context for all subsequent chunks (using the most recent</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21"></a><span class="sd">      heading seen at each level).</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22"></a><span class="sd">    - Context headings are prepended in their original document order.</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23"></a>
+<a id="__codelineno-0-24" name="__codelineno-0-24"></a><span class="sd">    If no split can be found, a list with the original document is returned.</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25"></a>
+<a id="__codelineno-0-26" name="__codelineno-0-26"></a><span class="sd">    ExternalRef: each split document receives an "external-parent" ref pointing to</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27"></a><span class="sd">    the original document's id.</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28"></a>
+<a id="__codelineno-0-29" name="__codelineno-0-29"></a><span class="sd">    Ref-awareness: elements are partitioned into ElementGroups before splitting.</span>
+<a id="__codelineno-0-30" name="__codelineno-0-30"></a><span class="sd">    A referenced element (e.g. a Footnote) always travels with the root that references</span>
+<a id="__codelineno-0-31" name="__codelineno-0-31"></a><span class="sd">    it, even when the referenced element is physically positioned after a split-level</span>
+<a id="__codelineno-0-32" name="__codelineno-0-32"></a><span class="sd">    heading in the original document.</span>
+<a id="__codelineno-0-33" name="__codelineno-0-33"></a>
+<a id="__codelineno-0-34" name="__codelineno-0-34"></a><span class="sd">    Examples (heading levels in document order):</span>
+<a id="__codelineno-0-35" name="__codelineno-0-35"></a><span class="sd">        [2, 1, 3, 2, 3, 4, 4, 3] → split_level=2 → [[2,1,3], [1,2,3,4,4,3]]</span>
+<a id="__codelineno-0-36" name="__codelineno-0-36"></a><span class="sd">        [2, 1, 3, 3, 3] → split_level=3 → [[2,1,3], [2,1,3], [2,1,3]]  (h2 and h1 duplicated as context)</span>
+<a id="__codelineno-0-37" name="__codelineno-0-37"></a><span class="sd">        [1, 2, 3, 3, 2, 3] → split_level=2 → [[1,2,3,3], [1,2,3]]</span>
+<a id="__codelineno-0-38" name="__codelineno-0-38"></a><span class="sd">        [1, 2, 3] → no split (only one heading at each level)</span>
+<a id="__codelineno-0-39" name="__codelineno-0-39"></a><span class="sd">        [2, 1, 3, 3, 2] → split_level=2 → [[2,1,3,3], [1,2]]</span>
+<a id="__codelineno-0-40" name="__codelineno-0-40"></a>
+<a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-42" name="__codelineno-0-42"></a><span class="sd">        document: The document to split.</span>
+<a id="__codelineno-0-43" name="__codelineno-0-43"></a>
+<a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-45" name="__codelineno-0-45"></a><span class="sd">        A list of Documents with ExternalRef relationships set.</span>
+<a id="__codelineno-0-46" name="__codelineno-0-46"></a><span class="sd">        Returns a single-element list if no meaningful split is possible.</span>
+<a id="__codelineno-0-47" name="__codelineno-0-47"></a>
+<a id="__codelineno-0-48" name="__codelineno-0-48"></a><span class="sd">    Note:</span>
+<a id="__codelineno-0-49" name="__codelineno-0-49"></a><span class="sd">        Does not set ``split_sequence`` / ``split_total`` in metadata. Call</span>
+<a id="__codelineno-0-50" name="__codelineno-0-50"></a><span class="sd">        :func:`ragdoc.splitting.token.split_document` for reading-order numbering.</span>
+<a id="__codelineno-0-51" name="__codelineno-0-51"></a><span class="sd">    """</span>
+<a id="__codelineno-0-52" name="__codelineno-0-52"></a>    <span class="n">heading_levels</span> <span class="o">=</span> <span class="p">[</span><span class="n">h</span><span class="o">.</span><span class="n">level</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">document</span><span class="o">.</span><span class="n">headings</span><span class="p">]</span>
+<a id="__codelineno-0-53" name="__codelineno-0-53"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="n">heading_levels</span><span class="p">:</span>
+<a id="__codelineno-0-54" name="__codelineno-0-54"></a>        <span class="k">return</span> <span class="p">[</span><span class="n">document</span><span class="p">]</span>
+<a id="__codelineno-0-55" name="__codelineno-0-55"></a>
+<a id="__codelineno-0-56" name="__codelineno-0-56"></a>    <span class="n">split_level</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">heading_levels</span><span class="p">)</span>
+<a id="__codelineno-0-57" name="__codelineno-0-57"></a>    <span class="k">while</span> <span class="n">heading_levels</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">split_level</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+<a id="__codelineno-0-58" name="__codelineno-0-58"></a>        <span class="n">split_level</span> <span class="o">+=</span> <span class="mi">1</span>
+<a id="__codelineno-0-59" name="__codelineno-0-59"></a>        <span class="k">if</span> <span class="n">split_level</span> <span class="o">&gt;</span> <span class="nb">max</span><span class="p">(</span><span class="n">heading_levels</span><span class="p">):</span>
+<a id="__codelineno-0-60" name="__codelineno-0-60"></a>            <span class="k">return</span> <span class="p">[</span><span class="n">document</span><span class="p">]</span>
+<a id="__codelineno-0-61" name="__codelineno-0-61"></a>
+<a id="__codelineno-0-62" name="__codelineno-0-62"></a>    <span class="c1"># Scan element groups in document order:</span>
+<a id="__codelineno-0-63" name="__codelineno-0-63"></a>    <span class="c1"># - Headings at level &lt; split_level are "parent context" headings.</span>
+<a id="__codelineno-0-64" name="__codelineno-0-64"></a>    <span class="c1">#   Before the first split-level heading they only update context (preamble).</span>
+<a id="__codelineno-0-65" name="__codelineno-0-65"></a>    <span class="c1">#   Inside a chunk they are included in that chunk's body AND update context.</span>
+<a id="__codelineno-0-66" name="__codelineno-0-66"></a>    <span class="c1"># - Headings at level == split_level are split points: they close the current</span>
+<a id="__codelineno-0-67" name="__codelineno-0-67"></a>    <span class="c1">#   chunk and start a new one.</span>
+<a id="__codelineno-0-68" name="__codelineno-0-68"></a>    <span class="c1"># - Everything else (non-headings, headings at level &gt; split_level) goes into</span>
+<a id="__codelineno-0-69" name="__codelineno-0-69"></a>    <span class="c1">#   the current chunk, or into preamble_extras if no split has been seen yet.</span>
+<a id="__codelineno-0-70" name="__codelineno-0-70"></a>    <span class="c1"># - ElementGroups carry root + all transitively-referenced elements together,</span>
+<a id="__codelineno-0-71" name="__codelineno-0-71"></a>    <span class="c1">#   so a footnote physically past a heading boundary follows its referencing paragraph.</span>
+<a id="__codelineno-0-72" name="__codelineno-0-72"></a>
+<a id="__codelineno-0-73" name="__codelineno-0-73"></a>    <span class="n">parent_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Heading</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># level → most recent heading</span>
+<a id="__codelineno-0-74" name="__codelineno-0-74"></a>    <span class="n">context_level_order</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># levels in document order of first appearance</span>
+<a id="__codelineno-0-75" name="__codelineno-0-75"></a>
+<a id="__codelineno-0-76" name="__codelineno-0-76"></a>    <span class="n">preamble_extras</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># non-context elements before first split-level heading</span>
+<a id="__codelineno-0-77" name="__codelineno-0-77"></a>    <span class="n">current_chunk</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-0-78" name="__codelineno-0-78"></a>    <span class="n">current_ctx_snapshot</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Heading</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-79" name="__codelineno-0-79"></a>    <span class="n">raw_chunks</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Heading</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-80" name="__codelineno-0-80"></a>
+<a id="__codelineno-0-81" name="__codelineno-0-81"></a>    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">build_element_groups</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="s2">"list[BaseElement]"</span><span class="p">,</span> <span class="n">document</span><span class="o">.</span><span class="n">elements</span><span class="p">)):</span>
+<a id="__codelineno-0-82" name="__codelineno-0-82"></a>        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">Heading</span><span class="p">):</span>
+<a id="__codelineno-0-83" name="__codelineno-0-83"></a>            <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">level</span> <span class="o">==</span> <span class="n">split_level</span><span class="p">:</span>
+<a id="__codelineno-0-84" name="__codelineno-0-84"></a>                <span class="k">if</span> <span class="n">current_chunk</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-85" name="__codelineno-0-85"></a>                    <span class="n">raw_chunks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">current_chunk</span><span class="p">,</span> <span class="n">current_ctx_snapshot</span><span class="p">))</span>
+<a id="__codelineno-0-86" name="__codelineno-0-86"></a>                <span class="n">current_ctx_snapshot</span> <span class="o">=</span> <span class="p">[</span><span class="n">parent_context</span><span class="p">[</span><span class="n">lvl</span><span class="p">]</span> <span class="k">for</span> <span class="n">lvl</span> <span class="ow">in</span> <span class="n">context_level_order</span><span class="p">]</span>
+<a id="__codelineno-0-87" name="__codelineno-0-87"></a>                <span class="n">current_chunk</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">]</span>
+<a id="__codelineno-0-88" name="__codelineno-0-88"></a>            <span class="k">elif</span> <span class="n">item</span><span class="o">.</span><span class="n">level</span> <span class="o">&lt;</span> <span class="n">split_level</span><span class="p">:</span>
+<a id="__codelineno-0-89" name="__codelineno-0-89"></a>                <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">level</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">context_level_order</span><span class="p">:</span>
+<a id="__codelineno-0-90" name="__codelineno-0-90"></a>                    <span class="n">context_level_order</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">level</span><span class="p">)</span>
+<a id="__codelineno-0-91" name="__codelineno-0-91"></a>                <span class="n">parent_context</span><span class="p">[</span><span class="n">item</span><span class="o">.</span><span class="n">level</span><span class="p">]</span> <span class="o">=</span> <span class="n">item</span>
+<a id="__codelineno-0-92" name="__codelineno-0-92"></a>                <span class="k">if</span> <span class="n">current_chunk</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-93" name="__codelineno-0-93"></a>                    <span class="n">current_chunk</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+<a id="__codelineno-0-94" name="__codelineno-0-94"></a>                <span class="c1"># else: preamble parent heading — context only, not added to any chunk body</span>
+<a id="__codelineno-0-95" name="__codelineno-0-95"></a>            <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-96" name="__codelineno-0-96"></a>                <span class="c1"># Heading at level &gt; split_level: child heading, treated as content</span>
+<a id="__codelineno-0-97" name="__codelineno-0-97"></a>                <span class="k">if</span> <span class="n">current_chunk</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-98" name="__codelineno-0-98"></a>                    <span class="n">current_chunk</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+<a id="__codelineno-0-99" name="__codelineno-0-99"></a>                <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-100" name="__codelineno-0-100"></a>                    <span class="n">preamble_extras</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+<a id="__codelineno-0-101" name="__codelineno-0-101"></a>        <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-102" name="__codelineno-0-102"></a>            <span class="c1"># ElementGroup: root + all referenced elements travel together</span>
+<a id="__codelineno-0-103" name="__codelineno-0-103"></a>            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">ElementGroup</span><span class="p">)</span>
+<a id="__codelineno-0-104" name="__codelineno-0-104"></a>            <span class="k">if</span> <span class="n">current_chunk</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-105" name="__codelineno-0-105"></a>                <span class="n">current_chunk</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">all_elements</span><span class="p">)</span>
+<a id="__codelineno-0-106" name="__codelineno-0-106"></a>            <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-107" name="__codelineno-0-107"></a>                <span class="n">preamble_extras</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">all_elements</span><span class="p">)</span>
+<a id="__codelineno-0-108" name="__codelineno-0-108"></a>
+<a id="__codelineno-0-109" name="__codelineno-0-109"></a>    <span class="k">if</span> <span class="n">current_chunk</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-110" name="__codelineno-0-110"></a>        <span class="n">raw_chunks</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">current_chunk</span><span class="p">,</span> <span class="n">current_ctx_snapshot</span><span class="p">))</span>
+<a id="__codelineno-0-111" name="__codelineno-0-111"></a>
+<a id="__codelineno-0-112" name="__codelineno-0-112"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">raw_chunks</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+<a id="__codelineno-0-113" name="__codelineno-0-113"></a>        <span class="k">return</span> <span class="p">[</span><span class="n">document</span><span class="p">]</span>
+<a id="__codelineno-0-114" name="__codelineno-0-114"></a>
+<a id="__codelineno-0-115" name="__codelineno-0-115"></a>    <span class="n">split_docs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Document</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-116" name="__codelineno-0-116"></a>    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">elements</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">raw_chunks</span><span class="p">):</span>
+<a id="__codelineno-0-117" name="__codelineno-0-117"></a>        <span class="n">prefix</span> <span class="o">=</span> <span class="n">preamble_extras</span> <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="p">[]</span>
+<a id="__codelineno-0-118" name="__codelineno-0-118"></a>        <span class="n">all_elements</span> <span class="o">=</span> <span class="n">ctx</span> <span class="o">+</span> <span class="n">prefix</span> <span class="o">+</span> <span class="n">elements</span>
+<a id="__codelineno-0-119" name="__codelineno-0-119"></a>        <span class="n">doc</span> <span class="o">=</span> <span class="n">Document</span><span class="p">(</span>
+<a id="__codelineno-0-120" name="__codelineno-0-120"></a>            <span class="n">elements</span><span class="o">=</span><span class="n">cast</span><span class="p">(</span><span class="s2">"list[ElementType]"</span><span class="p">,</span> <span class="n">all_elements</span><span class="p">),</span>
+<a id="__codelineno-0-121" name="__codelineno-0-121"></a>            <span class="n">title</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">title</span><span class="p">,</span>
+<a id="__codelineno-0-122" name="__codelineno-0-122"></a>            <span class="n">source_path</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">source_path</span><span class="p">,</span>
+<a id="__codelineno-0-123" name="__codelineno-0-123"></a>            <span class="n">metadata</span><span class="o">=</span><span class="n">copy_metadata</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">metadata</span><span class="p">),</span>
+<a id="__codelineno-0-124" name="__codelineno-0-124"></a>        <span class="p">)</span>
+<a id="__codelineno-0-125" name="__codelineno-0-125"></a>        <span class="n">split_docs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
+<a id="__codelineno-0-126" name="__codelineno-0-126"></a>
+<a id="__codelineno-0-127" name="__codelineno-0-127"></a>    <span class="n">parent_ref</span> <span class="o">=</span> <span class="n">ExternalRef</span><span class="p">(</span><span class="n">target_id</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">rel_type</span><span class="o">=</span><span class="s2">"external-parent"</span><span class="p">)</span>
+<a id="__codelineno-0-128" name="__codelineno-0-128"></a>    <span class="k">for</span> <span class="n">doc</span> <span class="ow">in</span> <span class="n">split_docs</span><span class="p">:</span>
+<a id="__codelineno-0-129" name="__codelineno-0-129"></a>        <span class="n">doc</span><span class="o">.</span><span class="n">external_refs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parent_ref</span><span class="p">)</span>
+<a id="__codelineno-0-130" name="__codelineno-0-130"></a>
+<a id="__codelineno-0-131" name="__codelineno-0-131"></a>    <span class="k">return</span> <span class="n">split_docs</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -2248,7 +2796,7 @@ heading in the original document.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.tabs.link", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

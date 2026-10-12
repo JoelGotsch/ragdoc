@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -581,6 +581,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -796,6 +802,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#concatenating-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concatenating documents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -830,6 +847,34 @@
     
   
     Parsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processing
   
 
     
@@ -990,6 +1035,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../sync-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction & Knowledge Graphs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../custom-metadata/" class="md-nav__link">
         
   
@@ -1026,6 +1127,10 @@
   
     
     
+      
+        
+      
+        
       
         
       
@@ -1139,6 +1244,34 @@
     
   
     Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
   
 
     
@@ -1307,6 +1440,34 @@
     
   
     Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction
   
 
     
@@ -1630,6 +1791,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#concatenating-documents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concatenating documents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1664,7 +1836,7 @@
 <blockquote>
 <p>Run interactively: <code>marimo edit docs/notebooks/document_model.py</code></p>
 </blockquote>
-<p>The <a href="../../api/document/#Document"><code>Document</code></a> is the central data structure in ragdoc.
+<p>The <a href="../../api/document/#document"><code>Document</code></a> is the central data structure in ragdoc.
 Every pipeline stage — parsing, processing, splitting, and chunking — operates on <code>Document</code>
 objects. It is the single source of truth throughout the pipeline.</p>
 <h2 id="structure">Structure<a class="headerlink" href="#structure" title="Permanent link">&para;</a></h2>
@@ -1672,30 +1844,32 @@ objects. It is the single source of truth throughout the pipeline.</p>
 <ul>
 <li><strong><code>id</code></strong> — Unique identifier (UUID string)</li>
 <li><strong><code>title</code></strong> — Optional document title</li>
-<li><strong><code>elements</code></strong> — Ordered list of <a href="../../api/document/#BaseElement"><code>BaseElement</code></a> subclasses</li>
-<li><strong><code>filename</code></strong> — Name of the source file (e.g. <code>"report.pdf"</code>), set by parsers</li>
-<li><strong><code>source_path</code></strong> — Full path to the source file (e.g. <code>"/data/report.pdf"</code>), set by parsers</li>
-<li><strong><code>metadata</code></strong> — Arbitrary key-value metadata (dict) for user-defined custom data</li>
-<li><strong><code>external_refs</code></strong> — List of <a href="../../api/document/#ExternalRef"><code>ExternalRef</code></a> for cross-document links</li>
-<li><strong><code>parser</code></strong> — Provenance string set by the parser (e.g. <code>"azure_di"</code>, <code>"pandoc"</code>)</li>
+<li><strong><code>elements</code></strong> — Ordered list of <a href="../../api/document/#baseelement"><code>BaseElement</code></a> subclasses</li>
+<li><strong><code>source_path</code></strong> — Full path to the source file (e.g. <code>"/data/report.pdf"</code>)</li>
+<li><strong><code>source_id</code></strong> / <strong><code>source_hash</code></strong> — Sync identity and file-byte hash, stamped by the pipelines (<code>None</code> on a hand-built document)</li>
+<li><strong><code>metadata</code></strong> — Key-value metadata (dict): your own custom data plus a few library-written
+  informational keys such as <code>filename</code> (the bare source filename, e.g. <code>"report.pdf"</code>)</li>
+<li><strong><code>external_refs</code></strong> — List of <a href="../../api/document/#externalref"><code>ExternalRef</code></a> for cross-document links</li>
+<li><strong><code>parser</code></strong> — Name of the parser that produced the document (e.g. <code>"azure_di"</code>, <code>"pandoc"</code>)</li>
 </ul>
-<p><code>filename</code> and <code>source_path</code> are explicit first-class fields — not stored in <code>metadata</code>.
-Parsers set them automatically; they propagate through splitting and into <code>Chunk</code>.</p>
+<p><code>source_path</code> is a first-class field; the bare filename lives in <code>metadata["filename"]</code>.
+Both, and <code>parser</code>, are stamped by <a href="../../api/parsing/#load"><code>load()</code></a> (and by the pipelines
+when you pass a custom parser). <code>source_path</code> and <code>metadata</code> propagate through splitting and
+into <code>Chunk</code>; <code>parser</code> is not copied to splits.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.document</span><span class="w"> </span><span class="kn">import</span> <span class="n">Document</span><span class="p">,</span> <span class="n">Heading</span><span class="p">,</span> <span class="n">Paragraph</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">doc</span> <span class="o">=</span> <span class="n">Document</span><span class="p">(</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Annual Report&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;annual_report.docx&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">source_path</span><span class="o">=</span><span class="s2">&quot;/data/annual_report.docx&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">elements</span><span class="o">=</span><span class="p">[</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="n">Heading</span><span class="p">(</span><span class="n">innerhtml</span><span class="o">=</span><span class="s2">&quot;Introduction&quot;</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="n">Paragraph</span><span class="p">(</span><span class="n">html_content</span><span class="o">=</span><span class="s2">&quot;&lt;p&gt;This report covers...&lt;/p&gt;&quot;</span><span class="p">),</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="p">],</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">metadata</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;year&quot;</span><span class="p">:</span> <span class="mi">2024</span><span class="p">},</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">title</span><span class="o">=</span><span class="s2">"Annual Report"</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">source_path</span><span class="o">=</span><span class="s2">"/data/annual_report.docx"</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">elements</span><span class="o">=</span><span class="p">[</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="n">Heading</span><span class="p">(</span><span class="n">html</span><span class="o">=</span><span class="s2">"&lt;h1&gt;Introduction&lt;/h1&gt;"</span><span class="p">),</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="n">Paragraph</span><span class="p">(</span><span class="n">html</span><span class="o">=</span><span class="s2">"&lt;p&gt;This report covers...&lt;/p&gt;"</span><span class="p">),</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="p">],</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">metadata</span><span class="o">=</span><span class="p">{</span><span class="s2">"year"</span><span class="p">:</span> <span class="mi">2024</span><span class="p">,</span> <span class="s2">"filename"</span><span class="p">:</span> <span class="s2">"annual_report.docx"</span><span class="p">},</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">)</span>
 </code></pre></div>
 <h2 id="element-types">Element types<a class="headerlink" href="#element-types" title="Permanent link">&para;</a></h2>
-<p>All elements inherit from <a href="../../api/document/#BaseElement"><code>BaseElement</code></a>:</p>
+<p>All elements inherit from <a href="../../api/document/#baseelement"><code>BaseElement</code></a>:</p>
 <table>
 <thead>
 <tr>
@@ -1705,43 +1879,60 @@ Parsers set them automatically; they propagate through splitting and into <code>
 </thead>
 <tbody>
 <tr>
-<td><a href="../../api/document/#Heading"><code>Heading</code></a></td>
-<td>Section heading with <code>level</code> (1–6) and <code>innerhtml</code></td>
+<td><a href="../../api/document/#heading"><code>Heading</code></a></td>
+<td>Section heading; stored <code>html</code> carries the outer <code>&lt;h1&gt;</code>–<code>&lt;h6&gt;</code> tag (<code>level</code> is derived)</td>
 </tr>
 <tr>
-<td><a href="../../api/document/#Paragraph"><code>Paragraph</code></a></td>
+<td><a href="../../api/document/#paragraph"><code>Paragraph</code></a></td>
 <td>Body text with HTML content</td>
 </tr>
 <tr>
-<td><a href="../../api/document/#Table"><code>Table</code></a></td>
+<td><a href="../../api/document/#table"><code>Table</code></a></td>
 <td>Table with HTML content (<code>&lt;table&gt;...&lt;/table&gt;</code>)</td>
 </tr>
 <tr>
-<td><a href="../../api/document/#Image"><code>Image</code></a></td>
+<td><a href="../../api/document/#image"><code>Image</code></a></td>
 <td>Image with base64 data, alt text, and optional <code>text_representation</code></td>
 </tr>
 <tr>
-<td><a href="../../api/document/#DocumentList"><code>DocumentList</code></a></td>
+<td><a href="../../api/document/#documentlist"><code>DocumentList</code></a></td>
 <td>Ordered or unordered list</td>
 </tr>
 <tr>
-<td><a href="../../api/document/#Footnote"><code>Footnote</code></a></td>
+<td><a href="../../api/document/#footnote"><code>Footnote</code></a></td>
 <td>Footnote definition with number and text</td>
 </tr>
 <tr>
-<td><a href="../../api/document/#RawText"><code>RawText</code></a></td>
-<td>Raw HTML content (pre-formatted blocks)</td>
+<td><a href="../../api/document/#rawtext"><code>RawText</code></a></td>
+<td>Raw HTML content (pre-formatted blocks), always inside one outer <code>&lt;div&gt;</code></td>
 </tr>
 </tbody>
 </table>
+<p>A few rules hold for every element:</p>
+<ul>
+<li><strong>Unknown keywords raise.</strong> Elements and <code>Document</code> are strict (<code>extra="forbid"</code>): a
+  misspelled or outdated constructor keyword — or an unknown key in JSON passed to
+  <code>model_validate</code> — is a <code>ValidationError</code>, never silently dropped. The pre-refactor
+  spellings <code>html_content=</code> and <code>RawText(innerhtml=…)</code> are not aliases; the error names the
+  <code>html</code> field. Custom element subclasses inherit this, so declare every field you pass.</li>
+<li><strong><code>RawText</code> only guarantees its wrapper.</strong> A value that is exactly one root <code>&lt;div&gt;…&lt;/div&gt;</code>
+  is stored unchanged; anything else (plain text, several sibling tags, a single <code>&lt;table&gt;</code> or
+  <code>&lt;pre&gt;</code>) is wrapped verbatim in a <code>&lt;div&gt;</code>. The content is never unwrapped or re-serialized,
+  and <code>RawText.innerhtml</code> returns it byte for byte. It is still HTML, so escape literal text
+  yourself: <code>RawText(html=f"&lt;pre&gt;&lt;code&gt;{html.escape(code)}&lt;/code&gt;&lt;/pre&gt;")</code>.</li>
+<li><strong>Equality is by value.</strong> Two elements are equal when they have the same concrete type and
+  equal field values. Internal caches (the parsed HTML behind <code>.text</code> / <code>.inline_refs</code>) never
+  affect equality, so an element equals its own <code>model_copy()</code> and its JSON round-trip.</li>
+</ul>
 <h3 id="image-text_representation">Image <code>text_representation</code><a class="headerlink" href="#image-text_representation" title="Permanent link">&para;</a></h3>
 <p><code>Image</code> elements have an optional <code>text_representation</code> field. This is populated by
-<code>ImageSummaryProcessor</code> and is used by <code>render_for_prompt</code> as a text fallback when
-the image cannot be displayed. The <code>ImageSummary</code> model also includes a <code>decorative</code>
-boolean field that allows the processor to flag worthless images (e.g. decorative
-borders) so they can be skipped during rendering.</p>
+<code>ImageSummaryProcessor</code>. <code>render_for_prompt</code> never emits image data: an image renders as its
+<code>text_representation</code>, else its <code>alt</code> text, else <code>[Unprocessed Image]</code>. The <code>ImageSummary</code>
+model also has a <code>decorative</code> flag; for a decorative image the processor leaves
+<code>text_representation</code> as <code>None</code> — the image is not removed from the document or the
+rendering.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># ImageSummaryProcessor writes here:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">image_element</span><span class="o">.</span><span class="n">text_representation</span> <span class="o">=</span> <span class="s2">&quot;Bar chart showing revenue growth from 2020 to 2024.&quot;</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">image_element</span><span class="o">.</span><span class="n">text_representation</span> <span class="o">=</span> <span class="s2">"Bar chart showing revenue growth from 2020 to 2024."</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># render_for_prompt uses text_representation as a text fallback for images</span>
 </code></pre></div>
@@ -1751,24 +1942,25 @@ embedded in HTML content. This is how images embedded in paragraphs, footnote ma
 and inline tables are represented.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># A paragraph referencing an image inline:</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">para</span> <span class="o">=</span> <span class="n">Paragraph</span><span class="p">(</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">html_content</span><span class="o">=</span><span class="s1">&#39;&lt;p&gt;As shown in &lt;ref id=&quot;fig-1&quot; rel=&quot;image&quot;/&gt;, revenue grew...&lt;/p&gt;&#39;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">html</span><span class="o">=</span><span class="s1">'&lt;p&gt;As shown in &lt;ref id="fig-1" rel="image"/&gt;, revenue grew...&lt;/p&gt;'</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p">)</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># The renderer resolves &lt;ref&gt; tags to the rendered content of the referenced element.</span>
 </code></pre></div>
-<p>The <a href="../../api/document/#InlineRef"><code>InlineRef</code></a> model is derived from the HTML — it is
+<p>The <a href="../../api/document/#inlineref"><code>InlineRef</code></a> model is derived from the HTML — it is
 not stored as a field. The HTML is the single source of truth.</p>
 <h2 id="cross-document-references">Cross-document references<a class="headerlink" href="#cross-document-references" title="Permanent link">&para;</a></h2>
-<p><a href="../../api/document/#ExternalRef"><code>ExternalRef</code></a> records relationships between documents —
-typically parent/child links created by the splitter:</p>
+<p><a href="../../api/document/#externalref"><code>ExternalRef</code></a> records relationships between documents —
+such as the <code>external-parent</code> link every split carries back to its source document (the
+splitters do not write <code>external-child</code> links onto the source):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.document</span><span class="w"> </span><span class="kn">import</span> <span class="n">ExternalRef</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># After splitting, child documents carry a reference to their parent:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># What a splitter sets on each split:</span>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">child_doc</span><span class="o">.</span><span class="n">external_refs</span> <span class="o">=</span> <span class="p">[</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">ExternalRef</span><span class="p">(</span><span class="n">target_id</span><span class="o">=</span><span class="n">parent_doc</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">rel_type</span><span class="o">=</span><span class="s2">&quot;external-parent&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">ExternalRef</span><span class="p">(</span><span class="n">target_id</span><span class="o">=</span><span class="n">parent_doc</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">rel_type</span><span class="o">=</span><span class="s2">"external-parent"</span><span class="p">)</span>
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">]</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># And the parent carries references to all its children:</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># The reverse link is yours to add if you want it:</span>
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">parent_doc</span><span class="o">.</span><span class="n">external_refs</span> <span class="o">=</span> <span class="p">[</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">ExternalRef</span><span class="p">(</span><span class="n">target_id</span><span class="o">=</span><span class="n">child_doc</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">rel_type</span><span class="o">=</span><span class="s2">&quot;external-child&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">ExternalRef</span><span class="p">(</span><span class="n">target_id</span><span class="o">=</span><span class="n">child_doc</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">rel_type</span><span class="o">=</span><span class="s2">"external-child"</span><span class="p">)</span>
 <a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="p">]</span>
 </code></pre></div>
 <h2 id="convenience-properties">Convenience properties<a class="headerlink" href="#convenience-properties" title="Permanent link">&para;</a></h2>
@@ -1779,8 +1971,22 @@ typically parent/child links created by the splitter:</p>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">doc</span><span class="o">.</span><span class="n">images</span>        <span class="c1"># list[Image]</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">doc</span><span class="o">.</span><span class="n">footnotes</span>     <span class="c1"># list[Footnote]</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">doc</span><span class="o">.</span><span class="n">main_heading</span>  <span class="c1"># Heading | None  (the first h1)</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">doc</span><span class="o">.</span><span class="n">main_heading</span>  <span class="c1"># Heading | None  (lowest level number, then earliest by page/position)</span>
 </code></pre></div>
+<h2 id="concatenating-documents">Concatenating documents<a class="headerlink" href="#concatenating-documents" title="Permanent link">&para;</a></h2>
+<p><code>concat_documents(first, second)</code> appends <code>second</code>'s elements after <code>first</code>'s and returns a
+new <code>Document</code> (inputs are not mutated); <code>join_documents([...])</code> folds a list left-to-right.
+There is no <code>|</code> operator on <code>Document</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.document</span><span class="w"> </span><span class="kn">import</span> <span class="n">concat_documents</span><span class="p">,</span> <span class="n">join_documents</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">combined</span> <span class="o">=</span> <span class="n">concat_documents</span><span class="p">(</span><span class="n">part_one</span><span class="p">,</span> <span class="n">part_two</span><span class="p">)</span>                          <span class="c1"># metadata: first wins</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">combined</span> <span class="o">=</span> <span class="n">concat_documents</span><span class="p">(</span><span class="n">part_one</span><span class="p">,</span> <span class="n">part_two</span><span class="p">,</span> <span class="n">metadata_policy</span><span class="o">=</span><span class="s2">"strict"</span><span class="p">)</span>  <span class="c1"># raise on conflicting keys</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">whole</span> <span class="o">=</span> <span class="n">join_documents</span><span class="p">([</span><span class="n">part_one</span><span class="p">,</span> <span class="n">part_two</span><span class="p">,</span> <span class="n">appendix</span><span class="p">])</span>
+</code></pre></div>
+<p>When both documents have a title, an <code>&lt;h1&gt;</code> carrying the second title is inserted between
+the two element lists. The result has a new <code>id</code> and no <code>source_id</code> / <code>source_hash</code>.
+This is plain concatenation — to <em>align</em> two parses of the same source, see the
+<a href="../merging/">Merging Guide</a>.</p>
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../../api/document/">API Reference: Document</a></li>
@@ -1863,7 +2069,7 @@ typically parent/child links created by the splitter:</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.tabs.link", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

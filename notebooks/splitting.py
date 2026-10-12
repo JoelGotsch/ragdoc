@@ -41,14 +41,14 @@ def _():
     sample_doc = Document(
         title="Annual Report",
         elements=[
-            Heading(innerhtml="Introduction", level=1),
-            Paragraph(html_content="<p>Overview paragraph.</p>"),
-            Heading(innerhtml="Section A", level=2),
-            Paragraph(html_content="<p>Section A content.</p>"),
-            Heading(innerhtml="Section B", level=2),
-            Paragraph(html_content="<p>Section B content.</p>"),
-            Heading(innerhtml="Subsection B1", level=3),
-            Paragraph(html_content="<p>Subsection B1 content.</p>"),
+            Heading(html="<h1>Introduction</h1>"),
+            Paragraph(html="<p>Overview paragraph.</p>"),
+            Heading(html="<h2>Section A</h2>"),
+            Paragraph(html="<p>Section A content.</p>"),
+            Heading(html="<h2>Section B</h2>"),
+            Paragraph(html="<p>Section B content.</p>"),
+            Heading(html="<h3>Subsection B1</h3>"),
+            Paragraph(html="<p>Subsection B1 content.</p>"),
         ],
         metadata={"source": "annual_report.docx"},
     )
@@ -85,7 +85,8 @@ def _(mo):
     mo.md(r"""
     ### `split_hierarchical`
 
-    Splits recursively by the lowest heading level that produces at least two parts. Use this
+    Splits once, at the lowest heading level that occurs at least twice (`split_document`
+    applies it recursively). Use this
     when you want larger, more self-contained sections that preserve sub-structure.
     """)
     return
@@ -107,8 +108,8 @@ def _(mo):
     mo.md(r"""
     ## Parent-child relationships
 
-    After splitting, each child document has an `external_refs` entry pointing to its parent,
-    and the parent has entries pointing to all children.
+    After splitting, each split has one `external-parent` entry in `external_refs` pointing to
+    the source document. The source document itself is not modified.
     """)
     return
 
@@ -142,8 +143,9 @@ def _(sample_doc, split_by_headings):
 
     # Example: run a processor on each section after splitting
     # from ragdoc.processing import ImageSummaryProcessor
+    # from ragdoc.processing.summary_image import openai_image_summarizer
     # from openai import AsyncOpenAI
-    # processor = ImageSummaryProcessor(client=AsyncOpenAI())
+    # processor = ImageSummaryProcessor(summarize=openai_image_summarizer(AsyncOpenAI()))
     # sections_3 = [await processor.process(s) for s in sections_3]
 
     print("Post-split processing: run any DocumentProcessor on each section before chunking.")

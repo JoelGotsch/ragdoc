@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://joelgotsch.github.io/ragdoc/guide/merging/">
       
       
-        <link rel="prev" href="../parsing/">
+        <link rel="prev" href="../processing/">
       
       
         <link rel="next" href="../rendering/">
@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -581,6 +581,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -700,6 +706,34 @@
     
   
     Parsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processing
   
 
     
@@ -1168,6 +1202,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../sync-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction & Knowledge Graphs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../custom-metadata/" class="md-nav__link">
         
   
@@ -1204,6 +1294,10 @@
   
     
     
+      
+        
+      
+        
       
         
       
@@ -1317,6 +1411,34 @@
     
   
     Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
   
 
     
@@ -1485,6 +1607,34 @@
     
   
     Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction
   
 
     
@@ -2049,8 +2199,8 @@
 </tr>
 <tr>
 <td>Standalone Images</td>
-<td>✓ preserved (base64 + URL)</td>
-<td>✓ preserved (base64 + URL)</td>
+<td>✓ preserved (base64)</td>
+<td>✓ preserved (base64)</td>
 </tr>
 <tr>
 <td>Inline Image refs (<code>&lt;ref&gt;</code>)</td>
@@ -2069,8 +2219,8 @@
 </tr>
 <tr>
 <td>doc_a-unique elements</td>
-<td>✓ preserved</td>
-<td>✓ preserved</td>
+<td>✗ dropped (<code>DELETE_A</code>; override <code>resolved_elements</code> to keep)</td>
+<td>✓ preserved (except in low-similarity replace blocks)</td>
 </tr>
 <tr>
 <td>Heading hierarchy detection</td>
@@ -2079,7 +2229,7 @@
 </tr>
 <tr>
 <td>Page / bounding-box metadata</td>
-<td>✓ preserved</td>
+<td>✓ preserved, except aligned headings (rebuilt: lose <code>page</code>, <code>bounding_box</code>, <code>metadata</code>, <code>id</code>)</td>
 <td>✗ lost (architectural)</td>
 </tr>
 </tbody>
@@ -2103,8 +2253,8 @@
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">merged</span> <span class="o">=</span> <span class="n">merge_documents_html</span><span class="p">(</span><span class="n">doc_mineru</span><span class="p">,</span> <span class="n">doc_azure_di</span><span class="p">)</span>
 </code></pre></div>
 <p>Both functions return a <code>Document</code> with <code>parser="merged"</code> and <code>metadata</code> set:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">merged</span><span class="o">.</span><span class="n">parser</span>          <span class="c1"># &quot;merged&quot;</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">merged</span><span class="o">.</span><span class="n">metadata</span>        <span class="c1"># {&quot;source_parser_a&quot;: &quot;mineru&quot;, &quot;source_parser_b&quot;: &quot;azure_di&quot;}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">merged</span><span class="o">.</span><span class="n">parser</span>          <span class="c1"># "merged"</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">merged</span><span class="o">.</span><span class="n">metadata</span>        <span class="c1"># {"source_parser_a": "mineru", "source_parser_b": "azure_di"}</span>
 </code></pre></div>
 <hr />
 <h2 id="pipeline-level-multi-source-parsing">Pipeline-level multi-source parsing<a class="headerlink" href="#pipeline-level-multi-source-parsing" title="Permanent link">&para;</a></h2>
@@ -2117,11 +2267,11 @@ awareness of the merge.</p>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.parsing.multi_source</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiSourceParser</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">merged_parser</span> <span class="o">=</span> <span class="n">MultiSourceParser</span><span class="p">(</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">primary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">&quot;mineru&quot;</span><span class="p">),</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">secondary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">&quot;azure_di&quot;</span><span class="p">),</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">primary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">"mineru"</span><span class="p">),</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">secondary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">"azure_di"</span><span class="p">),</span>
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="p">)</span>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">document</span> <span class="o">=</span> <span class="k">await</span> <span class="n">merged_parser</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;report_middle.json&quot;</span><span class="p">))</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">document</span> <span class="o">=</span> <span class="k">await</span> <span class="n">merged_parser</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"report_middle.json"</span><span class="p">))</span>
 </code></pre></div>
 <p>Both parsers receive the same path. The default merge strategy is <code>merge_documents</code>
 (Approach A).</p>
@@ -2134,11 +2284,11 @@ returned unchanged:</p>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.parsing.resolvers</span><span class="w"> </span><span class="kn">import</span> <span class="n">sibling_resolver</span>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">merged_parser</span> <span class="o">=</span> <span class="n">MultiSourceParser</span><span class="p">(</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">primary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">&quot;mineru&quot;</span><span class="p">),</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">secondary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">&quot;html&quot;</span><span class="p">),</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">secondary_resolver</span><span class="o">=</span><span class="n">sibling_resolver</span><span class="p">(</span><span class="s2">&quot;.html&quot;</span><span class="p">),</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;mineru_html&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">patterns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;_middle.json&quot;</span><span class="p">],</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">primary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">"mineru"</span><span class="p">),</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">secondary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">"html"</span><span class="p">),</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">secondary_resolver</span><span class="o">=</span><span class="n">sibling_resolver</span><span class="p">(</span><span class="s2">".html"</span><span class="p">),</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">"mineru_html"</span><span class="p">,</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">patterns</span><span class="o">=</span><span class="p">[</span><span class="s2">"_middle.json"</span><span class="p">],</span>
 <a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">priority</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
 <a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">)</span>
 <a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
@@ -2146,7 +2296,7 @@ returned unchanged:</p>
 <a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="c1"># parser because priority 60 &gt; 50 — see the Parsing guide for details)</span>
 <a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="n">register_parser</span><span class="p">(</span><span class="n">merged_parser</span><span class="p">)</span>
 <a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>
-<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="n">document</span> <span class="o">=</span> <span class="k">await</span> <span class="n">load</span><span class="p">(</span><span class="s2">&quot;report_middle.json&quot;</span><span class="p">)</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="n">document</span> <span class="o">=</span> <span class="k">await</span> <span class="n">load</span><span class="p">(</span><span class="s2">"report_middle.json"</span><span class="p">)</span>
 <a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="c1"># → merges MinerU output with report_middle.html if it exists on disk</span>
 </code></pre></div>
 <div class="admonition tip">
@@ -2165,21 +2315,21 @@ guide for details.</p>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">my_merge</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">merge_documents</span><span class="p">,</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">prefer_source</span><span class="o">=</span><span class="p">{</span><span class="n">ElementTypeEnum</span><span class="o">.</span><span class="n">TABLE</span><span class="p">:</span> <span class="s2">&quot;b&quot;</span><span class="p">},</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="n">prefer_source</span><span class="o">=</span><span class="p">{</span><span class="n">ElementTypeEnum</span><span class="o">.</span><span class="n">TABLE</span><span class="p">:</span> <span class="s2">"b"</span><span class="p">},</span>
 <a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="p">)</span>
 <a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
 <a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">merged_parser</span> <span class="o">=</span> <span class="n">MultiSourceParser</span><span class="p">(</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">primary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">&quot;mineru&quot;</span><span class="p">),</span>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">secondary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">&quot;html&quot;</span><span class="p">),</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">primary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">"mineru"</span><span class="p">),</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">secondary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">"html"</span><span class="p">),</span>
 <a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    <span class="n">merge</span><span class="o">=</span><span class="n">my_merge</span><span class="p">,</span>
 <a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="p">)</span>
 </code></pre></div>
 <h3 id="nesting-for-three-way-merges">Nesting for three-way merges<a class="headerlink" href="#nesting-for-three-way-merges" title="Permanent link">&para;</a></h3>
 <p><code>MultiSourceParser</code> itself inherits from <code>Parser</code>, so it can be nested:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">inner</span> <span class="o">=</span> <span class="n">MultiSourceParser</span><span class="p">(</span><span class="n">primary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">&quot;mineru&quot;</span><span class="p">),</span> <span class="n">secondary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">&quot;html&quot;</span><span class="p">))</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">outer</span> <span class="o">=</span> <span class="n">MultiSourceParser</span><span class="p">(</span><span class="n">primary</span><span class="o">=</span><span class="n">inner</span><span class="p">,</span> <span class="n">secondary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">&quot;azure_di&quot;</span><span class="p">))</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">inner</span> <span class="o">=</span> <span class="n">MultiSourceParser</span><span class="p">(</span><span class="n">primary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">"mineru"</span><span class="p">),</span> <span class="n">secondary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">"html"</span><span class="p">))</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">outer</span> <span class="o">=</span> <span class="n">MultiSourceParser</span><span class="p">(</span><span class="n">primary</span><span class="o">=</span><span class="n">inner</span><span class="p">,</span> <span class="n">secondary</span><span class="o">=</span><span class="n">get_parser</span><span class="p">(</span><span class="s2">"azure_di"</span><span class="p">))</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">document</span> <span class="o">=</span> <span class="k">await</span> <span class="n">outer</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;report_middle.json&quot;</span><span class="p">))</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">document</span> <span class="o">=</span> <span class="k">await</span> <span class="n">outer</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"report_middle.json"</span><span class="p">))</span>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># MinerU + HTML merged first, then merged again with Azure DI</span>
 </code></pre></div>
 <hr />
@@ -2192,8 +2342,8 @@ guide for details.</p>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">merged</span> <span class="o">=</span> <span class="n">merge_documents_html</span><span class="p">(</span>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">doc_a</span><span class="p">,</span> <span class="n">doc_b</span><span class="p">,</span>
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">prefer_source</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="n">ElementTypeEnum</span><span class="o">.</span><span class="n">HEADING</span><span class="p">:</span> <span class="s2">&quot;b&quot;</span><span class="p">,</span>   <span class="c1"># always take headings from doc_b</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        <span class="n">ElementTypeEnum</span><span class="o">.</span><span class="n">TABLE</span><span class="p">:</span> <span class="s2">&quot;a&quot;</span><span class="p">,</span>     <span class="c1"># always take tables from doc_a</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="n">ElementTypeEnum</span><span class="o">.</span><span class="n">HEADING</span><span class="p">:</span> <span class="s2">"b"</span><span class="p">,</span>   <span class="c1"># always take headings from doc_b</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        <span class="n">ElementTypeEnum</span><span class="o">.</span><span class="n">TABLE</span><span class="p">:</span> <span class="s2">"a"</span><span class="p">,</span>     <span class="c1"># always take tables from doc_a</span>
 <a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="p">},</span>
 <a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="p">)</span>
 </code></pre></div>
@@ -2222,14 +2372,14 @@ guide for details.</p>
 <a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="c1"># Inspect decisions</span>
 <a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">patch</span><span class="o">.</span><span class="n">operations</span><span class="p">:</span>
 <a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">op</span><span class="p">,</span> <span class="n">op</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="c1"># PatchOperationType.MERGE  &quot;richer markup from doc_b&quot;</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    <span class="c1"># PatchOperationType.KEEP_A &quot;identical text&quot;</span>
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="c1"># PatchOperationType.DELETE_A &quot;no counterpart in doc_b&quot;</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="c1"># PatchOperationType.MERGE  "richer markup from doc_b"</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>    <span class="c1"># PatchOperationType.KEEP_A "identical text"</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="c1"># PatchOperationType.DELETE_A "no counterpart in doc_b"</span>
 <a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="c1"># ...</span>
 <a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>
 <a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="c1"># Override a specific decision before applying</span>
 <a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.document</span><span class="w"> </span><span class="kn">import</span> <span class="n">Paragraph</span>
-<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="n">patch</span><span class="o">.</span><span class="n">operations</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">resolved_elements</span> <span class="o">=</span> <span class="p">[</span><span class="n">Paragraph</span><span class="p">(</span><span class="n">html_content</span><span class="o">=</span><span class="s2">&quot;&lt;p&gt;Custom&lt;/p&gt;&quot;</span><span class="p">)]</span>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="n">patch</span><span class="o">.</span><span class="n">operations</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">resolved_elements</span> <span class="o">=</span> <span class="p">[</span><span class="n">Paragraph</span><span class="p">(</span><span class="n">html</span><span class="o">=</span><span class="s2">"&lt;p&gt;Custom&lt;/p&gt;"</span><span class="p">)]</span>
 <a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>
 <a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="n">merged</span> <span class="o">=</span> <span class="n">patch</span><span class="o">.</span><span class="n">apply</span><span class="p">()</span>
 </code></pre></div>
@@ -2237,12 +2387,12 @@ guide for details.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">json_str</span> <span class="o">=</span> <span class="n">patch</span><span class="o">.</span><span class="n">model_dump_json</span><span class="p">()</span>
 </code></pre></div>
 <p>Source parser information is available on the patch:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">patch</span><span class="o">.</span><span class="n">source_parser_a</span>  <span class="c1"># &quot;mineru&quot;</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">patch</span><span class="o">.</span><span class="n">source_parser_b</span>  <span class="c1"># &quot;html&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">patch</span><span class="o">.</span><span class="n">source_parser_a</span>  <span class="c1"># "mineru"</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">patch</span><span class="o">.</span><span class="n">source_parser_b</span>  <span class="c1"># "html"</span>
 </code></pre></div>
 <h3 id="heading-level-selection-approach-a">Heading level selection (Approach A)<a class="headerlink" href="#heading-level-selection-approach-a" title="Permanent link">&para;</a></h3>
 <p>Approach A uses a <code>trust_parsers</code> set (default: <code>{"html", "pandoc"}</code>) to decide whose heading levels to trust. If only one parser is trusted, its heading levels win:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># mineru (flat h1s) + html (h1/h2/h3) → html&#39;s levels win</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># mineru (flat h1s) + html (h1/h2/h3) → html's levels win</span>
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">merged</span> <span class="o">=</span> <span class="n">merge_documents</span><span class="p">(</span><span class="n">doc_mineru</span><span class="p">,</span> <span class="n">doc_html</span><span class="p">)</span>
 </code></pre></div>
 <hr />
@@ -2256,13 +2406,13 @@ guide for details.</p>
 <a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="c1"># Inspect</span>
 <a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">patch</span><span class="o">.</span><span class="n">operations</span><span class="p">:</span>
 <a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">opcode</span><span class="p">,</span> <span class="n">op</span><span class="o">.</span><span class="n">selected</span><span class="p">)</span>
-<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="c1"># &quot;equal&quot;   [&#39;&lt;h2&gt;Introduction&lt;/h2&gt;&#39;]</span>
-<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    <span class="c1"># &quot;replace&quot; [&#39;&lt;p&gt;&lt;em&gt;enriched text&lt;/em&gt;&lt;/p&gt;&#39;]</span>
-<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    <span class="c1"># &quot;insert&quot;  [&#39;&lt;aside class=&quot;footnote&quot; ...&gt;...&lt;/aside&gt;&#39;]</span>
-<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="c1"># &quot;delete&quot;  [&#39;&lt;p&gt;Only in doc_a&lt;/p&gt;&#39;]</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="c1"># "equal"   ['&lt;h2&gt;Introduction&lt;/h2&gt;']</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>    <span class="c1"># "replace" ['&lt;p&gt;&lt;em&gt;enriched text&lt;/em&gt;&lt;/p&gt;']</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    <span class="c1"># "insert"  ['&lt;aside class="footnote" ...&gt;...&lt;/aside&gt;']</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="c1"># "delete"  ['&lt;p&gt;Only in doc_a&lt;/p&gt;']</span>
 <a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>
 <a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="c1"># Override before applying</span>
-<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="n">patch</span><span class="o">.</span><span class="n">operations</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">selected</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;&lt;h1&gt;Custom Title&lt;/h1&gt;&quot;</span><span class="p">]</span>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a><span class="n">patch</span><span class="o">.</span><span class="n">operations</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">selected</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"&lt;h1&gt;Custom Title&lt;/h1&gt;"</span><span class="p">]</span>
 <a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>
 <a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a><span class="n">merged</span> <span class="o">=</span> <span class="n">patch</span><span class="o">.</span><span class="n">apply</span><span class="p">()</span>
 </code></pre></div>
@@ -2284,7 +2434,7 @@ guide for details.</p>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># doc_a: all h1 (flat, no hierarchy)</span>
 <a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="c1"># doc_b: h1/h2/h3 (detected hierarchy)</span>
-<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="c1"># → merged uses doc_b&#39;s levels</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="c1"># → merged uses doc_b's levels</span>
 <a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">merged</span> <span class="o">=</span> <span class="n">merge_documents_html</span><span class="p">(</span><span class="n">doc_a</span><span class="p">,</span> <span class="n">doc_b</span><span class="p">)</span>
 </code></pre></div>
 <hr />
@@ -2292,9 +2442,9 @@ guide for details.</p>
 <h3 id="page-and-bounding-box-metadata">Page and bounding-box metadata<a class="headerlink" href="#page-and-bounding-box-metadata" title="Permanent link">&para;</a></h3>
 <p>Approach B loses page numbers, bounding boxes, and element-level metadata — <code>render_raw</code> emits only visual HTML. If you need this metadata, use Approach A.</p>
 <h3 id="images">Images<a class="headerlink" href="#images" title="Permanent link">&para;</a></h3>
-<p>Both approaches handle <code>Image</code> elements with base64 data or HTTP URLs:</p>
+<p>Both approaches handle <code>Image</code> elements (base64 data; <code>Image</code> has no URL form):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># base64 round-trips correctly through Approach B</span>
-<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">img</span> <span class="o">=</span> <span class="n">Image</span><span class="p">(</span><span class="n">image</span><span class="o">=</span><span class="n">base64_data</span><span class="p">,</span> <span class="n">image_type</span><span class="o">=</span><span class="s2">&quot;png&quot;</span><span class="p">,</span> <span class="n">alt</span><span class="o">=</span><span class="s2">&quot;Chart&quot;</span><span class="p">)</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">img</span> <span class="o">=</span> <span class="n">Image</span><span class="p">(</span><span class="n">image</span><span class="o">=</span><span class="n">base64_data</span><span class="p">,</span> <span class="n">image_type</span><span class="o">=</span><span class="s2">"png"</span><span class="p">,</span> <span class="n">alt</span><span class="o">=</span><span class="s2">"Chart"</span><span class="p">)</span>
 </code></pre></div>
 <p><code>Image(image=None)</code> — where no binary data is available — cannot survive the render-reparse pipeline and is silently absent from the Approach B result. This is expected and documented behaviour; use Approach A to preserve such elements.</p>
 <h3 id="footnote-inline-references">Footnote inline references<a class="headerlink" href="#footnote-inline-references" title="Permanent link">&para;</a></h3>
@@ -2305,9 +2455,9 @@ guide for details.</p>
 <a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>
 <a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">broken</span> <span class="o">=</span> <span class="n">validate_inline_refs</span><span class="p">(</span><span class="n">merged</span><span class="p">)</span>
 <a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="k">if</span> <span class="n">broken</span><span class="p">:</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Broken inline refs:&quot;</span><span class="p">,</span> <span class="n">broken</span><span class="p">)</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">"Broken inline refs:"</span><span class="p">,</span> <span class="n">broken</span><span class="p">)</span>
 <a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;All inline refs resolved&quot;</span><span class="p">)</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">"All inline refs resolved"</span><span class="p">)</span>
 </code></pre></div>
 <p><code>validate_inline_refs</code> returns a list of target IDs for which no matching element exists in the document.</p>
 
@@ -2386,7 +2536,7 @@ guide for details.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.tabs.link", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

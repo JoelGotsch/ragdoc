@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="./favicon.ico" />
+    <!-- Preload is necessary because we show these images when we disconnect from the server,
+    but at that point we cannot load these images from the server -->
+    <link rel="preload" href="./assets/gradient-yHQUC_QB.png" as="image" />
+    <link rel="preload" href="./assets/noise-60BoTA8O.png" as="image" />
+    <!-- Preload the fonts -->
+    <link rel="preload" href="./assets/Lora-VariableFont_wght-CZceb_kH.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/PTSans-Regular-Bam3NpBI.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/PTSans-Bold-C_DwAp7Z.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Regular-CEsLFVD9.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Medium-D5MAsWEG.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+    <link rel="preload" href="./assets/FiraMono-Bold-C6PDArdf.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="a marimo app" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.json" />
+
+    <script data-marimo="true">
+      function __resizeIframe(obj) {
+        const scrollbarHeight = 20; // Max between windows, mac, and linux
+
+        function setHeight() {
+          // Guard against race condition where iframe isn't ready
+          if (!obj.contentWindow?.document?.documentElement) {
+            return;
+          }
+          const element = obj.contentWindow.document.documentElement;
+          // If there is no vertical scrollbar, we don't need to resize the iframe
+          if (element.scrollHeight === element.clientHeight) {
+            return;
+          }
+
+          // Create a new height that includes the scrollbar height if it's visible
+          const hasHorizontalScrollbar = element.scrollWidth > element.clientWidth;
+          const newHeight = element.scrollHeight + (hasHorizontalScrollbar ? scrollbarHeight : 0);
+
+          // Only update the height if it's different from the current height
+          if (obj.style.height !== `${newHeight}px`) {
+            obj.style.height = `${newHeight}px`;
+          }
+        }
+
+        // Resize the iframe to the height of the content and bottom scrollbar height
+        setHeight();
+
+        // Resize the iframe when the content changes
+        const resizeObserver = new ResizeObserver((_entries) => {
+          setHeight();
+        });
+        // Only observe if iframe content is ready
+        if (obj.contentWindow?.document?.body) {
+          resizeObserver.observe(obj.contentWindow.document.body);
+        }
+      }
+    </script>
+    <marimo-filename hidden>notebook.py</marimo-filename>
+    <!-- TODO(Trevor): Legacy, required by VS Code plugin. Remove when plugin is updated (see marimo/server/_templates/template.py) -->
+    <marimo-version data-version="{{ version }}" hidden></marimo-version>
+    <marimo-user-config data-config="{{ user_config }}" hidden></marimo-user-config>
+    <marimo-server-token data-token="{{ server_token }}" hidden></marimo-server-token>
+    <!-- /TODO -->
+    <title>document model</title>
+    <script type="module" crossorigin src="./assets/index-DafnX1Xx.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-B0Z9INg1.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-CUdNIagt.js">
+    <link rel="modulepreload" crossorigin href="./assets/compiler-runtime-BQ9S8nyo.js">
+    <link rel="modulepreload" crossorigin href="./assets/useEvent-Dc9HkKI2.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-dom-CKsE8sC1.js">
+    <link rel="modulepreload" crossorigin href="./assets/schemas-BL-NsLlF.js">
+    <link rel="modulepreload" crossorigin href="./assets/isObject-BCaOs5rp.js">
+    <link rel="modulepreload" crossorigin href="./assets/isSymbol-oX0TOjjx.js">
+    <link rel="modulepreload" crossorigin href="./assets/now-Cmx0b_zA.js">
+    <link rel="modulepreload" crossorigin href="./assets/debounce-aFmHgJZY.js">
+    <link rel="modulepreload" crossorigin href="./assets/isArrayLikeObject-DnwgSs_Z.js">
+    <link rel="modulepreload" crossorigin href="./assets/_baseMerge-CQpUq7ep.js">
+    <link rel="modulepreload" crossorigin href="./assets/objects-snlMn4yk.js">
+    <link rel="modulepreload" crossorigin href="./assets/jsx-runtime-B74pBk57.js">
+    <link rel="modulepreload" crossorigin href="./assets/useEventListener-BdZUApHd.js">
+    <link rel="modulepreload" crossorigin href="./assets/invariant-Ci2dTZ72.js">
+    <link rel="modulepreload" crossorigin href="./assets/config-BxZgoFvi.js">
+    <link rel="modulepreload" crossorigin href="./assets/utils-B4K466FK.js">
+    <link rel="modulepreload" crossorigin href="./assets/session-DXKMv4Bs.js">
+    <link rel="modulepreload" crossorigin href="./assets/Deferred-CrTnjj37.js">
+    <link rel="modulepreload" crossorigin href="./assets/config-DpGPGznL.js">
+    <link rel="modulepreload" crossorigin href="./assets/clsx-DB0hHKMi.js">
+    <link rel="modulepreload" crossorigin href="./assets/cn-ldLVeaqm.js">
+    <link rel="modulepreload" crossorigin href="./assets/fullscreen-BmzAqMKq.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-CyYN7zJg.js">
+    <link rel="modulepreload" crossorigin href="./assets/menu-items-BBdeXCvU.js">
+    <link rel="modulepreload" crossorigin href="./assets/use-restore-focus-B98SEiGc.js">
+    <link rel="modulepreload" crossorigin href="./assets/button-BoklZTGL.js">
+    <link rel="modulepreload" crossorigin href="./assets/createLucideIcon-rHn2EdoM.js">
+    <link rel="modulepreload" crossorigin href="./assets/check-Wea4hZ6R.js">
+    <link rel="modulepreload" crossorigin href="./assets/context-BFOBKCJB.js">
+    <link rel="modulepreload" crossorigin href="./assets/useNumberFormatter-C4-_TnkF.js">
+    <link rel="modulepreload" crossorigin href="./assets/select-BplWpfFo.js">
+    <link rel="modulepreload" crossorigin href="./assets/circle-CeQt3rdW.js">
+    <link rel="modulepreload" crossorigin href="./assets/toast-KNfsFUiB.js">
+    <link rel="modulepreload" crossorigin href="./assets/tooltip-DR2Z2N4w.js">
+    <link rel="modulepreload" crossorigin href="./assets/paths-CzfpItSz.js">
+    <link rel="modulepreload" crossorigin href="./assets/useLifecycle-DKSBdWUf.js">
+    <link rel="modulepreload" crossorigin href="./assets/toDate-BbJ1_N2T.js">
+    <link rel="modulepreload" crossorigin href="./assets/database-zap-CrkOvbyN.js">
+    <link rel="modulepreload" crossorigin href="./assets/alert-dialog-CeE3i3Qa.js">
+    <link rel="modulepreload" crossorigin href="./assets/arrays-BqUx5USx.js">
+    <link rel="modulepreload" crossorigin href="./assets/once-Haz_uxEL.js">
+    <link rel="modulepreload" crossorigin href="./assets/numbers-DsgsDslU.js">
+    <link rel="modulepreload" crossorigin href="./assets/useDebounce-DMbg9X18.js">
+    <link rel="modulepreload" crossorigin href="./assets/input-BDakodZ2.js">
+    <link rel="modulepreload" crossorigin href="./assets/use-toast-CC89xOwH.js">
+    <link rel="modulepreload" crossorigin href="./assets/requests-yTHMxhVa.js">
+    <link rel="modulepreload" crossorigin href="./assets/uuid-k9DpjH68.js">
+    <link rel="modulepreload" crossorigin href="./assets/write-secret-modal-BiG2tahJ.js">
+    <link rel="modulepreload" crossorigin href="./assets/plus-gbN72xHe.js">
+    <link rel="modulepreload" crossorigin href="./assets/trash-2-BJG-7Qob.js">
+    <link rel="modulepreload" crossorigin href="./assets/preload-helper-HclGiUj8.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-BczecT6V.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-BTskHGpb.js">
+    <link rel="modulepreload" crossorigin href="./assets/capabilities-Bj3s1hGN.js">
+    <link rel="modulepreload" crossorigin href="./assets/cjs-C49f7GXV.js">
+    <link rel="modulepreload" crossorigin href="./assets/createReducer-BPvK7C_R.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-Ccyblc8N.js">
+    <link rel="modulepreload" crossorigin href="./assets/marked.esm-B_3iMIUq.js">
+    <link rel="modulepreload" crossorigin href="./assets/strings-BHZPE0Mc.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-BN-7G8qZ.js">
+    <link rel="modulepreload" crossorigin href="./assets/badge-DFf033uX.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-CiUBikfn.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-MRn68vX1.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-Bviq_Dee.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-DBqBVprh.js">
+    <link rel="modulepreload" crossorigin href="./assets/dist-DueXZKz9.js">
+    <link rel="modulepreload" crossorigin href="./assets/stex-CJTNBbet.js">
+    <link rel="modulepreload" crossorigin href="./assets/useTheme-DcnXlv0_.js">
+    <link rel="modulepreload" crossorigin href="./assets/useAsyncData-DucTwMkf.js">
+    <link rel="modulepreload" crossorigin href="./assets/purify.es-CYRiAeUx.js">
+    <link rel="modulepreload" crossorigin href="./assets/cells-CzugpTQu.js">
+    <link rel="modulepreload" crossorigin href="./assets/get-DjNf4SIX.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-RyCOE8jo.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-BhJktFeI.js">
+    <link rel="modulepreload" crossorigin href="./assets/copy-icon-DFhUGBjO.js">
+    <link rel="modulepreload" crossorigin href="./assets/ErrorBoundary-BeE1cdgM.js">
+    <link rel="modulepreload" crossorigin href="./assets/config-B4VJJibu.js">
+    <link rel="modulepreload" crossorigin href="./assets/chevron-right-DOPs2jx8.js">
+    <link rel="modulepreload" crossorigin href="./assets/dropdown-menu-VuyoeQOD.js">
+    <link rel="modulepreload" crossorigin href="./assets/LazyAnyLanguageCodeMirror-B_IYTCX5.js">
+    <link rel="modulepreload" crossorigin href="./assets/hat-glasses-DVgK5i5l.js">
+    <link rel="modulepreload" crossorigin href="./assets/package-BeYhVWvM.js">
+    <link rel="modulepreload" crossorigin href="./assets/errors-D9vyuMar.js">
+    <link rel="modulepreload" crossorigin href="./assets/defaultLocale-CNPGWpMu.js">
+    <link rel="modulepreload" crossorigin href="./assets/precisionRound-Bq_nmf5u.js">
+    <link rel="modulepreload" crossorigin href="./assets/defaultLocale-D5bOh7g6.js">
+    <link rel="modulepreload" crossorigin href="./assets/vega-loader.browser-CLRkNgm7.js">
+    <link rel="modulepreload" crossorigin href="./assets/tooltip-PLkI_UfK.js">
+    <link rel="modulepreload" crossorigin href="./assets/filename-fxG7K_MU.js">
+    <link rel="modulepreload" crossorigin href="./assets/micromark-factory-space-D9Dr-k4J.js">
+    <link rel="modulepreload" crossorigin href="./assets/chunk-YOKDWASO-CaoEAGJk.js">
+    <link rel="stylesheet" crossorigin href="./assets/cells-0PFKL3SH.css">
+    <link rel="stylesheet" crossorigin href="./assets/index--sT8xf-8.css">
+  <marimo-wasm hidden=""></marimo-wasm>
+    <script>
+        if (window.location.protocol === 'file:') {
+            alert('Warning: This file must be served by an HTTP server to function correctly.');
+        }
+    </script>
+    
+    <style>
+        #save-button {
+            display: none !important;
+        }
+        #filename-input {
+            display: none !important;
+        }
+    </style>
+    
+<script data-marimo="true">
+    Object.defineProperty(window, "__MARIMO_EXPORT_CONTEXT__", {
+        value: Object.freeze({
+            trusted: true,
+            notebookCode: "import marimo\n\n__generated_with = \"0.25.1\"\napp = marimo.App()\n\n\n@app.cell\ndef _():\n    import marimo as mo\n\n    return (mo,)\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    # Document Model\n\n    `Document` is the central data structure in ragdoc. Every pipeline stage \u2014 parsing,\n    processing, splitting, and chunking \u2014 operates on `Document` objects. It is the single\n    source of truth throughout the pipeline.\n    \"\"\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Structure\n\n    A `Document` is a Pydantic model containing:\n\n    - **`id`** \u2014 Unique identifier (UUID string)\n    - **`title`** \u2014 Optional document title\n    - **`elements`** \u2014 Ordered list of `BaseElement` subclasses\n    - **`metadata`** \u2014 Arbitrary key-value metadata (dict)\n    - **`external_refs`** \u2014 List of `ExternalRef` for cross-document links\n    - **`parser`** \u2014 Provenance string set by the parser (e.g. `\"azure_di\"`, `\"pandoc\"`)\n    \"\"\")\n    return\n\n\n@app.cell\ndef _():\n    from ragdoc.document import Document, Heading, Paragraph\n\n    doc = Document(\n        title=\"Annual Report\",\n        elements=[\n            Heading(html=\"\u003Ch1\u003EIntroduction\u003C/h1\u003E\"),\n            Paragraph(html=\"\u003Cp\u003EThis report covers...\u003C/p\u003E\"),\n        ],\n        metadata={\"source\": \"annual_report.docx\", \"year\": 2024},\n    )\n\n    print(f\"id={doc.id!r}\")\n    print(f\"title={doc.title!r}\")\n    print(f\"parser={doc.parser!r}\")\n    print(f\"elements={len(doc.elements)}\")\n    print(f\"metadata={doc.metadata}\")\n    return Document, Heading, Paragraph\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Element types\n\n    All elements inherit from [`BaseElement`][ragdoc.document.BaseElement]:\n\n    | Type | Description |\n    |------|-------------|\n    | `Heading` | Section heading; stored `html` carries the outer `\u003Ch1\u003E`\u2013`\u003Ch6\u003E` tag (`level` derived) |\n    | `Paragraph` | Body text with HTML content |\n    | `Table` | Table with HTML content (`\u003Ctable\u003E...\u003C/table\u003E`) |\n    | `Image` | Image with base64 data, alt text, and optional `text_representation` |\n    | `DocumentList` | Ordered or unordered list |\n    | `Footnote` | Footnote definition with number and text |\n    | `RawText` | Raw HTML content (pre-formatted blocks), always inside one outer `\u003Cdiv\u003E` |\n\n    Elements are strict: an unknown or outdated constructor keyword (for example the old\n    `html_content=`) raises a `ValidationError` instead of being silently dropped.\n    \"\"\")\n    return\n\n\n@app.cell\ndef _():\n    from ragdoc.document import DocumentList, Footnote, Image, RawText, Table\n\n    # Construct examples of each element type\n    table = Table(html=\"\u003Ctable\u003E\u003Ctr\u003E\u003Cth\u003EA\u003C/th\u003E\u003C/tr\u003E\u003C/table\u003E\")\n    fn = Footnote(innerhtml=\"\u003Cp\u003ESee Statute Art. IV.\u003C/p\u003E\", number=1)\n    # RawText only guarantees an outer \u003Cdiv\u003E: the content is wrapped verbatim, never rewritten.\n    raw = RawText(html=\"\u003Cpre\u003Ecode block\u003C/pre\u003E\")\n\n    print(f\"Table element_type: {table.element_type!r}\")\n    print(f\"Footnote number: {fn.number}\")\n    print(f\"RawText html:      {raw.html}\")  # \u003Cdiv\u003E\u003Cpre\u003Ecode block\u003C/pre\u003E\u003C/div\u003E\n    print(f\"RawText innerhtml: {raw.innerhtml}\")  # \u003Cpre\u003Ecode block\u003C/pre\u003E\n    return Image, Table, raw\n\n\n@app.cell\ndef test_rawtext_wraps_without_rewriting(raw):\n    assert raw.html == \"\u003Cdiv\u003E\u003Cpre\u003Ecode block\u003C/pre\u003E\u003C/div\u003E\"\n    assert raw.innerhtml == \"\u003Cpre\u003Ecode block\u003C/pre\u003E\"\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ### Image `text_representation`\n\n    `Image` elements have an optional `text_representation` field. This is populated by\n    `ImageSummaryProcessor`. `render_for_prompt` renders an image as its `text_representation`,\n    else its `alt` text, else `[Unprocessed Image]`. The `ImageSummary` model also has a\n    `decorative` flag; for a decorative image the processor leaves `text_representation` unset.\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(Image):\n    # Demonstrate text_representation field on Image\n    image_el = Image(alt=\"Revenue chart\")\n    image_el.text_representation = \"Bar chart showing revenue growth from 2020 to 2024.\"\n\n    # render_for_prompt uses text_representation as a text fallback for images\n    print(f\"image.text_representation={image_el.text_representation!r}\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Inline references\n\n    Within a document, elements can reference each other using `\u003Cref id=\"...\" rel=\"...\"/\u003E`\n    tags embedded in HTML content. This is how images embedded in paragraphs, footnote\n    markers, and inline tables are represented.\n\n    The `Renderer` resolves these `\u003Cref\u003E` tags inline when generating prompt content.\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(Document, Image, Paragraph):\n    img = Image(alt=\"Revenue chart\")\n\n    doc_with_ref = Document(\n        elements=[\n            Paragraph(html=f'\u003Cp\u003EAs shown in \u003Cref id=\"{img.id}\" rel=\"image\"/\u003E, revenue grew...\u003C/p\u003E'),\n            img,\n        ],\n    )\n\n    # The renderer replaces \u003Cref\u003E tags with the rendered content of the referenced element\n    from ragdoc.rendering import OutputFormat, Renderer, render_for_prompt\n    renderer = Renderer(format=OutputFormat.MARKDOWN, element_renderer=render_for_prompt)\n    print(renderer.render(doc_with_ref))\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Cross-document references\n\n    [`ExternalRef`][ragdoc.document.ExternalRef] records relationships between documents \u2014\n    typically parent/child links created by the splitter:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(Document, Heading, Paragraph):\n    from ragdoc.document import ExternalRef\n\n    parent_doc = Document(\n        title=\"Full Report\",\n        elements=[Heading(html=\"\u003Ch1\u003EFull Report\u003C/h1\u003E\")],\n    )\n    child_doc = Document(\n        title=\"Introduction\",\n        elements=[Paragraph(html=\"\u003Cp\u003EIntroduction text.\u003C/p\u003E\")],\n    )\n\n    # Splitters set this external-parent link on every split (the reverse link below is manual)\n    child_doc.external_refs = [\n        ExternalRef(target_id=parent_doc.id, rel_type=\"external-parent\")\n    ]\n    parent_doc.external_refs = [\n        ExternalRef(target_id=child_doc.id, rel_type=\"external-child\")\n    ]\n\n    print(f\"Child refs: {[r.rel_type for r in child_doc.external_refs]}\")\n    print(f\"Parent refs: {[r.rel_type for r in parent_doc.external_refs]}\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Convenience properties\n\n    `Document` exposes typed property accessors for each element type:\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(Document, Heading, Paragraph, Table):\n    demo_doc = Document(\n        elements=[\n            Heading(html=\"\u003Ch1\u003ETitle\u003C/h1\u003E\"),\n            Paragraph(html=\"\u003Cp\u003EText.\u003C/p\u003E\"),\n            Table(html=\"\u003Ctable\u003E\u003C/table\u003E\"),\n            Heading(html=\"\u003Ch2\u003ESection\u003C/h2\u003E\"),\n        ]\n    )\n\n    print(f\"headings:    {[h.level for h in demo_doc.headings]}\")\n    print(f\"paragraphs:  {len(demo_doc.paragraphs)}\")\n    print(f\"tables:      {len(demo_doc.tables)}\")\n    print(f\"main_heading: {demo_doc.main_heading.text if demo_doc.main_heading else None!r}\")\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## Concatenating documents\n\n    `concat_documents(first, second)` appends `second`'s elements after `first`'s and returns\n    a **new** `Document`; neither input is mutated. `join_documents([...])` does the same\n    left-to-right over a list. (There is no `|` operator on `Document`.)\n\n    | Field | Result |\n    |---|---|\n    | `title` | `first.title or second.title` |\n    | `elements` | first's, then \u2014 if **both** have a title \u2014 an `\u003Ch1\u003E` carrying `second.title`, then second's |\n    | `metadata` | merged; on a conflicting key `metadata_policy` decides: `\"first\"` (default) / `\"second\"` wins, `\"strict\"` raises `ValueError` |\n    | `id` | a new id |\n    | `source_id`, `source_hash` | `None` \u2014 the result is new content |\n\n    This is plain concatenation. To *align* two parses of the **same** source (e.g. two PDF\n    parsers) use `ragdoc.merging.merge_documents` \u2014 see the [Merging notebook](merging.py).\n    \"\"\")\n    return\n\n\n@app.cell\ndef _(Document, Heading, Paragraph):\n    from ragdoc.document import concat_documents, join_documents\n\n    part_one = Document(\n        title=\"Part One\",\n        elements=[Paragraph(html=\"\u003Cp\u003EFirst part.\u003C/p\u003E\")],\n        metadata={\"filename\": \"one.html\", \"language\": \"en\"},\n    )\n    part_two = Document(\n        title=\"Part Two\",\n        elements=[Paragraph(html=\"\u003Cp\u003ESecond part.\u003C/p\u003E\")],\n        metadata={\"filename\": \"two.html\"},\n    )\n\n    combined = concat_documents(part_one, part_two)\n    print(f\"title:    {combined.title!r}\")\n    print(f\"elements: {[(type(e).__name__, e.text) for e in combined.elements]}\")\n    print(f\"metadata: {combined.metadata}\")\n\n    combined_second_wins = concat_documents(part_one, part_two, metadata_policy=\"second\")\n    try:\n        concat_documents(part_one, part_two, metadata_policy=\"strict\")\n        strict_error = None\n    except ValueError as _exc:\n        strict_error = str(_exc)\n    print(f\"strict:   {strict_error}\")\n\n    joined = join_documents([part_one, part_two, Document(elements=[Heading(html=\"\u003Ch2\u003EAppendix\u003C/h2\u003E\")])])\n    return (\n        combined,\n        combined_second_wins,\n        joined,\n        part_one,\n        part_two,\n        strict_error,\n    )\n\n\n@app.cell\ndef test_concat_documents(\n    combined,\n    combined_second_wins,\n    joined,\n    part_one,\n    part_two,\n    strict_error,\n):\n    # Elements: first's, a bridge \u003Ch1\u003E with the second title, then second's.\n    assert [e.text for e in combined.elements] == [\"First part.\", \"Part Two\", \"Second part.\"]\n    assert combined.elements[1].level == 1\n    assert combined.title == \"Part One\"\n    # Metadata: first wins by default, second on request, \"strict\" refuses the conflict.\n    assert combined.metadata == {\"filename\": \"one.html\", \"language\": \"en\"}\n    assert combined_second_wins.metadata == {\"filename\": \"two.html\", \"language\": \"en\"}\n    assert strict_error is not None and \"filename\" in strict_error\n    # A new document: new id, no inherited sync identity, inputs untouched.\n    assert combined.id not in {part_one.id, part_two.id}\n    assert combined.source_id is None\n    assert len(part_one.elements) == 1 and len(part_two.elements) == 1\n    # join_documents folds a list left-to-right.\n    assert [e.text for e in joined.elements] == [\"First part.\", \"Part Two\", \"Second part.\", \"Appendix\"]\n    return\n\n\n@app.cell(hide_code=True)\ndef _(mo):\n    mo.md(r\"\"\"\n    ## See Also\n\n    - [API Reference: Document][ragdoc.document]\n    - [Parsing notebook](parsing.py) \u2014 how parsers produce Documents\n    - [Processing API][ragdoc.processing] \u2014 processors that enrich documents\n    \"\"\")\n    return\n\n\nif __name__ == \"__main__\":\n    app.run()\n",
+        }),
+        writable: false,
+        configurable: false,
+    });
+</script>
+<marimo-code hidden="">import%20marimo%0A%0A__generated_with%20%3D%20%220.25.1%22%0Aapp%20%3D%20marimo.App()%0A%0A%0A%40app.cell%0Adef%20_()%3A%0A%20%20%20%20import%20marimo%20as%20mo%0A%0A%20%20%20%20return%20(mo%2C)%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%20Document%20Model%0A%0A%20%20%20%20%60Document%60%20is%20the%20central%20data%20structure%20in%20ragdoc.%20Every%20pipeline%20stage%20%E2%80%94%20parsing%2C%0A%20%20%20%20processing%2C%20splitting%2C%20and%20chunking%20%E2%80%94%20operates%20on%20%60Document%60%20objects.%20It%20is%20the%20single%0A%20%20%20%20source%20of%20truth%20throughout%20the%20pipeline.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Structure%0A%0A%20%20%20%20A%20%60Document%60%20is%20a%20Pydantic%20model%20containing%3A%0A%0A%20%20%20%20-%20**%60id%60**%20%E2%80%94%20Unique%20identifier%20(UUID%20string)%0A%20%20%20%20-%20**%60title%60**%20%E2%80%94%20Optional%20document%20title%0A%20%20%20%20-%20**%60elements%60**%20%E2%80%94%20Ordered%20list%20of%20%60BaseElement%60%20subclasses%0A%20%20%20%20-%20**%60metadata%60**%20%E2%80%94%20Arbitrary%20key-value%20metadata%20(dict)%0A%20%20%20%20-%20**%60external_refs%60**%20%E2%80%94%20List%20of%20%60ExternalRef%60%20for%20cross-document%20links%0A%20%20%20%20-%20**%60parser%60**%20%E2%80%94%20Provenance%20string%20set%20by%20the%20parser%20(e.g.%20%60%22azure_di%22%60%2C%20%60%22pandoc%22%60)%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_()%3A%0A%20%20%20%20from%20ragdoc.document%20import%20Document%2C%20Heading%2C%20Paragraph%0A%0A%20%20%20%20doc%20%3D%20Document(%0A%20%20%20%20%20%20%20%20title%3D%22Annual%20Report%22%2C%0A%20%20%20%20%20%20%20%20elements%3D%5B%0A%20%20%20%20%20%20%20%20%20%20%20%20Heading(html%3D%22%3Ch1%3EIntroduction%3C%2Fh1%3E%22)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Paragraph(html%3D%22%3Cp%3EThis%20report%20covers...%3C%2Fp%3E%22)%2C%0A%20%20%20%20%20%20%20%20%5D%2C%0A%20%20%20%20%20%20%20%20metadata%3D%7B%22source%22%3A%20%22annual_report.docx%22%2C%20%22year%22%3A%202024%7D%2C%0A%20%20%20%20)%0A%0A%20%20%20%20print(f%22id%3D%7Bdoc.id!r%7D%22)%0A%20%20%20%20print(f%22title%3D%7Bdoc.title!r%7D%22)%0A%20%20%20%20print(f%22parser%3D%7Bdoc.parser!r%7D%22)%0A%20%20%20%20print(f%22elements%3D%7Blen(doc.elements)%7D%22)%0A%20%20%20%20print(f%22metadata%3D%7Bdoc.metadata%7D%22)%0A%20%20%20%20return%20Document%2C%20Heading%2C%20Paragraph%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Element%20types%0A%0A%20%20%20%20All%20elements%20inherit%20from%20%5B%60BaseElement%60%5D%5Bragdoc.document.BaseElement%5D%3A%0A%0A%20%20%20%20%7C%20Type%20%7C%20Description%20%7C%0A%20%20%20%20%7C------%7C-------------%7C%0A%20%20%20%20%7C%20%60Heading%60%20%7C%20Section%20heading%3B%20stored%20%60html%60%20carries%20the%20outer%20%60%3Ch1%3E%60%E2%80%93%60%3Ch6%3E%60%20tag%20(%60level%60%20derived)%20%7C%0A%20%20%20%20%7C%20%60Paragraph%60%20%7C%20Body%20text%20with%20HTML%20content%20%7C%0A%20%20%20%20%7C%20%60Table%60%20%7C%20Table%20with%20HTML%20content%20(%60%3Ctable%3E...%3C%2Ftable%3E%60)%20%7C%0A%20%20%20%20%7C%20%60Image%60%20%7C%20Image%20with%20base64%20data%2C%20alt%20text%2C%20and%20optional%20%60text_representation%60%20%7C%0A%20%20%20%20%7C%20%60DocumentList%60%20%7C%20Ordered%20or%20unordered%20list%20%7C%0A%20%20%20%20%7C%20%60Footnote%60%20%7C%20Footnote%20definition%20with%20number%20and%20text%20%7C%0A%20%20%20%20%7C%20%60RawText%60%20%7C%20Raw%20HTML%20content%20(pre-formatted%20blocks)%2C%20always%20inside%20one%20outer%20%60%3Cdiv%3E%60%20%7C%0A%0A%20%20%20%20Elements%20are%20strict%3A%20an%20unknown%20or%20outdated%20constructor%20keyword%20(for%20example%20the%20old%0A%20%20%20%20%60html_content%3D%60)%20raises%20a%20%60ValidationError%60%20instead%20of%20being%20silently%20dropped.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_()%3A%0A%20%20%20%20from%20ragdoc.document%20import%20DocumentList%2C%20Footnote%2C%20Image%2C%20RawText%2C%20Table%0A%0A%20%20%20%20%23%20Construct%20examples%20of%20each%20element%20type%0A%20%20%20%20table%20%3D%20Table(html%3D%22%3Ctable%3E%3Ctr%3E%3Cth%3EA%3C%2Fth%3E%3C%2Ftr%3E%3C%2Ftable%3E%22)%0A%20%20%20%20fn%20%3D%20Footnote(innerhtml%3D%22%3Cp%3ESee%20Statute%20Art.%20IV.%3C%2Fp%3E%22%2C%20number%3D1)%0A%20%20%20%20%23%20RawText%20only%20guarantees%20an%20outer%20%3Cdiv%3E%3A%20the%20content%20is%20wrapped%20verbatim%2C%20never%20rewritten.%0A%20%20%20%20raw%20%3D%20RawText(html%3D%22%3Cpre%3Ecode%20block%3C%2Fpre%3E%22)%0A%0A%20%20%20%20print(f%22Table%20element_type%3A%20%7Btable.element_type!r%7D%22)%0A%20%20%20%20print(f%22Footnote%20number%3A%20%7Bfn.number%7D%22)%0A%20%20%20%20print(f%22RawText%20html%3A%20%20%20%20%20%20%7Braw.html%7D%22)%20%20%23%20%3Cdiv%3E%3Cpre%3Ecode%20block%3C%2Fpre%3E%3C%2Fdiv%3E%0A%20%20%20%20print(f%22RawText%20innerhtml%3A%20%7Braw.innerhtml%7D%22)%20%20%23%20%3Cpre%3Ecode%20block%3C%2Fpre%3E%0A%20%20%20%20return%20Image%2C%20Table%2C%20raw%0A%0A%0A%40app.cell%0Adef%20test_rawtext_wraps_without_rewriting(raw)%3A%0A%20%20%20%20assert%20raw.html%20%3D%3D%20%22%3Cdiv%3E%3Cpre%3Ecode%20block%3C%2Fpre%3E%3C%2Fdiv%3E%22%0A%20%20%20%20assert%20raw.innerhtml%20%3D%3D%20%22%3Cpre%3Ecode%20block%3C%2Fpre%3E%22%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%23%20Image%20%60text_representation%60%0A%0A%20%20%20%20%60Image%60%20elements%20have%20an%20optional%20%60text_representation%60%20field.%20This%20is%20populated%20by%0A%20%20%20%20%60ImageSummaryProcessor%60.%20%60render_for_prompt%60%20renders%20an%20image%20as%20its%20%60text_representation%60%2C%0A%20%20%20%20else%20its%20%60alt%60%20text%2C%20else%20%60%5BUnprocessed%20Image%5D%60.%20The%20%60ImageSummary%60%20model%20also%20has%20a%0A%20%20%20%20%60decorative%60%20flag%3B%20for%20a%20decorative%20image%20the%20processor%20leaves%20%60text_representation%60%20unset.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(Image)%3A%0A%20%20%20%20%23%20Demonstrate%20text_representation%20field%20on%20Image%0A%20%20%20%20image_el%20%3D%20Image(alt%3D%22Revenue%20chart%22)%0A%20%20%20%20image_el.text_representation%20%3D%20%22Bar%20chart%20showing%20revenue%20growth%20from%202020%20to%202024.%22%0A%0A%20%20%20%20%23%20render_for_prompt%20uses%20text_representation%20as%20a%20text%20fallback%20for%20images%0A%20%20%20%20print(f%22image.text_representation%3D%7Bimage_el.text_representation!r%7D%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Inline%20references%0A%0A%20%20%20%20Within%20a%20document%2C%20elements%20can%20reference%20each%20other%20using%20%60%3Cref%20id%3D%22...%22%20rel%3D%22...%22%2F%3E%60%0A%20%20%20%20tags%20embedded%20in%20HTML%20content.%20This%20is%20how%20images%20embedded%20in%20paragraphs%2C%20footnote%0A%20%20%20%20markers%2C%20and%20inline%20tables%20are%20represented.%0A%0A%20%20%20%20The%20%60Renderer%60%20resolves%20these%20%60%3Cref%3E%60%20tags%20inline%20when%20generating%20prompt%20content.%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(Document%2C%20Image%2C%20Paragraph)%3A%0A%20%20%20%20img%20%3D%20Image(alt%3D%22Revenue%20chart%22)%0A%0A%20%20%20%20doc_with_ref%20%3D%20Document(%0A%20%20%20%20%20%20%20%20elements%3D%5B%0A%20%20%20%20%20%20%20%20%20%20%20%20Paragraph(html%3Df'%3Cp%3EAs%20shown%20in%20%3Cref%20id%3D%22%7Bimg.id%7D%22%20rel%3D%22image%22%2F%3E%2C%20revenue%20grew...%3C%2Fp%3E')%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20img%2C%0A%20%20%20%20%20%20%20%20%5D%2C%0A%20%20%20%20)%0A%0A%20%20%20%20%23%20The%20renderer%20replaces%20%3Cref%3E%20tags%20with%20the%20rendered%20content%20of%20the%20referenced%20element%0A%20%20%20%20from%20ragdoc.rendering%20import%20OutputFormat%2C%20Renderer%2C%20render_for_prompt%0A%20%20%20%20renderer%20%3D%20Renderer(format%3DOutputFormat.MARKDOWN%2C%20element_renderer%3Drender_for_prompt)%0A%20%20%20%20print(renderer.render(doc_with_ref))%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Cross-document%20references%0A%0A%20%20%20%20%5B%60ExternalRef%60%5D%5Bragdoc.document.ExternalRef%5D%20records%20relationships%20between%20documents%20%E2%80%94%0A%20%20%20%20typically%20parent%2Fchild%20links%20created%20by%20the%20splitter%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(Document%2C%20Heading%2C%20Paragraph)%3A%0A%20%20%20%20from%20ragdoc.document%20import%20ExternalRef%0A%0A%20%20%20%20parent_doc%20%3D%20Document(%0A%20%20%20%20%20%20%20%20title%3D%22Full%20Report%22%2C%0A%20%20%20%20%20%20%20%20elements%3D%5BHeading(html%3D%22%3Ch1%3EFull%20Report%3C%2Fh1%3E%22)%5D%2C%0A%20%20%20%20)%0A%20%20%20%20child_doc%20%3D%20Document(%0A%20%20%20%20%20%20%20%20title%3D%22Introduction%22%2C%0A%20%20%20%20%20%20%20%20elements%3D%5BParagraph(html%3D%22%3Cp%3EIntroduction%20text.%3C%2Fp%3E%22)%5D%2C%0A%20%20%20%20)%0A%0A%20%20%20%20%23%20Splitters%20set%20this%20external-parent%20link%20on%20every%20split%20(the%20reverse%20link%20below%20is%20manual)%0A%20%20%20%20child_doc.external_refs%20%3D%20%5B%0A%20%20%20%20%20%20%20%20ExternalRef(target_id%3Dparent_doc.id%2C%20rel_type%3D%22external-parent%22)%0A%20%20%20%20%5D%0A%20%20%20%20parent_doc.external_refs%20%3D%20%5B%0A%20%20%20%20%20%20%20%20ExternalRef(target_id%3Dchild_doc.id%2C%20rel_type%3D%22external-child%22)%0A%20%20%20%20%5D%0A%0A%20%20%20%20print(f%22Child%20refs%3A%20%7B%5Br.rel_type%20for%20r%20in%20child_doc.external_refs%5D%7D%22)%0A%20%20%20%20print(f%22Parent%20refs%3A%20%7B%5Br.rel_type%20for%20r%20in%20parent_doc.external_refs%5D%7D%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Convenience%20properties%0A%0A%20%20%20%20%60Document%60%20exposes%20typed%20property%20accessors%20for%20each%20element%20type%3A%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(Document%2C%20Heading%2C%20Paragraph%2C%20Table)%3A%0A%20%20%20%20demo_doc%20%3D%20Document(%0A%20%20%20%20%20%20%20%20elements%3D%5B%0A%20%20%20%20%20%20%20%20%20%20%20%20Heading(html%3D%22%3Ch1%3ETitle%3C%2Fh1%3E%22)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Paragraph(html%3D%22%3Cp%3EText.%3C%2Fp%3E%22)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Table(html%3D%22%3Ctable%3E%3C%2Ftable%3E%22)%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20Heading(html%3D%22%3Ch2%3ESection%3C%2Fh2%3E%22)%2C%0A%20%20%20%20%20%20%20%20%5D%0A%20%20%20%20)%0A%0A%20%20%20%20print(f%22headings%3A%20%20%20%20%7B%5Bh.level%20for%20h%20in%20demo_doc.headings%5D%7D%22)%0A%20%20%20%20print(f%22paragraphs%3A%20%20%7Blen(demo_doc.paragraphs)%7D%22)%0A%20%20%20%20print(f%22tables%3A%20%20%20%20%20%20%7Blen(demo_doc.tables)%7D%22)%0A%20%20%20%20print(f%22main_heading%3A%20%7Bdemo_doc.main_heading.text%20if%20demo_doc.main_heading%20else%20None!r%7D%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20Concatenating%20documents%0A%0A%20%20%20%20%60concat_documents(first%2C%20second)%60%20appends%20%60second%60's%20elements%20after%20%60first%60's%20and%20returns%0A%20%20%20%20a%20**new**%20%60Document%60%3B%20neither%20input%20is%20mutated.%20%60join_documents(%5B...%5D)%60%20does%20the%20same%0A%20%20%20%20left-to-right%20over%20a%20list.%20(There%20is%20no%20%60%7C%60%20operator%20on%20%60Document%60.)%0A%0A%20%20%20%20%7C%20Field%20%7C%20Result%20%7C%0A%20%20%20%20%7C---%7C---%7C%0A%20%20%20%20%7C%20%60title%60%20%7C%20%60first.title%20or%20second.title%60%20%7C%0A%20%20%20%20%7C%20%60elements%60%20%7C%20first's%2C%20then%20%E2%80%94%20if%20**both**%20have%20a%20title%20%E2%80%94%20an%20%60%3Ch1%3E%60%20carrying%20%60second.title%60%2C%20then%20second's%20%7C%0A%20%20%20%20%7C%20%60metadata%60%20%7C%20merged%3B%20on%20a%20conflicting%20key%20%60metadata_policy%60%20decides%3A%20%60%22first%22%60%20(default)%20%2F%20%60%22second%22%60%20wins%2C%20%60%22strict%22%60%20raises%20%60ValueError%60%20%7C%0A%20%20%20%20%7C%20%60id%60%20%7C%20a%20new%20id%20%7C%0A%20%20%20%20%7C%20%60source_id%60%2C%20%60source_hash%60%20%7C%20%60None%60%20%E2%80%94%20the%20result%20is%20new%20content%20%7C%0A%0A%20%20%20%20This%20is%20plain%20concatenation.%20To%20*align*%20two%20parses%20of%20the%20**same**%20source%20(e.g.%20two%20PDF%0A%20%20%20%20parsers)%20use%20%60ragdoc.merging.merge_documents%60%20%E2%80%94%20see%20the%20%5BMerging%20notebook%5D(merging.py).%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0A%40app.cell%0Adef%20_(Document%2C%20Heading%2C%20Paragraph)%3A%0A%20%20%20%20from%20ragdoc.document%20import%20concat_documents%2C%20join_documents%0A%0A%20%20%20%20part_one%20%3D%20Document(%0A%20%20%20%20%20%20%20%20title%3D%22Part%20One%22%2C%0A%20%20%20%20%20%20%20%20elements%3D%5BParagraph(html%3D%22%3Cp%3EFirst%20part.%3C%2Fp%3E%22)%5D%2C%0A%20%20%20%20%20%20%20%20metadata%3D%7B%22filename%22%3A%20%22one.html%22%2C%20%22language%22%3A%20%22en%22%7D%2C%0A%20%20%20%20)%0A%20%20%20%20part_two%20%3D%20Document(%0A%20%20%20%20%20%20%20%20title%3D%22Part%20Two%22%2C%0A%20%20%20%20%20%20%20%20elements%3D%5BParagraph(html%3D%22%3Cp%3ESecond%20part.%3C%2Fp%3E%22)%5D%2C%0A%20%20%20%20%20%20%20%20metadata%3D%7B%22filename%22%3A%20%22two.html%22%7D%2C%0A%20%20%20%20)%0A%0A%20%20%20%20combined%20%3D%20concat_documents(part_one%2C%20part_two)%0A%20%20%20%20print(f%22title%3A%20%20%20%20%7Bcombined.title!r%7D%22)%0A%20%20%20%20print(f%22elements%3A%20%7B%5B(type(e).__name__%2C%20e.text)%20for%20e%20in%20combined.elements%5D%7D%22)%0A%20%20%20%20print(f%22metadata%3A%20%7Bcombined.metadata%7D%22)%0A%0A%20%20%20%20combined_second_wins%20%3D%20concat_documents(part_one%2C%20part_two%2C%20metadata_policy%3D%22second%22)%0A%20%20%20%20try%3A%0A%20%20%20%20%20%20%20%20concat_documents(part_one%2C%20part_two%2C%20metadata_policy%3D%22strict%22)%0A%20%20%20%20%20%20%20%20strict_error%20%3D%20None%0A%20%20%20%20except%20ValueError%20as%20_exc%3A%0A%20%20%20%20%20%20%20%20strict_error%20%3D%20str(_exc)%0A%20%20%20%20print(f%22strict%3A%20%20%20%7Bstrict_error%7D%22)%0A%0A%20%20%20%20joined%20%3D%20join_documents(%5Bpart_one%2C%20part_two%2C%20Document(elements%3D%5BHeading(html%3D%22%3Ch2%3EAppendix%3C%2Fh2%3E%22)%5D)%5D)%0A%20%20%20%20return%20(%0A%20%20%20%20%20%20%20%20combined%2C%0A%20%20%20%20%20%20%20%20combined_second_wins%2C%0A%20%20%20%20%20%20%20%20joined%2C%0A%20%20%20%20%20%20%20%20part_one%2C%0A%20%20%20%20%20%20%20%20part_two%2C%0A%20%20%20%20%20%20%20%20strict_error%2C%0A%20%20%20%20)%0A%0A%0A%40app.cell%0Adef%20test_concat_documents(%0A%20%20%20%20combined%2C%0A%20%20%20%20combined_second_wins%2C%0A%20%20%20%20joined%2C%0A%20%20%20%20part_one%2C%0A%20%20%20%20part_two%2C%0A%20%20%20%20strict_error%2C%0A)%3A%0A%20%20%20%20%23%20Elements%3A%20first's%2C%20a%20bridge%20%3Ch1%3E%20with%20the%20second%20title%2C%20then%20second's.%0A%20%20%20%20assert%20%5Be.text%20for%20e%20in%20combined.elements%5D%20%3D%3D%20%5B%22First%20part.%22%2C%20%22Part%20Two%22%2C%20%22Second%20part.%22%5D%0A%20%20%20%20assert%20combined.elements%5B1%5D.level%20%3D%3D%201%0A%20%20%20%20assert%20combined.title%20%3D%3D%20%22Part%20One%22%0A%20%20%20%20%23%20Metadata%3A%20first%20wins%20by%20default%2C%20second%20on%20request%2C%20%22strict%22%20refuses%20the%20conflict.%0A%20%20%20%20assert%20combined.metadata%20%3D%3D%20%7B%22filename%22%3A%20%22one.html%22%2C%20%22language%22%3A%20%22en%22%7D%0A%20%20%20%20assert%20combined_second_wins.metadata%20%3D%3D%20%7B%22filename%22%3A%20%22two.html%22%2C%20%22language%22%3A%20%22en%22%7D%0A%20%20%20%20assert%20strict_error%20is%20not%20None%20and%20%22filename%22%20in%20strict_error%0A%20%20%20%20%23%20A%20new%20document%3A%20new%20id%2C%20no%20inherited%20sync%20identity%2C%20inputs%20untouched.%0A%20%20%20%20assert%20combined.id%20not%20in%20%7Bpart_one.id%2C%20part_two.id%7D%0A%20%20%20%20assert%20combined.source_id%20is%20None%0A%20%20%20%20assert%20len(part_one.elements)%20%3D%3D%201%20and%20len(part_two.elements)%20%3D%3D%201%0A%20%20%20%20%23%20join_documents%20folds%20a%20list%20left-to-right.%0A%20%20%20%20assert%20%5Be.text%20for%20e%20in%20joined.elements%5D%20%3D%3D%20%5B%22First%20part.%22%2C%20%22Part%20Two%22%2C%20%22Second%20part.%22%2C%20%22Appendix%22%5D%0A%20%20%20%20return%0A%0A%0A%40app.cell(hide_code%3DTrue)%0Adef%20_(mo)%3A%0A%20%20%20%20mo.md(r%22%22%22%0A%20%20%20%20%23%23%20See%20Also%0A%0A%20%20%20%20-%20%5BAPI%20Reference%3A%20Document%5D%5Bragdoc.document%5D%0A%20%20%20%20-%20%5BParsing%20notebook%5D(parsing.py)%20%E2%80%94%20how%20parsers%20produce%20Documents%0A%20%20%20%20-%20%5BProcessing%20API%5D%5Bragdoc.processing%5D%20%E2%80%94%20processors%20that%20enrich%20documents%0A%20%20%20%20%22%22%22)%0A%20%20%20%20return%0A%0A%0Aif%20__name__%20%3D%3D%20%22__main__%22%3A%0A%20%20%20%20app.run()%0A</marimo-code></head>
+  <body>
+    <div id="root"></div>
+    <script data-marimo="true">
+      Object.defineProperty(window, "__MARIMO_MOUNT_CONFIG__", {
+        value: Object.freeze({
+            "filename": "notebook.py",
+            "cwd": "",
+            "lspWorkspace": null,
+            "mode": "read",
+            "version": "0.25.1",
+            "serverToken": "unused",
+            "config": {"ai": {"allow_provider_config": true, "custom_providers": {}, "enabled": true, "models": {"custom_models": [], "displayed_models": []}}, "completion": {"activate_on_typing": true, "auto_close_pairs": true, "copilot": false, "signature_hint_on_typing": false}, "diagnostics": {"sql_linter": true}, "display": {"cell_output": "below", "code_editor_font_size": 14, "code_lens": true, "dataframes": "rich", "default_table_max_columns": 50, "default_table_page_size": 10, "default_width": "medium", "reference_highlighting": true, "theme": "light"}, "formatting": {"line_length": 79}, "keymap": {"overrides": {}, "preset": "default"}, "language_servers": {"pylsp": {"enable_flake8": false, "enable_mypy": true, "enable_pydocstyle": false, "enable_pyflakes": false, "enable_pylint": false, "enable_ruff": true, "enabled": false}}, "mcp": {"mcpServers": {}, "presets": []}, "package_management": {"manager": "uv"}, "runtime": {"auto_instantiate": false, "auto_reload": "off", "default_csv_encoding": "utf-8", "default_sql_output": "auto", "on_cell_change": "autorun", "output_max_bytes": 8000000, "reactive_tests": true, "show_tracebacks": false, "std_stream_max_bytes": 1000000, "watcher_on_save": "lazy"}, "save": {"autosave": "off", "autosave_delay": 1000, "format_on_save": false}, "server": {"browser": "default", "follow_symlink": false}, "snippets": {"custom_paths": [], "include_default_snippets": true}},
+            "configOverrides": {},
+            "appConfig": {"sql_output": "auto", "width": "compact"},
+            "layout": null,
+            "view": {"showAppCode": false},
+            "notebook": null,
+            "session": null,
+            "runtimeConfig": null
+        }),
+        writable: false,
+        configurable: false,
+      });
+    </script>
+  </body>
+</html>

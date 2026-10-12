@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -577,6 +577,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -695,6 +701,34 @@
     
   
     Parsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processing
   
 
     
@@ -855,6 +889,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../guide/sync-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction & Knowledge Graphs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guide/custom-metadata/" class="md-nav__link">
         
   
@@ -891,6 +981,10 @@
   
     
     
+      
+        
+      
+        
       
         
       
@@ -1004,6 +1098,34 @@
     
   
     Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
   
 
     
@@ -1172,6 +1294,34 @@
     
   
     Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction
   
 
     
@@ -1556,10 +1706,12 @@
 
 
 <h1 id="tutorials">Tutorials<a class="headerlink" href="#tutorials" title="Permanent link">&para;</a></h1>
-<p>Interactive notebooks for the ragdoc library. Each notebook runs fully in the browser
-via WebAssembly — no installation required.</p>
-<p>To run locally instead:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>marimo<span class="w"> </span>edit<span class="w"> </span>docs/notebooks/&lt;notebook&gt;.py
+<p>Interactive <a href="https://marimo.io">marimo</a> notebooks for the ragdoc library. The published
+pages are WebAssembly exports of the notebooks in <code>docs/notebooks/</code>. Each notebook is also
+a plain Python file and is executed by the test suite, so the code shown is known to run
+against the current library.</p>
+<p>To run and edit a notebook locally (after <code>uv sync --all-extras --group docs</code>):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>marimo<span class="w"> </span>edit<span class="w"> </span>docs/notebooks/&lt;notebook&gt;.py
 </code></pre></div>
 <hr />
 <h2 id="getting-started">Getting started<a class="headerlink" href="#getting-started" title="Permanent link">&para;</a></h2>
@@ -1577,7 +1729,7 @@ via WebAssembly — no installation required.</p>
 </tr>
 <tr>
 <td><a href="../notebooks/pipeline_walkthrough/">Pipeline Walkthrough</a></td>
-<td>Full walkthrough using a real MinerU-parsed document</td>
+<td>Stage-by-stage walkthrough using a real MinerU-parsed paper (LLM stages need an API key)</td>
 </tr>
 </tbody>
 </table>
@@ -1592,11 +1744,11 @@ via WebAssembly — no installation required.</p>
 <tbody>
 <tr>
 <td><a href="../notebooks/document_model/">Document Model</a></td>
-<td><code>Document</code>, element types, inline refs, cross-document links</td>
+<td><code>Document</code>, element types, inline refs, cross-document links, <code>concat_documents</code></td>
 </tr>
 <tr>
 <td><a href="../notebooks/parsing/">Parsing</a></td>
-<td>All parser types: Pandoc, HTML, Excel, Azure DI</td>
+<td><code>load()</code>, the parser registry, and the built-in parsers</td>
 </tr>
 <tr>
 <td><a href="../notebooks/rendering/">Rendering</a></td>
@@ -1608,11 +1760,11 @@ via WebAssembly — no installation required.</p>
 </tr>
 <tr>
 <td><a href="../notebooks/chunking/">Chunking</a></td>
-<td>Creating <code>Chunk</code> objects with <code>SimpleChunker</code> and <code>LLMChunker</code></td>
+<td>Building <code>Chunk</code> objects by hand; how <code>SimpleChunker</code> / <code>LLMChunker</code> fill the two content fields</td>
 </tr>
 <tr>
 <td><a href="../notebooks/pipeline/">Pipeline</a></td>
-<td><code>DocumentPipeline</code>, <code>VectorStorePipeline</code>, streaming</td>
+<td><code>DocumentPipeline</code>, streaming, and incremental sync: <code>plan()</code> / <code>apply()</code> / <code>run()</code>, <code>ChangeSet</code>, <code>DocumentStorePipeline</code></td>
 </tr>
 <tr>
 <td><a href="../notebooks/merging/">Merging</a></td>
@@ -1630,8 +1782,12 @@ via WebAssembly — no installation required.</p>
 </thead>
 <tbody>
 <tr>
-<td><a href="../notebooks/qdrant_sync/">Qdrant Sync Pipeline</a></td>
-<td>Production incremental sync: MinerU + LLMChunker + QdrantVectorStore</td>
+<td><a href="../notebooks/qdrant_pipeline/">Qdrant Sync Pipeline</a></td>
+<td>Incremental sync into Qdrant with <code>QdrantVectorStore</code> / <code>QdrantDocumentStore</code> (runs offline against in-process Qdrant)</td>
+</tr>
+<tr>
+<td><a href="../notebooks/extraction/">Extraction &amp; Knowledge Graphs</a></td>
+<td>Mention → entity workflow end-to-end with a stub extractor (no API key)</td>
 </tr>
 <tr>
 <td><a href="../notebooks/custom_elements/">Custom Elements</a></td>
@@ -1719,7 +1875,7 @@ via WebAssembly — no installation required.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.tabs.link", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

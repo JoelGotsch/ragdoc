@@ -13,24 +13,27 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Production Qdrant Pipeline
+    # Qdrant Pipeline
 
-    End-to-end guide for running an **incremental update** pipeline with:
+    End-to-end guide for keeping a **Qdrant** collection in sync with a folder of documents:
 
     | Component | Role |
     |---|---|
-    | `MinerUParser` | Parse PDF via MinerU `_middle.json` → `Document` |
-    | `LLMHeadingResolver` | Assign semantic heading levels via LLM |
-    | `TitleDetectionProcessor` | Strip cover-page preamble |
-    | `FootnoteProcessor` | Link inline citation numbers to their definitions |
-    | `DocumentDumpProcessor` | Cache enriched documents to disk (pass-through) |
-    | `TokenSplitter` | Split into retrieval-sized sub-documents |
-    | `LLMChunker` | Generate per-topic `embedding_content` summaries via LLM |
-    | `QdrantVectorStore` | Qdrant-backed vector store |
-    | `VectorStorePipeline` | Hash-based incremental update — only changed files are re-processed |
+    | `DocumentPipeline` | parse → process → split → chunk one file |
+    | `QdrantVectorStore` | Qdrant-backed `VectorStore` |
+    | `EmbedderConfig` | which embedder embeds which text of a chunk |
+    | `VectorStorePipeline` | hash-based incremental sync — only changed files are re-processed |
+    | `QdrantDocumentStore` | optional: keep parsed `Document`s in Qdrant too and chunk from there |
+
+    **This notebook runs offline.** It uses Qdrant's in-process mode
+    (`AsyncQdrantClient(":memory:")`), a small HTML corpus in a temp directory, the default
+    `SimpleChunker` and a deterministic fake embedder — so every sync call below really
+    executes, and the `test_*` cells assert the results. Each step also shows what you would
+    swap in for production (a Qdrant server, a real embedder, LLM-based processors and
+    chunker).
 
     > **Related notebooks:**
-    > - [Pipeline](pipeline.py) — `DocumentPipeline` and `VectorStorePipeline` API reference
+    > - [Pipeline](pipeline.py) — `DocumentPipeline`, `VectorStorePipeline`, `plan()` / `apply()` in detail
     > - [Pipeline Walkthrough](pipeline_walkthrough.py) — step-by-step walkthrough of each stage with a real document
     """)
     return
@@ -41,22 +44,25 @@ def _(mo):
     mo.md(r"""
     ## Prerequisites
 
-    Install the `qdrant` extra and ensure a Qdrant instance is reachable:
+    Install the `qdrant` extra:
 
     ```bash
     uv add "ragdoc[qdrant]"
     ```
 
-    Required environment variables (loaded from `.env`):
+    For a production setup you also need a reachable Qdrant instance, and — if you use the
+    LLM-based components shown in Step 1 — an OpenAI-compatible endpoint (`ragdoc[llm]`).
+    Configuration is read from the environment or a `.env` file:
 
     ```dotenv
-    # OpenAI-compatible LLM endpoint — used by LLMHeadingResolver and LLMChunker
-    LLM_HEADING_RESOLVER_BASE_URL=https://your-llm-endpoint/v1
-    LLM_HEADING_RESOLVER_API_KEY=<your-api-key>
-    LLM_HEADING_RESOLVER_MODEL_NAME=your-model-name
-
     # Qdrant
     QDRANT_URL=http://localhost:6333
+
+    # OpenAI-compatible LLM endpoint — used by LLMHeadingResolver and LLMChunker
+    LLM_HEADING_RESOLVER_API_KEY=<your-api-key>
+    LLM_HEADING_RESOLVER_MODEL_NAME=gpt-4o-mini
+    # Optional: only for an endpoint other than api.openai.com
+    # LLM_HEADING_RESOLVER_BASE_URL=https://your-llm-endpoint/v1
     ```
     """)
     return
@@ -65,45 +71,41 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Setup
+    ## Sample corpus
     """)
     return
 
 
 @app.cell
 def _():
+    import tempfile
     from pathlib import Path
-    from dotenv import load_dotenv
-    from httpx import AsyncClient
-    from openai import AsyncOpenAI
-    from ragdoc.processing import LLMHeadingResolver, LLMHeadingResolverSettings
 
-    load_dotenv()
+    DOCUMENTS_DIR = Path(tempfile.mkdtemp(prefix="ragdoc-qdrant-"))
 
-    settings = LLMHeadingResolverSettings()
-    http_client = AsyncClient(verify=False)
-    openai_client = AsyncOpenAI(
-        max_retries=3,
-        api_key=settings.api_key.get_secret_value(),
-        base_url=settings.base_url,
-        http_client=http_client,
+    (DOCUMENTS_DIR / "onboarding.html").write_text(
+        "<html><body><h1>Onboarding</h1>"
+        "<h2>First day</h2><p>Collect your laptop and badge from the front desk, then meet your buddy.</p>"
+        "<h2>First week</h2><p>Set up your development environment and ship a small change.</p>"
+        "</body></html>",
+        encoding="utf-8",
     )
-    llm_model = settings.model_name
-
-    print(f"LLM endpoint: {settings.base_url}")
-    print(f"LLM model:    {llm_model}")
-    return (
-        AsyncClient,
-        AsyncOpenAI,
-        LLMHeadingResolver,
-        LLMHeadingResolverSettings,
-        Path,
-        http_client,
-        load_dotenv,
-        llm_model,
-        openai_client,
-        settings,
+    (DOCUMENTS_DIR / "security.html").write_text(
+        "<html><body><h1>Security Policy</h1>"
+        "<p>Use a password manager and enable two-factor authentication on every account.</p>"
+        "</body></html>",
+        encoding="utf-8",
     )
+    (DOCUMENTS_DIR / "travel.html").write_text(
+        "<html><body><h1>Travel Policy</h1>"
+        "<p>Book trains for journeys under four hours. Flights need approval from your lead.</p>"
+        "</body></html>",
+        encoding="utf-8",
+    )
+
+    paths = sorted(DOCUMENTS_DIR.glob("*.html"))
+    print(f"{len(paths)} files in {DOCUMENTS_DIR}")
+    return DOCUMENTS_DIR, Path, paths
 
 
 @app.cell(hide_code=True)
@@ -113,76 +115,102 @@ def _(mo):
 
     ## Step 1 — DocumentPipeline
 
-    `DocumentPipeline` wires together parse → process → split → chunk into a single `await pipeline.run(path)` call.
+    `DocumentPipeline` wires parse → process → split → chunk into a single
+    `await pipeline.run(path)` call. The offline pipeline below uses the registry parser
+    (`load`), no processors, a `TokenSplitter` and the default `SimpleChunker`
+    (`embedding_content = prompt_content`, no LLM calls).
 
-    ### Processor chain
-
-    | Processor | Type | Purpose |
-    |---|---|---|
-    | `LLMHeadingResolver` | Async (LLM) | Assigns `h1`/`h2`/`h3` levels; sets `document.title` |
-    | `TitleDetectionProcessor` | Sync | Strips preamble elements before the detected title |
-    | `FootnoteProcessor` | Async | Inserts `<ref>` tags linking citation numbers to definitions |
-    | `DocumentDumpProcessor` | Async | Writes each enriched document to disk as `.ragdoc.json` — useful for debugging and re-ingestion without re-parsing |
-
-    ### Chunker: `LLMChunker`
-
-    `LLMChunker` sends each split document to an LLM which produces 2–5 topic summaries.
-    Each summary becomes a separate chunk with the **same `prompt_content`** but a **distinct `embedding_content`**,
-    allowing a single section to be retrieved via multiple semantic angles.
-
-    Use `SimpleChunker` instead when LLM cost or latency is a concern —
-    it sets `embedding_content = prompt_content` with no LLM calls.
+    `source_id_fn` lives on the `DocumentPipeline`; the sync pipeline reads it from there.
+    Here the id is the path relative to the corpus directory.
     """)
     return
 
 
 @app.cell
-def _(LLMHeadingResolver, Path, llm_model, openai_client):
-    from ragdoc.parsing.mineru import MinerUParser
-    from ragdoc.processing import (
-        TitleDetectionProcessor,
-        FootnoteProcessor,
-        DocumentDumpProcessor,
-    )
-    from ragdoc.chunking import LLMChunker
+def _(DOCUMENTS_DIR):
     from ragdoc.pipeline import DocumentPipeline, TokenSplitter
 
-    DOCUMENTS_DIR = Path("data/raw")
-    DUMP_DIR = Path("data/documents_dump")
-
     doc_pipeline = DocumentPipeline(
+        splitter=TokenSplitter(max_tokens=7000, overlap_tokens=200),
+        source_id_fn=lambda p: str(p.relative_to(DOCUMENTS_DIR)),
+        on_error="skip",
+    )
+    print("DocumentPipeline ready: load → TokenSplitter(7000/200) → SimpleChunker")
+    return DocumentPipeline, TokenSplitter, doc_pipeline
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Production variant: MinerU + LLM processors + `LLMChunker`
+
+    For PDFs parsed with MinerU, a typical production pipeline adds LLM-based enrichment:
+
+    | Stage | Component | Purpose |
+    |---|---|---|
+    | Parser | `MinerUParser` | MinerU `_middle.json` → `Document` |
+    | Processor | `LLMHeadingResolver` | Assigns `h1`/`h2`/`h3` levels; sets `document.title` |
+    | Processor | `TitleDetectionProcessor` | Strips preamble elements before the detected title |
+    | Processor | `FootnoteProcessor` | Inserts `<ref>` tags linking citation numbers to definitions |
+    | Processor | `DocumentDumpProcessor` | Writes each enriched document to disk as `.ragdoc.json` |
+    | Chunker | `LLMChunker` | Several topic summaries per split: same `prompt_content`, distinct `embedding_content` |
+
+    The cell below builds that pipeline **only if** `LLM_HEADING_RESOLVER_API_KEY` is set
+    (constructing it makes no LLM call). Without a key it is skipped and the rest of the
+    notebook is unaffected.
+    """)
+    return
+
+
+@app.cell
+def _(DOCUMENTS_DIR, DocumentPipeline, TokenSplitter, mo):
+    import os
+
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    mo.stop(
+        not os.environ.get("LLM_HEADING_RESOLVER_API_KEY"),
+        mo.md("*Skipped: set `LLM_HEADING_RESOLVER_API_KEY` to build the LLM-based pipeline.*"),
+    )
+
+    from openai import AsyncOpenAI
+
+    from ragdoc.chunking import LLMChunker
+    from ragdoc.parsing.mineru import MinerUParser
+    from ragdoc.processing import (
+        DocumentDumpProcessor,
+        FootnoteProcessor,
+        LLMHeadingResolver,
+        LLMHeadingResolverSettings,
+        TitleDetectionProcessor,
+    )
+
+    _settings = LLMHeadingResolverSettings()
+    openai_client = AsyncOpenAI(
+        api_key=_settings.api_key.get_secret_value(),
+        base_url=_settings.base_url,  # None → api.openai.com
+        max_retries=3,
+    )
+
+    llm_doc_pipeline = DocumentPipeline(
         parser=MinerUParser(),
         processors=[
             LLMHeadingResolver(
                 client=openai_client,
-                model_name=llm_model,
+                model_name=_settings.model_name,
                 remove_elements_before_title=True,
             ),
             TitleDetectionProcessor(remove_elements_before_title=True),
             FootnoteProcessor(),
-            DocumentDumpProcessor(output_dir=DUMP_DIR),
+            DocumentDumpProcessor(output_dir=DOCUMENTS_DIR / "documents_dump"),
         ],
         splitter=TokenSplitter(max_tokens=7000, overlap_tokens=200),
-        chunker=LLMChunker(client=openai_client, model=llm_model),
+        chunker=LLMChunker(client=openai_client, model=_settings.model_name),
         on_error="skip",
     )
-    print("DocumentPipeline ready")
-    print(f"  Parser:    MinerUParser")
-    print(f"  Splitter:  TokenSplitter(max_tokens=7000, overlap_tokens=200)")
-    print(f"  Chunker:   LLMChunker (generates per-topic embedding_content)")
-    print(f"  Dump dir:  {DUMP_DIR}")
-    return (
-        DOCUMENTS_DIR,
-        DUMP_DIR,
-        DocumentDumpProcessor,
-        DocumentPipeline,
-        FootnoteProcessor,
-        LLMChunker,
-        MinerUParser,
-        TitleDetectionProcessor,
-        TokenSplitter,
-        doc_pipeline,
-    )
+    print(f"LLM pipeline ready (model: {_settings.model_name})")
+    return (llm_doc_pipeline,)
 
 
 @app.cell(hide_code=True)
@@ -192,21 +220,50 @@ def _(mo):
 
     ## Step 2 — QdrantVectorStore
 
-    `QdrantVectorStore.create()` creates the collection (if it does not exist) and adds a payload
-    index on `source_id`.  It is safe to call on every startup — the 409 response is silently ignored.
+    `QdrantVectorStore.create()` creates the collection and a payload index on `source_id`,
+    and returns the store. `vector_size` must match your embedder's output dimension.
 
-    The `vector_size` must match your embedder's output dimension.
-
-    ### Dense-only (single unnamed vector)
+    `create()` is idempotent, against a server and in-process alike: it checks whether the
+    collection exists and uses an existing one as is, so it can be called on every startup.
+    The in-process mode used in this notebook has no payload indexes (Qdrant emits a warning
+    saying so, silenced below).
 
     ```python
-    store = await QdrantVectorStore.create(qdrant_client, COLLECTION, vector_size=VECTOR_SIZE)
+    # Production: connect to a server instead of ":memory:"
+    qdrant_client = AsyncQdrantClient(os.environ["QDRANT_URL"])
     ```
+    """)
+    return
 
+
+@app.cell
+async def _():
+    import warnings
+
+    from qdrant_client import AsyncQdrantClient
+
+    from ragdoc.integrations.vector_stores import QdrantVectorStore
+
+    COLLECTION = "my_docs"
+    VECTOR_SIZE = 8  # must match the embedder (e.g. text-embedding-3-small → 1536)
+
+    qdrant_client = AsyncQdrantClient(":memory:")
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Payload indexes have no effect in the local Qdrant")
+        store = await QdrantVectorStore.create(qdrant_client, COLLECTION, vector_size=VECTOR_SIZE)
+
+    print(f"collection {COLLECTION!r} created, vector_size={VECTOR_SIZE}")
+    return COLLECTION, VECTOR_SIZE, qdrant_client, store, warnings
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ### Hybrid: dense + BM25 sparse (server-side inference)
 
-    Pass `sparse_vectors` to add a BM25 sparse vector field.  Qdrant computes the sparse
-    embedding **server-side** on every upsert — no extra embedding call needed from the client.
+    Pass `sparse_vectors` to add a BM25 sparse vector field. Qdrant computes the sparse
+    embedding **server-side** on every upsert — no extra embedding call from the client.
+    This needs a Qdrant server, so it is shown here but not executed:
 
     ```python
     from ragdoc.integrations.vector_stores import QdrantVectorStore, ServerSideVector
@@ -224,59 +281,13 @@ def _(mo):
 
     | Parameter | Effect |
     |---|---|
-    | `sparse_vectors=None` (default) | Single unnamed dense vector (backward-compatible) |
+    | `sparse_vectors=None` (default) | Single unnamed dense vector |
     | `sparse_vectors={...}` | Named-vector layout: `"dense"` for the dense field + one sparse field per entry |
     | `dense_vector_name` | Override the dense field name (default `"dense"`) |
 
-    `"Qdrant/bm25"` is a built-in model available on all Qdrant deployments (Cloud and self-hosted).
-    `text_fn=prompt_content_text` sends the full document text to BM25 — ideal for keyword recall.
+    `text_fn=prompt_content_text` sends the full chunk text to BM25 — a good fit for keyword recall.
     """)
     return
-
-
-@app.cell
-async def _():
-    import os
-    from qdrant_client import AsyncQdrantClient
-    from ragdoc.integrations.vector_stores import QdrantVectorStore, ServerSideVector
-    from ragdoc.pipeline import prompt_content_text
-
-    QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
-    COLLECTION = "my_docs"
-    VECTOR_SIZE = 1536  # match your embedder (e.g. text-embedding-3-small → 1536)
-
-    # qdrant_client = AsyncQdrantClient(QDRANT_URL)
-    #
-    # Dense-only:
-    # store = await QdrantVectorStore.create(qdrant_client, COLLECTION, vector_size=VECTOR_SIZE)
-    #
-    # Hybrid — dense + BM25 (server-side):
-    # store = await QdrantVectorStore.create(
-    #     qdrant_client,
-    #     COLLECTION,
-    #     vector_size=VECTOR_SIZE,
-    #     sparse_vectors={
-    #         "sparse": ServerSideVector(model="Qdrant/bm25", text_fn=prompt_content_text),
-    #     },
-    # )
-
-    print(f"QdrantVectorStore would connect to {QDRANT_URL}, collection={COLLECTION!r}")
-    print(f"  vector_size={VECTOR_SIZE} — must match the embedder output dimension")
-    print("  create() adds a source_id payload index → O(log n) filters in list_source_state / delete_by_source")
-    print()
-    print("  With sparse_vectors={'sparse': ServerSideVector('Qdrant/bm25')}:")
-    print("    → named-vector layout: 'dense' + 'sparse' fields")
-    print("    → Qdrant computes BM25 server-side from prompt_content on every upsert")
-    return (
-        AsyncQdrantClient,
-        COLLECTION,
-        QDRANT_URL,
-        VECTOR_SIZE,
-        QdrantVectorStore,
-        ServerSideVector,
-        os,
-        prompt_content_text,
-    )
 
 
 @app.cell(hide_code=True)
@@ -286,76 +297,54 @@ def _(mo):
 
     ## Step 3 — VectorStorePipeline with embedders
 
-    `VectorStorePipeline` wraps `DocumentPipeline` with **hash-based change detection**.
+    `VectorStorePipeline` wraps the `DocumentPipeline` with **hash-based change detection**
+    and embeds chunks before writing them.
 
-    ### Embedder configuration
-
-    Pass an `embedders` dict to compute **client-side** named vectors before upsert.
-    Each entry pairs an `Embedder` with the text it should embed:
+    Pass an `embedders` dict to compute **client-side** named vectors. Each entry pairs an
+    `Embedder` (anything with `async embed(texts) -> vectors`) with the text it should embed:
 
     | Key | Embedder | `text_fn` | Best for |
     |---|---|---|---|
-    | `"dense"` | dense model (e.g. `text-embedding-3-small`) | `embedding_content_text` (default) | Semantic similarity — uses the focused LLM topic summary |
-    | `"sparse"` | client-side sparse model (e.g. SPLADE) | `prompt_content_text` | Exact-match recall — uses the full rendered document text |
+    | `"dense"` | dense model (e.g. `text-embedding-3-small`) | `embedding_content_text` (default) | Semantic similarity |
+    | `"sparse"` | client-side sparse model (e.g. SPLADE) | `prompt_content_text` | Exact-match recall on the full text |
 
-    > **BM25 via server-side inference (recommended):** Instead of a client-side sparse embedder,
-    > configure `sparse_vectors` on `QdrantVectorStore` (Step 2).  Qdrant computes BM25 server-side
-    > on every upsert — no `Embedder` needed, no extra network call from the client.
+    The fake embedder below is deterministic and offline. In production use `OpenAIEmbedder`
+    (any OpenAI-compatible embeddings endpoint) or your own class:
 
-    `VectorStorePipeline` sets two first-class `Chunk` fields before upsert
-    — they are **not** injected into `chunk.metadata`:
+    ```python
+    from openai import AsyncOpenAI
+    from ragdoc.pipeline import EmbedderConfig, OpenAIEmbedder
 
-    | Field | Value |
-    |---|---|
-    | `chunk.source_id` | `source_id_fn(path)` — default: `path.name` |
-    | `chunk.source_hash` | SHA-256 hex digest of raw file bytes |
+    embedders = {"dense": EmbedderConfig(OpenAIEmbedder(AsyncOpenAI(), model="text-embedding-3-small"))}
+    ```
+
+    The pipeline stamps `chunk.source_hash` (SHA-256 of the raw file bytes) before writing;
+    `chunk.source_id` comes from the `DocumentPipeline`'s `source_id_fn`. Both are
+    first-class `Chunk` fields — nothing is injected into `chunk.metadata`.
     """)
     return
 
 
 @app.cell
-def _(doc_pipeline):
-    from ragdoc.pipeline import (
-        VectorStorePipeline,
-        EmbedderConfig,
-        embedding_content_text,
-        prompt_content_text,
-    )
+def _(VECTOR_SIZE, doc_pipeline, store):
+    import hashlib
 
-    # class MyDenseEmbedder:
-    #     async def embed(self, texts: list[str]) -> list[list[float]]:
-    #         # call your embedding API here
-    #         ...
-    #
-    # class MySparseEmbedder:
-    #     async def embed(self, texts: list[str]) -> list[list[float]]:
-    #         ...
-    #
-    # # source_id_fn lives on the DocumentPipeline (single source of truth):
-    # doc_pipeline = DocumentPipeline(
-    #     splitter=..., chunker=...,
-    #     source_id_fn=lambda p: str(p.relative_to(DOCUMENTS_DIR)),  # portable multi-dir
-    # )
-    # vs_pipeline = VectorStorePipeline(
-    #     pipeline=doc_pipeline,
-    #     vector_store=store,
-    #     embedders={
-    #         "dense":  EmbedderConfig(MyDenseEmbedder()),
-    #         "sparse": EmbedderConfig(MySparseEmbedder(), text_fn=prompt_content_text),
-    #     },
-    # )
+    from ragdoc.pipeline import EmbedderConfig, VectorStorePipeline, embedding_content_text
 
-    print("VectorStorePipeline (illustrative — requires live Qdrant + embedders):")
-    print("  embedders={")
-    print("    'dense':  EmbedderConfig(dense_embedder)                        # embeds embedding_content")
-    print("    'sparse': EmbedderConfig(sparse_embedder, text_fn=prompt_content_text)  # embeds prompt_content")
-    print("  }")
-    return (
-        EmbedderConfig,
-        VectorStorePipeline,
-        embedding_content_text,
-        prompt_content_text,
+    class FakeEmbedder:
+        """Deterministic stand-in for a real embedding model."""
+
+        async def embed(self, texts: list[str]) -> list[list[float]]:
+            return [[b / 255 for b in hashlib.sha256(t.encode("utf-8")).digest()[:VECTOR_SIZE]] for t in texts]
+
+    fake_embedder = FakeEmbedder()
+    vs_pipeline = VectorStorePipeline(
+        pipeline=doc_pipeline,
+        vector_store=store,
+        embedders={"dense": EmbedderConfig(fake_embedder, text_fn=embedding_content_text)},
     )
+    print("VectorStorePipeline ready")
+    return EmbedderConfig, VectorStorePipeline, fake_embedder, vs_pipeline
 
 
 @app.cell(hide_code=True)
@@ -365,14 +354,14 @@ def _(mo):
 
     ## Step 4 — Incremental update
 
-    Call `run()` with the current list of source paths on every ingestion run.
-    The pipeline handles all three cases automatically:
+    Call `run()` with the current list of source paths on every ingestion run:
 
     | Case | What happens |
     |---|---|
-    | **New file** | Parsed, chunked, embedded, upserted; `source_id` and `source_hash` set on each chunk |
-    | **Modified file** | Old chunks deleted by `source_id`, file re-processed, new chunks upserted |
-    | **Removed file** | All chunks for that `source_id` deleted from the store |
+    | **New file** | Parsed, chunked, embedded, upserted |
+    | **Unchanged file** | Skipped (its `source_hash` matches the store) |
+    | **Modified file** | Re-processed; the new chunks are written first, then the source's stale chunks are removed (`replace_source`) |
+    | **Removed file** | Left in the store by default; deleted only with `delete_orphans=True` |
 
     ### First run — all files processed
     """)
@@ -380,17 +369,13 @@ def _(mo):
 
 
 @app.cell
-def _(DOCUMENTS_DIR, Path):
-    paths: list[Path] = list(DOCUMENTS_DIR.glob("**/*_middle.json")) if DOCUMENTS_DIR.exists() else []
+async def _(paths, store, vs_pipeline):
+    first_run = await vs_pipeline.run(paths)
+    sources_after_first_run = await store.list_source_ids()
 
-    # result = await vs_pipeline.run(paths)
-    # print(f"processed: {len(result.processed)}, skipped: {len(result.skipped)}, deleted: {len(result.deleted)}")
-    # for path, exc in result.errors:
-    #     print(f"  FAILED {path}: {exc}")
-
-    print(f"Source paths: {len(paths)} files in {DOCUMENTS_DIR}")
-    print("First run → all files processed (vector store has no stored hashes yet)")
-    return (paths,)
+    print(f"processed={sorted(first_run.processed)}")
+    print(f"skipped={first_run.skipped} deleted={first_run.deleted} errors={first_run.errors}")
+    return first_run, sources_after_first_run
 
 
 @app.cell(hide_code=True)
@@ -398,38 +383,255 @@ def _(mo):
     mo.md(r"""
     ### Subsequent runs — unchanged files skipped
 
-    On re-runs, `VectorStorePipeline.plan()` reads all stored hashes in one call via
-    `list_source_state()`. If a file's bytes are unchanged (its `source_hash` matches), it is
-    skipped — it appears in `result.skipped` and in none of the ChangeSet lists:
+    On re-runs the pipeline reads all stored hashes in one call via `list_source_state()`.
+    A file whose bytes are unchanged is skipped — it appears in `result.skipped`.
+    `run_directory` is a shortcut that globs a directory and calls `run()`:
     """)
     return
 
 
 @app.cell
-def _():
-    # result2 = await vs_pipeline.run(paths)
-    # assert len(result2.skipped) == len(paths)
-    # assert len(result2.processed) == 0
-    print("Second run (no changes) → all files skipped, nothing re-processed")
-    print("  result.processed == [], result.skipped == paths")
+async def _(DOCUMENTS_DIR, first_run, vs_pipeline):
+    _ = first_run  # run after the first sync
+    second_run = await vs_pipeline.run_directory(DOCUMENTS_DIR, glob="*.html")
+    print(f"processed={second_run.processed} skipped={sorted(second_run.skipped)}")
+    return (second_run,)
+
+
+@app.cell
+def test_first_run_adds_second_run_skips(first_run, second_run, sources_after_first_run):
+    _all = ["onboarding.html", "security.html", "travel.html"]
+    assert sorted(first_run.processed) == _all
+    assert first_run.skipped == [] and first_run.errors == []
+    assert sources_after_first_run == set(_all)
+    assert second_run.processed == []
+    assert sorted(second_run.skipped) == _all
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Running against a directory
+    ### A modified file — review with `plan()`, write with `apply()`
 
-    `run_directory` discovers files automatically using a glob pattern:
+    `plan()` computes a `ChangeSet` without writing; `apply()` embeds and writes it. Use
+    the pair when you want to look at (or edit, or save to disk) what is about to change.
     """)
     return
 
 
 @app.cell
-def _(DOCUMENTS_DIR):
-    # result = await vs_pipeline.run_directory(DOCUMENTS_DIR, glob="**/*_middle.json")
-    print(f"run_directory({DOCUMENTS_DIR!r}, glob='**/*_middle.json')")
-    print("  → discovers files, then calls run() automatically")
+async def _(DOCUMENTS_DIR, paths, second_run, store, vs_pipeline):
+    _ = second_run  # run after the cells above
+    (DOCUMENTS_DIR / "security.html").write_text(
+        "<html><body><h1>Security Policy</h1>"
+        "<p>Hardware security keys are mandatory for all production access.</p>"
+        "</body></html>",
+        encoding="utf-8",
+    )
+
+    update_plan = await vs_pipeline.plan(paths)
+    print(f"to_add={[sc.source_id for sc in update_plan.to_add]}")
+    print(f"to_update={[sc.source_id for sc in update_plan.to_update]}")
+
+    update_result = await vs_pipeline.apply(update_plan)
+    state_after_update = await store.list_source_state()
+    print(f"apply(): processed={update_result.processed} errors={update_result.errors}")
+    return state_after_update, update_plan, update_result
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### A removed file — `delete_orphans`
+
+    Chunks of a file that is no longer in the list are **kept** unless you pass
+    `delete_orphans=True`. Only do that when the list is your complete corpus: with a partial
+    list, everything else in the collection would count as an orphan.
+    """)
+    return
+
+
+@app.cell
+async def _(DOCUMENTS_DIR, store, update_result, vs_pipeline):
+    _ = update_result  # run after the cells above
+    (DOCUMENTS_DIR / "travel.html").unlink()
+    _remaining = sorted(DOCUMENTS_DIR.glob("*.html"))
+
+    kept_run = await vs_pipeline.run(_remaining)
+    sources_after_kept = await store.list_source_ids()
+
+    orphan_run = await vs_pipeline.run(_remaining, delete_orphans=True)
+    sources_after_orphan = await store.list_source_ids()
+
+    print(f"default:             deleted={kept_run.deleted} store={sorted(sources_after_kept)}")
+    print(f"delete_orphans=True: deleted={orphan_run.deleted} store={sorted(sources_after_orphan)}")
+    return kept_run, orphan_run, sources_after_kept, sources_after_orphan
+
+
+@app.cell
+def test_update_and_orphans(
+    kept_run,
+    orphan_run,
+    sources_after_kept,
+    sources_after_orphan,
+    state_after_update,
+    update_plan,
+    update_result,
+):
+    # Only the edited file is planned and written.
+    assert update_plan.to_add == []
+    assert [sc.source_id for sc in update_plan.to_update] == ["security.html"]
+    assert update_result.processed == ["security.html"]
+    assert update_result.errors == []
+    # The store now records the new file hash for it.
+    assert state_after_update["security.html"].source_hash == update_plan.to_update[0].source_hash
+    # Removed file: kept by default, deleted on opt-in.
+    assert kept_run.deleted == []
+    assert sources_after_kept == {"onboarding.html", "security.html", "travel.html"}
+    assert orphan_run.deleted == ["travel.html"]
+    assert sources_after_orphan == {"onboarding.html", "security.html"}
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ---
+
+    ## What is stored
+
+    Each Qdrant point stores the `Chunk` as payload via `Chunk.model_dump(mode="json")`
+    (without `id` and `named_embeddings`). The provenance fields live at the top level —
+    they are **not** inside `metadata`:
+
+    | Payload key | Chunk field | Purpose |
+    |---|---|---|
+    | `source_id` | `chunk.source_id` | Groups chunks by source for cleanup |
+    | `source_hash` | `chunk.source_hash` | File-byte hash: detects whether the source file changed |
+    | `content_hash` | `chunk.content_hash` | Document content hash: change detection when chunking from a document store |
+    | `source_path` | `chunk.source_path` | Full path to the source file |
+    | `prompt_content` | `chunk.prompt_content` | Full-fidelity text for LLM context |
+    | `embedding_content` | `chunk.embedding_content` | Text the dense embedding was computed from |
+    | `metadata` | `chunk.metadata` | Document metadata (user-defined keys plus e.g. `filename`) |
+    | `created_at` | `chunk.created_at` | ISO 8601 creation timestamp |
+
+    The point ID is `chunk.id` (a UUID string, not stored in the payload). Vectors are stored
+    in Qdrant's vector fields, not the payload.
+    """)
+    return
+
+
+@app.cell
+async def _(COLLECTION, fake_embedder, orphan_run, qdrant_client):
+    _ = orphan_run  # run after the sync cells above
+    _points, _next = await qdrant_client.scroll(COLLECTION, limit=100, with_payload=True, with_vectors=True)
+    payload_keys = sorted(_points[0].payload)
+    print(f"{len(_points)} points; payload keys: {payload_keys}")
+
+    # A nearest-neighbour query with the embedding of one chunk's text returns that chunk.
+    _security = next(p for p in _points if p.payload["source_id"] == "security.html")
+    _query_vector = (await fake_embedder.embed([_security.payload["embedding_content"]]))[0]
+    _hits = await qdrant_client.query_points(COLLECTION, query=_query_vector, limit=1)
+    top_hit_payload = _hits.points[0].payload
+    print(f"top hit: {top_hit_payload['source_id']}")
+    return payload_keys, top_hit_payload
+
+
+@app.cell
+def test_payload_schema(payload_keys, top_hit_payload):
+    assert payload_keys == [
+        "content_hash",
+        "created_at",
+        "embedding_content",
+        "metadata",
+        "prompt_content",
+        "source_hash",
+        "source_id",
+        "source_path",
+    ]
+    assert top_hit_payload["source_id"] == "security.html"
+    assert "Hardware security keys" in top_hit_payload["prompt_content"]
+    assert top_hit_payload["metadata"]["filename"] == "security.html"
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ---
+
+    ## Optional — two boundaries with `QdrantDocumentStore`
+
+    Instead of going from files straight to chunks, you can store the parsed and processed
+    `Document`s first and chunk from there. Re-chunking (new splitter settings, a different
+    chunker) then needs no re-parsing and no repeated LLM processing:
+
+    1. `DocumentStorePipeline(ingest=IngestPipeline(...), document_store=...)` — files → documents
+    2. `VectorStorePipeline.from_document_store(chunk=ChunkPipeline(...), ...)` — documents → chunks
+
+    Boundary 2 detects changes by the document's `content_hash`, and takes `source_id`
+    strings (or nothing, meaning every stored document) instead of paths.
+    """)
+    return
+
+
+@app.cell
+async def _(
+    DOCUMENTS_DIR,
+    EmbedderConfig,
+    TokenSplitter,
+    VECTOR_SIZE,
+    VectorStorePipeline,
+    fake_embedder,
+    orphan_run,
+    qdrant_client,
+    warnings,
+):
+    from ragdoc.integrations.document_stores import QdrantDocumentStore
+    from ragdoc.integrations.vector_stores import QdrantVectorStore as _QdrantVectorStore
+    from ragdoc.pipeline import ChunkPipeline, DocumentStorePipeline, IngestPipeline
+
+    _ = orphan_run  # run after the direct-mode cells (they edit the corpus)
+    _files = sorted(DOCUMENTS_DIR.glob("*.html"))
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Payload indexes have no effect in the local Qdrant")
+        document_store = await QdrantDocumentStore.create(qdrant_client, "my_documents")
+        chunk_store = await _QdrantVectorStore.create(qdrant_client, "my_chunks", vector_size=VECTOR_SIZE)
+
+    # Boundary 1: files → documents
+    documents_pipeline = DocumentStorePipeline(ingest=IngestPipeline(), document_store=document_store)
+    b1_first = await documents_pipeline.run(_files)
+    b1_second = await documents_pipeline.run(_files)
+
+    # Boundary 2: documents → chunks
+    chunks_pipeline = VectorStorePipeline.from_document_store(
+        chunk=ChunkPipeline(splitter=TokenSplitter(max_tokens=7000, overlap_tokens=200)),
+        vector_store=chunk_store,
+        document_store=document_store,
+        embedders={"dense": EmbedderConfig(fake_embedder)},
+    )
+    b2_first = await chunks_pipeline.run()
+    b2_second = await chunks_pipeline.run()
+
+    stored_onboarding = await document_store.get_document("onboarding.html")
+    print(f"boundary 1: first={sorted(b1_first.processed)} then skipped={sorted(b1_second.skipped)}")
+    print(f"boundary 2: first={sorted(b2_first.processed)} then skipped={sorted(b2_second.skipped)}")
+    return b1_first, b1_second, b2_first, b2_second, stored_onboarding
+
+
+@app.cell
+def test_two_boundaries(b1_first, b1_second, b2_first, b2_second, stored_onboarding):
+    _remaining = ["onboarding.html", "security.html"]
+    assert sorted(b1_first.processed) == _remaining
+    assert b1_second.processed == [] and sorted(b1_second.skipped) == _remaining
+    assert sorted(b2_first.processed) == _remaining
+    assert b2_second.processed == [] and sorted(b2_second.skipped) == _remaining
+    # The document store returns a full Document, not chunks.
+    assert stored_onboarding is not None
+    assert stored_onboarding.source_id == "onboarding.html"
+    assert len(stored_onboarding.headings) == 3
     return
 
 
@@ -440,66 +642,25 @@ def _(mo):
 
     ## Source ID strategies
 
-    The default `source_id_fn` uses the bare filename (`path.name`).
-    Collisions arise when the same filename appears in multiple directories —
-    `run()` raises `ValueError` before any processing if two paths map to the same ID.
+    The default `source_id_fn` uses the bare filename (`path.name`). Collisions arise when
+    the same filename appears in multiple directories — the sync raises `ValueError` before
+    any processing if two paths map to the same id.
 
     | Strategy | Expression | Use case |
     |---|---|---|
     | Filename (default) | `lambda p: p.name` | Simple flat folders |
     | Full path | `lambda p: str(p)` | Multi-dir, single machine |
-    | Relative path | `lambda p: str(p.relative_to(base_dir))` | Portable multi-dir |
+    | Relative path | `lambda p: str(p.relative_to(base_dir))` | Portable multi-dir (used in this notebook) |
 
-    `source_id_fn` is set on the `DocumentPipeline` (the single source of truth); the
-    `VectorStorePipeline` reads it from there for collision/orphan checks.
-
-    ```python
-    doc_pipeline = DocumentPipeline(
-        splitter=..., chunker=...,
-        source_id_fn=lambda p: str(p.relative_to(DOCUMENTS_DIR)),
-    )
-    vs_pipeline = VectorStorePipeline(pipeline=doc_pipeline, vector_store=store)
-    ```
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ---
-
-    ## Payload schema
-
-    Each Qdrant point stores the full `Chunk` as payload via `Chunk.model_dump(mode="json")`.
-    The provenance fields live at the top level — they are **not** injected into `chunk.metadata`:
-
-    | Payload key | Chunk field | Purpose |
-    |---|---|---|
-    | `source_id` | `chunk.source_id` | Groups chunks by source for cleanup |
-    | `source_hash` | `chunk.source_hash` | Detects whether the source has changed |
-    | `source_path` | `chunk.source_path` | Full path to the source file |
-    | `prompt_content` | `chunk.prompt_content` | Full-fidelity text for LLM context |
-    | `embedding_content` | `chunk.embedding_content` | Topic summary used to generate the embedding |
-    | `metadata` | `chunk.metadata` | User-defined key/value data |
-    | `created_at` | `chunk.created_at` | ISO 8601 creation timestamp |
-
-    The point ID is `chunk.id` (not stored in the payload).
-    Named vectors are stored in Qdrant's vector fields, not the payload.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ---
+    `source_id_fn` is set on the `DocumentPipeline` (or on the `IngestPipeline` when you
+    build the halves yourself); the sync pipelines read it from there.
 
     ## See Also
 
-    - [Pipeline](pipeline.py) — `DocumentPipeline`, `VectorStorePipeline`, and `TokenSplitter` API
+    - [Pipeline](pipeline.py) — `DocumentPipeline`, `VectorStorePipeline`, `ChangeSet` and `TokenSplitter`
     - [Pipeline Walkthrough](pipeline_walkthrough.py) — stage-by-stage walkthrough with intermediate output
     - [Chunking](chunking.py) — `SimpleChunker` vs `LLMChunker` in depth
+    - [Sync Engine guide](../guide/sync-engine.md)
     - [API Reference: Pipeline](../api/pipeline.md)
     - [API Reference: Integrations](../api/integrations.md)
     """)

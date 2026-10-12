@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -581,6 +581,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -700,6 +706,34 @@
     
   
     Parsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processing
   
 
     
@@ -984,6 +1018,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../sync-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction & Knowledge Graphs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../custom-metadata/" class="md-nav__link">
         
   
@@ -1020,6 +1110,10 @@
   
     
     
+      
+        
+      
+        
       
         
       
@@ -1133,6 +1227,34 @@
     
   
     Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
   
 
     
@@ -1301,6 +1423,34 @@
     
   
     Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction
   
 
     
@@ -1653,10 +1803,10 @@
 <p>Run interactively: <code>marimo edit docs/notebooks/chunking.py</code></p>
 </blockquote>
 <p>Chunking is the final stage of the pipeline. It materializes a <a href="../document-model/"><code>Document</code></a>
-(or split section) into a <a href="../../api/chunking/#Chunk"><code>Chunk</code></a> — a
+(or split section) into a <a href="../../api/chunking/#chunk"><code>Chunk</code></a> — a
 flat, self-contained record ready to be loaded into a vector store.</p>
 <h2 id="what-is-a-chunk">What is a Chunk?<a class="headerlink" href="#what-is-a-chunk" title="Permanent link">&para;</a></h2>
-<p>A <a href="../../api/chunking/#Chunk"><code>Chunk</code></a> is a Pydantic model with:</p>
+<p>A <a href="../../api/chunking/#chunk"><code>Chunk</code></a> is a Pydantic model with:</p>
 <table>
 <thead>
 <tr>
@@ -1667,7 +1817,7 @@ flat, self-contained record ready to be loaded into a vector store.</p>
 <tbody>
 <tr>
 <td><code>id</code></td>
-<td>Unique identifier (UUID string)</td>
+<td>Unique identifier (UUID string; minted deterministically by <code>ChunkPipeline.run</code>)</td>
 </tr>
 <tr>
 <td><code>prompt_content</code></td>
@@ -1678,20 +1828,28 @@ flat, self-contained record ready to be loaded into a vector store.</p>
 <td>Compact semantic text for dense vector search</td>
 </tr>
 <tr>
-<td><code>metadata["filename"]</code></td>
-<td>Name of the source file (set by parsers in <code>document.metadata</code>)</td>
-</tr>
-<tr>
 <td><code>source_path</code></td>
 <td>Full path to the source file (propagated from <code>Document.source_path</code>)</td>
 </tr>
 <tr>
-<td><code>metadata</code></td>
-<td>Key-value metadata from the source document</td>
+<td><code>source_id</code></td>
+<td>Stable source identity used for incremental sync (from <code>IngestPipeline</code>'s <code>source_id_fn</code>)</td>
 </tr>
 <tr>
-<td><code>embedding</code></td>
-<td>Optional pre-computed embedding vector (list[float])</td>
+<td><code>source_hash</code></td>
+<td>SHA-256 of the raw source-file bytes (<code>None</code> outside the sync pipelines)</td>
+</tr>
+<tr>
+<td><code>content_hash</code></td>
+<td>Canonical-JSON hash of the parsed document content</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td>Key-value metadata from the source document (includes <code>metadata["filename"]</code>, stamped at load time)</td>
+</tr>
+<tr>
+<td><code>named_embeddings</code></td>
+<td>Embedding vectors keyed by embedder name (populated by <code>VectorStorePipeline</code>)</td>
 </tr>
 <tr>
 <td><code>created_at</code></td>
@@ -1701,8 +1859,8 @@ flat, self-contained record ready to be loaded into a vector store.</p>
 </table>
 <p>For <code>SimpleChunker</code>, <code>embedding_content</code> equals <code>prompt_content</code>. Only <code>LLMChunker</code> produces distinct <code>embedding_content</code> per topic.</p>
 <h2 id="creating-chunks">Creating chunks<a class="headerlink" href="#creating-chunks" title="Permanent link">&para;</a></h2>
-<p>Combine the <a href="../../api/rendering/#Renderer"><code>Renderer</code></a> with <code>Chunk</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Renderer</span><span class="p">,</span> <span class="n">render_for_prompt</span><span class="p">,</span> <span class="n">OutputFormat</span>
+<p>Combine the <a href="../../api/rendering/#renderer"><code>Renderer</code></a> with <code>Chunk</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.rendering</span><span class="w"> </span><span class="kn">import</span> <span class="n">OutputFormat</span><span class="p">,</span> <span class="n">Renderer</span><span class="p">,</span> <span class="n">render_for_prompt</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.chunking</span><span class="w"> </span><span class="kn">import</span> <span class="n">Chunk</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.splitting</span><span class="w"> </span><span class="kn">import</span> <span class="n">split_by_headings</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
@@ -1712,51 +1870,57 @@ flat, self-contained record ready to be loaded into a vector store.</p>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="nb">format</span><span class="o">=</span><span class="n">OutputFormat</span><span class="o">.</span><span class="n">MARKDOWN</span><span class="p">,</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">element_renderer</span><span class="o">=</span><span class="n">render_for_prompt</span><span class="p">,</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">include_title</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">metadata_keys</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">,</span> <span class="s2">&quot;date&quot;</span><span class="p">],</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">metadata_keys</span><span class="o">=</span><span class="p">[</span><span class="s2">"source"</span><span class="p">,</span> <span class="s2">"date"</span><span class="p">],</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
 <a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="c1"># SimpleChunker sets embedding_content = prompt_content</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="c1"># SimpleChunker does exactly this: embedding_content = prompt_content</span>
 <a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="n">chunks</span> <span class="o">=</span> <span class="p">[</span>
 <a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">Chunk</span><span class="p">(</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>        <span class="n">prompt_content</span><span class="o">=</span><span class="n">renderer</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">section</span><span class="p">),</span>
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        <span class="n">embedding_content</span><span class="o">=</span><span class="n">renderer</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">section</span><span class="p">),</span>
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        <span class="n">filename</span><span class="o">=</span><span class="n">section</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>        <span class="n">prompt_content</span><span class="o">=</span><span class="p">(</span><span class="n">rendered</span> <span class="o">:=</span> <span class="n">renderer</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">section</span><span class="p">)),</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        <span class="n">embedding_content</span><span class="o">=</span><span class="n">rendered</span><span class="p">,</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>        <span class="n">source_id</span><span class="o">=</span><span class="n">section</span><span class="o">.</span><span class="n">source_id</span> <span class="ow">or</span> <span class="n">section</span><span class="o">.</span><span class="n">source_path</span> <span class="ow">or</span> <span class="n">section</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>  <span class="c1"># required</span>
 <a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>        <span class="n">source_path</span><span class="o">=</span><span class="n">section</span><span class="o">.</span><span class="n">source_path</span><span class="p">,</span>
 <a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>        <span class="n">metadata</span><span class="o">=</span><span class="n">section</span><span class="o">.</span><span class="n">metadata</span><span class="p">,</span>
 <a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    <span class="p">)</span>
 <a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    <span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">sections</span>
 <a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="p">]</span>
 </code></pre></div>
+<p>In practice, prefer <code>SimpleChunker</code> (or a <code>ChunkPipeline</code>, which also mints deterministic
+chunk ids and stamps provenance) over constructing <code>Chunk</code> objects by hand:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.chunking</span><span class="w"> </span><span class="kn">import</span> <span class="n">SimpleChunker</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">chunker</span> <span class="o">=</span> <span class="n">SimpleChunker</span><span class="p">(</span><span class="n">prompt_renderer</span><span class="o">=</span><span class="n">renderer</span><span class="p">)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">chunks</span> <span class="o">=</span> <span class="p">[</span><span class="n">chunk</span> <span class="k">for</span> <span class="n">section</span> <span class="ow">in</span> <span class="n">sections</span> <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="k">await</span> <span class="n">chunker</span><span class="o">.</span><span class="n">chunk</span><span class="p">(</span><span class="n">section</span><span class="p">)]</span>
+</code></pre></div>
 <h2 id="provenance-fields">Provenance fields<a class="headerlink" href="#provenance-fields" title="Permanent link">&para;</a></h2>
-<p><code>filename</code> and <code>source_path</code> are explicit first-class fields on <code>Chunk</code> (not stored in
-<code>metadata</code>). They are propagated automatically through splitting, so every split section
-already carries them — chunkers just forward them:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Parsers set these; they propagate through splits automatically:</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;filename&quot;</span><span class="p">])</span>  <span class="c1"># &quot;annual_report_2024.docx&quot;</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">source_path</span><span class="p">)</span>          <span class="c1"># &quot;/data/annual_report_2024.docx&quot;</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># When constructing chunks manually, forward them explicitly:</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">chunk</span> <span class="o">=</span> <span class="n">Chunk</span><span class="p">(</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">prompt_content</span><span class="o">=...</span><span class="p">,</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">embedding_content</span><span class="o">=...</span><span class="p">,</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">source_path</span><span class="o">=</span><span class="n">section</span><span class="o">.</span><span class="n">source_path</span><span class="p">,</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">)</span>
+<p><code>source_path</code>, <code>source_id</code>, <code>source_hash</code>, and <code>content_hash</code> are explicit first-class
+fields on <code>Chunk</code>; the bare filename lives in <code>metadata["filename"]</code> (stamped onto the
+<code>Document</code> by <code>load()</code> and propagated automatically through splitting):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># load() stamps these; they propagate through splits automatically:</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">"filename"</span><span class="p">])</span>  <span class="c1"># "annual_report_2024.docx"</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">document</span><span class="o">.</span><span class="n">source_path</span><span class="p">)</span>          <span class="c1"># "/data/annual_report_2024.docx"</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># When constructing chunks manually, forward them explicitly:</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">chunk</span> <span class="o">=</span> <span class="n">Chunk</span><span class="p">(</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">prompt_content</span><span class="o">=...</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">embedding_content</span><span class="o">=...</span><span class="p">,</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="n">source_id</span><span class="o">=</span><span class="n">section</span><span class="o">.</span><span class="n">source_id</span> <span class="ow">or</span> <span class="n">section</span><span class="o">.</span><span class="n">source_path</span> <span class="ow">or</span> <span class="n">section</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>  <span class="c1"># required</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="n">source_path</span><span class="o">=</span><span class="n">section</span><span class="o">.</span><span class="n">source_path</span><span class="p">,</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="n">metadata</span><span class="o">=</span><span class="n">section</span><span class="o">.</span><span class="n">metadata</span><span class="p">,</span>  <span class="c1"># carries metadata["filename"]</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="p">)</span>
 </code></pre></div>
 <h2 id="metadata-inheritance">Metadata inheritance<a class="headerlink" href="#metadata-inheritance" title="Permanent link">&para;</a></h2>
 <p>When you split a document, child sections inherit parent metadata. Set metadata on the
-source document before parsing and it will flow through to all chunks:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">document</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;department&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Finance&quot;</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">document</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;year&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2024</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># All chunks will have department and year in their metadata</span>
+document before splitting and it will flow through to all chunks:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">document</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">"department"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"Finance"</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">document</span><span class="o">.</span><span class="n">metadata</span><span class="p">[</span><span class="s2">"year"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">2024</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># All chunks will have department and year in their metadata</span>
 </code></pre></div>
 <h2 id="loading-into-a-vector-store">Loading into a vector store<a class="headerlink" href="#loading-into-a-vector-store" title="Permanent link">&para;</a></h2>
-<p><code>Chunk</code> is designed to map directly to vector store document schemas.
-For LlamaIndex, use the integration helper:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.integrations.llama_index</span><span class="w"> </span><span class="kn">import</span> <span class="n">document_fragment_to_node_dict</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">node_dicts</span> <span class="o">=</span> <span class="p">[</span><span class="n">document_fragment_to_node_dict</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">chunks</span><span class="p">]</span>
-</code></pre></div>
+<p><code>Chunk</code> is designed to map directly to vector store document schemas. Use
+<a href="../../api/pipeline/#vectorstorepipeline"><code>VectorStorePipeline</code></a> to embed and
+upsert chunks with incremental change detection.</p>
 <h2 id="prompt-vs-embedding-content">Prompt vs embedding content<a class="headerlink" href="#prompt-vs-embedding-content" title="Permanent link">&para;</a></h2>
 <p>A <code>Chunk</code> carries two content fields:</p>
 <ul>
@@ -1766,11 +1930,14 @@ For LlamaIndex, use the integration helper:</p>
 <p>With <code>SimpleChunker</code>, <code>embedding_content</code> equals <code>prompt_content</code> — one renderer is used
 for both. Only <code>LLMChunker</code> produces distinct <code>embedding_content</code> by generating N topic
 summaries per document, each becoming a separate chunk with unique <code>embedding_content</code>
-but shared <code>prompt_content</code>.</p>
+but shared <code>prompt_content</code>. If the LLM returns no usable summary (an empty or all-blank
+list), <code>LLMChunker</code> logs a warning and emits one chunk with <code>embedding_content</code> equal to
+<code>prompt_content</code>, so the document never silently disappears from the index. A failed LLM call
+(after retries) or a refusal still raises.</p>
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../../api/chunking/">API Reference: Chunking</a></li>
-<li><a href="../../api/integrations/">API Reference: Integrations</a> — LlamaIndex helpers</li>
+<li><a href="../../api/integrations/">API Reference: Integrations</a> — vector store integrations</li>
 <li><a href="../rendering/">Rendering Guide</a> — understanding the rendering system</li>
 <li><a href="../splitting/">Splitting Guide</a> — preparing documents before chunking</li>
 </ul>
@@ -1850,7 +2017,7 @@ but shared <code>prompt_content</code>.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.tabs.link", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

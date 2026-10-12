@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -581,6 +581,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pdf-parsing-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PDF parsing options
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#install-for-development" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -665,6 +676,12 @@
   
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -802,6 +819,34 @@
     
   
     Parsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processing
   
 
     
@@ -962,6 +1007,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/sync-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction & Knowledge Graphs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/custom-metadata/" class="md-nav__link">
         
   
@@ -998,6 +1099,10 @@
   
     
     
+      
+        
+      
+        
       
         
       
@@ -1111,6 +1216,34 @@
     
   
     Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
   
 
     
@@ -1279,6 +1412,34 @@
     
   
     Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction
   
 
     
@@ -1552,6 +1713,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pdf-parsing-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PDF parsing options
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#install-for-development" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1607,29 +1779,85 @@
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">&para;</a></h1>
 <h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Python 3.10 or later</li>
+<li>Python 3.10 – 3.13</li>
 <li><a href="https://docs.astral.sh/uv/">uv</a> (recommended) or pip</li>
 </ul>
 <h2 id="install-with-uv">Install with uv<a class="headerlink" href="#install-with-uv" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Core library</span>
+<p>The base install is deliberately lean: it parses HTML and Word <code>.docx</code> (via pandoc),
+processes, splits, and chunks with no ML-sized dependencies. Everything else is
+an extra:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Core library (HTML + pandoc parsing, processing, splitting, chunking)</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>add<span class="w"> </span>ragdoc
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># With Azure Document Intelligence support</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;ragdoc[azure-di]&quot;</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># LLM features: LLMChunker, LLM processors, OpenAI embedders (openai + pillow)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">"ragdoc[llm]"</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># With MinerU PDF parsing support</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;ragdoc[pdf-mineru]&quot;</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Basic local PDF parsing — zero config (pymupdf)</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">"ragdoc[pdf]"</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># With Qdrant vector store support</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;ragdoc[qdrant]&quot;</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Excel parsing (pandas + openpyxl)</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">"ragdoc[xlsx]"</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># All extras</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">&quot;ragdoc[azure-di,pdf-mineru,qdrant]&quot;</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># HuggingFace tokenizers, e.g. RerankerTokenizer (transformers)</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">"ragdoc[tokenizers]"</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># Azure Document Intelligence PDF parsing (includes pymupdf for figure extraction)</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">"ragdoc[azure-di]"</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="c1"># MinerU middle-JSON PDF parsing</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">"ragdoc[pdf-mineru]"</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="c1"># Qdrant vector store support</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">"ragdoc[qdrant]"</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="c1"># Knowledge-graph / structured extraction (edtf + numpy)</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">"ragdoc[extraction]"</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="c1"># Several extras at once</span>
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>uv<span class="w"> </span>add<span class="w"> </span><span class="s2">"ragdoc[llm,pdf,qdrant]"</span>
 </code></pre></div>
+<p>If a feature needs an extra you don't have, ragdoc fails loudly with the exact
+install command — e.g. parsing a <code>.pdf</code> on a base install raises at parser
+<em>resolution</em> time with <code>install 'ragdoc[pdf]' for the basic local parser</code>.</p>
+<h2 id="pdf-parsing-options">PDF parsing options<a class="headerlink" href="#pdf-parsing-options" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Extra</th>
+<th>Parser</th>
+<th>Fidelity</th>
+<th>Setup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pdf</code></td>
+<td><code>pdf_basic</code> (pymupdf)</td>
+<td>Text + font-size headings</td>
+<td>zero config</td>
+</tr>
+<tr>
+<td><code>azure-di</code></td>
+<td><code>azure_di</code></td>
+<td>Full layout, tables, figures</td>
+<td>Azure credentials required</td>
+</tr>
+<tr>
+<td><code>pdf-mineru</code></td>
+<td><code>mineru</code></td>
+<td>Full layout via MinerU <code>_middle.json</code></td>
+<td>run MinerU separately</td>
+</tr>
+</tbody>
+</table>
+<p>For a <code>.pdf</code> path the registry picks the highest-priority <em>available</em> parser
+(azure_di 40 &gt; pdf_basic 10); unavailable ones (missing package or credentials)
+are skipped at resolve time. MinerU is not a <code>.pdf</code> parser: run MinerU yourself
+and <code>load()</code> the <code>*_middle.json</code> it writes.</p>
 <h2 id="install-for-development">Install for development<a class="headerlink" href="#install-for-development" title="Permanent link">&para;</a></h2>
 <p>Clone the repository and install all dependencies including docs tools:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>git<span class="w"> </span>clone<span class="w"> </span>&lt;repo-url&gt;
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>aa-document-processing
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">cd</span><span class="w"> </span>ragdoc
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Install all extras and dev/docs dependency groups</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>uv<span class="w"> </span>sync<span class="w"> </span>--all-extras<span class="w"> </span>--group<span class="w"> </span>docs
@@ -1637,14 +1865,15 @@
 <h2 id="optional-system-dependencies">Optional system dependencies<a class="headerlink" href="#optional-system-dependencies" title="Permanent link">&para;</a></h2>
 <p>Some parsers require system tools:</p>
 <ul>
-<li><strong>Word documents</strong> (<code>.docx</code>, <code>.doc</code>): requires <a href="https://pandoc.org/installing.html">Pandoc</a>
+<li><strong>Word documents</strong> (<code>.docx</code>): requires <a href="https://pandoc.org/installing.html">Pandoc</a>
   installed and on <code>PATH</code>.</li>
-<li><strong>PDF via MinerU</strong> (<code>pdf-mineru</code> extra): requires additional model downloads on first use.</li>
+<li><strong>MinerU output</strong> (<code>pdf-mineru</code> extra): ragdoc only reads MinerU's <code>*_middle.json</code>; install and
+  run MinerU separately (MinerU downloads its own models).</li>
 </ul>
 <h2 id="verify-installation">Verify installation<a class="headerlink" href="#verify-installation" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">ragdoc</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Document</span><span class="p">,</span> <span class="n">load_document</span><span class="p">,</span> <span class="n">from_path</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;ragdoc installed successfully&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Document</span><span class="p">,</span> <span class="n">DocumentPipeline</span><span class="p">,</span> <span class="n">load</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nb">print</span><span class="p">(</span><span class="s2">"ragdoc installed successfully"</span><span class="p">)</span>
 </code></pre></div>
 
 
@@ -1722,7 +1951,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.tabs.link", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

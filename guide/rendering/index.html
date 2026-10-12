@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -581,6 +581,12 @@
       
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -700,6 +706,34 @@
     
   
     Parsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Processing
   
 
     
@@ -995,6 +1029,62 @@
   
   
     <li class="md-nav__item">
+      <a href="../sync-engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sync Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction & Knowledge Graphs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../custom-metadata/" class="md-nav__link">
         
   
@@ -1031,6 +1121,10 @@
   
     
     
+      
+        
+      
+        
       
         
       
@@ -1144,6 +1238,34 @@
     
   
     Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/llm/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLM
   
 
     
@@ -1312,6 +1434,34 @@
     
   
     Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extraction
   
 
     
@@ -1695,11 +1845,11 @@ two element renderers and multiple output formats.</p>
 </tr>
 </tbody>
 </table>
-<p><code>render_for_prompt</code> is the primary renderer used throughout the pipeline. For <code>Image</code>
-elements, it uses <code>text_representation</code> as a text fallback when the image cannot be
-displayed directly.</p>
+<p><code>render_for_prompt</code> is the primary renderer used throughout the pipeline. It never emits
+image data: an <code>Image</code> renders as its <code>text_representation</code>, else its <code>alt</code> text, else
+<code>[Unprocessed Image]</code>.</p>
 <h2 id="using-the-renderer">Using the Renderer<a class="headerlink" href="#using-the-renderer" title="Permanent link">&para;</a></h2>
-<p><a href="../../api/rendering/#Renderer"><code>Renderer</code></a> combines an element renderer with a target
+<p><a href="../../api/rendering/#renderer"><code>Renderer</code></a> combines an element renderer with a target
 output format:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ragdoc.rendering</span><span class="w"> </span><span class="kn">import</span> <span class="n">Renderer</span><span class="p">,</span> <span class="n">render_for_prompt</span><span class="p">,</span> <span class="n">OutputFormat</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
@@ -1712,7 +1862,7 @@ output format:</p>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">prompt_text</span> <span class="o">=</span> <span class="n">prompt_renderer</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="output-formats">Output formats<a class="headerlink" href="#output-formats" title="Permanent link">&para;</a></h2>
-<p><a href="../../api/rendering/#OutputFormat"><code>OutputFormat</code></a> controls the final text format.
+<p><a href="../../api/rendering/#outputformat"><code>OutputFormat</code></a> controls the final text format.
 Element renderers always output HTML internally; the <code>Renderer</code> handles conversion:</p>
 <table>
 <thead>
@@ -1744,27 +1894,32 @@ Element renderers always output HTML internally; the <code>Renderer</code> handl
 </tr>
 </tbody>
 </table>
-<p>Format conversion is done via <a href="https://github.com/NicklasTegner/pypandoc">pypandoc</a>.</p>
+<p>MARKDOWN, GFM and RST are converted with <a href="https://github.com/NicklasTegner/pypandoc">pypandoc</a>;
+HTML is returned as is; PLAIN is the HTML's text content (BeautifulSoup <code>get_text()</code>).</p>
 <h2 id="metadata-in-output">Metadata in output<a class="headerlink" href="#metadata-in-output" title="Permanent link">&para;</a></h2>
 <p>Use <code>metadata_keys</code> to include selected metadata fields as a header in the rendered output:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">renderer</span> <span class="o">=</span> <span class="n">Renderer</span><span class="p">(</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="nb">format</span><span class="o">=</span><span class="n">OutputFormat</span><span class="o">.</span><span class="n">MARKDOWN</span><span class="p">,</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">element_renderer</span><span class="o">=</span><span class="n">render_for_prompt</span><span class="p">,</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">metadata_keys</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">,</span> <span class="s2">&quot;date&quot;</span><span class="p">,</span> <span class="s2">&quot;author&quot;</span><span class="p">],</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">metadata_keys</span><span class="o">=</span><span class="p">[</span><span class="s2">"source"</span><span class="p">,</span> <span class="s2">"date"</span><span class="p">,</span> <span class="s2">"author"</span><span class="p">],</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">include_title</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p">)</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="n">text</span> <span class="o">=</span> <span class="n">renderer</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># Output starts with: # Document Title\nsource: ...\ndate: ...\n\n...content...</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># Markdown output starts with a YAML front-matter block (keys sorted, title as a key):</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># ---\nauthor: ...\ndate: ...\nsource: ...\ntitle: Document Title\n---\n...content...</span>
 </code></pre></div>
 <h2 id="inline-reference-resolution">Inline reference resolution<a class="headerlink" href="#inline-reference-resolution" title="Permanent link">&para;</a></h2>
 <p>The <code>Renderer</code> resolves <code>&lt;ref id="..." rel="..."/&gt;</code> tags in element HTML. When a paragraph
 contains a reference to an image, the renderer replaces the <code>&lt;ref&gt;</code> tag with the rendered
 content of the image element.</p>
-<p>Elements that are only referenced inline (and never appear as standalone block elements)
-are skipped during the main rendering pass to avoid duplication.</p>
+<p>With <code>render_for_prompt</code>, an element that is referenced inline is rendered only at its
+<code>&lt;ref&gt;</code> location, not a second time as a standalone block. <code>render_raw</code> renders it in both
+places.</p>
 <h2 id="cross-document-references">Cross-document references<a class="headerlink" href="#cross-document-references" title="Permanent link">&para;</a></h2>
-<p>Pass an <a href="../../api/rendering/#ExternalRefProvider"><code>ExternalRefProvider</code></a> to access parent
-documents and siblings during rendering. A plain <code>dict[str, Document]</code> works:</p>
+<p>Pass an <a href="../../api/rendering/#externalrefprovider"><code>ExternalRefProvider</code></a> to make other
+documents available to <strong>custom</strong> element renderers (via the render context). The built-in
+renderers do not use it, so it does not change their output. A plain <code>dict[str, Document]</code>
+works:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">all_docs</span> <span class="o">=</span> <span class="p">{</span><span class="n">doc</span><span class="o">.</span><span class="n">id</span><span class="p">:</span> <span class="n">doc</span> <span class="k">for</span> <span class="n">doc</span> <span class="ow">in</span> <span class="n">all_documents</span><span class="p">}</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">renderer</span> <span class="o">=</span> <span class="n">Renderer</span><span class="p">(</span>
@@ -1781,8 +1936,8 @@ specific element types:</p>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nd">@render_for_prompt</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Image</span><span class="p">)</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">render_image_custom</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">inline</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">alt</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">alt</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&lt;figure&gt;&lt;img alt=&#39;</span><span class="si">{</span><span class="n">alt</span><span class="si">}</span><span class="s2">&#39;/&gt;&lt;/figure&gt;&quot;</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">alt</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">alt</span> <span class="ow">or</span> <span class="s2">""</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">"&lt;figure&gt;&lt;img alt='</span><span class="si">{</span><span class="n">alt</span><span class="si">}</span><span class="s2">'/&gt;&lt;/figure&gt;"</span>
 </code></pre></div>
 <h2 id="see-also">See Also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
@@ -1866,7 +2021,7 @@ specific element types:</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.indexes", "navigation.top", "toc.follow", "search.suggest", "search.highlight", "content.tabs.link", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
